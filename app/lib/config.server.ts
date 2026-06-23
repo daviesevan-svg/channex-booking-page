@@ -53,3 +53,8 @@ export function getChannexClient() {
 export function getConfigKV(): KVNamespace {
   return (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
 }
+
+/** The R2 bucket holding uploaded images (undefined if not bound). */
+export function getImagesBucket(): R2Bucket | undefined {
+  return (env as unknown as { IMAGES?: R2Bucket }).IMAGES;
+}

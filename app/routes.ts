@@ -3,6 +3,9 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/home.tsx"),
 
+  // Public image server (R2-backed)
+  route("images/*", "routes/image.tsx"),
+
   // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/verify", "routes/admin/verify.tsx"),

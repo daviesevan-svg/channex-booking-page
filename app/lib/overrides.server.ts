@@ -78,20 +78,15 @@ export async function getRoomOverride(
   return (await getRoomOverrides(propertyId))[roomId] ?? {};
 }
 
-export async function saveRoomOverride(
+export async function putRoomOverride(
   propertyId: string,
   roomId: string,
-  input: Record<string, FormDataEntryValue>,
+  ov: RoomOverride,
 ): Promise<RoomOverride> {
   const next: RoomOverride = {};
-  const name = String(input.name ?? "").trim();
-  const description = String(input.description ?? "").trim();
-  const images = String(input.images ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (name) next.name = name;
-  if (description) next.description = description;
+  if (ov.name?.trim()) next.name = ov.name.trim();
+  if (ov.description?.trim()) next.description = ov.description.trim();
+  const images = (ov.images ?? []).map((s) => s.trim()).filter(Boolean);
   if (images.length) next.images = images;
 
   const all = await getRoomOverrides(propertyId);
