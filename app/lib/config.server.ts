@@ -37,7 +37,8 @@ export function getConfig(): AppConfig {
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
-    sessionSecret: read("SESSION_SECRET", "dev-insecure-secret-change-me"),
+    // Never empty: an empty HMAC key throws in the Workers runtime.
+    sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
     appUrl: read("APP_URL", "http://localhost:5173"),
     resendApiKey: read("RESEND_API_KEY") || undefined,
   };
