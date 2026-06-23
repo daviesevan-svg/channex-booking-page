@@ -16,6 +16,7 @@ import {
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 import { occupancyLabel, readOccupancy, type Occupancy } from "~/lib/occupancy";
+import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 
 interface Stay {
@@ -63,7 +64,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
-  return { stay, lines, nights, totals: cartCoverage(lines) };
+  const text = await getPageText(params.channelId, "checkout");
+  return { stay, lines, nights, totals: cartCoverage(lines), text };
 }
 
 const GuestSchema = z.object({
@@ -165,7 +167,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals } = loaderData;
+  const { stay, lines, nights, totals, text } = loaderData;
   const { currency } = useProperty();
   const [searchParams] = useSearchParams();
   const nav = useNavigation();
@@ -182,12 +184,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       >
         ← Back to rooms
       </Link>
-      <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">Your details</h1>
+      <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">{text.heading}</h1>
 
       <Form method="post" className="flex flex-wrap items-start gap-9">
         <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">Guest information</h3>
+            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field name="firstName" label="First name" placeholder="Jamie" error={errors?.firstName} />
               <Field name="lastName" label="Last name" placeholder="Doyle" error={errors?.lastName} />
@@ -197,7 +199,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </section>
 
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">Arrival &amp; requests</h3>
+            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.arrivalSection}</h3>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field name="arrival" label="Estimated arrival" placeholder="15:00" />
             </div>
@@ -213,10 +215,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </section>
 
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-2 font-serif text-[20px] font-semibold">Payment</h3>
-            <p className="mb-[18px] text-sm leading-[1.55] text-muted">
-              Your flexible rate is paid at the hotel. We only need a card to guarantee the
-              booking — you won't be charged today.
+            <h3 className="mb-2 font-serif text-[20px] font-semibold">{text.paymentSection}</h3>
+            <p className="mb-[18px] whitespace-pre-line text-sm leading-[1.55] text-muted">
+              {text.paymentNote}
             </p>
             <div className="rounded-[10px] border border-dashed border-[#d8cdb9] bg-[#fbf7f0] p-[18px] text-[13px] text-muted-2">
               secure card field — provided by payment gateway
@@ -266,10 +267,10 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             disabled={submitting}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
           >
-            {submitting ? "Confirming…" : "Complete booking"}
+            {submitting ? "Confirming…" : text.completeButton}
           </button>
           <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
-            Free cancellation until 24h before arrival.
+            {text.cancellationNote}
           </div>
         </aside>
       </Form>

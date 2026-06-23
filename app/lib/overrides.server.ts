@@ -1,6 +1,13 @@
 import type { RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
-import { isThemeId, normalizeHex, type SearchContent, type SiteSettings } from "./content";
+import {
+  isThemeId,
+  normalizeHex,
+  pageDef,
+  withDefaults,
+  type SearchContent,
+  type SiteSettings,
+} from "./content";
 
 // Per-property content overrides edited in the admin. Anything unset falls back
 // to the Channex property_info. Extend this as the admin grows (colors, images…).
@@ -102,6 +109,7 @@ export async function putRoomOverride(
 // ---------- editable page content ----------
 interface SiteContent {
   search?: SearchContent;
+  pages?: Record<string, Record<string, string>>;
 }
 
 const contentKey = (propertyId: string) => `content:${propertyId}`;
@@ -130,6 +138,43 @@ export async function saveSearchContent(
   if (!kv) return;
   const content = await getSiteContent(propertyId);
   content.search = search;
+  await kv.put(contentKey(propertyId), JSON.stringify(content));
+}
+
+/** Page copy merged over defaults — every field always present. */
+export async function getPageText(
+  propertyId: string,
+  pageId: string,
+): Promise<Record<string, string>> {
+  const content = await getSiteContent(propertyId);
+  return withDefaults(pageId, content.pages?.[pageId] ?? {});
+}
+
+/** Raw stored overrides for a page (no defaults) — for prefilling the admin form. */
+export async function getPageOverrides(
+  propertyId: string,
+  pageId: string,
+): Promise<Record<string, string>> {
+  const content = await getSiteContent(propertyId);
+  return content.pages?.[pageId] ?? {};
+}
+
+export async function savePageContent(
+  propertyId: string,
+  pageId: string,
+  input: Record<string, FormDataEntryValue>,
+): Promise<void> {
+  const def = pageDef(pageId);
+  if (!def) return;
+  const data: Record<string, string> = {};
+  for (const f of def.fields) {
+    const v = String(input[f.key] ?? "").trim();
+    if (v) data[f.key] = v;
+  }
+  const kv = getConfigKV();
+  if (!kv) return;
+  const content = await getSiteContent(propertyId);
+  content.pages = { ...(content.pages ?? {}), [pageId]: data };
   await kv.put(contentKey(propertyId), JSON.stringify(content));
 }
 

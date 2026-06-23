@@ -14,6 +14,7 @@ export default [
     index("routes/admin/property.tsx"),
     route("general", "routes/admin/general.tsx"),
     route("home", "routes/admin/home.tsx"),
+    route("pages/:page", "routes/admin/page.tsx"),
     route("rooms", "routes/admin/rooms.tsx"),
     route("rooms/:roomId", "routes/admin/room.tsx"),
   ]),

@@ -6,6 +6,7 @@ import type { Route } from "./+types/detail";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy } from "~/lib/occupancy";
@@ -30,7 +31,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!room) throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-  return { room, nights, party: partySize({ adults, childrenAge }), query: { checkin, checkout, currency, adults } };
+  const text = await getPageText(params.channelId, "detail");
+  return { room, nights, party: partySize({ adults, childrenAge }), text, query: { checkin, checkout, currency, adults } };
 }
 
 function rateNote(plan: RoomWithRates["ratePlans"][number]): string {
@@ -41,7 +43,7 @@ function rateNote(plan: RoomWithRates["ratePlans"][number]): string {
 }
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
-  const { room, nights, party, query } = loaderData;
+  const { room, nights, party, text, query } = loaderData;
   const { currency } = useProperty();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -79,7 +81,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         to={`/${params.channelId}/rooms?${qs}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
       >
-        ← All rooms
+        ← {text.backLink}
       </Link>
 
       {/* gallery */}
@@ -114,7 +116,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           )}
           {amenities.length > 0 && (
             <>
-              <h3 className="mb-4 font-serif text-[20px] font-semibold">In this room</h3>
+              <h3 className="mb-4 font-serif text-[20px] font-semibold">{text.amenitiesTitle}</h3>
               <div className="grid max-w-[520px] grid-cols-1 gap-x-7 gap-y-3 sm:grid-cols-2">
                 {amenities.map((a) => (
                   <div key={a} className="flex items-center gap-3 text-[15px] text-[#4a4236]">
@@ -135,7 +137,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           className="sticky top-24 min-w-[320px] flex-1 rounded-[18px] border border-line bg-surface p-6"
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-1 font-serif text-[21px] font-semibold">Choose your rate</h3>
+          <h3 className="mb-1 font-serif text-[21px] font-semibold">{text.rateTitle}</h3>
           <div className="mb-[18px] text-[13.5px] text-muted-2">{summary}</div>
           <div className="mb-5 flex flex-col gap-2.5">
             {ratePlans.map((plan) => {
@@ -188,7 +190,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             disabled={adding}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
-            {adding ? "Adding…" : "Add to your stay"}
+            {adding ? "Adding…" : text.addButton}
           </button>
         </div>
       </div>

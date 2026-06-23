@@ -13,6 +13,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { email, propertyId: getConfig().defaultPropertyId };
 }
 
+const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `block rounded-[10px] px-3.5 py-2.5 text-[14px] font-semibold ${
+    isActive ? "bg-surface text-ink" : "text-muted hover:text-ink"
+  }`;
+
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const { email, propertyId } = loaderData;
   const context: AdminContext = { propertyId };
@@ -49,25 +54,26 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           {[
             { to: "/admin", label: "Property details", end: true },
             { to: "/admin/general", label: "General", end: false },
-            { to: "/admin/home", label: "Home page", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
           ].map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `block rounded-[10px] px-3.5 py-2.5 text-[14px] font-semibold ${
-                  isActive ? "bg-surface text-ink" : "text-muted hover:text-ink"
-                }`
-              }
-            >
+            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               {item.label}
             </NavLink>
           ))}
-          <p className="mt-3 px-3.5 text-[12px] leading-[1.5] text-faint">
-            More sections (theme, content) coming soon.
-          </p>
+          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
+            Pages
+          </div>
+          {[
+            { to: "/admin/home", label: "Home" },
+            { to: "/admin/pages/results", label: "Results" },
+            { to: "/admin/pages/detail", label: "Room detail" },
+            { to: "/admin/pages/checkout", label: "Checkout" },
+            { to: "/admin/pages/confirmation", label: "Confirmation" },
+          ].map((item) => (
+            <NavLink key={item.to} to={item.to} className={navLinkClass}>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <main className="min-w-0 flex-1">
           <Outlet context={context} />

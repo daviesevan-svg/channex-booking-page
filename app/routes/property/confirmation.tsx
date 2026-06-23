@@ -6,6 +6,7 @@ import { useProperty } from "~/lib/booking-context";
 import { cartCoverage, parseCart, resolveCart } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
 import { occupancyLabel, readOccupancy } from "~/lib/occupancy";
+import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -45,11 +46,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     totalStr,
     datesStr,
     guests: occupancyLabel(occ.adults, occ.childrenAge),
+    text: await getPageText(params.channelId, "confirmation"),
   };
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, totalStr, datesStr, guests } = loaderData;
+  const { reference, simulated, rooms, totalStr, datesStr, guests, text } = loaderData;
   const { hotelName } = useProperty();
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 9px,#e7ddcc 9px,#e7ddcc 18px)";
 
@@ -75,9 +77,9 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
           }}
         />
       </div>
-      <h1 className="mb-3 font-serif text-[44px] font-medium tracking-[-0.02em]">You're all set</h1>
+      <h1 className="mb-3 font-serif text-[44px] font-medium tracking-[-0.02em]">{text.heading}</h1>
       <p className="mb-2 text-[18px] leading-[1.6] text-secondary">
-        Your stay at {hotelName} is confirmed. A confirmation email is on its way.
+        {text.subtitle.replaceAll("{hotel}", hotelName)}
       </p>
       <div
         className="mb-9 inline-block rounded-full px-[18px] py-2 text-sm font-semibold tracking-[0.04em] text-accent"
@@ -123,7 +125,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         to={`/${params.channelId}`}
         className="mt-7 inline-block rounded-[12px] border border-line-alt bg-surface-alt px-7 py-3.5 text-[15px] font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
       >
-        Make another booking
+        {text.newBooking}
       </Link>
     </main>
   );

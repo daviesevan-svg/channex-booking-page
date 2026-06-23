@@ -17,6 +17,7 @@ import {
   type ResolvedLine,
 } from "~/lib/cart";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {
   childrenAgeParam,
@@ -58,6 +59,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
+  const text = await getPageText(params.channelId, "results");
 
   const cartLines = resolveCart(parseCart(url.searchParams), rooms);
   const coverage = cartCoverage(cartLines);
@@ -71,6 +73,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     cartLines,
     coverage,
     covered,
+    text,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
 }
@@ -226,6 +229,8 @@ function CartPanel({
   onRemove,
   onContinue,
   continuePending,
+  cartTitle,
+  continueLabel,
 }: {
   lines: ResolvedLine[];
   coverage: { capacity: number; total: number };
@@ -235,13 +240,15 @@ function CartPanel({
   onRemove: (index: number) => void;
   onContinue: () => void;
   continuePending: boolean;
+  cartTitle: string;
+  continueLabel: string;
 }) {
   return (
     <aside
       className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-[18px] border border-line bg-surface p-6"
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
-      <h3 className="mb-1 font-serif text-[21px] font-semibold">Your stay</h3>
+      <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>
       <div className="mb-4 text-[13.5px] text-muted-2">
         {lines.length === 0 ? "No rooms selected yet" : `${lines.length} room${lines.length === 1 ? "" : "s"} selected`}
       </div>
@@ -307,14 +314,14 @@ function CartPanel({
         disabled={!covered || continuePending}
         className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {continuePending ? "Loading…" : "Continue to details"}
+        {continuePending ? "Loading…" : continueLabel}
       </button>
     </aside>
   );
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, text, query } = loaderData;
   const { currency } = useProperty();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -363,7 +370,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">
-            Choose your rooms
+            {text.heading}
           </h1>
           <div className="text-[15px] text-secondary">{summary}</div>
         </div>
@@ -371,7 +378,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           to={`/${params.channelId}?${qs}`}
           className="rounded-[10px] border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
         >
-          Edit search
+          {text.editSearch}
         </Link>
       </div>
 
@@ -413,6 +420,8 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
               onRemove={onRemove}
               onContinue={onContinue}
               continuePending={continuePending}
+              cartTitle={text.cartTitle}
+              continueLabel={text.continueButton}
             />
           </div>
         </div>
