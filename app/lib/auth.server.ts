@@ -53,6 +53,8 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
 
 export function isAllowedEmail(email: string): boolean {
   const { adminEmails } = getConfig();
+  // No allowlist configured => open access (fine for testing; set ADMIN_EMAILS to lock down).
+  if (adminEmails.length === 0) return true;
   return adminEmails.includes(email.trim().toLowerCase());
 }
 

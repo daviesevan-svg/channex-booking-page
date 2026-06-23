@@ -12,7 +12,7 @@
 	"vars": {
 		"CHANNEX_API_URL": "https://app.channex.io",
 		"CHANNEL_CODE": "OpenShopping",
-		"DEFAULT_PROPERTY_ID": "",
+		"DEFAULT_PROPERTY_ID": "439ec597-8caf-47be-b07d-663a9602c79c",
 		"GROUP_ID": "",
 		"PCI_URL": "https://pci.vaultera.co",
 		"GOOGLE_MAP_KEY": "",

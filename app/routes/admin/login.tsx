@@ -7,7 +7,6 @@ import {
   isAllowedEmail,
   sendMagicLink,
 } from "~/lib/auth.server";
-import { getConfig } from "~/lib/config.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   if (await getAdminEmail(request)) throw redirect("/admin");
@@ -22,8 +21,9 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: "That email isn't on the admin allowlist." };
   }
   const token = await createMagicToken(email);
-  const { appUrl } = getConfig();
-  const link = `${appUrl}/admin/verify?token=${encodeURIComponent(token)}`;
+  // Build the link from this request's own origin so it works on any host.
+  const origin = new URL(request.url).origin;
+  const link = `${origin}/admin/verify?token=${encodeURIComponent(token)}`;
   const result = await sendMagicLink(email, link);
   return { ok: true, sent: result.sent, devLink: result.link };
 }
