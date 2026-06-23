@@ -5,6 +5,7 @@ import {
   isThemeId,
   normalizeHex,
   pageDef,
+  searchDefaults,
   withDefaults,
   type SearchContent,
   type SiteSettings,
@@ -165,13 +166,14 @@ export async function getSearchContent(pid: string, lang = DEFAULT_LANG): Promis
   const m = await contentMap(pid);
   const base = m[DEFAULT_LANG]?.search ?? {};
   const loc = m[lang]?.search ?? {};
+  const d = searchDefaults(lang);
   return {
     eyebrow: loc.eyebrow ?? base.eyebrow,
-    heading: loc.heading ?? base.heading,
-    intro: loc.intro ?? base.intro,
-    promoText: loc.promoText ?? base.promoText,
-    searchButton: loc.searchButton ?? base.searchButton,
-    highlights: loc.highlights ?? base.highlights,
+    heading: loc.heading ?? base.heading ?? d.heading,
+    intro: loc.intro ?? base.intro ?? d.intro,
+    promoText: loc.promoText ?? base.promoText ?? d.promoText,
+    searchButton: loc.searchButton ?? base.searchButton ?? d.searchButton,
+    highlights: loc.highlights ?? base.highlights ?? d.highlights,
   };
 }
 export async function getSearchContentRaw(pid: string, lang: string): Promise<SearchContent> {
@@ -195,7 +197,7 @@ export async function getPageText(
   const m = await contentMap(pid);
   const base = m[DEFAULT_LANG]?.pages?.[pageId] ?? {};
   const loc = m[lang]?.pages?.[pageId] ?? {};
-  return withDefaults(pageId, { ...base, ...loc });
+  return withDefaults(pageId, { ...base, ...loc }, lang);
 }
 export async function getPageOverridesRaw(
   pid: string,

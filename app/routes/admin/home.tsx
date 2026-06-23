@@ -27,10 +27,11 @@ export async function action({ request }: Route.ActionArgs) {
   const s = (v: FormDataEntryValue | null) => String(v ?? "").trim();
   const titles = form.getAll("highlightTitle").map(String);
   const descs = form.getAll("highlightDesc").map(String);
-  const highlights = [0, 1, 2].map((i) => ({
-    title: (titles[i] ?? "").trim() || DEFAULT_SEARCH.highlights[i].title,
-    description: (descs[i] ?? "").trim() || DEFAULT_SEARCH.highlights[i].description,
-  }));
+  // Keep only rows the editor actually filled in; empty => fall back to the
+  // language defaults rather than baking in English.
+  const highlights = [0, 1, 2]
+    .map((i) => ({ title: (titles[i] ?? "").trim(), description: (descs[i] ?? "").trim() }))
+    .filter((h) => h.title || h.description);
 
   const content: SearchContent = {
     eyebrow: s(form.get("eyebrow")) || undefined,
@@ -38,7 +39,7 @@ export async function action({ request }: Route.ActionArgs) {
     intro: s(form.get("intro")) || undefined,
     promoText: s(form.get("promoText")) || undefined,
     searchButton: s(form.get("searchButton")) || undefined,
-    highlights,
+    highlights: highlights.length ? highlights : undefined,
   };
   await saveSearchContent(propertyId, pickLang(s(form.get("lang"))), content);
   return { ok: true };
