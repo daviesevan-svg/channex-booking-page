@@ -111,11 +111,18 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const navigation = useNavigation();
 
   return (
-    <div className="flex min-h-screen flex-col bg-page font-sans text-ink" data-theme={theme}>
+    <div
+      className="flex min-h-screen flex-col font-sans text-ink"
+      data-theme={theme}
+      style={{ background: "var(--page)" }}
+    >
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"
-        style={{ background: "rgba(247,242,236,0.85)", backdropFilter: "blur(10px)" }}
+        style={{
+          background: "color-mix(in oklab, var(--page) 82%, transparent)",
+          backdropFilter: "blur(10px)",
+        }}
       >
         <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4 px-7 py-4">
           <Link to={base} className="flex items-center gap-3">
