@@ -10,6 +10,7 @@ import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { langFromRequest } from "~/lib/content";
+import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy } from "~/lib/occupancy";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -41,16 +42,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return { room, nights, party: partySize({ adults, childrenAge }), text, query: { checkin, checkout, currency, adults } };
 }
 
-function rateNote(plan: RoomWithRates["ratePlans"][number]): string {
+function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): string {
   const parts: string[] = [];
   if (plan.mealPlan) parts.push(plan.mealPlan);
-  if (plan.cancellationPolicy?.title) parts.push(`${plan.cancellationPolicy.title} cancellation`);
-  return parts.join(" · ") || "Standard rate";
+  if (plan.cancellationPolicy?.title)
+    parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
+  return parts.join(" · ") || tr.t("standardRate");
 }
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const { room, nights, party, text, query } = loaderData;
   const { currency } = useProperty();
+  const tr = useT();
+  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -61,10 +65,10 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const [selectedRate, setSelectedRate] = useState(ratePlans[0]?.id);
   const chosen = ratePlans.find((r) => r.id === selectedRate) ?? ratePlans[0];
 
-  const summary = `${nights} night${nights > 1 ? "s" : ""} · ${format(
-    parseISO(query.checkin),
-    "EEE d",
-  )} — ${format(parseISO(query.checkout), "EEE d MMM")}`;
+  const summary = `${tr.p("night", nights)} · ${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
+    parseISO(query.checkout),
+    "EEE d MMM",
+  )}`;
 
   const photos = room.photos ?? [];
   const hero = photos[0]?.url;
@@ -171,11 +175,11 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                     <span className="flex items-baseline justify-between gap-2.5">
                       <span className="text-[15.5px] font-semibold">{plan.title}</span>
                       <span className="whitespace-nowrap text-[15.5px] font-semibold">
-                        {formatMoney(perNight, currency)} / night
+                        {formatMoney(perNight, currency)} {tr.t("perNight")}
                       </span>
                     </span>
                     <span className="mt-1 block text-[13px] leading-[1.45] text-muted">
-                      {rateNote(plan)}
+                      {rateNote(plan, tr)}
                     </span>
                   </span>
                 </button>
@@ -184,7 +188,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           </div>
           <div className="mb-4 flex items-baseline justify-between border-t border-divider pt-4">
             <span className="text-sm text-secondary">
-              Total · {nights} night{nights > 1 ? "s" : ""}
+              {tr.t("totalNights", { n: nights })}
             </span>
             <span className="font-serif text-[28px] font-semibold">
               {chosen ? formatMoney(chosen.totalPrice, currency) : "—"}

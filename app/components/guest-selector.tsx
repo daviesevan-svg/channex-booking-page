@@ -1,7 +1,7 @@
 import { useState } from "react";
 
+import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
-import { occupancyLabel } from "~/lib/occupancy";
 
 const MAX_ADULTS = 12;
 const MAX_CHILDREN = 8;
@@ -54,7 +54,11 @@ export function GuestSelector({
   onChange: (next: Occupancy) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const tr = useT();
   const { adults, childrenAge } = value;
+  const summary =
+    tr.p("adult", adults) +
+    (childrenAge.length ? `, ${tr.p("child", childrenAge.length)}` : "");
 
   function setAdults(n: number) {
     onChange({ ...value, adults: n });
@@ -78,8 +82,8 @@ export function GuestSelector({
         onClick={() => setOpen((o) => !o)}
         className="w-full cursor-pointer rounded-[12px] px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
       >
-        <div className="field-label mb-1.5">Guests</div>
-        <div className="text-[17px] font-semibold">{occupancyLabel(adults, childrenAge)}</div>
+        <div className="field-label mb-1.5">{tr.t("guests")}</div>
+        <div className="text-[17px] font-semibold">{summary}</div>
       </button>
 
       {open && (
@@ -91,16 +95,16 @@ export function GuestSelector({
           >
             <div className="flex items-center justify-between py-2">
               <div>
-                <div className="text-[15px] font-semibold">Adults</div>
-                <div className="text-[13px] text-muted-2">Age 18+</div>
+                <div className="text-[15px] font-semibold">{tr.t("adults")}</div>
+                <div className="text-[13px] text-muted-2">{tr.t("adultsSub")}</div>
               </div>
               <Stepper value={adults} min={1} max={MAX_ADULTS} onChange={setAdults} />
             </div>
 
             <div className="flex items-center justify-between border-t border-divider py-2 pt-3">
               <div>
-                <div className="text-[15px] font-semibold">Children</div>
-                <div className="text-[13px] text-muted-2">Age 0–17</div>
+                <div className="text-[15px] font-semibold">{tr.t("children")}</div>
+                <div className="text-[13px] text-muted-2">{tr.t("childrenSub")}</div>
               </div>
               <Stepper
                 value={childrenAge.length}
@@ -114,7 +118,7 @@ export function GuestSelector({
               <div className="mt-3 grid grid-cols-2 gap-3 border-t border-divider pt-4">
                 {childrenAge.map((age, i) => (
                   <label key={i} className="text-[13px] font-semibold text-secondary">
-                    Child {i + 1} age
+                    {tr.t("childAge", { n: i + 1 })}
                     <select
                       value={age}
                       onChange={(e) => setChildAge(i, Number(e.target.value))}
@@ -122,7 +126,7 @@ export function GuestSelector({
                     >
                       {Array.from({ length: CHILD_MAX_AGE + 1 }, (_, a) => (
                         <option key={a} value={a}>
-                          {a === 0 ? "Under 1" : a}
+                          {a === 0 ? tr.t("under1") : a}
                         </option>
                       ))}
                     </select>
@@ -136,7 +140,7 @@ export function GuestSelector({
               onClick={() => setOpen(false)}
               className="mt-4 w-full rounded-[10px] bg-accent py-2.5 text-sm font-semibold text-white hover:bg-accent-deep"
             >
-              Done
+              {tr.t("done")}
             </button>
           </div>
         </>

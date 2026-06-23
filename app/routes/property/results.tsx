@@ -19,10 +19,10 @@ import {
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 import { getPageText } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
+import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import {
   childrenAgeParam,
-  occupancyLabel,
   partySize,
   ratePlansForParty,
   readOccupancy,
@@ -86,12 +86,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 type EnrichedRoom = RoomWithRates & { fits: boolean };
 
-function lineOccupancyLabel(o: { adults: number; children: number }): string {
-  const parts = [`${o.adults} adult${o.adults === 1 ? "" : "s"}`];
-  if (o.children) parts.push(`${o.children} child${o.children === 1 ? "" : "ren"}`);
-  return parts.join(", ");
-}
-
 function RoomCard({
   room,
   isBestMatch,
@@ -117,6 +111,7 @@ function RoomCard({
   disabled: boolean;
   inCart: number;
 }) {
+  const tr = useT();
   const available = roomAvailability(room);
   const remaining = Number.isFinite(available) ? available - inCart : Infinity;
   const atMax = remaining <= 0;
@@ -153,7 +148,7 @@ function RoomCard({
         )}
         {isBestMatch && (
           <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-white">
-            Best match
+            {tr.t("bestMatch")}
           </span>
         )}
       </Link>
@@ -163,7 +158,7 @@ function RoomCard({
             {room.title}
           </h3>
         </Link>
-        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">Sleeps {capacity}</div>
+        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">{tr.t("sleeps", { n: capacity })}</div>
         {room.description && (
           <p className="mb-4 max-w-[440px] text-[14.5px] leading-[1.55] text-secondary line-clamp-2">
             {room.description}
@@ -182,11 +177,11 @@ function RoomCard({
       </div>
       <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
         <div>
-          <span className="text-[13px] text-muted-2">from </span>
+          <span className="text-[13px] text-muted-2">{tr.t("from")} </span>
           <span className="font-serif text-[28px] font-semibold">
             {formatMoney(perNight, currency)}
           </span>
-          <div className="text-[12px] text-muted-2">per night · incl. taxes</div>
+          <div className="text-[12px] text-muted-2">{tr.t("perNightInclTaxes")}</div>
         </div>
         {sorted.length > 1 ? (
           <select
@@ -206,12 +201,10 @@ function RoomCard({
         )}
         {atMax ? (
           <div className="text-[12px] font-medium text-muted-2">
-            All {available} available added
+            {tr.t("allAvailableAdded", { n: available })}
           </div>
         ) : remaining <= 5 ? (
-          <div className="text-[12px] font-medium text-accent">
-            Only {remaining} left
-          </div>
+          <div className="text-[12px] font-medium text-accent">{tr.t("onlyLeft", { n: remaining })}</div>
         ) : null}
         <button
           type="button"
@@ -219,7 +212,7 @@ function RoomCard({
           disabled={disabled || atMax}
           className="w-full rounded-[10px] bg-accent py-[11px] text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {pending ? "Adding…" : "Add room"}
+          {pending ? tr.t("adding") : tr.t("addRoom")}
         </button>
       </div>
     </div>
@@ -249,6 +242,7 @@ function CartPanel({
   cartTitle: string;
   continueLabel: string;
 }) {
+  const tr = useT();
   return (
     <aside
       className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-[18px] border border-line bg-surface p-6"
@@ -256,7 +250,7 @@ function CartPanel({
     >
       <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>
       <div className="mb-4 text-[13.5px] text-muted-2">
-        {lines.length === 0 ? "No rooms selected yet" : `${lines.length} room${lines.length === 1 ? "" : "s"} selected`}
+        {lines.length === 0 ? tr.t("noRoomsSelected") : tr.p("roomsSelected", lines.length)}
       </div>
 
       {lines.length > 0 && (
@@ -266,7 +260,8 @@ function CartPanel({
               <div className="min-w-0">
                 <div className="truncate text-[14.5px] font-semibold">{l.roomTitle}</div>
                 <div className="text-[12.5px] text-muted-2">
-                  {l.rateTitle} · {lineOccupancyLabel(l.occupancy)}
+                  {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
+                  {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
                 </div>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
@@ -303,12 +298,12 @@ function CartPanel({
           />
         )}
         {covered
-          ? `Sleeps all ${party} guest${party === 1 ? "" : "s"}`
-          : `Sleeps ${coverage.capacity} of ${party} — add another room`}
+          ? tr.t("sleepsAll", { n: party })
+          : tr.t("sleepsOf", { x: coverage.capacity, y: party })}
       </div>
 
       <div className="mb-4 flex items-baseline justify-between">
-        <span className="text-[15px] font-semibold">Total</span>
+        <span className="text-[15px] font-semibold">{tr.t("total")}</span>
         <span className="font-serif text-[26px] font-semibold">
           {formatMoney(coverage.total, currency)}
         </span>
@@ -320,7 +315,7 @@ function CartPanel({
         disabled={!covered || continuePending}
         className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {continuePending ? "Loading…" : continueLabel}
+        {continuePending ? tr.t("loading") : continueLabel}
       </button>
     </aside>
   );
@@ -329,6 +324,7 @@ function CartPanel({
 export default function Results({ loaderData, params }: Route.ComponentProps) {
   const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, text, query } = loaderData;
   const { currency } = useProperty();
+  const tr = useT();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -363,13 +359,11 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
     navigate(`/${params.channelId}/checkout?${searchParams.toString()}`);
   };
 
-  const summary = `${format(parseISO(query.checkin), "EEE d")} — ${format(
+  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
+  const summary = `${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
     parseISO(query.checkout),
     "EEE d MMM",
-  )} · ${nights} night${nights > 1 ? "s" : ""} · ${occupancyLabel(
-    query.adults,
-    query.childrenAge,
-  )}`;
+  )} · ${tr.p("night", nights)} · ${occLabel(tr, query.adults, query.childrenAge)}`;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
@@ -390,9 +384,9 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
 
       {rooms.length === 0 ? (
         <p className="text-secondary">
-          No availability for these dates.{" "}
+          {tr.t("noAvailability")}{" "}
           <Link to={`/${params.channelId}?${qs}`} className="font-semibold text-accent">
-            Try different dates
+            {tr.t("tryDifferentDates")}
           </Link>
           .
         </p>

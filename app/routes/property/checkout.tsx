@@ -15,7 +15,8 @@ import {
 } from "~/lib/cart";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
-import { occupancyLabel, readOccupancy, type Occupancy } from "~/lib/occupancy";
+import { readOccupancy, type Occupancy } from "~/lib/occupancy";
+import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
@@ -176,6 +177,8 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const { stay, lines, nights, totals, text } = loaderData;
   const { currency } = useProperty();
+  const tr = useT();
+  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [searchParams] = useSearchParams();
   const nav = useNavigation();
   const errors = actionData?.errors;
@@ -189,7 +192,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
         to={`/${params.channelId}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
       >
-        ← Back to rooms
+        ← {tr.t("allRooms")}
       </Link>
       <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">{text.heading}</h1>
 
@@ -198,20 +201,20 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
             <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="firstName" label="First name" placeholder="Jamie" error={errors?.firstName} />
-              <Field name="lastName" label="Last name" placeholder="Doyle" error={errors?.lastName} />
-              <Field name="email" label="Email" type="email" placeholder="jamie@email.com" error={errors?.email} />
-              <Field name="phone" label="Phone" placeholder="+44 …" error={errors?.phone} />
+              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName} />
+              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" error={errors?.lastName} />
+              <Field name="email" label={tr.t("email")} type="email" placeholder="jamie@email.com" error={errors?.email} />
+              <Field name="phone" label={tr.t("phone")} placeholder="+44 …" error={errors?.phone} />
             </div>
           </section>
 
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
             <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.arrivalSection}</h3>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="arrival" label="Estimated arrival" placeholder="15:00" />
+              <Field name="arrival" label={tr.t("estimatedArrival")} placeholder="15:00" />
             </div>
             <label className="block text-[13px] font-semibold text-secondary">
-              Special requests
+              {tr.t("specialRequests")}
               <textarea
                 name="requests"
                 rows={3}
@@ -227,7 +230,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               {text.paymentNote}
             </p>
             <div className="rounded-[10px] border border-dashed border-[#d8cdb9] bg-[#fbf7f0] p-[18px] text-[13px] text-muted-2">
-              secure card field — provided by payment gateway
+              {tr.t("cardPlaceholder")}
             </div>
           </section>
         </div>
@@ -238,7 +241,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-4 font-serif text-[21px] font-semibold">
-            Your stay · {lines.length} room{lines.length === 1 ? "" : "s"}
+            {tr.p("yourStayRooms", lines.length)}
           </h3>
           <div className="flex flex-col gap-3 border-b border-divider pb-4">
             {lines.map((l, i) => (
@@ -254,17 +257,17 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             ))}
           </div>
           <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
-            <Row label="Check-in" value={format(parseISO(stay.checkin), "EEE d MMM")} />
-            <Row label="Check-out" value={format(parseISO(stay.checkout), "EEE d MMM")} />
-            <Row label="Nights" value={String(nights)} />
-            <Row label="Guests" value={occupancyLabel(stay.occ.adults, stay.occ.childrenAge)} />
+            <Row label={tr.t("checkIn")} value={fmt(parseISO(stay.checkin), "EEE d MMM")} />
+            <Row label={tr.t("checkOut")} value={fmt(parseISO(stay.checkout), "EEE d MMM")} />
+            <Row label={tr.t("nights")} value={String(nights)} />
+            <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
           <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
-            <Row label="Subtotal" value={formatMoney(totals.net, currency)} />
-            <Row label="Taxes & fees" value={formatMoney(taxes, currency)} />
+            <Row label={tr.t("subtotal")} value={formatMoney(totals.net, currency)} />
+            <Row label={tr.t("taxesFees")} value={formatMoney(taxes, currency)} />
           </div>
           <div className="flex items-baseline justify-between py-4">
-            <span className="text-[16px] font-semibold">Total</span>
+            <span className="text-[16px] font-semibold">{tr.t("total")}</span>
             <span className="font-serif text-[30px] font-semibold">
               {formatMoney(totals.total, currency)}
             </span>
@@ -274,7 +277,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             disabled={submitting}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
           >
-            {submitting ? "Confirming…" : text.completeButton}
+            {submitting ? tr.t("confirming") : text.completeButton}
           </button>
           <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
             {text.cancellationNote}

@@ -13,6 +13,7 @@ import {
 import { useMemo, useState } from "react";
 
 import type { ClosedDates } from "./channex/types";
+import type { Translator } from "./i18n";
 
 export interface DayCell {
   key: string;
@@ -40,13 +41,16 @@ export interface UseDateRangeArgs {
   closedDates: ClosedDates | null;
   initialCheckin?: string;
   initialCheckout?: string;
+  tr: Translator;
 }
 
 export function useDateRange({
   closedDates,
   initialCheckin,
   initialCheckout,
+  tr,
 }: UseDateRangeArgs) {
+  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [checkin, setCheckin] = useState<Date | null>(
     initialCheckin ? parseISO(initialCheckin) : null,
   );
@@ -76,7 +80,7 @@ export function useDateRange({
       setCheckout(null);
       setHelper(
         minS > 1
-          ? `Minimum ${minS}-night stay for arrivals on ${format(date, "EEE d MMM")}.`
+          ? tr.t("helperMinStayArrival", { n: minS, date: fmt(date, "EEE d MMM") })
           : "",
       );
       return;
@@ -85,16 +89,13 @@ export function useDateRange({
     const minS = minStayFor(checkin);
     if (nights < minS) {
       setHelper(
-        `Minimum ${minS}-night stay — please choose a check-out on or after ${format(
-          addDays(checkin, minS),
-          "EEE d MMM",
-        )}.`,
+        tr.t("helperMinStayCheckout", { n: minS, date: fmt(addDays(checkin, minS), "EEE d MMM") }),
       );
       return;
     }
     for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) {
       if (isSold(d)) {
-        setHelper("Those dates include unavailable nights. Please choose another range.");
+        setHelper(tr.t("helperSoldOut"));
         return;
       }
     }
@@ -112,7 +113,7 @@ export function useDateRange({
     const baseMonth = startOfMonth(today);
     return [0, 1].map((i) => {
       const monthDate = addMonths(baseMonth, monthOffset + i);
-      const title = format(monthDate, "MMMM yyyy");
+      const title = fmt(monthDate, "MMMM yyyy");
       const firstDow = (getDay(monthDate) + 6) % 7; // Monday-first
       const dim = getDaysInMonth(monthDate);
       const cells: DayCell[] = [];
@@ -163,12 +164,11 @@ export function useDateRange({
 
   let rangeSummary: string;
   if (checkin && checkout) {
-    const n = differenceInCalendarDays(checkout, checkin);
-    rangeSummary = `${n} night${n > 1 ? "s" : ""} selected`;
+    rangeSummary = tr.p("nightsSelected", differenceInCalendarDays(checkout, checkin));
   } else if (checkin) {
-    rangeSummary = "Select a check-out date";
+    rangeSummary = tr.t("selectCheckout");
   } else {
-    rangeSummary = "Select your dates";
+    rangeSummary = tr.t("selectYourDates");
   }
 
   return {
@@ -176,8 +176,8 @@ export function useDateRange({
     checkout,
     checkinIso: checkin ? iso(checkin) : "",
     checkoutIso: checkout ? iso(checkout) : "",
-    checkinLabel: checkin ? format(checkin, "EEE d MMM") : "Select date",
-    checkoutLabel: checkout ? format(checkout, "EEE d MMM") : "Select date",
+    checkinLabel: checkin ? fmt(checkin, "EEE d MMM") : tr.t("selectDate"),
+    checkoutLabel: checkout ? fmt(checkout, "EEE d MMM") : tr.t("selectDate"),
     helper,
     rangeSummary,
     months,

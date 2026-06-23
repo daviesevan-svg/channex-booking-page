@@ -1,8 +1,7 @@
 import type { CSSProperties } from "react";
 
+import { useT } from "~/lib/i18n";
 import type { DayCell, DateRangeState } from "~/lib/use-date-range";
-
-const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 
 function cellStyle(cell: DayCell): CSSProperties {
   if (cell.blank) return { visibility: "hidden" };
@@ -30,6 +29,8 @@ export function CalendarPopover({
   state: DateRangeState;
   onClose: () => void;
 }) {
+  const tr = useT();
+  const weekdays = tr.t("weekdays").split(",");
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
@@ -46,7 +47,7 @@ export function CalendarPopover({
           >
             ‹
           </button>
-          <div className="text-[13px] font-semibold text-muted-2">Select your dates</div>
+          <div className="text-[13px] font-semibold text-muted-2">{tr.t("selectYourDates")}</div>
           <button
             type="button"
             onClick={state.nextMonth}
@@ -64,7 +65,7 @@ export function CalendarPopover({
                 {month.title}
               </div>
               <div className="mb-1 grid grid-cols-7 gap-0.5">
-                {WEEKDAYS.map((w) => (
+                {weekdays.map((w) => (
                   <div
                     key={w}
                     className="py-1 text-center text-[11px] font-semibold text-faint"
@@ -110,13 +111,13 @@ export function CalendarPopover({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
           <div className="flex items-center gap-[18px] text-[12.5px] text-muted-2">
             <span className="flex items-center gap-1.5">
-              <span className="text-disabled-day line-through">12</span> Unavailable
+              <span className="text-disabled-day line-through">12</span> {tr.t("unavailable")}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="relative inline-block h-3.5 w-3.5">
                 <span className="absolute bottom-0 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-accent" />
               </span>
-              Min. stay applies
+              {tr.t("minStayApplies")}
             </span>
           </div>
           <div className="flex items-center gap-2.5">
@@ -126,14 +127,14 @@ export function CalendarPopover({
               onClick={state.clear}
               className="cursor-pointer border-none bg-transparent text-[13px] font-semibold text-muted-2 hover:text-accent"
             >
-              Clear
+              {tr.t("clear")}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="rounded-[10px] bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent-deep"
             >
-              Done
+              {tr.t("done")}
             </button>
           </div>
         </div>

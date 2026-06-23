@@ -5,6 +5,7 @@ import type { Route } from "./+types/search";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
+import { useT } from "~/lib/i18n";
 import { getChannexClient } from "~/lib/config.server";
 import { DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
@@ -34,6 +35,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content } = loaderData;
   const { property, currency, hotelName } = useProperty();
+  const tr = useT();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -41,6 +43,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     closedDates,
     initialCheckin: searchParams.get("checkin") ?? undefined,
     initialCheckout: searchParams.get("checkout") ?? undefined,
+    tr,
   });
   const [showCal, setShowCal] = useState(false);
   const [occupancy, setOccupancy] = useState<Occupancy>(() => readOccupancy(searchParams));
@@ -96,7 +99,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             onClick={() => setShowCal(true)}
             className="min-w-[150px] flex-1 cursor-pointer rounded-[12px] px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
           >
-            <div className="field-label mb-1.5">Check-in</div>
+            <div className="field-label mb-1.5">{tr.t("checkIn")}</div>
             <div
               className="text-[17px] font-semibold"
               style={{ color: dates.checkin ? "#2a2521" : "#b6ab9d" }}
@@ -110,7 +113,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             onClick={() => setShowCal(true)}
             className="min-w-[150px] flex-1 cursor-pointer rounded-[12px] px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
           >
-            <div className="field-label mb-1.5">Check-out</div>
+            <div className="field-label mb-1.5">{tr.t("checkOut")}</div>
             <div
               className="text-[17px] font-semibold"
               style={{ color: dates.checkout ? "#2a2521" : "#b6ab9d" }}

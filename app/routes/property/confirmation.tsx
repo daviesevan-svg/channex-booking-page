@@ -6,7 +6,8 @@ import { useProperty } from "~/lib/booking-context";
 import { cartCoverage, parseCart, resolveCart } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
 import { langFromRequest } from "~/lib/content";
-import { occupancyLabel, readOccupancy } from "~/lib/occupancy";
+import { occLabel, useT } from "~/lib/i18n";
+import { readOccupancy } from "~/lib/occupancy";
 import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 
@@ -19,17 +20,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const simulated = url.searchParams.get("sim") === "1";
   const lang = langFromRequest(request);
 
-  let datesStr = "";
   let rooms: { title: string; rate: string }[] = [];
   let totalStr = "";
+  let nights = 0;
 
   if (checkin && checkout) {
-    const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-    datesStr = `${format(parseISO(checkin), "EEE d")} — ${format(
-      parseISO(checkout),
-      "EEE d MMM",
-    )} · ${nights} night${nights > 1 ? "s" : ""}`;
-
+    nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
     const apiRooms = await getRoomsWithOverrides(
       params.channelId,
       { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults },
@@ -45,23 +41,36 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     simulated,
     rooms,
     totalStr,
-    datesStr,
-    guests: occupancyLabel(occ.adults, occ.childrenAge),
+    checkin,
+    checkout,
+    nights,
+    adults: occ.adults,
+    childrenAge: occ.childrenAge,
     text: await getPageText(params.channelId, "confirmation", lang),
   };
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, totalStr, datesStr, guests, text } = loaderData;
+  const { reference, simulated, rooms, totalStr, checkin, checkout, nights, adults, childrenAge, text } =
+    loaderData;
   const { hotelName } = useProperty();
+  const tr = useT();
+  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
+  const datesStr =
+    checkin && checkout
+      ? `${fmt(parseISO(checkin), "EEE d")} — ${fmt(parseISO(checkout), "EEE d MMM")} · ${tr.p(
+          "night",
+          nights,
+        )}`
+      : "";
+  const guests = occLabel(tr, adults, childrenAge);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 9px,#e7ddcc 9px,#e7ddcc 18px)";
 
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
       {simulated && (
         <div className="mb-6 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13px] text-muted">
-          Demo mode — no live reservation was created. Set <code>ALLOW_LIVE_BOOKING=true</code> to
-          submit real bookings.
+          {tr.t("demoMode")}
         </div>
       )}
       <div
@@ -86,7 +95,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         className="mb-9 inline-block rounded-full px-[18px] py-2 text-sm font-semibold tracking-[0.04em] text-accent"
         style={{ background: "var(--accent-soft)" }}
       >
-        Confirmation {reference}
+        {tr.t("confirmationRef", { ref: reference })}
       </div>
 
       <div
@@ -106,16 +115,16 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         </div>
         <div className="mt-5 flex flex-col gap-3 text-[15px]">
           <div className="flex justify-between">
-            <span className="text-secondary">Dates</span>
+            <span className="text-secondary">{tr.t("dates")}</span>
             <span className="font-semibold">{datesStr}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-secondary">Guests</span>
+            <span className="text-secondary">{tr.t("guests")}</span>
             <span className="font-semibold">{guests}</span>
           </div>
           {totalStr && (
             <div className="flex items-baseline justify-between border-t border-divider pt-3">
-              <span className="text-secondary">Total</span>
+              <span className="text-secondary">{tr.t("total")}</span>
               <span className="font-serif text-[24px] font-semibold">{totalStr}</span>
             </div>
           )}

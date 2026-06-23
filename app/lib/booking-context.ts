@@ -6,6 +6,7 @@ export interface PropertyOutletContext {
   property: PropertyInfo;
   currency: string;
   hotelName: string;
+  lang: string;
 }
 
 export const useProperty = () => useOutletContext<PropertyOutletContext>();

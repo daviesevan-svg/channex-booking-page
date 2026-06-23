@@ -13,6 +13,7 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { makeTranslator, type Translator } from "~/lib/i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { channelCode } = getConfig();
@@ -72,7 +73,7 @@ function useStep(channelId: string): Step {
   return "search";
 }
 
-function Stepper({ step }: { step: Step }) {
+function Stepper({ step, tr }: { step: Step; tr: Translator }) {
   const roomsOn = step === "results" || step === "detail";
   const roomsDone = step === "checkout" || step === "confirmation";
   const detOn = step === "checkout";
@@ -80,9 +81,9 @@ function Stepper({ step }: { step: Step }) {
   const conOn = step === "confirmation";
 
   const steps = [
-    { n: 1, label: "Choose a room", on: roomsOn || roomsDone },
-    { n: 2, label: "Your details", on: detOn || detDone },
-    { n: 3, label: "Confirmation", on: conOn },
+    { n: 1, label: tr.t("step_room"), on: roomsOn || roomsDone },
+    { n: 2, label: tr.t("step_details"), on: detOn || detDone },
+    { n: 3, label: tr.t("step_confirmation"), on: conOn },
   ];
   const lines = [roomsDone, detDone];
 
@@ -141,8 +142,9 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 
-  const context: PropertyOutletContext = { property, currency, hotelName };
+  const context: PropertyOutletContext = { property, currency, hotelName, lang };
   const navigation = useNavigation();
+  const tr = makeTranslator(lang);
 
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "var(--page)" } as React.CSSProperties;
@@ -195,13 +197,13 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 ))}
               </select>
             )}
-            <span className="cursor-pointer hover:text-accent">Manage booking</span>
+            <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
             {property.phone && <span className="hidden sm:inline">{property.phone}</span>}
           </div>
         </div>
       </header>
 
-      {step !== "search" && <Stepper step={step} />}
+      {step !== "search" && <Stepper step={step} tr={tr} />}
 
       <div className="flex-1">
         <Outlet context={context} />
@@ -209,12 +211,12 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
       <footer className="border-t border-nav-border bg-surface-alt">
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-[13px] text-muted-2">
-          <span>© 2026 {hotelName} · All rights reserved</span>
+          <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
           <span className="flex items-center gap-2">
-            Secure booking · Powered by Channex
+            {tr.t("footerRight")}
             <span className="text-faint">·</span>
             <Link to="/admin" className="text-faint hover:text-accent">
-              Admin
+              {tr.t("admin")}
             </Link>
           </span>
         </div>
