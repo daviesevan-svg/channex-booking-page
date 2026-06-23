@@ -32,8 +32,15 @@ export function isThemeId(value: string): value is ThemeId {
 }
 
 export interface SiteSettings {
-  theme?: ThemeId;
+  theme?: ThemeId | "custom";
+  customColor?: string;
   customDomain?: string;
+}
+
+/** Returns a normalized #rrggbb / #rgb hex, or undefined if invalid. */
+export function normalizeHex(value: string): string | undefined {
+  const s = value.trim();
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s.toLowerCase() : undefined;
 }
 
 export const DEFAULT_SEARCH = {

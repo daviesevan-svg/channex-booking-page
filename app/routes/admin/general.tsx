@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
@@ -44,6 +45,8 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
 
   const { settings, host } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
+  const [hex, setHex] = useState(settings.customColor || "#b5651d");
+  const validHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
 
   return (
     <div>
@@ -77,6 +80,45 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                 </span>
               </label>
             ))}
+
+            {/* Custom colour */}
+            <label className="cursor-pointer">
+              <input
+                type="radio"
+                name="theme"
+                value="custom"
+                defaultChecked={activeTheme === "custom"}
+                className="peer sr-only"
+              />
+              <span className="flex w-[92px] flex-col items-center gap-2 rounded-[12px] border-2 border-line-alt p-3 transition-colors peer-checked:border-accent peer-checked:bg-field-hover">
+                <span
+                  className="h-8 w-8 rounded-full"
+                  style={{ background: validHex ? hex : "conic-gradient(red,orange,gold,green,blue,violet,red)" }}
+                />
+                <span className="text-[12.5px] font-semibold">Custom</span>
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <input
+              type="color"
+              value={validHex ? hex : "#b5651d"}
+              onChange={(e) => setHex(e.target.value)}
+              aria-label="Pick a colour"
+              className="h-10 w-12 cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt p-1"
+            />
+            <input
+              type="text"
+              name="customColor"
+              value={hex}
+              onChange={(e) => setHex(e.target.value)}
+              placeholder="#b5651d"
+              className="w-32 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[9px] font-mono text-[14px] text-ink outline-none focus:border-accent"
+            />
+            <span className="text-[12.5px] text-muted">
+              Pick or enter a hex code, then choose <strong>Custom</strong>.
+            </span>
           </div>
         </section>
 

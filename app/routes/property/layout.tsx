@@ -39,7 +39,13 @@ export async function loader({ params }: Route.LoaderArgs) {
   };
 
   const currency = merged.currency || merged.hotelPolicy?.currency || "GBP";
-  return { property: merged, currency, hotelName: merged.title, theme: settings.theme ?? DEFAULT_THEME };
+  return {
+    property: merged,
+    currency,
+    hotelName: merged.title,
+    theme: settings.theme ?? DEFAULT_THEME,
+    customColor: settings.customColor,
+  };
 }
 
 type Step = "search" | "results" | "detail" | "checkout" | "confirmation";
@@ -103,18 +109,30 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme } = loaderData;
+  const { property, currency, hotelName, theme, customColor } = loaderData;
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 
   const context: PropertyOutletContext = { property, currency, hotelName };
   const navigation = useNavigation();
 
+  const isCustom = theme === "custom" && !!customColor;
+  const themeStyle = { background: "var(--page)" } as React.CSSProperties;
+  if (isCustom) {
+    Object.assign(themeStyle, {
+      "--accent": customColor,
+      "--accent-deep": `color-mix(in oklab, ${customColor} 82%, black)`,
+      "--accent-soft": `color-mix(in oklab, ${customColor} 12%, #ffffff)`,
+      "--accent-soft-strong": `color-mix(in oklab, ${customColor} 20%, #ffffff)`,
+      "--page": `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
+    });
+  }
+
   return (
     <div
       className="flex min-h-screen flex-col font-sans text-ink"
-      data-theme={theme}
-      style={{ background: "var(--page)" }}
+      data-theme={isCustom ? undefined : theme}
+      style={themeStyle}
     >
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header

@@ -1,6 +1,6 @@
 import type { RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
-import { isThemeId, type SearchContent, type SiteSettings } from "./content";
+import { isThemeId, normalizeHex, type SearchContent, type SiteSettings } from "./content";
 
 // Per-property content overrides edited in the admin. Anything unset falls back
 // to the Channex property_info. Extend this as the admin grows (colors, images…).
@@ -154,7 +154,8 @@ export async function saveSettings(
 ): Promise<SiteSettings> {
   const themeRaw = String(input.theme ?? "").trim();
   const next: SiteSettings = {
-    theme: isThemeId(themeRaw) ? themeRaw : undefined,
+    theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
+    customColor: normalizeHex(String(input.customColor ?? "")),
     customDomain:
       String(input.customDomain ?? "")
         .trim()
