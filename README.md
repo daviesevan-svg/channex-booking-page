@@ -70,10 +70,10 @@ the Cloudflare dashboard in production). No rebuild needed to change them.
 
 ### One-click
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR_ORG/YOUR_REPO)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/daviesevan-svg/channex-booking-page)
 
-> Replace `YOUR_ORG/YOUR_REPO` with your fork. The button forks the repo, connects it to
-> the user's Cloudflare account, and deploys.
+> The button forks the repo, connects it to your Cloudflare account, and deploys. After the
+> first deploy, create a `CONFIG` KV namespace and set the env vars (see Configuration above).
 
 ### Connect a Git repo (auto-deploy on push)
 
