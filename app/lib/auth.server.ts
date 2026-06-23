@@ -1,0 +1,136 @@
+import { createCookieSessionStorage, redirect } from "react-router";
+
+import { getConfig } from "./config.server";
+
+const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
+
+// ---------- base64url helpers ----------
+function toBase64Url(bytes: Uint8Array): string {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function fromBase64Url(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64);
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+const enc = (s: string) => new TextEncoder().encode(s);
+
+// ---------- HMAC-signed magic-link tokens ----------
+async function sign(payload: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc(payload));
+  return toBase64Url(new Uint8Array(sig));
+}
+
+export async function createMagicToken(email: string): Promise<string> {
+  const { sessionSecret } = getConfig();
+  const payload = toBase64Url(enc(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS })));
+  const sig = await sign(payload, sessionSecret);
+  return `${payload}.${sig}`;
+}
+
+export async function verifyMagicToken(token: string): Promise<string | null> {
+  const { sessionSecret } = getConfig();
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return null;
+  if ((await sign(payload, sessionSecret)) !== sig) return null;
+  try {
+    const { email, exp } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
+    if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
+    return email.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+export function isAllowedEmail(email: string): boolean {
+  const { adminEmails } = getConfig();
+  return adminEmails.includes(email.trim().toLowerCase());
+}
+
+// ---------- session ----------
+function sessionStorage() {
+  const { sessionSecret, appUrl } = getConfig();
+  return createCookieSessionStorage({
+    cookie: {
+      name: "__ibe_admin",
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: appUrl.startsWith("https"),
+      secrets: [sessionSecret],
+      maxAge: 60 * 60 * 24 * 7, // 1 week
+    },
+  });
+}
+
+export async function createAdminSession(email: string, redirectTo: string) {
+  const storage = sessionStorage();
+  const session = await storage.getSession();
+  session.set("email", email.toLowerCase());
+  return redirect(redirectTo, {
+    headers: { "Set-Cookie": await storage.commitSession(session) },
+  });
+}
+
+export async function getAdminEmail(request: Request): Promise<string | null> {
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  const email = session.get("email");
+  return typeof email === "string" && isAllowedEmail(email) ? email : null;
+}
+
+export async function requireAdmin(request: Request): Promise<string> {
+  const email = await getAdminEmail(request);
+  if (!email) throw redirect("/admin/login");
+  return email;
+}
+
+export async function logout(request: Request) {
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  return redirect("/admin/login", {
+    headers: { "Set-Cookie": await storage.destroySession(session) },
+  });
+}
+
+// ---------- email delivery ----------
+/** Sends the magic link. Returns the link for on-screen display when no email
+ *  provider is configured (dev), so you can click through without real email. */
+export async function sendMagicLink(
+  email: string,
+  link: string,
+): Promise<{ sent: boolean; link?: string }> {
+  const { resendApiKey } = getConfig();
+  if (!resendApiKey) {
+    console.log(`[admin] magic link for ${email}: ${link}`);
+    return { sent: false, link };
+  }
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: "Booking Admin <onboarding@resend.dev>",
+        to: [email],
+        subject: "Your admin sign-in link",
+        html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
+      }),
+    });
+    if (!res.ok) return { sent: false, link };
+    return { sent: true };
+  } catch {
+    return { sent: false, link };
+  }
+}

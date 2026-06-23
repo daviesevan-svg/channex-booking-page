@@ -1,0 +1,422 @@
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { useEffect, useState } from "react";
+import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
+
+import type { Route } from "./+types/results";
+import type { RatePlan, RoomWithRates } from "~/lib/channex/types";
+import { useProperty } from "~/lib/booking-context";
+import {
+  addLine,
+  cartCoverage,
+  cartCovers,
+  parseCart,
+  removeIndex,
+  resolveCart,
+  roomCounts,
+  serializeCart,
+  type ResolvedLine,
+} from "~/lib/cart";
+import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { formatMoney } from "~/lib/money";
+import {
+  childrenAgeParam,
+  occupancyLabel,
+  partySize,
+  ratePlansForParty,
+  readOccupancy,
+  roomAvailability,
+  roomCapacity,
+  roomFits,
+} from "~/lib/occupancy";
+
+export async function loader({ params, request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const checkin = url.searchParams.get("checkin");
+  const checkout = url.searchParams.get("checkout");
+  const currency = url.searchParams.get("currency") || "GBP";
+  const occ = readOccupancy(url.searchParams);
+
+  if (!checkin || !checkout) {
+    throw redirect(`/${params.channelId}`);
+  }
+
+  const rooms = await getRoomsWithOverrides(params.channelId, {
+    checkinDate: checkin,
+    checkoutDate: checkout,
+    currency,
+    adults: occ.adults,
+    childrenAge: childrenAgeParam(occ.childrenAge),
+  });
+
+  const party = partySize(occ);
+  const cheapest = (room: RoomWithRates) =>
+    Math.min(...ratePlansForParty(room, party).map((r) => Number(r.totalPrice)));
+
+  const enriched = rooms
+    .map((room) => ({ ...room, fits: roomFits(room, occ) }))
+    .sort((a, b) => Number(b.fits) - Number(a.fits) || cheapest(a) - cheapest(b));
+
+  const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
+  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
+
+  const cartLines = resolveCart(parseCart(url.searchParams), rooms);
+  const coverage = cartCoverage(cartLines);
+  const covered = cartCovers(cartLines, occ);
+
+  return {
+    rooms: enriched,
+    nights,
+    bestMatchId,
+    party: partySize(occ),
+    cartLines,
+    coverage,
+    covered,
+    query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
+  };
+}
+
+type EnrichedRoom = RoomWithRates & { fits: boolean };
+
+function lineOccupancyLabel(o: { adults: number; children: number }): string {
+  const parts = [`${o.adults} adult${o.adults === 1 ? "" : "s"}`];
+  if (o.children) parts.push(`${o.children} child${o.children === 1 ? "" : "ren"}`);
+  return parts.join(", ");
+}
+
+function RoomCard({
+  room,
+  isBestMatch,
+  currency,
+  nights,
+  party,
+  channelId,
+  qs,
+  onAdd,
+  pending,
+  disabled,
+  inCart,
+}: {
+  room: EnrichedRoom;
+  isBestMatch: boolean;
+  currency: string;
+  nights: number;
+  party: number;
+  channelId: string;
+  qs: string;
+  onAdd: (rateId: string) => void;
+  pending: boolean;
+  disabled: boolean;
+  inCart: number;
+}) {
+  const available = roomAvailability(room);
+  const remaining = Number.isFinite(available) ? available - inCart : Infinity;
+  const atMax = remaining <= 0;
+  const sorted = ratePlansForParty(room, party).sort(
+    (a, b) => Number(a.totalPrice) - Number(b.totalPrice),
+  );
+  const [rateId, setRateId] = useState(sorted[0]?.id);
+  const chosen: RatePlan | undefined = sorted.find((r) => r.id === rateId) ?? sorted[0];
+  const perNight = chosen ? Number(chosen.totalPrice) / nights : 0;
+  const photo = room.photos?.[0]?.url;
+  const amenities = (room.facilities ?? []).slice(0, 4);
+  const { capacity } = roomCapacity(room);
+
+  return (
+    <div
+      className={`flex flex-wrap overflow-hidden rounded-[16px] border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_40px_-26px_rgba(70,55,35,0.4)] ${
+        isBestMatch ? "ring-2 ring-accent" : ""
+      }`}
+    >
+      <Link
+        to={`/${channelId}/rooms/${room.id}?${qs}`}
+        className="relative min-h-[200px] w-[230px] flex-none self-stretch"
+      >
+        {photo ? (
+          <img src={photo} alt={room.title} className="h-full w-full object-cover" />
+        ) : (
+          <div
+            className="h-full w-full"
+            style={{
+              background:
+                "repeating-linear-gradient(135deg,#efe7da,#efe7da 11px,#e7ddcc 11px,#e7ddcc 22px)",
+            }}
+          />
+        )}
+        {isBestMatch && (
+          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-white">
+            Best match
+          </span>
+        )}
+      </Link>
+      <div className="flex min-w-[240px] flex-1 flex-col p-6">
+        <Link to={`/${channelId}/rooms/${room.id}?${qs}`}>
+          <h3 className="mb-1.5 font-serif text-[24px] font-semibold tracking-[-0.01em] hover:text-accent">
+            {room.title}
+          </h3>
+        </Link>
+        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">Sleeps {capacity}</div>
+        {room.description && (
+          <p className="mb-4 max-w-[440px] text-[14.5px] leading-[1.55] text-secondary line-clamp-2">
+            {room.description}
+          </p>
+        )}
+        <div className="mt-auto flex flex-wrap gap-2">
+          {amenities.map((a) => (
+            <span
+              key={a}
+              className="rounded-full border border-chip-border bg-chip px-3 py-[5px] text-[12.5px] font-medium text-secondary"
+            >
+              {a}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
+        <div>
+          <span className="text-[13px] text-muted-2">from </span>
+          <span className="font-serif text-[28px] font-semibold">
+            {formatMoney(perNight, currency)}
+          </span>
+          <div className="text-[12px] text-muted-2">per night · incl. taxes</div>
+        </div>
+        {sorted.length > 1 ? (
+          <select
+            value={rateId}
+            onChange={(e) => setRateId(e.target.value)}
+            aria-label="Rate"
+            className="w-full truncate rounded-[10px] border border-line-alt bg-surface-alt py-2 pl-3 pr-8 text-[13px] text-ink outline-none focus:border-accent"
+          >
+            {sorted.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.title}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="truncate text-[13px] text-muted-2">{chosen?.title}</div>
+        )}
+        {atMax ? (
+          <div className="text-[12px] font-medium text-muted-2">
+            All {available} available added
+          </div>
+        ) : remaining <= 5 ? (
+          <div className="text-[12px] font-medium text-accent">
+            Only {remaining} left
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => chosen && onAdd(chosen.id)}
+          disabled={disabled || atMax}
+          className="w-full rounded-[10px] bg-accent py-[11px] text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? "Adding…" : "Add room"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CartPanel({
+  lines,
+  coverage,
+  covered,
+  party,
+  currency,
+  onRemove,
+  onContinue,
+  continuePending,
+}: {
+  lines: ResolvedLine[];
+  coverage: { capacity: number; total: number };
+  covered: boolean;
+  party: number;
+  currency: string;
+  onRemove: (index: number) => void;
+  onContinue: () => void;
+  continuePending: boolean;
+}) {
+  return (
+    <aside
+      className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-[18px] border border-line bg-surface p-6"
+      style={{ boxShadow: "var(--shadow-sticky)" }}
+    >
+      <h3 className="mb-1 font-serif text-[21px] font-semibold">Your stay</h3>
+      <div className="mb-4 text-[13.5px] text-muted-2">
+        {lines.length === 0 ? "No rooms selected yet" : `${lines.length} room${lines.length === 1 ? "" : "s"} selected`}
+      </div>
+
+      {lines.length > 0 && (
+        <div className="mb-4 flex flex-col gap-3 border-b border-divider pb-4">
+          {lines.map((l, i) => (
+            <div key={`${l.roomId}-${l.rateId}-${i}`} className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-[14.5px] font-semibold">{l.roomTitle}</div>
+                <div className="text-[12.5px] text-muted-2">
+                  {l.rateTitle} · {lineOccupancyLabel(l.occupancy)}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-[14px] font-semibold">{formatMoney(l.total, currency)}</span>
+                <button
+                  type="button"
+                  onClick={() => onRemove(i)}
+                  aria-label="Remove room"
+                  className="text-[18px] leading-none text-muted-2 hover:text-accent"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        className="mb-4 flex items-center gap-2 rounded-[10px] px-3.5 py-2.5 text-[13px] font-semibold"
+        style={{
+          background: covered ? "#e8f0e6" : "#f5efe5",
+          color: covered ? "#3f7a52" : "#857a6c",
+        }}
+      >
+        {covered ? (
+          <span className="flex-none text-[14px] leading-none" style={{ color: "#3f7a52" }}>
+            ✓
+          </span>
+        ) : (
+          <span
+            className="h-[7px] w-[7px] flex-none rounded-[1px] bg-accent"
+            style={{ transform: "rotate(45deg)" }}
+          />
+        )}
+        {covered
+          ? `Sleeps all ${party} guest${party === 1 ? "" : "s"}`
+          : `Sleeps ${coverage.capacity} of ${party} — add another room`}
+      </div>
+
+      <div className="mb-4 flex items-baseline justify-between">
+        <span className="text-[15px] font-semibold">Total</span>
+        <span className="font-serif text-[26px] font-semibold">
+          {formatMoney(coverage.total, currency)}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onContinue}
+        disabled={!covered || continuePending}
+        className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {continuePending ? "Loading…" : "Continue to details"}
+      </button>
+    </aside>
+  );
+}
+
+export default function Results({ loaderData, params }: Route.ComponentProps) {
+  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, query } = loaderData;
+  const { currency } = useProperty();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const navigation = useNavigation();
+  const qs = searchParams.toString();
+
+  const cart = parseCart(searchParams);
+  const counts = roomCounts(cart);
+
+  const [pendingAddId, setPendingAddId] = useState<string | null>(null);
+  const [continuePending, setContinuePending] = useState(false);
+  useEffect(() => {
+    if (navigation.state === "idle") {
+      setPendingAddId(null);
+      setContinuePending(false);
+    }
+  }, [navigation.state]);
+  const busy = navigation.state !== "idle";
+
+  function go(sel: string) {
+    const next = new URLSearchParams(searchParams);
+    if (sel) next.set("sel", sel);
+    else next.delete("sel");
+    navigate(`/${params.channelId}/rooms?${next.toString()}`);
+  }
+  const onAdd = (roomId: string, rateId: string) => {
+    setPendingAddId(roomId);
+    go(serializeCart(addLine(cart, { roomId, rateId })));
+  };
+  const onRemove = (index: number) => go(serializeCart(removeIndex(cart, index)));
+  const onContinue = () => {
+    setContinuePending(true);
+    navigate(`/${params.channelId}/checkout?${searchParams.toString()}`);
+  };
+
+  const summary = `${format(parseISO(query.checkin), "EEE d")} — ${format(
+    parseISO(query.checkout),
+    "EEE d MMM",
+  )} · ${nights} night${nights > 1 ? "s" : ""} · ${occupancyLabel(
+    query.adults,
+    query.childrenAge,
+  )}`;
+
+  return (
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
+      <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
+        <div>
+          <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">
+            Choose your rooms
+          </h1>
+          <div className="text-[15px] text-secondary">{summary}</div>
+        </div>
+        <Link
+          to={`/${params.channelId}?${qs}`}
+          className="rounded-[10px] border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+        >
+          Edit search
+        </Link>
+      </div>
+
+      {rooms.length === 0 ? (
+        <p className="text-secondary">
+          No availability for these dates.{" "}
+          <Link to={`/${params.channelId}?${qs}`} className="font-semibold text-accent">
+            Try different dates
+          </Link>
+          .
+        </p>
+      ) : (
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          <div className="flex flex-[1.7] flex-col gap-4">
+            {rooms.map((room) => (
+              <RoomCard
+                key={room.id}
+                room={room}
+                isBestMatch={room.id === bestMatchId}
+                currency={currency}
+                nights={nights}
+                party={party}
+                channelId={params.channelId}
+                qs={qs}
+                onAdd={(rateId) => onAdd(room.id, rateId)}
+                pending={pendingAddId === room.id}
+                disabled={busy}
+                inCart={counts.get(room.id) ?? 0}
+              />
+            ))}
+          </div>
+          <div className="lg:w-[340px]">
+            <CartPanel
+              lines={cartLines}
+              coverage={coverage}
+              covered={covered}
+              party={party}
+              currency={currency}
+              onRemove={onRemove}
+              onContinue={onContinue}
+              continuePending={continuePending}
+            />
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}

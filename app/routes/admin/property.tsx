@@ -1,0 +1,133 @@
+import { Form, useNavigation } from "react-router";
+
+import type { Route } from "./+types/property";
+import { requireAdmin } from "~/lib/auth.server";
+import { getChannexClient, getConfig } from "~/lib/config.server";
+import { getOverrides, saveOverrides } from "~/lib/overrides.server";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  await requireAdmin(request);
+  const propertyId = getConfig().defaultPropertyId;
+  if (!propertyId) return { configured: false as const };
+
+  const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
+  const overrides = await getOverrides(propertyId);
+  return {
+    configured: true as const,
+    propertyId,
+    overrides,
+    defaults: {
+      hotelName: property?.title ?? "",
+      address: property?.address ?? "",
+      description: property?.description ?? "",
+      phone: property?.phone ?? "",
+      email: property?.email ?? "",
+    },
+  };
+}
+
+export async function action({ request }: Route.ActionArgs) {
+  await requireAdmin(request);
+  const propertyId = getConfig().defaultPropertyId;
+  if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID is configured." };
+  const form = await request.formData();
+  await saveOverrides(propertyId, Object.fromEntries(form));
+  return { ok: true };
+}
+
+export function meta() {
+  return [{ title: "Admin · Property details" }];
+}
+
+function Field({
+  name,
+  label,
+  value,
+  placeholder,
+  textarea,
+}: {
+  name: string;
+  label: string;
+  value?: string;
+  placeholder?: string;
+  textarea?: boolean;
+}) {
+  const cls =
+    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
+  return (
+    <label className="block text-[13px] font-semibold text-secondary">
+      {label}
+      {textarea ? (
+        <textarea
+          name={name}
+          rows={4}
+          defaultValue={value}
+          placeholder={placeholder}
+          className={`${cls} resize-y`}
+        />
+      ) : (
+        <input name={name} defaultValue={value} placeholder={placeholder} className={cls} />
+      )}
+      {placeholder && (
+        <span className="mt-1 block text-[11px] font-normal text-faint">
+          From Channex: {placeholder || "—"} — leave blank to use this.
+        </span>
+      )}
+    </label>
+  );
+}
+
+export default function AdminProperty({ loaderData, actionData }: Route.ComponentProps) {
+  const nav = useNavigation();
+  const saving = nav.state === "submitting";
+
+  if (!loaderData.configured) {
+    return (
+      <div className="rounded-[14px] border border-line bg-surface p-6">
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">Property details</h1>
+        <p className="text-[15px] text-secondary">
+          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to edit a
+          property here.
+        </p>
+      </div>
+    );
+  }
+
+  const { overrides, defaults } = loaderData;
+
+  return (
+    <div>
+      <div className="mb-5 flex items-center justify-between">
+        <h1 className="font-serif text-[26px] font-semibold">Property details</h1>
+        {actionData?.ok && (
+          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
+            ✓ Saved
+          </span>
+        )}
+      </div>
+      <p className="mb-6 text-[14px] text-muted">
+        These override what guests see in the booking engine. Empty fields fall back to Channex.
+      </p>
+
+      <Form method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder={defaults.hotelName} />
+        <Field name="address" label="Address" value={overrides.address} placeholder={defaults.address} />
+        <Field name="description" label="Description" value={overrides.description} placeholder={defaults.description} textarea />
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <Field name="phone" label="Phone" value={overrides.phone} placeholder={defaults.phone} />
+          <Field name="email" label="Email" value={overrides.email} placeholder={defaults.email} />
+        </div>
+        {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
+        <div>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save changes"}
+          </button>
+        </div>
+      </Form>
+    </div>
+  );
+}

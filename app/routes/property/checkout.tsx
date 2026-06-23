@@ -1,0 +1,278 @@
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { z } from "zod";
+
+import type { Route } from "./+types/checkout";
+import type { RoomWithRates } from "~/lib/channex/types";
+import { useProperty } from "~/lib/booking-context";
+import {
+  cartCoverage,
+  cartCovers,
+  parseCart,
+  resolveCart,
+  withinAvailability,
+  type ResolvedLine,
+} from "~/lib/cart";
+import { getChannexClient, getConfig } from "~/lib/config.server";
+import { formatMoney } from "~/lib/money";
+import { occupancyLabel, readOccupancy, type Occupancy } from "~/lib/occupancy";
+import { getRoomsWithOverrides } from "~/lib/rooms.server";
+
+interface Stay {
+  channelId: string;
+  checkin: string;
+  checkout: string;
+  currency: string;
+  occ: Occupancy;
+}
+
+function readStay(url: URL, channelId: string): Stay | null {
+  const checkin = url.searchParams.get("checkin");
+  const checkout = url.searchParams.get("checkout");
+  if (!checkin || !checkout) return null;
+  return {
+    channelId,
+    checkin,
+    checkout,
+    currency: url.searchParams.get("currency") || "GBP",
+    occ: readOccupancy(url.searchParams),
+  };
+}
+
+async function resolveStayCart(
+  stay: Stay,
+  url: URL,
+): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
+  const rooms = await getRoomsWithOverrides(stay.channelId, {
+    checkinDate: stay.checkin,
+    checkoutDate: stay.checkout,
+    currency: stay.currency,
+    adults: stay.occ.adults,
+  });
+  return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
+}
+
+export async function loader({ params, request }: Route.LoaderArgs) {
+  const url = new URL(request.url);
+  const stay = readStay(url, params.channelId);
+  if (!stay) throw redirect(`/${params.channelId}`);
+
+  const { rooms, lines } = await resolveStayCart(stay, url);
+  if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
+    throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+  }
+
+  const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
+  return { stay, lines, nights, totals: cartCoverage(lines) };
+}
+
+const GuestSchema = z.object({
+  firstName: z.string().min(1, "Required"),
+  lastName: z.string().min(1, "Required"),
+  email: z.string().email("Enter a valid email"),
+  phone: z.string().min(3, "Required"),
+  arrival: z.string().optional(),
+  requests: z.string().optional(),
+});
+
+export async function action({ params, request }: Route.ActionArgs) {
+  const url = new URL(request.url);
+  const stay = readStay(url, params.channelId);
+  if (!stay) throw redirect(`/${params.channelId}`);
+
+  const form = await request.formData();
+  const parsed = GuestSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors };
+  }
+
+  const { rooms, lines } = await resolveStayCart(stay, url);
+  if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
+    throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+  }
+
+  const g = parsed.data;
+  const booking = {
+    status: "new",
+    arrivalDate: stay.checkin,
+    departureDate: stay.checkout,
+    currency: stay.currency,
+    arrivalHour: g.arrival || undefined,
+    customer: { name: g.firstName, surname: g.lastName, mail: g.email, phone: g.phone },
+    notes: g.requests || undefined,
+    rooms: lines.map((l, index) => ({
+      index,
+      roomTypeCode: l.roomId,
+      ratePlanCode: l.rateId,
+      occupancy: l.occupancy,
+    })),
+  };
+
+  const config = getConfig();
+  let reference: string;
+  if (config.allowLiveBooking) {
+    const client = getChannexClient();
+    const result = await client.pushBooking<{ id?: string; reservationId?: string }>(
+      stay.channelId,
+      booking,
+    );
+    reference = result?.reservationId || result?.id || "CONFIRMED";
+  } else {
+    reference = `SIM-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+  }
+
+  const next = new URLSearchParams(url.searchParams);
+  next.set("sim", config.allowLiveBooking ? "0" : "1");
+  return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
+}
+
+function Field({
+  name,
+  label,
+  type = "text",
+  placeholder,
+  error,
+}: {
+  name: string;
+  label: string;
+  type?: string;
+  placeholder?: string;
+  error?: string[];
+}) {
+  return (
+    <label className="block text-[13px] font-semibold text-secondary">
+      {label}
+      <input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        className="mt-[7px] block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
+      />
+      {error?.[0] && (
+        <span className="mt-1 block text-[12px] font-normal text-red-600">{error[0]}</span>
+      )}
+    </label>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-secondary">{label}</span>
+      <span className="font-semibold">{value}</span>
+    </div>
+  );
+}
+
+export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
+  const { stay, lines, nights, totals } = loaderData;
+  const { currency } = useProperty();
+  const [searchParams] = useSearchParams();
+  const nav = useNavigation();
+  const errors = actionData?.errors;
+  const submitting = nav.state === "submitting";
+
+  const taxes = Math.max(0, totals.total - totals.net);
+
+  return (
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+      <Link
+        to={`/${params.channelId}/rooms?${searchParams.toString()}`}
+        className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
+      >
+        ← Back to rooms
+      </Link>
+      <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">Your details</h1>
+
+      <Form method="post" className="flex flex-wrap items-start gap-9">
+        <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
+          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
+            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">Guest information</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field name="firstName" label="First name" placeholder="Jamie" error={errors?.firstName} />
+              <Field name="lastName" label="Last name" placeholder="Doyle" error={errors?.lastName} />
+              <Field name="email" label="Email" type="email" placeholder="jamie@email.com" error={errors?.email} />
+              <Field name="phone" label="Phone" placeholder="+44 …" error={errors?.phone} />
+            </div>
+          </section>
+
+          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
+            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">Arrival &amp; requests</h3>
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field name="arrival" label="Estimated arrival" placeholder="15:00" />
+            </div>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Special requests
+              <textarea
+                name="requests"
+                rows={3}
+                placeholder="Quiet room, early check-in, anything we should know…"
+                className="mt-[7px] block w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
+              />
+            </label>
+          </section>
+
+          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
+            <h3 className="mb-2 font-serif text-[20px] font-semibold">Payment</h3>
+            <p className="mb-[18px] text-sm leading-[1.55] text-muted">
+              Your flexible rate is paid at the hotel. We only need a card to guarantee the
+              booking — you won't be charged today.
+            </p>
+            <div className="rounded-[10px] border border-dashed border-[#d8cdb9] bg-[#fbf7f0] p-[18px] text-[13px] text-muted-2">
+              secure card field — provided by payment gateway
+            </div>
+          </section>
+        </div>
+
+        {/* summary */}
+        <aside
+          className="sticky top-24 min-w-[300px] flex-1 rounded-[18px] border border-line bg-surface p-6"
+          style={{ boxShadow: "var(--shadow-sticky)" }}
+        >
+          <h3 className="mb-4 font-serif text-[21px] font-semibold">
+            Your stay · {lines.length} room{lines.length === 1 ? "" : "s"}
+          </h3>
+          <div className="flex flex-col gap-3 border-b border-divider pb-4">
+            {lines.map((l, i) => (
+              <div key={`${l.roomId}-${i}`} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[14.5px] font-semibold">{l.roomTitle}</div>
+                  <div className="text-[12.5px] text-muted-2">{l.rateTitle}</div>
+                </div>
+                <span className="whitespace-nowrap text-[14px] font-semibold">
+                  {formatMoney(l.total, currency)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
+            <Row label="Check-in" value={format(parseISO(stay.checkin), "EEE d MMM")} />
+            <Row label="Check-out" value={format(parseISO(stay.checkout), "EEE d MMM")} />
+            <Row label="Nights" value={String(nights)} />
+            <Row label="Guests" value={occupancyLabel(stay.occ.adults, stay.occ.childrenAge)} />
+          </div>
+          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
+            <Row label="Subtotal" value={formatMoney(totals.net, currency)} />
+            <Row label="Taxes & fees" value={formatMoney(taxes, currency)} />
+          </div>
+          <div className="flex items-baseline justify-between py-4">
+            <span className="text-[16px] font-semibold">Total</span>
+            <span className="font-serif text-[30px] font-semibold">
+              {formatMoney(totals.total, currency)}
+            </span>
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
+          >
+            {submitting ? "Confirming…" : "Complete booking"}
+          </button>
+          <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
+            Free cancellation until 24h before arrival.
+          </div>
+        </aside>
+      </Form>
+    </main>
+  );
+}
