@@ -9,7 +9,7 @@
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && vite preview",
     "cf-typegen": "wrangler types",
-    "postinstall": "wrangler types"
+    "postinstall": "wrangler types && react-router build"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
