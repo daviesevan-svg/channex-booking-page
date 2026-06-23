@@ -15,6 +15,27 @@ export interface SearchContent {
   highlights?: Highlight[];
 }
 
+// Brand accent presets (map to [data-theme="…"] blocks in app.css).
+export const THEMES = [
+  { id: "terracotta", label: "Terracotta", accent: "oklch(0.63 0.13 45)" },
+  { id: "sage", label: "Sage", accent: "oklch(0.57 0.075 155)" },
+  { id: "indigo", label: "Indigo", accent: "oklch(0.54 0.10 268)" },
+  { id: "ocean", label: "Ocean", accent: "oklch(0.58 0.11 230)" },
+  { id: "plum", label: "Plum", accent: "oklch(0.55 0.13 350)" },
+] as const;
+
+export type ThemeId = (typeof THEMES)[number]["id"];
+export const DEFAULT_THEME: ThemeId = "terracotta";
+
+export function isThemeId(value: string): value is ThemeId {
+  return THEMES.some((t) => t.id === value);
+}
+
+export interface SiteSettings {
+  theme?: ThemeId;
+  customDomain?: string;
+}
+
 export const DEFAULT_SEARCH = {
   heading: "Reserve your stay",
   intro:

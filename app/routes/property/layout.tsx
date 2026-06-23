@@ -4,7 +4,8 @@ import type { Route } from "./+types/layout";
 import { ChannexApiError } from "~/lib/channex/client";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { getOverrides } from "~/lib/overrides.server";
+import { DEFAULT_THEME } from "~/lib/content";
+import { getOverrides, getSettings } from "~/lib/overrides.server";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { channelCode } = getConfig();
@@ -24,7 +25,10 @@ export async function loader({ params }: Route.LoaderArgs) {
   }
 
   // Apply admin content overrides (fall back to Channex when unset).
-  const overrides = await getOverrides(params.channelId);
+  const [overrides, settings] = await Promise.all([
+    getOverrides(params.channelId),
+    getSettings(params.channelId),
+  ]);
   const merged = {
     ...property,
     title: overrides.hotelName || property.title,
@@ -35,7 +39,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   };
 
   const currency = merged.currency || merged.hotelPolicy?.currency || "GBP";
-  return { property: merged, currency, hotelName: merged.title };
+  return { property: merged, currency, hotelName: merged.title, theme: settings.theme ?? DEFAULT_THEME };
 }
 
 type Step = "search" | "results" | "detail" | "checkout" | "confirmation";
@@ -99,7 +103,7 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName } = loaderData;
+  const { property, currency, hotelName, theme } = loaderData;
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 
@@ -107,7 +111,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const navigation = useNavigation();
 
   return (
-    <div className="flex min-h-screen flex-col bg-page font-sans text-ink">
+    <div className="flex min-h-screen flex-col bg-page font-sans text-ink" data-theme={theme}>
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"

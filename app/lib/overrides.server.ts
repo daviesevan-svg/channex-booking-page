@@ -1,6 +1,6 @@
 import type { RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
-import type { SearchContent } from "./content";
+import { isThemeId, type SearchContent, type SiteSettings } from "./content";
 
 // Per-property content overrides edited in the admin. Anything unset falls back
 // to the Channex property_info. Extend this as the admin grows (colors, images…).
@@ -131,6 +131,39 @@ export async function saveSearchContent(
   const content = await getSiteContent(propertyId);
   content.search = search;
   await kv.put(contentKey(propertyId), JSON.stringify(content));
+}
+
+// ---------- general site settings (theme, custom domain) ----------
+const settingsKey = (propertyId: string) => `settings:${propertyId}`;
+
+export async function getSettings(propertyId: string): Promise<SiteSettings> {
+  const kv = getConfigKV();
+  if (!kv) return {};
+  const raw = await kv.get(settingsKey(propertyId));
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as SiteSettings;
+  } catch {
+    return {};
+  }
+}
+
+export async function saveSettings(
+  propertyId: string,
+  input: Record<string, FormDataEntryValue>,
+): Promise<SiteSettings> {
+  const themeRaw = String(input.theme ?? "").trim();
+  const next: SiteSettings = {
+    theme: isThemeId(themeRaw) ? themeRaw : undefined,
+    customDomain:
+      String(input.customDomain ?? "")
+        .trim()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/.*$/, "") || undefined,
+  };
+  const kv = getConfigKV();
+  if (kv) await kv.put(settingsKey(propertyId), JSON.stringify(next));
+  return next;
 }
 
 /** Apply a room's content override on top of the Channex room (keeps rate plans). */

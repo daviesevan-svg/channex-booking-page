@@ -48,6 +48,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         <nav className="w-44 flex-none space-y-1">
           {[
             { to: "/admin", label: "Property details", end: true },
+            { to: "/admin/general", label: "General", end: false },
             { to: "/admin/home", label: "Home page", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
           ].map((item) => (
