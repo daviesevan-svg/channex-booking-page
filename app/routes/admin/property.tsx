@@ -3,18 +3,21 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { getOverrides, saveOverrides } from "~/lib/overrides.server";
+import { langFromRequest, pickLang } from "~/lib/content";
+import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
+  const lang = langFromRequest(request);
   const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
-  const overrides = await getOverrides(propertyId);
+  const overrides = await getOverridesRaw(propertyId, lang);
   return {
     configured: true as const,
     propertyId,
+    lang,
     overrides,
     defaults: {
       hotelName: property?.title ?? "",
@@ -31,7 +34,7 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID is configured." };
   const form = await request.formData();
-  await saveOverrides(propertyId, Object.fromEntries(form));
+  await saveOverrides(propertyId, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));
   return { ok: true };
 }
 
@@ -93,7 +96,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, defaults } = loaderData;
+  const { overrides, defaults, lang } = loaderData;
 
   return (
     <div>
@@ -109,7 +112,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         These override what guests see in the booking engine. Empty fields fall back to Channex.
       </p>
 
-      <Form method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+      <Form
+        method="post"
+        key={lang}
+        className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
+      >
+        <input type="hidden" name="lang" value={lang} />
         <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder={defaults.hotelName} />
         <Field name="address" label="Address" value={overrides.address} placeholder={defaults.address} />
         <Field name="description" label="Description" value={overrides.description} placeholder={defaults.description} textarea />

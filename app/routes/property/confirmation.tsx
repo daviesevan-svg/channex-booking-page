@@ -5,6 +5,7 @@ import type { Route } from "./+types/confirmation";
 import { useProperty } from "~/lib/booking-context";
 import { cartCoverage, parseCart, resolveCart } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
+import { langFromRequest } from "~/lib/content";
 import { occupancyLabel, readOccupancy } from "~/lib/occupancy";
 import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
@@ -16,6 +17,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
   const simulated = url.searchParams.get("sim") === "1";
+  const lang = langFromRequest(request);
 
   let datesStr = "";
   let rooms: { title: string; rate: string }[] = [];
@@ -28,12 +30,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       "EEE d MMM",
     )} · ${nights} night${nights > 1 ? "s" : ""}`;
 
-    const apiRooms = await getRoomsWithOverrides(params.channelId, {
-      checkinDate: checkin,
-      checkoutDate: checkout,
-      currency,
-      adults: occ.adults,
-    });
+    const apiRooms = await getRoomsWithOverrides(
+      params.channelId,
+      { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults },
+      lang,
+    );
     const lines = resolveCart(parseCart(url.searchParams), apiRooms);
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     if (lines.length) totalStr = formatMoney(cartCoverage(lines).total, currency);
@@ -46,7 +47,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     totalStr,
     datesStr,
     guests: occupancyLabel(occ.adults, occ.childrenAge),
-    text: await getPageText(params.channelId, "confirmation"),
+    text: await getPageText(params.channelId, "confirmation", lang),
   };
 }
 

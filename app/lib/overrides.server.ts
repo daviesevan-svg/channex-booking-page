@@ -1,6 +1,7 @@
 import type { RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import {
+  DEFAULT_LANG,
   isThemeId,
   normalizeHex,
   pageDef,
@@ -9,8 +10,28 @@ import {
   type SiteSettings,
 } from "./content";
 
-// Per-property content overrides edited in the admin. Anything unset falls back
-// to the Channex property_info. Extend this as the admin grows (colors, images…).
+// Localized content is stored per language: KV value is { [lang]: data }.
+// Guests read their language merged over the default language; the admin edits
+// one language at a time (raw values for that language).
+type LangMap<T> = Record<string, T>;
+
+async function readJson<T>(key: string): Promise<T | null> {
+  const kv = getConfigKV();
+  if (!kv) return null;
+  const raw = await kv.get(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+async function writeJson(key: string, value: unknown): Promise<void> {
+  const kv = getConfigKV();
+  if (kv) await kv.put(key, JSON.stringify(value));
+}
+
+// ===== property overrides (localized) =====
 export interface PropertyOverrides {
   hotelName?: string;
   address?: string;
@@ -18,7 +39,6 @@ export interface PropertyOverrides {
   phone?: string;
   email?: string;
 }
-
 const OVERRIDE_FIELDS: (keyof PropertyOverrides)[] = [
   "hotelName",
   "address",
@@ -26,191 +46,99 @@ const OVERRIDE_FIELDS: (keyof PropertyOverrides)[] = [
   "phone",
   "email",
 ];
+const overridesKey = (pid: string) => `overrides:${pid}`;
+const overridesMap = (pid: string) =>
+  readJson<LangMap<PropertyOverrides>>(overridesKey(pid)).then((m) => m ?? {});
 
-const key = (propertyId: string) => `overrides:${propertyId}`;
-
-export async function getOverrides(propertyId: string): Promise<PropertyOverrides> {
-  const kv = getConfigKV();
-  if (!kv) return {};
-  const raw = await kv.get(key(propertyId));
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as PropertyOverrides;
-  } catch {
-    return {};
-  }
+export async function getOverrides(pid: string, lang = DEFAULT_LANG): Promise<PropertyOverrides> {
+  const m = await overridesMap(pid);
+  return { ...(m[DEFAULT_LANG] ?? {}), ...(m[lang] ?? {}) };
 }
-
-/** Persist overrides; empty strings clear a field (fall back to Channex). */
+export async function getOverridesRaw(pid: string, lang: string): Promise<PropertyOverrides> {
+  return (await overridesMap(pid))[lang] ?? {};
+}
 export async function saveOverrides(
-  propertyId: string,
+  pid: string,
+  lang: string,
   input: Record<string, FormDataEntryValue>,
-): Promise<PropertyOverrides> {
+): Promise<void> {
   const next: PropertyOverrides = {};
-  for (const field of OVERRIDE_FIELDS) {
-    const value = String(input[field] ?? "").trim();
-    if (value) next[field] = value;
+  for (const f of OVERRIDE_FIELDS) {
+    const v = String(input[f] ?? "").trim();
+    if (v) next[f] = v;
   }
-  const kv = getConfigKV();
-  if (kv) await kv.put(key(propertyId), JSON.stringify(next));
-  return next;
+  const m = await overridesMap(pid);
+  m[lang] = next;
+  await writeJson(overridesKey(pid), m);
 }
 
-// ---------- per-room content overrides ----------
+// ===== room overrides (name/description localized; images shared) =====
 export interface RoomOverride {
   name?: string;
   description?: string;
   images?: string[];
 }
-
 type RoomOverridesMap = Record<string, RoomOverride>;
+const roomsKey = (pid: string) => `rooms:${pid}`;
+const roomsMap = (pid: string) =>
+  readJson<LangMap<RoomOverridesMap>>(roomsKey(pid)).then((m) => m ?? {});
 
-const roomsKey = (propertyId: string) => `rooms:${propertyId}`;
-
-export async function getRoomOverrides(propertyId: string): Promise<RoomOverridesMap> {
-  const kv = getConfigKV();
-  if (!kv) return {};
-  const raw = await kv.get(roomsKey(propertyId));
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as RoomOverridesMap;
-  } catch {
-    return {};
+/** Merged for guests: language text over default text; images from the default language. */
+export async function getRoomOverrides(pid: string, lang = DEFAULT_LANG): Promise<RoomOverridesMap> {
+  const m = await roomsMap(pid);
+  const base = m[DEFAULT_LANG] ?? {};
+  const loc = m[lang] ?? {};
+  const out: RoomOverridesMap = {};
+  for (const id of new Set([...Object.keys(base), ...Object.keys(loc)])) {
+    out[id] = {
+      name: loc[id]?.name ?? base[id]?.name,
+      description: loc[id]?.description ?? base[id]?.description,
+      images: base[id]?.images,
+    };
   }
+  return out;
 }
-
+/** Admin prefill: this language's text + the shared (default-language) images. */
 export async function getRoomOverride(
-  propertyId: string,
+  pid: string,
   roomId: string,
+  lang: string,
 ): Promise<RoomOverride> {
-  return (await getRoomOverrides(propertyId))[roomId] ?? {};
+  const m = await roomsMap(pid);
+  const langEntry = (m[lang] ?? {})[roomId] ?? {};
+  const baseEntry = (m[DEFAULT_LANG] ?? {})[roomId] ?? {};
+  return { name: langEntry.name, description: langEntry.description, images: baseEntry.images };
 }
-
 export async function putRoomOverride(
-  propertyId: string,
+  pid: string,
   roomId: string,
+  lang: string,
   ov: RoomOverride,
-): Promise<RoomOverride> {
-  const next: RoomOverride = {};
-  if (ov.name?.trim()) next.name = ov.name.trim();
-  if (ov.description?.trim()) next.description = ov.description.trim();
+): Promise<void> {
+  const m = await roomsMap(pid);
+  const name = ov.name?.trim() || undefined;
+  const description = ov.description?.trim() || undefined;
   const images = (ov.images ?? []).map((s) => s.trim()).filter(Boolean);
-  if (images.length) next.images = images;
 
-  const all = await getRoomOverrides(propertyId);
-  if (Object.keys(next).length) all[roomId] = next;
-  else delete all[roomId];
+  // Text for this language.
+  const langMap = { ...(m[lang] ?? {}) };
+  const textEntry: RoomOverride = {};
+  if (name) textEntry.name = name;
+  if (description) textEntry.description = description;
+  if (Object.keys(textEntry).length) langMap[roomId] = textEntry;
+  else delete langMap[roomId];
+  m[lang] = langMap;
 
-  const kv = getConfigKV();
-  if (kv) await kv.put(roomsKey(propertyId), JSON.stringify(all));
-  return next;
-}
+  // Images are shared — always stored on the default-language entry.
+  const baseMap = { ...(m[DEFAULT_LANG] ?? {}) };
+  const baseEntry = { ...(baseMap[roomId] ?? {}) };
+  if (images.length) baseEntry.images = images;
+  else delete baseEntry.images;
+  if (Object.keys(baseEntry).length) baseMap[roomId] = baseEntry;
+  else delete baseMap[roomId];
+  m[DEFAULT_LANG] = baseMap;
 
-// ---------- editable page content ----------
-interface SiteContent {
-  search?: SearchContent;
-  pages?: Record<string, Record<string, string>>;
-}
-
-const contentKey = (propertyId: string) => `content:${propertyId}`;
-
-async function getSiteContent(propertyId: string): Promise<SiteContent> {
-  const kv = getConfigKV();
-  if (!kv) return {};
-  const raw = await kv.get(contentKey(propertyId));
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as SiteContent;
-  } catch {
-    return {};
-  }
-}
-
-export async function getSearchContent(propertyId: string): Promise<SearchContent> {
-  return (await getSiteContent(propertyId)).search ?? {};
-}
-
-export async function saveSearchContent(
-  propertyId: string,
-  search: SearchContent,
-): Promise<void> {
-  const kv = getConfigKV();
-  if (!kv) return;
-  const content = await getSiteContent(propertyId);
-  content.search = search;
-  await kv.put(contentKey(propertyId), JSON.stringify(content));
-}
-
-/** Page copy merged over defaults — every field always present. */
-export async function getPageText(
-  propertyId: string,
-  pageId: string,
-): Promise<Record<string, string>> {
-  const content = await getSiteContent(propertyId);
-  return withDefaults(pageId, content.pages?.[pageId] ?? {});
-}
-
-/** Raw stored overrides for a page (no defaults) — for prefilling the admin form. */
-export async function getPageOverrides(
-  propertyId: string,
-  pageId: string,
-): Promise<Record<string, string>> {
-  const content = await getSiteContent(propertyId);
-  return content.pages?.[pageId] ?? {};
-}
-
-export async function savePageContent(
-  propertyId: string,
-  pageId: string,
-  input: Record<string, FormDataEntryValue>,
-): Promise<void> {
-  const def = pageDef(pageId);
-  if (!def) return;
-  const data: Record<string, string> = {};
-  for (const f of def.fields) {
-    const v = String(input[f.key] ?? "").trim();
-    if (v) data[f.key] = v;
-  }
-  const kv = getConfigKV();
-  if (!kv) return;
-  const content = await getSiteContent(propertyId);
-  content.pages = { ...(content.pages ?? {}), [pageId]: data };
-  await kv.put(contentKey(propertyId), JSON.stringify(content));
-}
-
-// ---------- general site settings (theme, custom domain) ----------
-const settingsKey = (propertyId: string) => `settings:${propertyId}`;
-
-export async function getSettings(propertyId: string): Promise<SiteSettings> {
-  const kv = getConfigKV();
-  if (!kv) return {};
-  const raw = await kv.get(settingsKey(propertyId));
-  if (!raw) return {};
-  try {
-    return JSON.parse(raw) as SiteSettings;
-  } catch {
-    return {};
-  }
-}
-
-export async function saveSettings(
-  propertyId: string,
-  input: Record<string, FormDataEntryValue>,
-): Promise<SiteSettings> {
-  const themeRaw = String(input.theme ?? "").trim();
-  const next: SiteSettings = {
-    theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
-    customColor: normalizeHex(String(input.customColor ?? "")),
-    customBg: normalizeHex(String(input.customBg ?? "")),
-    customDomain:
-      String(input.customDomain ?? "")
-        .trim()
-        .replace(/^https?:\/\//, "")
-        .replace(/\/.*$/, "") || undefined,
-  };
-  const kv = getConfigKV();
-  if (kv) await kv.put(settingsKey(propertyId), JSON.stringify(next));
-  return next;
+  await writeJson(roomsKey(pid), m);
 }
 
 /** Apply a room's content override on top of the Channex room (keeps rate plans). */
@@ -222,4 +150,100 @@ export function mergeRoomOverride(room: RoomWithRates, ov?: RoomOverride): RoomW
     description: ov.description || room.description,
     photos: ov.images?.length ? ov.images.map((url) => ({ url })) : room.photos,
   };
+}
+
+// ===== editable page content (localized) =====
+interface SiteContent {
+  search?: SearchContent;
+  pages?: Record<string, Record<string, string>>;
+}
+const contentKey = (pid: string) => `content:${pid}`;
+const contentMap = (pid: string) =>
+  readJson<LangMap<SiteContent>>(contentKey(pid)).then((m) => m ?? {});
+
+export async function getSearchContent(pid: string, lang = DEFAULT_LANG): Promise<SearchContent> {
+  const m = await contentMap(pid);
+  const base = m[DEFAULT_LANG]?.search ?? {};
+  const loc = m[lang]?.search ?? {};
+  return {
+    eyebrow: loc.eyebrow ?? base.eyebrow,
+    heading: loc.heading ?? base.heading,
+    intro: loc.intro ?? base.intro,
+    promoText: loc.promoText ?? base.promoText,
+    searchButton: loc.searchButton ?? base.searchButton,
+    highlights: loc.highlights ?? base.highlights,
+  };
+}
+export async function getSearchContentRaw(pid: string, lang: string): Promise<SearchContent> {
+  return (await contentMap(pid))[lang]?.search ?? {};
+}
+export async function saveSearchContent(
+  pid: string,
+  lang: string,
+  search: SearchContent,
+): Promise<void> {
+  const m = await contentMap(pid);
+  m[lang] = { ...(m[lang] ?? {}), search };
+  await writeJson(contentKey(pid), m);
+}
+
+export async function getPageText(
+  pid: string,
+  pageId: string,
+  lang = DEFAULT_LANG,
+): Promise<Record<string, string>> {
+  const m = await contentMap(pid);
+  const base = m[DEFAULT_LANG]?.pages?.[pageId] ?? {};
+  const loc = m[lang]?.pages?.[pageId] ?? {};
+  return withDefaults(pageId, { ...base, ...loc });
+}
+export async function getPageOverridesRaw(
+  pid: string,
+  pageId: string,
+  lang: string,
+): Promise<Record<string, string>> {
+  const m = await contentMap(pid);
+  return m[lang]?.pages?.[pageId] ?? {};
+}
+export async function savePageContent(
+  pid: string,
+  pageId: string,
+  lang: string,
+  input: Record<string, FormDataEntryValue>,
+): Promise<void> {
+  const def = pageDef(pageId);
+  if (!def) return;
+  const data: Record<string, string> = {};
+  for (const f of def.fields) {
+    const v = String(input[f.key] ?? "").trim();
+    if (v) data[f.key] = v;
+  }
+  const m = await contentMap(pid);
+  const entry = m[lang] ?? {};
+  entry.pages = { ...(entry.pages ?? {}), [pageId]: data };
+  m[lang] = entry;
+  await writeJson(contentKey(pid), m);
+}
+
+// ===== general site settings (global, not localized) =====
+const settingsKey = (pid: string) => `settings:${pid}`;
+
+export async function getSettings(pid: string): Promise<SiteSettings> {
+  return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
+}
+export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const themeRaw = String(form.get("theme") ?? "").trim();
+  const next: SiteSettings = {
+    theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
+    customColor: normalizeHex(String(form.get("customColor") ?? "")),
+    customBg: normalizeHex(String(form.get("customBg") ?? "")),
+    customDomain:
+      String(form.get("customDomain") ?? "")
+        .trim()
+        .replace(/^https?:\/\//, "")
+        .replace(/\/.*$/, "") || undefined,
+    languages: form.getAll("languages").map(String),
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
 }

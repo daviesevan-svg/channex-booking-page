@@ -7,12 +7,13 @@ import { getRoomOverrides, mergeRoomOverride } from "./overrides.server";
 export async function getRoomsWithOverrides(
   propertyId: string,
   query: RoomsQuery = {},
+  lang?: string,
 ): Promise<RoomWithRates[]> {
   const [rooms, overrides] = await Promise.all([
     getChannexClient()
       .getRooms(propertyId, query)
       .catch(() => [] as RoomWithRates[]),
-    getRoomOverrides(propertyId),
+    getRoomOverrides(propertyId, lang),
   ]);
   return rooms.map((room) => mergeRoomOverride(room, overrides[room.id]));
 }

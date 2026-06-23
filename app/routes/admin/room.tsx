@@ -3,6 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
+import { langFromRequest, pickLang } from "~/lib/content";
 import { uploadRoomImage } from "~/lib/images.server";
 import { getRoomOverride, putRoomOverride } from "~/lib/overrides.server";
 
@@ -15,10 +16,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const room = rooms.find((r) => r.id === params.roomId);
   if (!room) throw redirect("/admin/rooms");
 
-  const override = await getRoomOverride(propertyId, params.roomId);
+  const lang = langFromRequest(request);
+  const override = await getRoomOverride(propertyId, params.roomId, lang);
   return {
     roomId: params.roomId,
     override,
+    lang,
     defaults: { name: room.title, description: room.description ?? "" },
   };
 }
@@ -47,7 +50,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { error: e instanceof Error ? e.message : "Upload failed." };
   }
 
-  await putRoomOverride(propertyId, params.roomId, {
+  await putRoomOverride(propertyId, params.roomId, pickLang(String(form.get("lang") ?? "")), {
     name: String(form.get("name") ?? ""),
     description: String(form.get("description") ?? ""),
     images: [...keep, ...uploaded, ...urls],
@@ -60,7 +63,7 @@ export function meta() {
 }
 
 export default function AdminRoom({ loaderData, actionData }: Route.ComponentProps) {
-  const { override, defaults } = loaderData;
+  const { override, defaults, lang } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const existing = override.images ?? [];
@@ -87,9 +90,11 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
 
       <Form
         method="post"
+        key={lang}
         encType="multipart/form-data"
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
+        <input type="hidden" name="lang" value={lang} />
         <label className="block text-[13px] font-semibold text-secondary">
           Room name
           <input name="name" defaultValue={override.name} placeholder={defaults.name} className={inputCls} />

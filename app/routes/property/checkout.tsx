@@ -16,6 +16,7 @@ import {
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 import { occupancyLabel, readOccupancy, type Occupancy } from "~/lib/occupancy";
+import { langFromRequest } from "~/lib/content";
 import { getPageText } from "~/lib/overrides.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 
@@ -43,13 +44,18 @@ function readStay(url: URL, channelId: string): Stay | null {
 async function resolveStayCart(
   stay: Stay,
   url: URL,
+  lang: string,
 ): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
-  const rooms = await getRoomsWithOverrides(stay.channelId, {
-    checkinDate: stay.checkin,
-    checkoutDate: stay.checkout,
-    currency: stay.currency,
-    adults: stay.occ.adults,
-  });
+  const rooms = await getRoomsWithOverrides(
+    stay.channelId,
+    {
+      checkinDate: stay.checkin,
+      checkoutDate: stay.checkout,
+      currency: stay.currency,
+      adults: stay.occ.adults,
+    },
+    lang,
+  );
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 
@@ -58,13 +64,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const stay = readStay(url, params.channelId);
   if (!stay) throw redirect(`/${params.channelId}`);
 
-  const { rooms, lines } = await resolveStayCart(stay, url);
+  const lang = langFromRequest(request);
+  const { rooms, lines } = await resolveStayCart(stay, url, lang);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
-  const text = await getPageText(params.channelId, "checkout");
+  const text = await getPageText(params.channelId, "checkout", lang);
   return { stay, lines, nights, totals: cartCoverage(lines), text };
 }
 
@@ -88,7 +95,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { errors: parsed.error.flatten().fieldErrors };
   }
 
-  const { rooms, lines } = await resolveStayCart(stay, url);
+  const { rooms, lines } = await resolveStayCart(stay, url, langFromRequest(request));
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }

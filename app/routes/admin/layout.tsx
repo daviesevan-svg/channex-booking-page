@@ -1,16 +1,26 @@
-import { Form, Link, NavLink, Outlet } from "react-router";
+import { Form, Link, NavLink, Outlet, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
+import { DEFAULT_LANG, enabledLanguages, langFromRequest, langLabel } from "~/lib/content";
+import { getSettings } from "~/lib/overrides.server";
 
 export interface AdminContext {
   propertyId?: string;
+  lang: string;
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
-  return { email, propertyId: getConfig().defaultPropertyId };
+  const propertyId = getConfig().defaultPropertyId;
+  const settings = propertyId ? await getSettings(propertyId) : {};
+  return {
+    email,
+    propertyId,
+    lang: langFromRequest(request),
+    languages: enabledLanguages(settings),
+  };
 }
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
@@ -19,8 +29,16 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId } = loaderData;
-  const context: AdminContext = { propertyId };
+  const { email, propertyId, lang, languages } = loaderData;
+  const context: AdminContext = { propertyId, lang };
+  const [, setSearchParams] = useSearchParams();
+  const changeLang = (code: string) =>
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (code === DEFAULT_LANG) p.delete("lang");
+      else p.set("lang", code);
+      return p;
+    });
 
   return (
     <div className="min-h-screen bg-page text-ink">
@@ -34,6 +52,22 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             <span className="font-serif text-[19px] font-semibold">Booking Admin</span>
           </Link>
           <div className="flex items-center gap-5 text-[13px] text-muted">
+            {languages.length > 1 && (
+              <label className="flex items-center gap-1.5">
+                <span className="text-faint">Editing</span>
+                <select
+                  value={lang}
+                  onChange={(e) => changeLang(e.target.value)}
+                  className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[13px] font-semibold text-ink outline-none focus:border-accent"
+                >
+                  {languages.map((code) => (
+                    <option key={code} value={code}>
+                      {langLabel(code)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {propertyId && (
               <Link to={`/${propertyId}`} className="hover:text-accent" target="_blank">
                 View site ↗

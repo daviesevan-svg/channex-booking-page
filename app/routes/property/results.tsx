@@ -18,6 +18,7 @@ import {
 } from "~/lib/cart";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 import { getPageText } from "~/lib/overrides.server";
+import { langFromRequest } from "~/lib/content";
 import { formatMoney } from "~/lib/money";
 import {
   childrenAgeParam,
@@ -36,18 +37,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const checkout = url.searchParams.get("checkout");
   const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
+  const lang = langFromRequest(request);
 
   if (!checkin || !checkout) {
     throw redirect(`/${params.channelId}`);
   }
 
-  const rooms = await getRoomsWithOverrides(params.channelId, {
-    checkinDate: checkin,
-    checkoutDate: checkout,
-    currency,
-    adults: occ.adults,
-    childrenAge: childrenAgeParam(occ.childrenAge),
-  });
+  const rooms = await getRoomsWithOverrides(
+    params.channelId,
+    {
+      checkinDate: checkin,
+      checkoutDate: checkout,
+      currency,
+      adults: occ.adults,
+      childrenAge: childrenAgeParam(occ.childrenAge),
+    },
+    lang,
+  );
 
   const party = partySize(occ);
   const cheapest = (room: RoomWithRates) =>
@@ -59,7 +65,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-  const text = await getPageText(params.channelId, "results");
+  const text = await getPageText(params.channelId, "results", lang);
 
   const cartLines = resolveCart(parseCart(url.searchParams), rooms);
   const coverage = cartCoverage(cartLines);

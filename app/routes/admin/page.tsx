@@ -3,23 +3,25 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/page";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
-import { pageDef } from "~/lib/content";
-import { getPageOverrides, savePageContent } from "~/lib/overrides.server";
+import { langFromRequest, pageDef, pickLang } from "~/lib/content";
+import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const def = pageDef(params.page);
   if (!def) throw redirect("/admin");
   const propertyId = getConfig().defaultPropertyId;
-  const overrides = propertyId ? await getPageOverrides(propertyId, params.page) : {};
-  return { configured: Boolean(propertyId), page: params.page, label: def.label, fields: def.fields, overrides };
+  const lang = langFromRequest(request);
+  const overrides = propertyId ? await getPageOverridesRaw(propertyId, params.page, lang) : {};
+  return { configured: Boolean(propertyId), page: params.page, label: def.label, fields: def.fields, overrides, lang };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
-  await savePageContent(propertyId, params.page, Object.fromEntries(await request.formData()));
+  const form = await request.formData();
+  await savePageContent(propertyId, params.page, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));
   return { ok: true };
 }
 
@@ -63,9 +65,10 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
 
       <Form
         method="post"
-        key={loaderData.page}
+        key={loaderData.page + loaderData.lang}
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
+        <input type="hidden" name="lang" value={loaderData.lang} />
         {fields.map((f) => (
           <label key={f.key} className="block text-[13px] font-semibold text-secondary">
             {f.label}

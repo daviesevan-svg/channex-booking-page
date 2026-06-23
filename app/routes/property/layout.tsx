@@ -1,13 +1,13 @@
-import { Link, Outlet, useLocation, useNavigation } from "react-router";
+import { Link, Outlet, useLocation, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
 import { ChannexApiError } from "~/lib/channex/client";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { DEFAULT_THEME } from "~/lib/content";
+import { DEFAULT_LANG, DEFAULT_THEME, enabledLanguages, langFromRequest, langLabel } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const { channelCode } = getConfig();
   if (!channelCode) {
     throw new Response("CHANNEL_CODE is not configured", { status: 500 });
@@ -25,8 +25,9 @@ export async function loader({ params }: Route.LoaderArgs) {
   }
 
   // Apply admin content overrides (fall back to Channex when unset).
+  const lang = langFromRequest(request);
   const [overrides, settings] = await Promise.all([
-    getOverrides(params.channelId),
+    getOverrides(params.channelId, lang),
     getSettings(params.channelId),
   ]);
   const merged = {
@@ -46,6 +47,8 @@ export async function loader({ params }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
+    lang,
+    languages: enabledLanguages(settings),
   };
 }
 
@@ -110,7 +113,19 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme, customColor, customBg } = loaderData;
+  const { property, currency, hotelName, theme, customColor, customBg, lang, languages } =
+    loaderData;
+  const [, setSearchParams] = useSearchParams();
+  const changeLang = (code: string) =>
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (code === DEFAULT_LANG) p.delete("lang");
+        else p.set("lang", code);
+        return p;
+      },
+      { preventScrollReset: true },
+    );
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 
@@ -153,11 +168,23 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
               {hotelName}
             </span>
           </Link>
-          <div className="flex items-center gap-6 text-sm text-muted">
-            <span className="cursor-pointer hover:text-accent">Manage booking</span>
-            {property.phone && (
-              <span className="hidden sm:inline">{property.phone}</span>
+          <div className="flex items-center gap-5 text-sm text-muted">
+            {languages.length > 1 && (
+              <select
+                value={lang}
+                onChange={(e) => changeLang(e.target.value)}
+                aria-label="Language"
+                className="cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt px-2 py-1 text-[13px] font-semibold text-secondary outline-none focus:border-accent"
+              >
+                {languages.map((code) => (
+                  <option key={code} value={code}>
+                    {langLabel(code)}
+                  </option>
+                ))}
+              </select>
             )}
+            <span className="cursor-pointer hover:text-accent">Manage booking</span>
+            {property.phone && <span className="hidden sm:inline">{property.phone}</span>}
           </div>
         </div>
       </header>

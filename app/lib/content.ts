@@ -124,6 +124,46 @@ export interface SiteSettings {
   customColor?: string;
   customBg?: string;
   customDomain?: string;
+  languages?: string[]; // enabled languages (always includes the default)
+}
+
+// Supported content languages for the booking pages.
+export const LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "fr", label: "Français" },
+  { code: "de", label: "Deutsch" },
+  { code: "es", label: "Español" },
+  { code: "it", label: "Italiano" },
+  { code: "pt", label: "Português" },
+  { code: "nl", label: "Nederlands" },
+] as const;
+
+export const DEFAULT_LANG = "en";
+
+export function isLang(code: string): boolean {
+  return LANGUAGES.some((l) => l.code === code);
+}
+
+/** Validate a language code, falling back to the default. */
+export function pickLang(code: string): string {
+  return isLang(code) ? code : DEFAULT_LANG;
+}
+
+/** Read & validate the `?lang` param from a request, falling back to default. */
+export function langFromRequest(request: Request): string {
+  const code = new URL(request.url).searchParams.get("lang") ?? "";
+  return isLang(code) ? code : DEFAULT_LANG;
+}
+
+export function langLabel(code: string): string {
+  return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
+}
+
+/** Enabled languages from settings — always includes the default, only valid codes. */
+export function enabledLanguages(settings: SiteSettings): string[] {
+  const set = new Set([DEFAULT_LANG, ...(settings.languages ?? []).filter(isLang)]);
+  // preserve LANGUAGES order
+  return LANGUAGES.map((l) => l.code).filter((c) => set.has(c));
 }
 
 /** Returns a normalized #rrggbb / #rgb hex, or undefined if invalid. */

@@ -3,18 +3,19 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { DEFAULT_SEARCH, type SearchContent } from "~/lib/content";
-import { getSearchContent, saveSearchContent } from "~/lib/overrides.server";
+import { DEFAULT_SEARCH, langFromRequest, pickLang, type SearchContent } from "~/lib/content";
+import { getSearchContentRaw, saveSearchContent } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
+  const lang = langFromRequest(request);
   const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
-  const content = await getSearchContent(propertyId);
+  const content = await getSearchContentRaw(propertyId, lang);
   const eyebrowDefault = (property?.address?.split(",")[1] ?? property?.title ?? "").trim();
-  return { configured: true as const, content, eyebrowDefault };
+  return { configured: true as const, content, eyebrowDefault, lang };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -39,7 +40,7 @@ export async function action({ request }: Route.ActionArgs) {
     searchButton: s(form.get("searchButton")) || undefined,
     highlights,
   };
-  await saveSearchContent(propertyId, content);
+  await saveSearchContent(propertyId, pickLang(s(form.get("lang"))), content);
   return { ok: true };
 }
 
@@ -91,7 +92,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { content, eyebrowDefault } = loaderData;
+  const { content, eyebrowDefault, lang } = loaderData;
 
   return (
     <div>
@@ -107,7 +108,12 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         The text guests see on the landing page. Empty fields use the defaults shown.
       </p>
 
-      <Form method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+      <Form
+        method="post"
+        key={lang}
+        className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
+      >
+        <input type="hidden" name="lang" value={lang} />
         <Field name="eyebrow" label="Eyebrow (small label above the heading)" value={content.eyebrow} placeholder={eyebrowDefault} />
         <Field name="heading" label="Heading" value={content.heading} placeholder={DEFAULT_SEARCH.heading} />
         <Field name="intro" label="Intro paragraph" value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />

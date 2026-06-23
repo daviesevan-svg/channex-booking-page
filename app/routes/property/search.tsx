@@ -6,17 +6,18 @@ import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
 import { getChannexClient } from "~/lib/config.server";
-import { DEFAULT_SEARCH } from "~/lib/content";
+import { DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getSearchContent } from "~/lib/overrides.server";
 import { useDateRange } from "~/lib/use-date-range";
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const client = getChannexClient();
+  const lang = langFromRequest(request);
   const [closedDates, content] = await Promise.all([
     client.getClosedDates(params.channelId).catch(() => null),
-    getSearchContent(params.channelId),
+    getSearchContent(params.channelId, lang),
   ]);
   return { closedDates, content };
 }
@@ -67,6 +68,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       }),
       occupancy,
     );
+    const lang = searchParams.get("lang");
+    if (lang) qs.set("lang", lang);
     navigate(`/${params.channelId}/rooms?${qs.toString()}`);
   }
 

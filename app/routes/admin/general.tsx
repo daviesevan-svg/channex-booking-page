@@ -4,7 +4,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/general";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
-import { DEFAULT_THEME, THEMES } from "~/lib/content";
+import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -18,8 +18,7 @@ export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
-  const form = await request.formData();
-  await saveSettings(propertyId, Object.fromEntries(form));
+  await saveSettings(propertyId, await request.formData());
   return { ok: true };
 }
 
@@ -183,6 +182,37 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             add a custom domain. If your DNS is elsewhere, create a <strong>CNAME</strong> for your
             domain pointing to <code className="rounded bg-surface px-1 py-0.5">{host}</code>. Saving
             here records the domain; Cloudflare handles the certificate.
+          </div>
+        </section>
+
+        {/* Languages */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Languages</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            Enable the languages guests can switch between. Translate each in the Pages/Rooms
+            editors using the language selector. English is always available.
+          </p>
+          <div className="flex flex-wrap gap-2.5">
+            {LANGUAGES.map((l) => {
+              const isDefault = l.code === DEFAULT_LANG;
+              const checked = isDefault || (settings.languages ?? []).includes(l.code);
+              return (
+                <label
+                  key={l.code}
+                  className="flex items-center gap-2 rounded-[10px] border border-line-alt px-3 py-2 text-[14px] font-medium"
+                >
+                  <input
+                    type="checkbox"
+                    name="languages"
+                    value={l.code}
+                    defaultChecked={checked}
+                    disabled={isDefault}
+                  />
+                  {l.label}
+                  {isDefault && <span className="text-[11px] text-faint">default</span>}
+                </label>
+              );
+            })}
           </div>
         </section>
 
