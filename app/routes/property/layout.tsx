@@ -4,7 +4,14 @@ import type { Route } from "./+types/layout";
 import { ChannexApiError } from "~/lib/channex/client";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { DEFAULT_LANG, DEFAULT_THEME, enabledLanguages, langFromRequest, langLabel } from "~/lib/content";
+import {
+  DEFAULT_LANG,
+  DEFAULT_THEME,
+  enabledLanguages,
+  langFromRequest,
+  langLabel,
+  LANG_COOKIE,
+} from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -116,7 +123,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const { property, currency, hotelName, theme, customColor, customBg, lang, languages } =
     loaderData;
   const [, setSearchParams] = useSearchParams();
-  const changeLang = (code: string) =>
+  const changeLang = (code: string) => {
+    // Persist as a cookie so the choice survives navigations that drop ?lang.
+    document.cookie = `${LANG_COOKIE}=${code}; path=/; max-age=${
+      code === DEFAULT_LANG ? 0 : 60 * 60 * 24 * 365
+    }`;
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev);
@@ -126,6 +137,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       },
       { preventScrollReset: true },
     );
+  };
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 

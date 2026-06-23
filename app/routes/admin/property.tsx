@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { langFromRequest, pickLang } from "~/lib/content";
+import { langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -11,7 +11,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
-  const lang = langFromRequest(request);
+  const lang = langParam(request);
   const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
   const overrides = await getOverridesRaw(propertyId, lang);
   return {

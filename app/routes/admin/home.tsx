@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { DEFAULT_SEARCH, langFromRequest, pickLang, type SearchContent } from "~/lib/content";
+import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
 import { getSearchContentRaw, saveSearchContent } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -11,7 +11,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
-  const lang = langFromRequest(request);
+  const lang = langParam(request);
   const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
   const content = await getSearchContentRaw(propertyId, lang);
   const eyebrowDefault = (property?.address?.split(",")[1] ?? property?.title ?? "").trim();

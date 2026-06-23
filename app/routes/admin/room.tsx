@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
-import { langFromRequest, pickLang } from "~/lib/content";
+import { langParam, pickLang } from "~/lib/content";
 import { uploadRoomImage } from "~/lib/images.server";
 import { getRoomOverride, putRoomOverride } from "~/lib/overrides.server";
 
@@ -16,7 +16,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const room = rooms.find((r) => r.id === params.roomId);
   if (!room) throw redirect("/admin/rooms");
 
-  const lang = langFromRequest(request);
+  const lang = langParam(request);
   const override = await getRoomOverride(propertyId, params.roomId, lang);
   return {
     roomId: params.roomId,

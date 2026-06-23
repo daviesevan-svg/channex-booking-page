@@ -3,7 +3,7 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/page";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
-import { langFromRequest, pageDef, pickLang } from "~/lib/content";
+import { langParam, pageDef, pickLang } from "~/lib/content";
 import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -11,7 +11,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const def = pageDef(params.page);
   if (!def) throw redirect("/admin");
   const propertyId = getConfig().defaultPropertyId;
-  const lang = langFromRequest(request);
+  const lang = langParam(request);
   const overrides = propertyId ? await getPageOverridesRaw(propertyId, params.page, lang) : {};
   return { configured: Boolean(propertyId), page: params.page, label: def.label, fields: def.fields, overrides, lang };
 }

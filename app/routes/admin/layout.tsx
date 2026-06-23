@@ -3,7 +3,7 @@ import { Form, Link, NavLink, Outlet, useSearchParams } from "react-router";
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
-import { DEFAULT_LANG, enabledLanguages, langFromRequest, langLabel } from "~/lib/content";
+import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 
 export interface AdminContext {
@@ -18,7 +18,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     email,
     propertyId,
-    lang: langFromRequest(request),
+    lang: langParam(request),
     languages: enabledLanguages(settings),
   };
 }

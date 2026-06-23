@@ -149,10 +149,21 @@ export function pickLang(code: string): string {
   return isLang(code) ? code : DEFAULT_LANG;
 }
 
-/** Read & validate the `?lang` param from a request, falling back to default. */
+export const LANG_COOKIE = "ibe_lang";
+
+/** Guest language: `?lang` wins, then the sticky `ibe_lang` cookie, then default. */
 export function langFromRequest(request: Request): string {
-  const code = new URL(request.url).searchParams.get("lang") ?? "";
-  return isLang(code) ? code : DEFAULT_LANG;
+  const param = new URL(request.url).searchParams.get("lang");
+  if (param && isLang(param)) return param;
+  const cookie = request.headers.get("Cookie") ?? "";
+  const m = cookie.match(/(?:^|;\s*)ibe_lang=([^;]+)/);
+  if (m && isLang(m[1])) return m[1];
+  return DEFAULT_LANG;
+}
+
+/** Admin language: `?lang` only (independent of the guest cookie). */
+export function langParam(request: Request): string {
+  return pickLang(new URL(request.url).searchParams.get("lang") ?? "");
 }
 
 export function langLabel(code: string): string {
