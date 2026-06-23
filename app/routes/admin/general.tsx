@@ -47,6 +47,12 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
   const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [hex, setHex] = useState(settings.customColor || "#b5651d");
   const validHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
+  const [bgHex, setBgHex] = useState(settings.customBg || "");
+  const validBg = bgHex === "" || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(bgHex);
+
+  const pickerCls = "h-10 w-12 cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt p-1";
+  const hexCls =
+    "w-36 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[9px] font-mono text-[14px] text-ink outline-none focus:border-accent";
 
   return (
     <div>
@@ -100,24 +106,59 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <input
-              type="color"
-              value={validHex ? hex : "#b5651d"}
-              onChange={(e) => setHex(e.target.value)}
-              aria-label="Pick a colour"
-              className="h-10 w-12 cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt p-1"
-            />
-            <input
-              type="text"
-              name="customColor"
-              value={hex}
-              onChange={(e) => setHex(e.target.value)}
-              placeholder="#b5651d"
-              className="w-32 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[9px] font-mono text-[14px] text-ink outline-none focus:border-accent"
-            />
+          <div className="mt-4 grid max-w-md grid-cols-1 gap-4">
+            <div>
+              <div className="mb-1.5 text-[13px] font-semibold text-secondary">Accent colour</div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={validHex ? hex : "#b5651d"}
+                  onChange={(e) => setHex(e.target.value)}
+                  aria-label="Accent colour"
+                  className={pickerCls}
+                />
+                <input
+                  type="text"
+                  name="customColor"
+                  value={hex}
+                  onChange={(e) => setHex(e.target.value)}
+                  placeholder="#b5651d"
+                  className={hexCls}
+                />
+              </div>
+            </div>
+            <div>
+              <div className="mb-1.5 text-[13px] font-semibold text-secondary">Background colour</div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={validBg && bgHex ? bgHex : "#f5f2ec"}
+                  onChange={(e) => setBgHex(e.target.value)}
+                  aria-label="Background colour"
+                  className={pickerCls}
+                />
+                <input
+                  type="text"
+                  name="customBg"
+                  value={bgHex}
+                  onChange={(e) => setBgHex(e.target.value)}
+                  placeholder="auto (from accent)"
+                  className={hexCls}
+                />
+                {bgHex && (
+                  <button
+                    type="button"
+                    onClick={() => setBgHex("")}
+                    className="text-[12.5px] font-semibold text-muted hover:text-accent"
+                  >
+                    Auto
+                  </button>
+                )}
+              </div>
+            </div>
             <span className="text-[12.5px] text-muted">
-              Pick or enter a hex code, then choose <strong>Custom</strong>.
+              Enter hex codes, then choose <strong>Custom</strong> above. Leave the background blank
+              to derive it from the accent. Cards and text stay neutral for readability.
             </span>
           </div>
         </section>

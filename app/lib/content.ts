@@ -34,6 +34,7 @@ export function isThemeId(value: string): value is ThemeId {
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
+  customBg?: string;
   customDomain?: string;
 }
 

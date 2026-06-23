@@ -45,6 +45,7 @@ export async function loader({ params }: Route.LoaderArgs) {
     hotelName: merged.title,
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
+    customBg: settings.customBg,
   };
 }
 
@@ -109,7 +110,7 @@ function Stepper({ step }: { step: Step }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme, customColor } = loaderData;
+  const { property, currency, hotelName, theme, customColor, customBg } = loaderData;
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
 
@@ -124,7 +125,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       "--accent-deep": `color-mix(in oklab, ${customColor} 82%, black)`,
       "--accent-soft": `color-mix(in oklab, ${customColor} 12%, #ffffff)`,
       "--accent-soft-strong": `color-mix(in oklab, ${customColor} 20%, #ffffff)`,
-      "--page": `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
+      "--page": customBg || `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
     });
   }
 

@@ -156,6 +156,7 @@ export async function saveSettings(
   const next: SiteSettings = {
     theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
     customColor: normalizeHex(String(input.customColor ?? "")),
+    customBg: normalizeHex(String(input.customBg ?? "")),
     customDomain:
       String(input.customDomain ?? "")
         .trim()
