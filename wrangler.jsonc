@@ -26,7 +26,7 @@
 	// Per-property content overrides edited in the admin. Create the namespace for
 	// production with `wrangler kv namespace create CONFIG` and paste the id here.
 	"kv_namespaces": [
-		{ "binding": "CONFIG_KV", "id": "00000000000000000000000000000000" }
+		{ "binding": "CONFIG_KV", "id": "587c02394bb94350886345fe04983fbe" }
 	],
 	"observability": {
 		"enabled": true
