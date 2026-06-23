@@ -6,21 +6,20 @@ import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
 import { getChannexClient } from "~/lib/config.server";
+import { DEFAULT_SEARCH } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
+import { getSearchContent } from "~/lib/overrides.server";
 import { useDateRange } from "~/lib/use-date-range";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const client = getChannexClient();
-  const closedDates = await client.getClosedDates(params.channelId).catch(() => null);
-  return { closedDates };
+  const [closedDates, content] = await Promise.all([
+    client.getClosedDates(params.channelId).catch(() => null),
+    getSearchContent(params.channelId),
+  ]);
+  return { closedDates, content };
 }
-
-const HIGHLIGHTS = [
-  { title: "Free cancellation", desc: "On all flexible rates, up to 24h before arrival." },
-  { title: "Best rate, guaranteed", desc: "Lower price elsewhere? We'll match it." },
-  { title: "No booking fees", desc: "The price you see is the price you pay." },
-];
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
   return (
@@ -32,7 +31,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates } = loaderData;
+  const { closedDates, content } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -47,7 +46,12 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const navigation = useNavigation();
   const searching = navigation.state === "loading";
 
-  const eyebrow = (property.address?.split(",")[1] ?? hotelName).trim();
+  const eyebrow = content.eyebrow || (property.address?.split(",")[1] ?? hotelName).trim();
+  const heading = content.heading || DEFAULT_SEARCH.heading;
+  const intro = content.intro || DEFAULT_SEARCH.intro;
+  const promoText = content.promoText || DEFAULT_SEARCH.promoText;
+  const searchButton = content.searchButton || DEFAULT_SEARCH.searchButton;
+  const highlights = content.highlights?.length ? content.highlights : DEFAULT_SEARCH.highlights;
   const heroPhoto = property.photos?.[0]?.url;
 
   function searchRooms() {
@@ -71,11 +75,10 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       <div className="max-w-[680px]">
         <div className="eyebrow mb-[18px]">{eyebrow}</div>
         <h1 className="mb-[18px] font-serif text-[56px] font-medium leading-[1.05] tracking-[-0.02em]">
-          Reserve your stay
+          {heading}
         </h1>
-        <p className="mb-9 max-w-[560px] text-[18px] leading-[1.6] text-secondary">
-          Book direct for our best available rates, free cancellation on flexible
-          bookings, and absolutely no booking fees — every time.
+        <p className="mb-9 max-w-[560px] whitespace-pre-line text-[18px] leading-[1.6] text-secondary">
+          {intro}
         </p>
       </div>
 
@@ -120,7 +123,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             disabled={searching}
             className="min-h-16 flex-none cursor-pointer rounded-[12px] bg-accent px-[34px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
-            {searching ? "Searching…" : "Search rooms"}
+            {searching ? "Searching…" : searchButton}
           </button>
         </div>
 
@@ -128,18 +131,17 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       </div>
 
       <div className="mt-3.5 flex cursor-pointer items-center gap-1.5 text-sm text-muted">
-        <span className="text-[18px] leading-none text-accent">+</span> Add a promo or
-        corporate code
+        <span className="text-[18px] leading-none text-accent">+</span> {promoText}
       </div>
 
       {/* highlights */}
       <div className="mt-12 grid max-w-[920px] grid-cols-1 gap-[18px] sm:grid-cols-3">
-        {HIGHLIGHTS.map((h) => (
-          <div key={h.title} className="flex items-start gap-3.5">
+        {highlights.map((h, i) => (
+          <div key={i} className="flex items-start gap-3.5">
             <Diamond className="mt-1.5" />
             <div>
               <div className="mb-0.5 text-[15px] font-semibold">{h.title}</div>
-              <div className="text-sm leading-[1.5] text-muted">{h.desc}</div>
+              <div className="text-sm leading-[1.5] text-muted">{h.description}</div>
             </div>
           </div>
         ))}

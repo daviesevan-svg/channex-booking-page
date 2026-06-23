@@ -1,5 +1,6 @@
 import type { RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
+import type { SearchContent } from "./content";
 
 // Per-property content overrides edited in the admin. Anything unset falls back
 // to the Channex property_info. Extend this as the admin grows (colors, images…).
@@ -96,6 +97,40 @@ export async function putRoomOverride(
   const kv = getConfigKV();
   if (kv) await kv.put(roomsKey(propertyId), JSON.stringify(all));
   return next;
+}
+
+// ---------- editable page content ----------
+interface SiteContent {
+  search?: SearchContent;
+}
+
+const contentKey = (propertyId: string) => `content:${propertyId}`;
+
+async function getSiteContent(propertyId: string): Promise<SiteContent> {
+  const kv = getConfigKV();
+  if (!kv) return {};
+  const raw = await kv.get(contentKey(propertyId));
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as SiteContent;
+  } catch {
+    return {};
+  }
+}
+
+export async function getSearchContent(propertyId: string): Promise<SearchContent> {
+  return (await getSiteContent(propertyId)).search ?? {};
+}
+
+export async function saveSearchContent(
+  propertyId: string,
+  search: SearchContent,
+): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  const content = await getSiteContent(propertyId);
+  content.search = search;
+  await kv.put(contentKey(propertyId), JSON.stringify(content));
 }
 
 /** Apply a room's content override on top of the Channex room (keeps rate plans). */
