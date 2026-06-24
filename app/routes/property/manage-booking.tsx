@@ -6,6 +6,7 @@ import { useProperty } from "~/lib/booking-context";
 import { getBooking, updateBooking } from "~/lib/bookings.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
+import { cancellationView } from "~/lib/cancellation";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 
@@ -99,6 +100,18 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           ? tr.t("cancelNotAllowed")
           : "";
 
+  const cv = cancellationView(b.cancellation, Date.now());
+  const cancellationText =
+    cv.kind === "nonRefundable"
+      ? tr.t("nonRefundableBooking")
+      : cv.kind === "freeAnytime"
+        ? tr.t("freeCancellationAnytime")
+        : cv.kind === "freeUntil"
+          ? tr.t(cv.passed ? "freeCancellationEnded" : "freeCancellationUntil", {
+              date: fmt(cv.iso, "EEE d MMM yyyy"),
+            })
+          : "";
+
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">
       <Link
@@ -178,6 +191,13 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           <span className="font-serif text-[28px] font-semibold">{formatMoney(b.total, cur)}</span>
         </div>
       </section>
+
+      {cancellationText && (
+        <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{tr.t("cancellationPolicy")}</h2>
+          <p className="text-[14px] text-secondary">{cancellationText}</p>
+        </section>
+      )}
 
       <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
         <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionPayment")}</h2>

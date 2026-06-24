@@ -3,6 +3,7 @@ import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/booking";
 import { BookingStatusBadge } from "~/components/booking-status";
+import { cancellationView } from "~/lib/cancellation";
 import { requireAdmin } from "~/lib/auth.server";
 import { getBooking } from "~/lib/bookings.server";
 import { getConfig } from "~/lib/config.server";
@@ -32,6 +33,18 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function AdminBooking({ loaderData }: Route.ComponentProps) {
   const { booking: b } = loaderData;
+  const cv = cancellationView(b.cancellation, Date.now());
+  const cancellationText =
+    cv.kind === "nonRefundable"
+      ? "This booking is non-refundable."
+      : cv.kind === "freeAnytime"
+        ? "Free cancellation any time before arrival."
+        : cv.kind === "freeUntil"
+          ? `Free cancellation ${cv.passed ? "was available until" : "until"} ${format(
+              parseISO(cv.iso),
+              "EEE d MMM yyyy",
+            )}.`
+          : "";
 
   return (
     <div>
@@ -126,6 +139,13 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
           </span>
         </div>
       </section>
+
+      {cancellationText && (
+        <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">Cancellation policy</h2>
+          <p className="text-[14px] text-secondary">{cancellationText}</p>
+        </section>
+      )}
 
       <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
         <h2 className="mb-3 font-serif text-[18px] font-semibold">Payment</h2>
