@@ -113,6 +113,11 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
           </span>
         </div>
       </section>
+
+      <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">Payment</h2>
+        <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
+      </section>
     </div>
   );
 }
