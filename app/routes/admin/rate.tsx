@@ -14,7 +14,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!propertyId) throw redirect("/admin/rates");
 
   const rates = await getRatePlanList(propertyId).catch(() => []);
-  const rate = rates.find((r) => r.id === params.rateId);
+  const rate = rates.find((r) => r.key === params.rateId);
   if (!rate) throw redirect("/admin/rates");
 
   const lang = langParam(request);
@@ -25,7 +25,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lang,
     defaults: {
       name: rate.channexTitle,
-      roomTitle: rate.roomTitle,
+      rooms: rate.rooms.join(", "),
       cancellation: rate.cancellationTitle ?? "",
     },
   };
@@ -96,7 +96,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           </span>
         )}
       </div>
-      <p className="mb-5 text-[13px] text-muted-2">Room: {defaults.roomTitle}</p>
+      <p className="mb-5 text-[13px] text-muted-2">Applies to: {defaults.rooms}</p>
 
       <Form
         method="post"

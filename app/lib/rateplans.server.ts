@@ -1,20 +1,21 @@
 import { getChannexClient } from "./config.server";
-import { getRoomOverrides } from "./overrides.server";
+import { getRoomOverrides, rateKey } from "./overrides.server";
 
 export interface RatePlanListItem {
-  /** Parent (logical) rate-plan id — the mapping key for content overrides. */
-  id: string;
+  /** Slug of the rate title — the mapping key and URL param. */
+  key: string;
   channexTitle: string;
-  roomId: string;
-  roomTitle: string;
+  /** Display names of the rooms that offer this rate. */
+  rooms: string[];
   mealType?: string | null;
   cancellationTitle?: string;
 }
 
 // Channex only returns rate plans for rooms that are sellable on the queried
 // dates (a dateless call returns none), and availability can be sparse. To
-// discover the property's rate plans we sample several future windows and union
-// the results by parent rate-plan id.
+// discover the property's rate plans we sample several future windows and group
+// them by title — so one "Breakfast Rate" entry represents every room/occupancy
+// copy Channex exposes under that name.
 const SCAN_OFFSETS_DAYS = [10, 24, 38, 60, 90, 120, 150, 180];
 const STAY_NIGHTS = 2;
 
@@ -25,8 +26,8 @@ function isoPlusDays(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Discover the property's rate plans (deduped by parent id), with the owning
- *  room's display name (room overrides applied). */
+/** Discover the property's rate plans, deduped by title, with the display names
+ *  of the rooms that offer each (room overrides applied). */
 export async function getRatePlanList(
   propertyId: string,
   lang?: string,
@@ -46,22 +47,30 @@ export async function getRatePlanList(
     windows.map((q) => client.getRooms(propertyId, q).catch(() => [])),
   );
 
-  const byId = new Map<string, RatePlanListItem>();
+  const byKey = new Map<string, RatePlanListItem & { roomSet: Set<string> }>();
   for (const rooms of results) {
     for (const room of rooms) {
+      const roomName = roomOverrides[room.id]?.name ?? room.title;
       for (const rp of room.ratePlans) {
-        const id = rp.parentRatePlanId ?? rp.id;
-        if (byId.has(id)) continue;
-        byId.set(id, {
-          id,
-          channexTitle: rp.title,
-          roomId: room.id,
-          roomTitle: roomOverrides[room.id]?.name ?? room.title,
-          mealType: rp.mealType,
-          cancellationTitle: rp.cancellationPolicy?.title,
-        });
+        const key = rateKey(rp.title);
+        let item = byKey.get(key);
+        if (!item) {
+          item = {
+            key,
+            channexTitle: rp.title,
+            rooms: [],
+            roomSet: new Set<string>(),
+            mealType: rp.mealType,
+            cancellationTitle: rp.cancellationPolicy?.title,
+          };
+          byKey.set(key, item);
+        }
+        if (!item.roomSet.has(roomName)) {
+          item.roomSet.add(roomName);
+          item.rooms.push(roomName);
+        }
       }
     }
   }
-  return [...byId.values()];
+  return [...byKey.values()].map(({ roomSet: _roomSet, ...rest }) => rest);
 }

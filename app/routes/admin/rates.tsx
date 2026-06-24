@@ -19,12 +19,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     configured: true as const,
     rates: rates.map((r) => ({
-      id: r.id,
+      key: r.key,
       channexTitle: r.channexTitle,
-      roomTitle: r.roomTitle,
+      rooms: r.rooms,
       cancellationTitle: r.cancellationTitle,
-      name: overrides[r.id]?.name,
-      customised: Boolean(overrides[r.id] && Object.keys(overrides[r.id]).length),
+      name: overrides[r.key]?.name,
+      customised: Boolean(overrides[r.key] && Object.keys(overrides[r.key]).length),
     })),
   };
 }
@@ -52,8 +52,9 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
     <div>
       <h1 className="mb-1 font-serif text-[26px] font-semibold">Rates</h1>
       <p className="mb-6 text-[14px] text-muted">
-        {rates.length} bookable rate plan{rates.length === 1 ? "" : "s"} from Channex. Rename them,
-        add a description, photos, what&rsquo;s included and a cancellation policy.
+        {rates.length} rate plan{rates.length === 1 ? "" : "s"} from Channex. Edit one and it applies
+        to every room that offers it — rename, add a description, photos, what&rsquo;s included and a
+        cancellation policy.
       </p>
 
       {rates.length === 0 ? (
@@ -65,8 +66,8 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
           {rates.map((rate, i) => (
             <Link
-              key={rate.id}
-              to={`/admin/rates/${rate.id}`}
+              key={rate.key}
+              to={`/admin/rates/${rate.key}`}
               className={`flex items-center justify-between gap-4 px-5 py-4 hover:bg-field-hover ${
                 i > 0 ? "border-t border-divider" : ""
               }`}
@@ -81,13 +82,13 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {rate.roomTitle}
                   {rate.name && rate.name !== rate.channexTitle && (
-                    <> · Channex: {rate.channexTitle}</>
+                    <>Channex: {rate.channexTitle} · </>
                   )}
+                  {rate.rooms.length} room{rate.rooms.length === 1 ? "" : "s"}
                   {rate.cancellationTitle && <> · Cancellation: {rate.cancellationTitle}</>}
                 </div>
-                <div className="mt-0.5 font-mono text-[11px] text-faint">{rate.id}</div>
+                <div className="mt-0.5 truncate text-[11px] text-faint">{rate.rooms.join(", ")}</div>
               </div>
               <span className="flex-none text-[13px] font-semibold text-accent">Edit →</span>
             </Link>

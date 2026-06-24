@@ -5,6 +5,7 @@ import {
   getRoomOverrides,
   mergeRatePlanOverride,
   mergeRoomOverride,
+  rateKey,
 } from "./overrides.server";
 
 /** Fetch rooms from Channex and apply per-room and per-rate-plan admin content
@@ -27,7 +28,7 @@ export async function getRoomsWithOverrides(
     return {
       ...merged,
       ratePlans: merged.ratePlans.map((rp) =>
-        mergeRatePlanOverride(rp, rateOverrides[rp.parentRatePlanId ?? rp.id]),
+        mergeRatePlanOverride(rp, rateOverrides[rateKey(rp.title)]),
       ),
     };
   });

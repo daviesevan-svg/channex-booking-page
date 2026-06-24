@@ -154,6 +154,18 @@ export function mergeRoomOverride(room: RoomWithRates, ov?: RoomOverride): RoomW
 }
 
 // ===== rate-plan overrides (text localized; images shared) =====
+// Rate plans are mapped by their (logical) title, not by Channex id — Channex
+// splits one rate into many ids (per room, per occupancy), but the admin edits
+// a single "Breakfast Rate" entry that applies wherever that title is offered.
+export function rateKey(title: string): string {
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "rate"
+  );
+}
 export interface RatePlanOverride {
   name?: string;
   description?: string;
