@@ -5,6 +5,7 @@ import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "rea
 import type { Route } from "./+types/results";
 import type { RatePlan, RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
+import { RateDetailsModal } from "~/components/rate-details-modal";
 import {
   addLine,
   cartCoverage,
@@ -119,6 +120,7 @@ function RoomCard({
     (a, b) => Number(a.totalPrice) - Number(b.totalPrice),
   );
   const [rateId, setRateId] = useState(sorted[0]?.id);
+  const [showDetails, setShowDetails] = useState(false);
   const chosen: RatePlan | undefined = sorted.find((r) => r.id === rateId) ?? sorted[0];
   const perNight = chosen ? Number(chosen.totalPrice) / nights : 0;
   const photo = room.photos?.[0]?.url;
@@ -183,7 +185,7 @@ function RoomCard({
           </span>
           <div className="text-[12px] text-muted-2">{tr.t("perNightInclTaxes")}</div>
         </div>
-        {sorted.length > 1 ? (
+        {sorted.length > 1 && (
           <select
             value={rateId}
             onChange={(e) => setRateId(e.target.value)}
@@ -196,8 +198,15 @@ function RoomCard({
               </option>
             ))}
           </select>
-        ) : (
-          <div className="truncate text-[13px] text-muted-2">{chosen?.title}</div>
+        )}
+        {chosen && (
+          <button
+            type="button"
+            onClick={() => setShowDetails(true)}
+            className="self-end text-[13px] font-medium text-muted-2 underline decoration-dotted underline-offset-2 hover:text-accent"
+          >
+            {sorted.length > 1 ? tr.t("rateDetails") : chosen.title}
+          </button>
         )}
         {atMax ? (
           <div className="text-[12px] font-medium text-muted-2">
@@ -215,6 +224,14 @@ function RoomCard({
           {pending ? tr.t("adding") : tr.t("addRoom")}
         </button>
       </div>
+      {showDetails && chosen && (
+        <RateDetailsModal
+          rate={chosen}
+          currency={currency}
+          nights={nights}
+          onClose={() => setShowDetails(false)}
+        />
+      )}
     </div>
   );
 }
