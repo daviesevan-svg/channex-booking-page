@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 import type { RatePlan } from "~/lib/channex/types";
 import { useT } from "~/lib/i18n";
@@ -30,7 +31,9 @@ export function RateDetailsModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
       <div
@@ -106,6 +109,7 @@ export function RateDetailsModal({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
