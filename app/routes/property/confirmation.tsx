@@ -9,6 +9,7 @@ import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
 import { getPageText } from "~/lib/overrides.server";
+import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { getRoomsWithOverrides } from "~/lib/rooms.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -21,7 +22,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
 
   let rooms: { title: string; rate: string }[] = [];
-  let totalStr = "";
+  let total = 0;
   let nights = 0;
 
   if (checkin && checkout) {
@@ -33,14 +34,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     );
     const lines = resolveCart(parseCart(url.searchParams), apiRooms);
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
-    if (lines.length) totalStr = formatMoney(cartCoverage(lines).total, currency);
+    if (lines.length) total = cartCoverage(lines).total;
   }
+
+  const applied =
+    total > 0 ? await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", total) : null;
 
   return {
     reference: params.ref,
     simulated,
     rooms,
-    totalStr,
+    currency,
+    total,
+    discount: applied?.discount ?? 0,
+    promoCode: applied?.code ?? null,
     checkin,
     checkout,
     nights,
@@ -51,7 +58,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, totalStr, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, rooms, currency, total, discount, promoCode, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -122,10 +129,20 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             <span className="text-secondary">{tr.t("guests")}</span>
             <span className="font-semibold">{guests}</span>
           </div>
-          {totalStr && (
+          {total > 0 && discount > 0 && promoCode && (
+            <div className="flex justify-between text-[#3f7a52]">
+              <span>
+                {tr.t("discount")} ({promoCode})
+              </span>
+              <span className="font-semibold">−{formatMoney(discount, currency)}</span>
+            </div>
+          )}
+          {total > 0 && (
             <div className="flex items-baseline justify-between border-t border-divider pt-3">
               <span className="text-secondary">{tr.t("total")}</span>
-              <span className="font-serif text-[24px] font-semibold">{totalStr}</span>
+              <span className="font-serif text-[24px] font-semibold">
+                {formatMoney(total - discount, currency)}
+              </span>
             </div>
           )}
         </div>

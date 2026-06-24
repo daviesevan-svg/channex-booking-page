@@ -126,6 +126,12 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
             </div>
           ))}
         </div>
+        {b.promo && (
+          <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
+            <span>Promo ({b.promo.code})</span>
+            <span className="font-semibold">−{formatMoney(b.promo.discount, b.currency)}</span>
+          </div>
+        )}
         <div className="mt-4 flex items-baseline justify-between border-t border-divider pt-4">
           <span className="text-[15px] font-semibold">Total</span>
           <span className="font-serif text-[24px] font-semibold">

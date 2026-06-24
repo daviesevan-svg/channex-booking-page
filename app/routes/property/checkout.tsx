@@ -15,6 +15,8 @@ import {
 } from "~/lib/cart";
 import { generateReference, recordBooking, type BookingStatus } from "~/lib/bookings.server";
 import { resolveBookingCancellation } from "~/lib/policy.server";
+import { resolveAppliedPromo } from "~/lib/promotions.server";
+import { normalizeCode } from "~/lib/promotions";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
@@ -93,15 +95,35 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!stay) throw redirect(`/${params.channelId}`);
 
   const form = await request.formData();
-  const parsed = GuestSchema.safeParse(Object.fromEntries(form));
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors };
-  }
+  const intent = String(form.get("intent") || "book");
+  const promoCode = String(form.get("promoCode") || "");
 
   const { rooms, lines } = await resolveStayCart(stay, url, langFromRequest(request));
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }
+  const totals = cartCoverage(lines);
+
+  // "Apply" — preview the discount without booking, so typed guest details stay.
+  if (intent === "applyPromo") {
+    if (!normalizeCode(promoCode)) return { appliedPromo: null };
+    const applied = await resolveAppliedPromo(stay.channelId, promoCode, totals.total);
+    return applied ? { appliedPromo: applied } : { promoError: true, promoCode: normalizeCode(promoCode) };
+  }
+
+  const parsed = GuestSchema.safeParse(Object.fromEntries(form));
+  if (!parsed.success) {
+    return { errors: parsed.error.flatten().fieldErrors };
+  }
+
+  // Re-resolve the promo server-side; a code entered but no longer valid must
+  // not silently bill full price.
+  const applied = await resolveAppliedPromo(stay.channelId, promoCode, totals.total);
+  if (normalizeCode(promoCode) && !applied) {
+    return { promoError: true, promoCode: normalizeCode(promoCode) };
+  }
+  const discount = applied?.discount ?? 0;
+  const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
 
   const g = parsed.data;
   const booking = {
@@ -111,7 +133,17 @@ export async function action({ params, request }: Route.ActionArgs) {
     currency: stay.currency,
     arrivalHour: g.arrival || undefined,
     customer: { name: g.firstName, surname: g.lastName, mail: g.email, phone: g.phone },
-    notes: g.requests || undefined,
+    notes:
+      [
+        g.requests || null,
+        applied ? `Promo ${applied.code} applied (-${discount.toFixed(2)} ${stay.currency})` : null,
+      ]
+        .filter(Boolean)
+        .join("\n") || undefined,
+    // A promo sends the discounted price as the booking's custom amount. Channex
+    // accepts a custom price; confirm the exact field(s) against your account
+    // before enabling live booking.
+    ...(discount > 0 ? { amount: discountedTotal.toFixed(2) } : {}),
     rooms: lines.map((l, index) => ({
       index,
       roomTypeCode: l.roomId,
@@ -166,7 +198,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     checkin: stay.checkin,
     checkout: stay.checkout,
     nights,
-    total: cartCoverage(lines).total,
+    total: discountedTotal,
+    promo: applied ?? undefined,
     guest: {
       firstName: g.firstName,
       lastName: g.lastName,
@@ -192,6 +225,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", config.allowLiveBooking ? "0" : "1");
+  if (applied) next.set("promo", applied.code);
   return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
 }
 
@@ -242,9 +276,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const nav = useNavigation();
   const errors = actionData?.errors;
   const bookingError = actionData?.bookingError;
+  const appliedPromo = actionData?.appliedPromo ?? undefined;
+  const promoError = actionData?.promoError ?? false;
+  const promoCodeValue = actionData?.promoCode ?? appliedPromo?.code ?? "";
   const submitting = nav.state === "submitting";
 
   const taxes = Math.max(0, totals.total - totals.net);
+  const discount = appliedPromo?.discount ?? 0;
+  const grandTotal = Math.round((totals.total - discount) * 100) / 100;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -331,15 +370,56 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
             <Row label={tr.t("subtotal")} value={formatMoney(totals.net, currency)} />
             <Row label={tr.t("taxesFees")} value={formatMoney(taxes, currency)} />
+            {discount > 0 && appliedPromo && (
+              <div className="flex justify-between text-[#3f7a52]">
+                <span>
+                  {tr.t("discount")} ({appliedPromo.code})
+                </span>
+                <span className="font-semibold">−{formatMoney(discount, currency)}</span>
+              </div>
+            )}
           </div>
+
+          {/* promo code */}
+          <div className="border-b border-divider py-4">
+            <label className="block text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+              {tr.t("promoCode")}
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                name="promoCode"
+                defaultValue={promoCodeValue}
+                placeholder="SUMMER10"
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+              />
+              <button
+                type="submit"
+                name="intent"
+                value="applyPromo"
+                formNoValidate
+                disabled={submitting}
+                className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {tr.t("applyCode")}
+              </button>
+            </div>
+            {promoError && <p className="mt-1.5 text-[12px] text-red-600">{tr.t("promoInvalid")}</p>}
+            {appliedPromo && discount > 0 && (
+              <p className="mt-1.5 text-[12px] text-[#3f7a52]">{tr.t("promoApplied")}</p>
+            )}
+          </div>
+
           <div className="flex items-baseline justify-between py-4">
             <span className="text-[16px] font-semibold">{tr.t("total")}</span>
             <span className="font-serif text-[30px] font-semibold">
-              {formatMoney(totals.total, currency)}
+              {formatMoney(grandTotal, currency)}
             </span>
           </div>
           <button
             type="submit"
+            name="intent"
+            value="book"
             disabled={submitting}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
           >

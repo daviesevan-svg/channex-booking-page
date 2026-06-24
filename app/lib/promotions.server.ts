@@ -1,5 +1,5 @@
 import { getConfigKV } from "./config.server";
-import { normalizeCode, type Promotion } from "./promotions";
+import { computeDiscount, normalizeCode, type AppliedPromo, type Promotion } from "./promotions";
 
 const promotionsKey = (pid: string) => `promotions:${pid}`;
 
@@ -28,6 +28,20 @@ export async function findPromotionByCode(
   const c = normalizeCode(code);
   if (!c) return undefined;
   return (await getPromotions(pid)).find((p) => p.enabled && p.code === c);
+}
+
+/** Resolve a guest-entered code against a booking total. Returns the applied
+ *  discount, or null when the code is blank, unknown, disabled, or zero-value. */
+export async function resolveAppliedPromo(
+  pid: string,
+  code: string,
+  total: number,
+): Promise<AppliedPromo | null> {
+  const promo = await findPromotionByCode(pid, code);
+  if (!promo) return null;
+  const discount = computeDiscount(promo, total);
+  if (discount <= 0) return null;
+  return { code: promo.code, type: promo.type, value: promo.value, discount };
 }
 
 async function writePromotions(pid: string, list: Promotion[]): Promise<void> {

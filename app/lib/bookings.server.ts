@@ -1,4 +1,5 @@
 import type { CancellationSnapshot } from "./policy.server";
+import type { AppliedPromo } from "./promotions";
 import { getConfigKV } from "./config.server";
 
 export type BookingStatus = "confirmed" | "simulated" | "failed";
@@ -29,6 +30,8 @@ export interface BookingRecord {
   cancelledAt?: string;
   /** Cancellation policy resolved at booking time (drives the guest cancel button). */
   cancellation?: CancellationSnapshot;
+  /** Promo code applied at checkout, if any. `total` is the post-discount total. */
+  promo?: AppliedPromo;
   createdAt: string;
   currency: string;
   checkin: string;

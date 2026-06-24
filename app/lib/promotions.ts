@@ -16,6 +16,16 @@ export interface Promotion {
   createdAt: string;
 }
 
+/** A promotion resolved and applied to a specific booking total. Snapshotted
+ *  onto the booking record so the discount is stable after the fact. */
+export interface AppliedPromo {
+  code: string;
+  type: DiscountType;
+  value: number;
+  /** The discount amount in the booking currency. */
+  discount: number;
+}
+
 /** Codes are matched case- and whitespace-insensitively. */
 export function normalizeCode(code: string): string {
   return code.trim().toUpperCase().replace(/\s+/g, "");
