@@ -126,6 +126,7 @@ const EN: Dict = {
   nights: "Nights",
   subtotal: "Subtotal",
   taxesFees: "Taxes & fees",
+  includesTaxes: "Includes {amount} in taxes & fees",
   discount: "Discount",
   promoCode: "Promo code",
   applyCode: "Apply",

@@ -295,6 +295,10 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const taxes = Math.max(0, totals.total - totals.net);
   const discount = appliedPromo?.discount ?? 0;
   const grandTotal = Math.round((totals.total - discount) * 100) / 100;
+  // Rates are tax-inclusive, so the discount lowers the tax proportionally.
+  // Show the tax actually contained in the amount paid.
+  const taxAfter =
+    totals.total > 0 ? Math.round(taxes * (grandTotal / totals.total) * 100) / 100 : taxes;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -378,18 +382,17 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
-          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
-            <Row label={tr.t("subtotal")} value={formatMoney(totals.net, currency)} />
-            <Row label={tr.t("taxesFees")} value={formatMoney(taxes, currency)} />
-            {discount > 0 && appliedPromo && (
+          {discount > 0 && appliedPromo && (
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
+              <Row label={tr.t("subtotal")} value={formatMoney(totals.total, currency)} />
               <div className="flex justify-between text-[#3f7a52]">
                 <span>
                   {tr.t("discount")} ({appliedPromo.code})
                 </span>
                 <span className="font-semibold">−{formatMoney(discount, currency)}</span>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {/* promo code */}
           <div className="border-b border-divider py-4">
@@ -421,12 +424,17 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             )}
           </div>
 
-          <div className="flex items-baseline justify-between py-4">
+          <div className="flex items-baseline justify-between pt-4">
             <span className="text-[16px] font-semibold">{tr.t("total")}</span>
             <span className="font-serif text-[30px] font-semibold">
               {formatMoney(grandTotal, currency)}
             </span>
           </div>
+          {taxAfter > 0 && (
+            <p className="pb-4 pt-1 text-right text-[12px] text-muted-2">
+              {tr.t("includesTaxes", { amount: formatMoney(taxAfter, currency) })}
+            </p>
+          )}
           <button
             type="submit"
             name="intent"
