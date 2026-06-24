@@ -19,17 +19,20 @@ async function ownedBooking(channelId: string, id: string, request: Request) {
   return booking;
 }
 
-/** Whether a guest may self-cancel right now (global switch + policy snapshot). */
-function canCancelNow(
+type CancelReason = "ok" | "notAllowed" | "nonRefundable" | "deadline";
+
+/** Whether a guest may self-cancel right now, and if not, why (for the tooltip). */
+function cancelState(
   booking: NonNullable<Awaited<ReturnType<typeof getBooking>>>,
   allowCancel: boolean,
-): boolean {
-  if ((booking.lifecycle ?? "active") !== "active") return false;
-  if (!allowCancel) return false;
+): { canCancel: boolean; reason: CancelReason } {
+  if (!allowCancel) return { canCancel: false, reason: "notAllowed" };
   const c = booking.cancellation;
-  if (c && c.refundable === false) return false;
-  if (c?.cancelByISO && Date.now() > Date.parse(c.cancelByISO)) return false;
-  return true;
+  if (c && c.refundable === false) return { canCancel: false, reason: "nonRefundable" };
+  if (c?.cancelByISO && Date.now() > Date.parse(c.cancelByISO)) {
+    return { canCancel: false, reason: "deadline" };
+  }
+  return { canCancel: true, reason: "ok" };
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -37,10 +40,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!booking) throw redirect(`/${params.channelId}/manage`);
 
   const settings = await getSettings(params.channelId);
+  const { canCancel, reason } = cancelState(booking, Boolean(settings.allowCancel));
   return {
     booking,
-    canCancel: canCancelNow(booking, Boolean(settings.allowCancel)),
-    allowCancel: Boolean(settings.allowCancel),
+    canCancel,
+    cancelReason: reason,
     afterDeadlineMessage: settings.afterDeadlineMessage,
   };
 }
@@ -53,7 +57,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (form.get("intent") === "cancel") {
     const settings = await getSettings(params.channelId);
     // Re-check server-side so a stale page can't cancel past the deadline.
-    if (canCancelNow(booking, Boolean(settings.allowCancel))) {
+    const active = (booking.lifecycle ?? "active") === "active";
+    if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
       await updateBooking(params.channelId, booking.id, {
         lifecycle: "cancelled",
         cancelledAt: new Date().toISOString(),
@@ -77,7 +82,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function ManageBooking({ loaderData, params }: Route.ComponentProps) {
-  const { booking: b, canCancel, allowCancel, afterDeadlineMessage } = loaderData;
+  const { booking: b, canCancel, cancelReason, afterDeadlineMessage } = loaderData;
   const tr = useT();
   const { currency } = useProperty();
   const nav = useNavigation();
@@ -85,6 +90,14 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   const cur = b.currency || currency;
   const cancelled = (b.lifecycle ?? "active") === "cancelled";
   const cancelling = nav.state === "submitting";
+  const cancelTip =
+    cancelReason === "nonRefundable"
+      ? tr.t("nonRefundableNotice")
+      : cancelReason === "deadline"
+        ? afterDeadlineMessage || tr.t("cancelUnavailable")
+        : cancelReason === "notAllowed"
+          ? tr.t("cancelNotAllowed")
+          : "";
 
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">
@@ -171,31 +184,29 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         <p className="text-[14px] text-muted-2">{tr.t("noPaymentInfo")}</p>
       </section>
 
-      {!cancelled && canCancel && (
+      {!cancelled && (
         <Form
           method="post"
           className="mt-6"
           onSubmit={(e) => {
-            if (!confirm(tr.t("cancelConfirm"))) e.preventDefault();
+            if (!canCancel || !confirm(tr.t("cancelConfirm"))) e.preventDefault();
           }}
         >
           <button
             type="submit"
             name="intent"
             value="cancel"
-            disabled={cancelling}
-            className="rounded-[12px] border border-[#e0b4ac] bg-surface px-6 py-3 text-[15px] font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
+            disabled={!canCancel || cancelling}
+            title={!canCancel ? cancelTip : undefined}
+            aria-disabled={!canCancel}
+            className="rounded-[12px] border border-[#e0b4ac] bg-surface px-6 py-3 text-[15px] font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
           >
             {cancelling ? tr.t("cancelling") : tr.t("cancelBooking")}
           </button>
+          {!canCancel && cancelTip && (
+            <p className="mt-2 text-[12.5px] text-muted-2">{cancelTip}</p>
+          )}
         </Form>
-      )}
-      {!cancelled && !canCancel && allowCancel && (
-        <p className="mt-6 text-[13.5px] text-muted-2">
-          {b.cancellation && b.cancellation.refundable === false
-            ? tr.t("nonRefundableNotice")
-            : afterDeadlineMessage || tr.t("cancelUnavailable")}
-        </p>
       )}
     </main>
   );

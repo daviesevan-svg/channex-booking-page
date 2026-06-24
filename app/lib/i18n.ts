@@ -33,6 +33,7 @@ const EN: Dict = {
   bookingCancelled: "This booking has been cancelled.",
   nonRefundableNotice: "This is a non-refundable booking and can't be cancelled online.",
   cancelUnavailable: "This booking can no longer be cancelled online. Please contact us.",
+  cancelNotAllowed: "Online cancellation isn't available for this booking. Please contact us.",
   statusCancelled: "Cancelled",
   footerRight: "Secure booking · Powered by Channex",
   allRightsReserved: "All rights reserved",
