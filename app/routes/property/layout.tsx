@@ -197,7 +197,9 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 ))}
               </select>
             )}
-            <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
+            <Link to={`${base}/manage`} className="hover:text-accent">
+              {tr.t("manageBooking")}
+            </Link>
             {property.phone && <span className="hidden sm:inline">{property.phone}</span>}
           </div>
         </div>

@@ -30,5 +30,7 @@ export default [
     route("rooms/:roomId", "routes/property/detail.tsx"),
     route("checkout", "routes/property/checkout.tsx"),
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
+    route("manage", "routes/property/manage.tsx"),
+    route("manage/:id", "routes/property/manage-booking.tsx"),
   ]),
 ] satisfies RouteConfig;

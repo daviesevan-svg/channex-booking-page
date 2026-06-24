@@ -59,6 +59,27 @@ export async function getBooking(pid: string, id: string): Promise<BookingRecord
   return (await getBookings(pid)).find((b) => b.id === id);
 }
 
+const norm = (s: string) => s.trim().toLowerCase();
+
+/** All bookings made with a given email (newest first). */
+export async function getBookingsByEmail(pid: string, email: string): Promise<BookingRecord[]> {
+  const e = norm(email);
+  return (await getBookings(pid)).filter((b) => norm(b.guest.email) === e);
+}
+
+/** Airline-style lookup: a booking matching both reference and email. */
+export async function findBookingByRefAndEmail(
+  pid: string,
+  reference: string,
+  email: string,
+): Promise<BookingRecord | undefined> {
+  const ref = norm(reference);
+  const e = norm(email);
+  return (await getBookings(pid)).find(
+    (b) => norm(b.reference) === ref && norm(b.guest.email) === e,
+  );
+}
+
 /** Prepend a booking record (newest first), capped to the most recent MAX_RECORDS. */
 export async function recordBooking(pid: string, record: BookingRecord): Promise<void> {
   const kv = getConfigKV();

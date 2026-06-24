@@ -8,6 +8,19 @@ type Dict = Record<string, string>;
 
 const EN: Dict = {
   manageBooking: "Manage booking",
+  manageTitle: "Manage your booking",
+  manageIntro: "Enter your booking reference and the email you booked with.",
+  bookingReference: "Booking reference",
+  emailAddress: "Email",
+  findBooking: "Find my booking",
+  manageNotFound:
+    "We couldn't find a booking with that reference and email. Please check and try again.",
+  yourBookings: "Your bookings",
+  signOut: "Sign out",
+  view: "View",
+  noBookingsForEmail: "No bookings found for this email yet.",
+  reference: "Reference",
+  bookedOn: "Booked",
   footerRight: "Secure booking · Powered by Channex",
   allRightsReserved: "All rights reserved",
   admin: "Admin",
