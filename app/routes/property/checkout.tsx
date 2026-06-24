@@ -14,6 +14,7 @@ import {
   type ResolvedLine,
 } from "~/lib/cart";
 import { recordBooking, type BookingStatus } from "~/lib/bookings.server";
+import { resolveBookingCancellation } from "~/lib/policy.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
@@ -149,12 +150,19 @@ export async function action({ params, request }: Route.ActionArgs) {
     1,
     differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)),
   );
+  const cancellation = await resolveBookingCancellation(
+    stay.channelId,
+    lines.map((l) => l.rateTitle),
+    stay.checkin,
+  );
   await recordBooking(stay.channelId, {
     id: crypto.randomUUID(),
     reference,
     channexId,
     status,
     error,
+    lifecycle: "active",
+    cancellation,
     createdAt: new Date().toISOString(),
     currency: stay.currency,
     checkin: stay.checkin,

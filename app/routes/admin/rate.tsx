@@ -27,6 +27,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       name: rate.channexTitle,
       rooms: rate.rooms.join(", "),
       cancellation: rate.cancellationTitle ?? "",
+      cancelValue: rate.channexCancelValue,
+      cancelUnit: rate.channexCancelUnit,
     },
   };
 }
@@ -57,12 +59,26 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { error: e instanceof Error ? e.message : "Upload failed." };
   }
 
+  const posInt = (v: FormDataEntryValue | null) => {
+    const n = parseInt(String(v ?? ""), 10);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const unit = (v: FormDataEntryValue | null) => {
+    const u = String(v ?? "");
+    return u === "hours" || u === "days" ? u : undefined;
+  };
+
   await putRatePlanOverride(propertyId, params.rateId, pickLang(String(form.get("lang") ?? "")), {
     name: String(form.get("name") ?? ""),
     description: String(form.get("description") ?? ""),
     inclusions,
     cancellation: String(form.get("cancellation") ?? ""),
     images: [...keep, ...uploaded, ...urls],
+    refundable: form.get("refundable") === "on",
+    cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
+    cancelDeadlineUnit: unit(form.get("cancelDeadlineUnit")),
+    modifyDeadlineValue: posInt(form.get("modifyDeadlineValue")),
+    modifyDeadlineUnit: unit(form.get("modifyDeadlineUnit")),
   });
   return { ok: true };
 }
@@ -137,8 +153,69 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           />
         </label>
 
+        <fieldset className="rounded-[12px] border border-line-alt p-4">
+          <legend className="px-1.5 text-[13px] font-semibold text-secondary">
+            Cancellation &amp; changes
+          </legend>
+          <label className="flex items-center gap-2.5 text-[14px] font-semibold">
+            <input
+              type="checkbox"
+              name="refundable"
+              defaultChecked={override.refundable ?? true}
+              className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent"
+            />
+            Refundable (guests can cancel for a refund)
+          </label>
+
+          <div className="mt-4 text-[13px] font-semibold text-secondary">Free cancellation up to</div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              name="cancelDeadlineValue"
+              type="number"
+              min={0}
+              defaultValue={override.cancelDeadlineValue ?? defaults.cancelValue ?? ""}
+              placeholder="0"
+              className="w-24 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
+            />
+            <select
+              name="cancelDeadlineUnit"
+              defaultValue={override.cancelDeadlineUnit ?? defaults.cancelUnit ?? "hours"}
+              className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+            >
+              <option value="days">days</option>
+              <option value="hours">hours</option>
+            </select>
+            <span className="text-[13px] text-muted-2">before arrival</span>
+          </div>
+
+          <div className="mt-4 text-[13px] font-semibold text-secondary">Changes allowed up to</div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <input
+              name="modifyDeadlineValue"
+              type="number"
+              min={0}
+              defaultValue={override.modifyDeadlineValue ?? ""}
+              placeholder="0"
+              className="w-24 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
+            />
+            <select
+              name="modifyDeadlineUnit"
+              defaultValue={override.modifyDeadlineUnit ?? "days"}
+              className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+            >
+              <option value="days">days</option>
+              <option value="hours">hours</option>
+            </select>
+            <span className="text-[13px] text-muted-2">before arrival</span>
+          </div>
+          <p className="mt-2 text-[11px] text-faint">
+            Leave a value blank for no time limit. The Customer Portal master switches and these
+            windows decide when guests can cancel or change a booking.
+          </p>
+        </fieldset>
+
         <label className="block text-[13px] font-semibold text-secondary">
-          Cancellation policy
+          Cancellation note shown to guests (optional)
           <input
             name="cancellation"
             defaultValue={override.cancellation}
@@ -146,7 +223,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             className={inputCls}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            Shown to guests on the rate. Leave blank to use the Channex policy
+            Free-text wording shown on the rate. Leave blank to use the Channex policy
             {defaults.cancellation ? ` (“${defaults.cancellation}”)` : ""}.
           </span>
         </label>

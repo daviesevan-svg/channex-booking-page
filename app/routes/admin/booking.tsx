@@ -46,8 +46,21 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
         <h1 className="font-serif text-[26px] font-semibold">
           {b.guest.firstName} {b.guest.lastName}
         </h1>
-        <BookingStatusBadge status={b.status} />
+        <div className="flex items-center gap-2.5">
+          {(b.lifecycle ?? "active") === "cancelled" && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-2.5 py-1 text-[12px] font-semibold text-[#c0392b]">
+              ✕ Cancelled
+            </span>
+          )}
+          <BookingStatusBadge status={b.status} />
+        </div>
       </div>
+
+      {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
+          Cancelled by the guest on {format(parseISO(b.cancelledAt), "d MMM yyyy, HH:mm")}.
+        </div>
+      )}
 
       {b.status === "failed" && b.error && (
         <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">

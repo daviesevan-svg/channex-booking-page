@@ -120,13 +120,27 @@ export function isThemeId(value: string): value is ThemeId {
   return THEMES.some((t) => t.id === value);
 }
 
+export type DeadlineUnit = "hours" | "days";
+
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
   customBg?: string;
   customDomain?: string;
   languages?: string[]; // enabled languages (always includes the default)
+  // ----- Customer Portal (manage-my-booking) -----
+  allowCancel?: boolean;
+  allowModify?: boolean;
+  /** Default windows used when a rate plan doesn't set its own. */
+  cancelDeadlineValue?: number;
+  cancelDeadlineUnit?: DeadlineUnit;
+  modifyDeadlineValue?: number;
+  modifyDeadlineUnit?: DeadlineUnit;
+  /** Shown to guests once the cancel/modify deadline has passed. */
+  afterDeadlineMessage?: string;
 }
+
+export const isDeadlineUnit = (v: string): v is DeadlineUnit => v === "hours" || v === "days";
 
 // Supported content languages for the booking pages.
 export const LANGUAGES = [

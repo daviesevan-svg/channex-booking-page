@@ -1,6 +1,8 @@
+import type { CancellationSnapshot } from "./policy.server";
 import { getConfigKV } from "./config.server";
 
 export type BookingStatus = "confirmed" | "simulated" | "failed";
+export type BookingLifecycle = "active" | "cancelled";
 
 export interface BookingRoom {
   roomId: string;
@@ -22,6 +24,11 @@ export interface BookingRecord {
   status: BookingStatus;
   /** Failure reason from Channex, when status is "failed". */
   error?: string;
+  /** Where the booking is in its life: active or cancelled. Defaults to active. */
+  lifecycle?: BookingLifecycle;
+  cancelledAt?: string;
+  /** Cancellation policy resolved at booking time (drives the guest cancel button). */
+  cancellation?: CancellationSnapshot;
   createdAt: string;
   currency: string;
   checkin: string;
@@ -88,4 +95,20 @@ export async function recordBooking(pid: string, record: BookingRecord): Promise
   arr.unshift(record);
   if (arr.length > MAX_RECORDS) arr.length = MAX_RECORDS;
   await kv.put(bookingsKey(pid), JSON.stringify(arr));
+}
+
+/** Patch a stored booking by id. Returns the updated record, or undefined. */
+export async function updateBooking(
+  pid: string,
+  id: string,
+  patch: Partial<BookingRecord>,
+): Promise<BookingRecord | undefined> {
+  const kv = getConfigKV();
+  if (!kv) return undefined;
+  const arr = await getBookings(pid);
+  const i = arr.findIndex((b) => b.id === id);
+  if (i === -1) return undefined;
+  arr[i] = { ...arr[i], ...patch };
+  await kv.put(bookingsKey(pid), JSON.stringify(arr));
+  return arr[i];
 }

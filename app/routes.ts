@@ -13,6 +13,7 @@ export default [
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("general", "routes/admin/general.tsx"),
+    route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),
     route("rooms", "routes/admin/rooms.tsx"),

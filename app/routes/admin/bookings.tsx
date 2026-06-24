@@ -62,6 +62,11 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                     {b.guest.firstName} {b.guest.lastName}
                   </span>
                   <BookingStatusBadge status={b.status} />
+                  {(b.lifecycle ?? "active") === "cancelled" && (
+                    <span className="rounded-full bg-[#fbe9e7] px-2 py-0.5 text-[11px] font-semibold text-[#c0392b]">
+                      Cancelled
+                    </span>
+                  )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
                   {b.reference} · {format(parseISO(b.checkin), "d MMM")} —{" "}

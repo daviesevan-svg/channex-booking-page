@@ -9,6 +9,9 @@ export interface RatePlanListItem {
   rooms: string[];
   mealType?: string | null;
   cancellationTitle?: string;
+  /** Channex's own cancellation deadline, used to pre-fill the policy editor. */
+  channexCancelValue?: number;
+  channexCancelUnit?: "hours" | "days";
 }
 
 // Channex only returns rate plans for rooms that are sellable on the queried
@@ -55,6 +58,8 @@ export async function getRatePlanList(
         const key = rateKey(rp.title);
         let item = byKey.get(key);
         if (!item) {
+          const dl = rp.cancellationPolicy?.cancellationPolicyDeadline;
+          const dlType = rp.cancellationPolicy?.cancellationPolicyDeadlineType;
           item = {
             key,
             channexTitle: rp.title,
@@ -62,6 +67,8 @@ export async function getRatePlanList(
             roomSet: new Set<string>(),
             mealType: rp.mealType,
             cancellationTitle: rp.cancellationPolicy?.title,
+            channexCancelValue: typeof dl === "number" ? dl : undefined,
+            channexCancelUnit: dlType === "hours" || dlType === "days" ? dlType : undefined,
           };
           byKey.set(key, item);
         }

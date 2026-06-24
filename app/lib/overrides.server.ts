@@ -2,11 +2,13 @@ import type { RatePlan, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import {
   DEFAULT_LANG,
+  isDeadlineUnit,
   isThemeId,
   normalizeHex,
   pageDef,
   searchDefaults,
   withDefaults,
+  type DeadlineUnit,
   type SearchContent,
   type SiteSettings,
 } from "./content";
@@ -173,6 +175,25 @@ export interface RatePlanOverride {
   /** Cancellation policy text shown to guests (overrides the Channex title). */
   cancellation?: string;
   images?: string[];
+  // ----- structured policy (language-agnostic; stored on the default-lang entry) -----
+  refundable?: boolean;
+  cancelDeadlineValue?: number;
+  cancelDeadlineUnit?: DeadlineUnit;
+  modifyDeadlineValue?: number;
+  modifyDeadlineUnit?: DeadlineUnit;
+}
+const POLICY_KEYS = [
+  "refundable",
+  "cancelDeadlineValue",
+  "cancelDeadlineUnit",
+  "modifyDeadlineValue",
+  "modifyDeadlineUnit",
+] as const;
+function pickPolicy(e: RatePlanOverride | undefined): Partial<RatePlanOverride> {
+  const out: Partial<RatePlanOverride> = {};
+  if (!e) return out;
+  for (const k of POLICY_KEYS) if (e[k] !== undefined) (out as Record<string, unknown>)[k] = e[k];
+  return out;
 }
 type RatePlanOverridesMap = Record<string, RatePlanOverride>;
 const ratePlansKey = (pid: string) => `rateplans:${pid}`;
@@ -195,6 +216,7 @@ export async function getRatePlanOverrides(
       inclusions: loc[id]?.inclusions ?? base[id]?.inclusions,
       cancellation: loc[id]?.cancellation ?? base[id]?.cancellation,
       images: base[id]?.images,
+      ...pickPolicy(base[id]),
     };
   }
   return out;
@@ -214,6 +236,7 @@ export async function getRatePlanOverride(
     inclusions: langEntry.inclusions,
     cancellation: langEntry.cancellation,
     images: baseEntry.images,
+    ...pickPolicy(baseEntry),
   };
 }
 export async function putRatePlanOverride(
@@ -240,11 +263,18 @@ export async function putRatePlanOverride(
   else delete langMap[rateId];
   m[lang] = langMap;
 
-  // Images are shared — always stored on the default-language entry.
+  // Images + structured policy are language-agnostic — stored on the default-language entry.
   const baseMap = { ...(m[DEFAULT_LANG] ?? {}) };
-  const baseEntry = { ...(baseMap[rateId] ?? {}) };
-  if (images.length) baseEntry.images = images;
-  else delete baseEntry.images;
+  const baseEntry: RatePlanOverride = { ...(baseMap[rateId] ?? {}) };
+  baseEntry.images = images.length ? images : undefined;
+  baseEntry.refundable = ov.refundable;
+  baseEntry.cancelDeadlineValue = ov.cancelDeadlineValue;
+  baseEntry.cancelDeadlineUnit = ov.cancelDeadlineUnit;
+  baseEntry.modifyDeadlineValue = ov.modifyDeadlineValue;
+  baseEntry.modifyDeadlineUnit = ov.modifyDeadlineUnit;
+  for (const k of ["images", ...POLICY_KEYS] as const) {
+    if (baseEntry[k] === undefined) delete baseEntry[k];
+  }
   if (Object.keys(baseEntry).length) baseMap[rateId] = baseEntry;
   else delete baseMap[rateId];
   m[DEFAULT_LANG] = baseMap;
@@ -345,8 +375,10 @@ export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
 export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
   const themeRaw = String(form.get("theme") ?? "").trim();
   const next: SiteSettings = {
+    ...existing,
     theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
     customColor: normalizeHex(String(form.get("customColor") ?? "")),
     customBg: normalizeHex(String(form.get("customBg") ?? "")),
@@ -356,6 +388,31 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
         .replace(/^https?:\/\//, "")
         .replace(/\/.*$/, "") || undefined,
     languages: form.getAll("languages").map(String),
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
+const posInt = (v: FormDataEntryValue | null): number | undefined => {
+  const n = parseInt(String(v ?? ""), 10);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
+export async function savePortalSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const unit = (k: string) => {
+    const u = String(form.get(k) ?? "");
+    return isDeadlineUnit(u) ? u : undefined;
+  };
+  const next: SiteSettings = {
+    ...existing,
+    allowCancel: form.get("allowCancel") === "on",
+    allowModify: form.get("allowModify") === "on",
+    cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
+    cancelDeadlineUnit: unit("cancelDeadlineUnit"),
+    modifyDeadlineValue: posInt(form.get("modifyDeadlineValue")),
+    modifyDeadlineUnit: unit("modifyDeadlineUnit"),
+    afterDeadlineMessage: String(form.get("afterDeadlineMessage") ?? "").trim() || undefined,
   };
   await writeJson(settingsKey(pid), next);
   return next;
