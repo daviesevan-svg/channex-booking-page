@@ -141,6 +141,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   };
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
+  // Only the landing page shows the "Manage booking" and "Admin" links, to keep
+  // the search/checkout/manage screens focused.
+  const { pathname } = useLocation();
+  const isHome = pathname.replace(/\/$/, "") === base;
 
   const context: PropertyOutletContext = { property, currency, hotelName, lang };
   const navigation = useNavigation();
@@ -197,9 +201,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 ))}
               </select>
             )}
-            <Link to={`${base}/manage`} className="hover:text-accent">
-              {tr.t("manageBooking")}
-            </Link>
+            {isHome && (
+              <Link to={`${base}/manage`} className="hover:text-accent">
+                {tr.t("manageBooking")}
+              </Link>
+            )}
             {property.phone && <span className="hidden sm:inline">{property.phone}</span>}
           </div>
         </div>
@@ -216,10 +222,14 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
           <span className="flex items-center gap-2">
             {tr.t("footerRight")}
-            <span className="text-faint">·</span>
-            <Link to="/admin" className="text-faint hover:text-accent">
-              {tr.t("admin")}
-            </Link>
+            {isHome && (
+              <>
+                <span className="text-faint">·</span>
+                <Link to="/admin" className="text-faint hover:text-accent">
+                  {tr.t("admin")}
+                </Link>
+              </>
+            )}
           </span>
         </div>
       </footer>
