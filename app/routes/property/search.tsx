@@ -47,6 +47,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   });
   const [showCal, setShowCal] = useState(false);
   const [occupancy, setOccupancy] = useState<Occupancy>(() => readOccupancy(searchParams));
+  const [promoCode, setPromoCode] = useState(() => searchParams.get("promo") ?? "");
+  const [showPromo, setShowPromo] = useState(() => Boolean(searchParams.get("promo")));
   const navigation = useNavigation();
   const searching = navigation.state === "loading";
 
@@ -73,6 +75,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     );
     const lang = searchParams.get("lang");
     if (lang) qs.set("lang", lang);
+    const promo = promoCode.trim();
+    if (promo) qs.set("promo", promo);
     navigate(`/${params.channelId}/rooms?${qs.toString()}`);
   }
 
@@ -136,8 +140,27 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         {showCal && <CalendarPopover state={dates} onClose={() => setShowCal(false)} />}
       </div>
 
-      <div className="mt-3.5 flex cursor-pointer items-center gap-1.5 text-sm text-muted">
-        <span className="text-[18px] leading-none text-accent">+</span> {promoText}
+      <div className="mt-3.5">
+        <button
+          type="button"
+          onClick={() => setShowPromo((v) => !v)}
+          className="flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-accent"
+        >
+          <span className="text-[18px] leading-none text-accent">{showPromo ? "−" : "+"}</span>
+          {promoText}
+        </button>
+        {showPromo && (
+          <input
+            value={promoCode}
+            onChange={(e) => setPromoCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") searchRooms();
+            }}
+            placeholder="SUMMER10"
+            autoComplete="off"
+            className="mt-2 block w-[240px] max-w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+          />
+        )}
       </div>
 
       {/* highlights */}

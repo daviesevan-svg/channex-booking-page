@@ -77,7 +77,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   const text = await getPageText(params.channelId, "checkout", lang);
-  return { stay, lines, nights, totals: cartCoverage(lines), text };
+  const totals = cartCoverage(lines);
+  // A promo carried from the landing page (?promo=) is pre-applied here so the
+  // guest sees the discount immediately.
+  const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
+  return { stay, lines, nights, totals, text, urlPromo };
 }
 
 const GuestSchema = z.object({
@@ -276,8 +280,15 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const nav = useNavigation();
   const errors = actionData?.errors;
   const bookingError = actionData?.bookingError;
-  const appliedPromo = actionData?.appliedPromo ?? undefined;
   const promoError = actionData?.promoError ?? false;
+  // Prefer the result of an Apply/Book round-trip; otherwise use the promo
+  // pre-applied from the URL (?promo carried from the landing page).
+  const actionHasPromo = !!actionData && "appliedPromo" in actionData;
+  const appliedPromo = actionHasPromo
+    ? (actionData?.appliedPromo ?? undefined)
+    : promoError
+      ? undefined
+      : (loaderData.urlPromo ?? undefined);
   const promoCodeValue = actionData?.promoCode ?? appliedPromo?.code ?? "";
   const submitting = nav.state === "submitting";
 
