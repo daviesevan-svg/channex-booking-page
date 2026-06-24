@@ -13,6 +13,7 @@ export interface SearchContent {
   promoText?: string;
   searchButton?: string;
   highlights?: Highlight[];
+  heroImage?: string; // language-independent; falls back to the Channex photo
 }
 
 // ---- Editable copy for the remaining pages (flat string fields) ----

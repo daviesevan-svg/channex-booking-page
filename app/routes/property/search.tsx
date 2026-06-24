@@ -56,7 +56,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const promoText = content.promoText || DEFAULT_SEARCH.promoText;
   const searchButton = content.searchButton || DEFAULT_SEARCH.searchButton;
   const highlights = content.highlights?.length ? content.highlights : DEFAULT_SEARCH.highlights;
-  const heroPhoto = property.photos?.[0]?.url;
+  const heroPhoto = content.heroImage || property.photos?.[0]?.url;
 
   function searchRooms() {
     if (!dates.checkinIso || !dates.checkoutIso) {

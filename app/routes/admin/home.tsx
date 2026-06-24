@@ -4,7 +4,13 @@ import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
-import { getSearchContentRaw, saveSearchContent } from "~/lib/overrides.server";
+import {
+  getHeroImage,
+  getSearchContentRaw,
+  saveHeroImage,
+  saveSearchContent,
+} from "~/lib/overrides.server";
+import { uploadHomeImage } from "~/lib/images.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -14,8 +20,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const lang = langParam(request);
   const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
   const content = await getSearchContentRaw(propertyId, lang);
+  const heroImage = await getHeroImage(propertyId);
+  const channexPhoto = property?.photos?.[0]?.url;
   const eyebrowDefault = (property?.address?.split(",")[1] ?? property?.title ?? "").trim();
-  return { configured: true as const, content, eyebrowDefault, lang };
+  return { configured: true as const, content, heroImage, channexPhoto, eyebrowDefault, lang };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -41,7 +49,21 @@ export async function action({ request }: Route.ActionArgs) {
     searchButton: s(form.get("searchButton")) || undefined,
     highlights: highlights.length ? highlights : undefined,
   };
+  // Save text first; saveHeroImage merges onto the base entry afterwards so the
+  // image survives even when the default language's text is rewritten here.
   await saveSearchContent(propertyId, pickLang(s(form.get("lang"))), content);
+
+  const upload = form.get("heroUpload");
+  const file = upload instanceof File && upload.size > 0 ? upload : null;
+  try {
+    if (form.get("removeHero")) {
+      await saveHeroImage(propertyId, null);
+    } else if (file) {
+      await saveHeroImage(propertyId, await uploadHomeImage(propertyId, file));
+    }
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Image upload failed." };
+  }
   return { ok: true };
 }
 
@@ -93,7 +115,8 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { content, eyebrowDefault, lang } = loaderData;
+  const { content, heroImage, channexPhoto, eyebrowDefault, lang } = loaderData;
+  const currentHero = heroImage || channexPhoto;
 
   return (
     <div>
@@ -112,6 +135,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
       <Form
         method="post"
         key={lang}
+        encType="multipart/form-data"
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
@@ -148,6 +172,44 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                 </label>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Feature image</div>
+          <p className="mb-3 text-[13px] text-muted">
+            The large image near the bottom of the landing page. Shared across all languages.
+            {!heroImage && channexPhoto && " Currently using the property photo from Channex."}
+          </p>
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="h-[120px] w-[200px] flex-none overflow-hidden rounded-[12px] border border-line-alt bg-surface-alt">
+              {currentHero ? (
+                <img src={currentHero} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div
+                  className="h-full w-full"
+                  style={{
+                    background:
+                      "repeating-linear-gradient(135deg,#efe7da,#efe7da 13px,#e7ddcc 13px,#e7ddcc 26px)",
+                  }}
+                />
+              )}
+            </div>
+            <div className="flex min-w-[220px] flex-1 flex-col gap-2.5">
+              <input
+                type="file"
+                name="heroUpload"
+                accept="image/*"
+                className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border-0 file:bg-chip file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-ink hover:file:bg-field-hover"
+              />
+              <p className="text-[12px] text-faint">JPG or PNG, up to 8MB.</p>
+              {heroImage && (
+                <label className="flex items-center gap-2 text-[13px] text-secondary">
+                  <input type="checkbox" name="removeHero" value="1" />
+                  Remove custom image{channexPhoto ? " (revert to the Channex photo)" : ""}
+                </label>
+              )}
+            </div>
           </div>
         </div>
 

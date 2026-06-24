@@ -315,10 +315,25 @@ export async function getSearchContent(pid: string, lang = DEFAULT_LANG): Promis
     promoText: loc.promoText ?? base.promoText ?? d.promoText,
     searchButton: loc.searchButton ?? base.searchButton ?? d.searchButton,
     highlights: loc.highlights ?? base.highlights ?? d.highlights,
+    heroImage: base.heroImage, // language-independent — always from the base entry
   };
 }
 export async function getSearchContentRaw(pid: string, lang: string): Promise<SearchContent> {
   return (await contentMap(pid))[lang]?.search ?? {};
+}
+/** The hero image lives on the default-language base entry, regardless of which
+ *  language tab is being edited. */
+export async function getHeroImage(pid: string): Promise<string | undefined> {
+  return (await contentMap(pid))[DEFAULT_LANG]?.search?.heroImage;
+}
+export async function saveHeroImage(pid: string, url: string | null): Promise<void> {
+  const m = await contentMap(pid);
+  const base = m[DEFAULT_LANG] ?? {};
+  m[DEFAULT_LANG] = {
+    ...base,
+    search: { ...(base.search ?? {}), heroImage: url ?? undefined },
+  };
+  await writeJson(contentKey(pid), m);
 }
 export async function saveSearchContent(
   pid: string,
