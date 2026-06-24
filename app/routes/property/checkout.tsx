@@ -13,6 +13,7 @@ import {
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
+import { recordBooking, type BookingStatus } from "~/lib/bookings.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
@@ -119,16 +120,68 @@ export async function action({ params, request }: Route.ActionArgs) {
   };
 
   const config = getConfig();
+  const stamp = Date.now().toString(36).toUpperCase().slice(-6);
+  let status: BookingStatus;
   let reference: string;
+  let channexId: string | undefined;
+  let error: string | undefined;
+
   if (config.allowLiveBooking) {
-    const client = getChannexClient();
-    const result = await client.pushBooking<{ id?: string; reservationId?: string }>(
-      stay.channelId,
-      booking,
-    );
-    reference = result?.reservationId || result?.id || "CONFIRMED";
+    try {
+      const result = await getChannexClient().pushBooking<{ id?: string; reservationId?: string }>(
+        stay.channelId,
+        booking,
+      );
+      channexId = result?.reservationId || result?.id || undefined;
+      reference = channexId || "CONFIRMED";
+      status = "confirmed";
+    } catch (e) {
+      status = "failed";
+      error = e instanceof Error ? e.message : "Channex rejected the booking.";
+      reference = `ERR-${stamp}`;
+    }
   } else {
-    reference = `SIM-${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    status = "simulated";
+    reference = `SIM-${stamp}`;
+  }
+
+  const nights = Math.max(
+    1,
+    differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)),
+  );
+  await recordBooking(stay.channelId, {
+    id: crypto.randomUUID(),
+    reference,
+    channexId,
+    status,
+    error,
+    createdAt: new Date().toISOString(),
+    currency: stay.currency,
+    checkin: stay.checkin,
+    checkout: stay.checkout,
+    nights,
+    total: cartCoverage(lines).total,
+    guest: {
+      firstName: g.firstName,
+      lastName: g.lastName,
+      email: g.email,
+      phone: g.phone,
+      arrival: g.arrival || undefined,
+      requests: g.requests || undefined,
+    },
+    rooms: lines.map((l) => ({
+      roomId: l.roomId,
+      roomTitle: l.roomTitle,
+      rateId: l.rateId,
+      rateTitle: l.rateTitle,
+      adults: l.occupancy.adults,
+      children: l.occupancy.children,
+      total: l.total,
+    })),
+  });
+
+  if (status === "failed") {
+    return { bookingError: error };
   }
 
   const next = new URLSearchParams(url.searchParams);
@@ -182,6 +235,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const [searchParams] = useSearchParams();
   const nav = useNavigation();
   const errors = actionData?.errors;
+  const bookingError = actionData?.bookingError;
   const submitting = nav.state === "submitting";
 
   const taxes = Math.max(0, totals.total - totals.net);
@@ -195,6 +249,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
         ← {tr.t("allRooms")}
       </Link>
       <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">{text.heading}</h1>
+
+      {bookingError && (
+        <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
+          {bookingError}
+        </div>
+      )}
 
       <Form method="post" className="flex flex-wrap items-start gap-9">
         <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
