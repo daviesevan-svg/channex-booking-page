@@ -1,4 +1,4 @@
-import { format, parseISO } from "date-fns";
+import { fmtDate } from "~/lib/dates";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/bookings";
@@ -69,12 +69,12 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {b.reference} · {format(parseISO(b.checkin), "d MMM")} —{" "}
-                  {format(parseISO(b.checkout), "d MMM yyyy")} ·{" "}
+                  {b.reference} · {fmtDate(b.checkin, "d MMM")} —{" "}
+                  {fmtDate(b.checkout, "d MMM yyyy")} ·{" "}
                   {b.rooms.length} room{b.rooms.length === 1 ? "" : "s"}
                 </div>
                 <div className="mt-0.5 text-[11px] text-faint">
-                  {format(parseISO(b.createdAt), "d MMM yyyy, HH:mm")}
+                  {fmtDate(b.createdAt, "d MMM yyyy, HH:mm")}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">

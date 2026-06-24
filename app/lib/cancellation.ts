@@ -20,3 +20,28 @@ export function cancellationView(
   if (!c.cancelByISO) return { kind: "freeAnytime" };
   return { kind: "freeUntil", iso: c.cancelByISO, passed: nowMs > Date.parse(c.cancelByISO) };
 }
+
+/** The i18n key (and any date) for a booking's cancellation-policy line, or null
+ *  when there's nothing to show. Both the guest portal and admin render this —
+ *  the guest with its locale translator, admin with the English one. */
+export type CancelMessage =
+  | { key: "nonRefundableBooking" }
+  | { key: "freeCancellationAnytime" }
+  | { key: "freeCancellationUntil" | "freeCancellationEnded"; iso: string };
+
+export function cancellationMessage(
+  c: CancellationLike | undefined,
+  nowMs: number,
+): CancelMessage | null {
+  const v = cancellationView(c, nowMs);
+  switch (v.kind) {
+    case "none":
+      return null;
+    case "nonRefundable":
+      return { key: "nonRefundableBooking" };
+    case "freeAnytime":
+      return { key: "freeCancellationAnytime" };
+    case "freeUntil":
+      return { key: v.passed ? "freeCancellationEnded" : "freeCancellationUntil", iso: v.iso };
+  }
+}

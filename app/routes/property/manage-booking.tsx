@@ -1,4 +1,3 @@
-import { format, parseISO } from "date-fns";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage-booking";
@@ -6,7 +5,8 @@ import { useProperty } from "~/lib/booking-context";
 import { getBooking, updateBooking } from "~/lib/bookings.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
-import { cancellationView } from "~/lib/cancellation";
+import { cancellationMessage } from "~/lib/cancellation";
+import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 
@@ -87,7 +87,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   const tr = useT();
   const { currency } = useProperty();
   const nav = useNavigation();
-  const fmt = (d: string, f: string) => format(parseISO(d), f, { locale: tr.locale });
+  const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
   const cur = b.currency || currency;
   const cancelled = (b.lifecycle ?? "active") === "cancelled";
   const cancelling = nav.state === "submitting";
@@ -100,17 +100,10 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           ? tr.t("cancelNotAllowed")
           : "";
 
-  const cv = cancellationView(b.cancellation, Date.now());
-  const cancellationText =
-    cv.kind === "nonRefundable"
-      ? tr.t("nonRefundableBooking")
-      : cv.kind === "freeAnytime"
-        ? tr.t("freeCancellationAnytime")
-        : cv.kind === "freeUntil"
-          ? tr.t(cv.passed ? "freeCancellationEnded" : "freeCancellationUntil", {
-              date: fmt(cv.iso, "EEE d MMM yyyy"),
-            })
-          : "";
+  const msg = cancellationMessage(b.cancellation, Date.now());
+  const cancellationText = msg
+    ? tr.t(msg.key, "iso" in msg ? { date: fmt(msg.iso, "EEE d MMM yyyy") } : undefined)
+    : "";
 
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">

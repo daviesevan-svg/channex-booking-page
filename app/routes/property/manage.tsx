@@ -1,7 +1,7 @@
-import { format, parseISO } from "date-fns";
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage";
+import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import {
   findBookingByRefAndEmail,
@@ -52,7 +52,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
   const tr = useT();
   const { currency } = useProperty();
   const nav = useNavigation();
-  const fmt = (d: string, f: string) => format(parseISO(d), f, { locale: tr.locale });
+  const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
 
   if (!loaderData.authed) {
     return (

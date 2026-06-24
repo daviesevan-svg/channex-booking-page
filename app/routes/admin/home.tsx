@@ -11,6 +11,7 @@ import {
   saveSearchContent,
 } from "~/lib/overrides.server";
 import { uploadHomeImage } from "~/lib/images.server";
+import { Field, FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -71,33 +72,6 @@ export function meta() {
   return [{ title: "Admin · Home page" }];
 }
 
-const inputCls =
-  "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
-
-function Field({
-  name,
-  label,
-  value,
-  placeholder,
-  textarea,
-}: {
-  name: string;
-  label: string;
-  value?: string;
-  placeholder?: string;
-  textarea?: boolean;
-}) {
-  return (
-    <label className="block text-[13px] font-semibold text-secondary">
-      {label}
-      {textarea ? (
-        <textarea name={name} rows={3} defaultValue={value} placeholder={placeholder} className={`${inputCls} resize-y`} />
-      ) : (
-        <input name={name} defaultValue={value} placeholder={placeholder} className={inputCls} />
-      )}
-    </label>
-  );
-}
 
 export default function AdminHome({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
@@ -158,7 +132,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                     name="highlightTitle"
                     defaultValue={content.highlights?.[i]?.title}
                     placeholder={DEFAULT_SEARCH.highlights[i].title}
-                    className={inputCls}
+                    className={FIELD_INPUT}
                   />
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
@@ -167,7 +141,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                     name="highlightDesc"
                     defaultValue={content.highlights?.[i]?.description}
                     placeholder={DEFAULT_SEARCH.highlights[i].description}
-                    className={inputCls}
+                    className={FIELD_INPUT}
                   />
                 </label>
               </div>

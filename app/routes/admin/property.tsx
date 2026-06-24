@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
+import { Field } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { langParam, pickLang } from "~/lib/content";
@@ -42,44 +43,6 @@ export function meta() {
   return [{ title: "Admin · Property details" }];
 }
 
-function Field({
-  name,
-  label,
-  value,
-  placeholder,
-  textarea,
-}: {
-  name: string;
-  label: string;
-  value?: string;
-  placeholder?: string;
-  textarea?: boolean;
-}) {
-  const cls =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
-  return (
-    <label className="block text-[13px] font-semibold text-secondary">
-      {label}
-      {textarea ? (
-        <textarea
-          name={name}
-          rows={4}
-          defaultValue={value}
-          placeholder={placeholder}
-          className={`${cls} resize-y`}
-        />
-      ) : (
-        <input name={name} defaultValue={value} placeholder={placeholder} className={cls} />
-      )}
-      {placeholder && (
-        <span className="mt-1 block text-[11px] font-normal text-faint">
-          From Channex: {placeholder || "—"} — leave blank to use this.
-        </span>
-      )}
-    </label>
-  );
-}
-
 export default function AdminProperty({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const saving = nav.state === "submitting";
@@ -118,12 +81,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder={defaults.hotelName} />
-        <Field name="address" label="Address" value={overrides.address} placeholder={defaults.address} />
-        <Field name="description" label="Description" value={overrides.description} placeholder={defaults.description} textarea />
+        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder={defaults.hotelName} channexHint />
+        <Field name="address" label="Address" value={overrides.address} placeholder={defaults.address} channexHint />
+        <Field name="description" label="Description" value={overrides.description} placeholder={defaults.description} textarea rows={4} channexHint />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="phone" label="Phone" value={overrides.phone} placeholder={defaults.phone} />
-          <Field name="email" label="Email" value={overrides.email} placeholder={defaults.email} />
+          <Field name="phone" label="Phone" value={overrides.phone} placeholder={defaults.phone} channexHint />
+          <Field name="email" label="Email" value={overrides.email} placeholder={defaults.email} channexHint />
         </div>
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
         <div>

@@ -1,9 +1,10 @@
-import { format, parseISO } from "date-fns";
 import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/booking";
 import { BookingStatusBadge } from "~/components/booking-status";
-import { cancellationView } from "~/lib/cancellation";
+import { cancellationMessage } from "~/lib/cancellation";
+import { fmtDate } from "~/lib/dates";
+import { makeTranslator } from "~/lib/i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { getBooking } from "~/lib/bookings.server";
 import { getConfig } from "~/lib/config.server";
@@ -33,18 +34,11 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function AdminBooking({ loaderData }: Route.ComponentProps) {
   const { booking: b } = loaderData;
-  const cv = cancellationView(b.cancellation, Date.now());
-  const cancellationText =
-    cv.kind === "nonRefundable"
-      ? "This booking is non-refundable."
-      : cv.kind === "freeAnytime"
-        ? "Free cancellation any time before arrival."
-        : cv.kind === "freeUntil"
-          ? `Free cancellation ${cv.passed ? "was available until" : "until"} ${format(
-              parseISO(cv.iso),
-              "EEE d MMM yyyy",
-            )}.`
-          : "";
+  const en = makeTranslator("en"); // admin UI is English
+  const msg = cancellationMessage(b.cancellation, Date.now());
+  const cancellationText = msg
+    ? en.t(msg.key, "iso" in msg ? { date: fmtDate(msg.iso, "EEE d MMM yyyy") } : undefined)
+    : "";
 
   return (
     <div>
@@ -71,7 +65,7 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
 
       {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
-          Cancelled by the guest on {format(parseISO(b.cancelledAt), "d MMM yyyy, HH:mm")}.
+          Cancelled by the guest on {fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm")}.
         </div>
       )}
 
@@ -91,10 +85,10 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
               value={<span className="font-mono text-[13px]">{b.channexId}</span>}
             />
           )}
-          <Row label="Check-in" value={format(parseISO(b.checkin), "EEE d MMM yyyy")} />
-          <Row label="Check-out" value={format(parseISO(b.checkout), "EEE d MMM yyyy")} />
+          <Row label="Check-in" value={fmtDate(b.checkin, "EEE d MMM yyyy")} />
+          <Row label="Check-out" value={fmtDate(b.checkout, "EEE d MMM yyyy")} />
           <Row label="Nights" value={String(b.nights)} />
-          <Row label="Booked" value={format(parseISO(b.createdAt), "d MMM yyyy, HH:mm")} />
+          <Row label="Booked" value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm")} />
         </section>
 
         <section className="rounded-[14px] border border-line bg-surface p-5">

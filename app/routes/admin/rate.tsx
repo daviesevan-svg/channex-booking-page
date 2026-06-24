@@ -7,6 +7,7 @@ import { langParam, pickLang } from "~/lib/content";
 import { uploadRatePlanImage } from "~/lib/images.server";
 import { getRatePlanList } from "~/lib/rateplans.server";
 import { getRatePlanOverride, putRatePlanOverride } from "~/lib/overrides.server";
+import { FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -93,8 +94,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const saving = nav.state === "submitting";
   const existing = override.images ?? [];
 
-  const inputCls =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
+  const inputCls = FIELD_INPUT;
 
   return (
     <div>
