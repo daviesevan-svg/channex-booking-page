@@ -8,6 +8,7 @@ import {
   getBookingsByEmail,
 } from "~/lib/bookings.server";
 import { createGuestSession, getGuestEmail, guestLogout } from "~/lib/guest-auth.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 
@@ -35,6 +36,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (form.get("intent") === "logout") {
     return guestLogout(request, `/${params.channelId}/manage`);
   }
+  // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
+  if (!(await rateLimit(`manage:${params.channelId}:${clientKey(request)}`, 8, 600))) {
+    return { tooMany: true };
+  }
+
   const reference = String(form.get("reference") ?? "").trim();
   const email = String(form.get("email") ?? "").trim();
   if (!reference || !email) return { notFound: true };
@@ -60,6 +66,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
         params={params}
         submitting={nav.state === "submitting"}
         notFound={Boolean(actionData && "notFound" in actionData && actionData.notFound)}
+        tooMany={Boolean(actionData && "tooMany" in actionData && actionData.tooMany)}
       />
     );
   }
@@ -123,10 +130,12 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
 function ManageLogin({
   submitting,
   notFound,
+  tooMany,
 }: {
   params: { channelId: string };
   submitting: boolean;
   notFound: boolean;
+  tooMany: boolean;
 }) {
   const tr = useT();
   const inputCls =
@@ -151,7 +160,11 @@ function ManageLogin({
           {tr.t("emailAddress")}
           <input name="email" type="email" placeholder="you@email.com" className={inputCls} />
         </label>
-        {notFound && <p className="text-[13px] text-red-600">{tr.t("manageNotFound")}</p>}
+        {tooMany ? (
+          <p className="text-[13px] text-red-600">{tr.t("manageTooMany")}</p>
+        ) : (
+          notFound && <p className="text-[13px] text-red-600">{tr.t("manageNotFound")}</p>
+        )}
         <button
           type="submit"
           disabled={submitting}

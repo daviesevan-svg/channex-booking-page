@@ -15,6 +15,7 @@ const EN: Dict = {
   findBooking: "Find my booking",
   manageNotFound:
     "We couldn't find a booking with that reference and email. Please check and try again.",
+  manageTooMany: "Too many attempts. Please wait a few minutes and try again.",
   yourBookings: "Your bookings",
   signOut: "Sign out",
   view: "View",

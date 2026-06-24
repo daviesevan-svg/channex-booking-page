@@ -49,6 +49,20 @@ export interface BookingRecord {
 const bookingsKey = (pid: string) => `bookings:${pid}`;
 const MAX_RECORDS = 500;
 
+// Crockford base32 (no I/L/O/U) — unambiguous when read aloud or typed.
+const REF_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** A high-entropy booking reference. This doubles as the guest's "manage my
+ *  booking" credential, so it must be unguessable — never derive it from the
+ *  clock or a constant. 8 chars of base32 ≈ 40 bits. (256 % 32 === 0, so the
+ *  modulo below is unbiased.) */
+export function generateReference(len = 8): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(len));
+  let out = "";
+  for (const b of bytes) out += REF_ALPHABET[b % 32];
+  return out;
+}
+
 export async function getBookings(pid: string): Promise<BookingRecord[]> {
   const kv = getConfigKV();
   if (!kv) return [];

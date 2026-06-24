@@ -13,7 +13,7 @@ import {
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
-import { recordBooking, type BookingStatus } from "~/lib/bookings.server";
+import { generateReference, recordBooking, type BookingStatus } from "~/lib/bookings.server";
 import { resolveBookingCancellation } from "~/lib/policy.server";
 import { getChannexClient, getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
@@ -121,9 +121,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   };
 
   const config = getConfig();
-  const stamp = Date.now().toString(36).toUpperCase().slice(-6);
+  // Always a random, unguessable reference — it's the guest's manage-booking
+  // credential. The Channex reservation id is kept separately in `channexId`.
+  const reference = generateReference();
   let status: BookingStatus;
-  let reference: string;
   let channexId: string | undefined;
   let error: string | undefined;
 
@@ -134,16 +135,13 @@ export async function action({ params, request }: Route.ActionArgs) {
         booking,
       );
       channexId = result?.reservationId || result?.id || undefined;
-      reference = channexId || "CONFIRMED";
       status = "confirmed";
     } catch (e) {
       status = "failed";
       error = e instanceof Error ? e.message : "Channex rejected the booking.";
-      reference = `ERR-${stamp}`;
     }
   } else {
     status = "simulated";
-    reference = `SIM-${stamp}`;
   }
 
   const nights = Math.max(
