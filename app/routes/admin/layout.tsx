@@ -89,6 +89,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin", label: "Property details", end: true },
             { to: "/admin/general", label: "General", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
+            { to: "/admin/rates", label: "Rates", end: false },
           ].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               {item.label}

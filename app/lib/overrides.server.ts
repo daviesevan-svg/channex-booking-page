@@ -1,4 +1,4 @@
-import type { RoomWithRates } from "./channex/types";
+import type { RatePlan, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import {
   DEFAULT_LANG,
@@ -151,6 +151,105 @@ export function mergeRoomOverride(room: RoomWithRates, ov?: RoomOverride): RoomW
     description: ov.description || room.description,
     photos: ov.images?.length ? ov.images.map((url) => ({ url })) : room.photos,
   };
+}
+
+// ===== rate-plan overrides (text localized; images shared) =====
+export interface RatePlanOverride {
+  name?: string;
+  description?: string;
+  inclusions?: string[];
+  /** Cancellation policy text shown to guests (overrides the Channex title). */
+  cancellation?: string;
+  images?: string[];
+}
+type RatePlanOverridesMap = Record<string, RatePlanOverride>;
+const ratePlansKey = (pid: string) => `rateplans:${pid}`;
+const ratePlansMap = (pid: string) =>
+  readJson<LangMap<RatePlanOverridesMap>>(ratePlansKey(pid)).then((m) => m ?? {});
+
+/** Merged for guests: language text over default text; images from the default language. */
+export async function getRatePlanOverrides(
+  pid: string,
+  lang = DEFAULT_LANG,
+): Promise<RatePlanOverridesMap> {
+  const m = await ratePlansMap(pid);
+  const base = m[DEFAULT_LANG] ?? {};
+  const loc = m[lang] ?? {};
+  const out: RatePlanOverridesMap = {};
+  for (const id of new Set([...Object.keys(base), ...Object.keys(loc)])) {
+    out[id] = {
+      name: loc[id]?.name ?? base[id]?.name,
+      description: loc[id]?.description ?? base[id]?.description,
+      inclusions: loc[id]?.inclusions ?? base[id]?.inclusions,
+      cancellation: loc[id]?.cancellation ?? base[id]?.cancellation,
+      images: base[id]?.images,
+    };
+  }
+  return out;
+}
+/** Admin prefill: this language's text + the shared (default-language) images. */
+export async function getRatePlanOverride(
+  pid: string,
+  rateId: string,
+  lang: string,
+): Promise<RatePlanOverride> {
+  const m = await ratePlansMap(pid);
+  const langEntry = (m[lang] ?? {})[rateId] ?? {};
+  const baseEntry = (m[DEFAULT_LANG] ?? {})[rateId] ?? {};
+  return {
+    name: langEntry.name,
+    description: langEntry.description,
+    inclusions: langEntry.inclusions,
+    cancellation: langEntry.cancellation,
+    images: baseEntry.images,
+  };
+}
+export async function putRatePlanOverride(
+  pid: string,
+  rateId: string,
+  lang: string,
+  ov: RatePlanOverride,
+): Promise<void> {
+  const m = await ratePlansMap(pid);
+  const name = ov.name?.trim() || undefined;
+  const description = ov.description?.trim() || undefined;
+  const inclusions = (ov.inclusions ?? []).map((s) => s.trim()).filter(Boolean);
+  const cancellation = ov.cancellation?.trim() || undefined;
+  const images = (ov.images ?? []).map((s) => s.trim()).filter(Boolean);
+
+  // Text for this language.
+  const langMap = { ...(m[lang] ?? {}) };
+  const textEntry: RatePlanOverride = {};
+  if (name) textEntry.name = name;
+  if (description) textEntry.description = description;
+  if (inclusions.length) textEntry.inclusions = inclusions;
+  if (cancellation) textEntry.cancellation = cancellation;
+  if (Object.keys(textEntry).length) langMap[rateId] = textEntry;
+  else delete langMap[rateId];
+  m[lang] = langMap;
+
+  // Images are shared — always stored on the default-language entry.
+  const baseMap = { ...(m[DEFAULT_LANG] ?? {}) };
+  const baseEntry = { ...(baseMap[rateId] ?? {}) };
+  if (images.length) baseEntry.images = images;
+  else delete baseEntry.images;
+  if (Object.keys(baseEntry).length) baseMap[rateId] = baseEntry;
+  else delete baseMap[rateId];
+  m[DEFAULT_LANG] = baseMap;
+
+  await writeJson(ratePlansKey(pid), m);
+}
+
+/** Apply a rate-plan content override on top of a Channex rate plan. */
+export function mergeRatePlanOverride(plan: RatePlan, ov?: RatePlanOverride): RatePlan {
+  if (!ov) return plan;
+  const merged: RatePlan = { ...plan };
+  if (ov.name) merged.title = ov.name;
+  if (ov.description) merged.description = ov.description;
+  if (ov.inclusions?.length) merged.inclusions = ov.inclusions;
+  if (ov.images?.length) merged.images = ov.images;
+  if (ov.cancellation) merged.cancellationNote = ov.cancellation;
+  return merged;
 }
 
 // ===== editable page content (localized) =====

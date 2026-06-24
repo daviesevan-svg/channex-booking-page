@@ -17,6 +17,8 @@ export default [
     route("pages/:page", "routes/admin/page.tsx"),
     route("rooms", "routes/admin/rooms.tsx"),
     route("rooms/:roomId", "routes/admin/room.tsx"),
+    route("rates", "routes/admin/rates.tsx"),
+    route("rates/:rateId", "routes/admin/rate.tsx"),
   ]),
 
   // Guest booking flow

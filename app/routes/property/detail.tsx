@@ -45,7 +45,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): string {
   const parts: string[] = [];
   if (plan.mealPlan) parts.push(plan.mealPlan);
-  if (plan.cancellationPolicy?.title)
+  if (plan.cancellationNote) parts.push(plan.cancellationNote);
+  else if (plan.cancellationPolicy?.title)
     parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
   return parts.join(" · ") || tr.t("standardRate");
 }
@@ -70,9 +71,10 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
     "EEE d MMM",
   )}`;
 
-  const photos = room.photos ?? [];
-  const hero = photos[0]?.url;
-  const thumbs = photos.slice(1, 3);
+  const ratePhotos = (chosen?.images ?? []).map((url) => ({ url }));
+  const galleryPhotos = [...ratePhotos, ...(room.photos ?? [])];
+  const hero = galleryPhotos[0]?.url;
+  const thumbs = galleryPhotos.slice(1, 3);
   const amenities = room.facilities ?? [];
 
   function addToStay() {
@@ -186,6 +188,38 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               );
             })}
           </div>
+          {(chosen?.description || chosen?.inclusions?.length) && (
+            <div className="mb-4 rounded-[12px] bg-[#faf6ef] p-4">
+              {chosen?.description && (
+                <p className="text-[13.5px] leading-[1.55] text-[#5e5547]">{chosen.description}</p>
+              )}
+              {chosen?.inclusions?.length ? (
+                <>
+                  <div
+                    className={`mb-2 text-[12px] font-semibold uppercase tracking-wider text-muted-2 ${
+                      chosen?.description ? "mt-3" : ""
+                    }`}
+                  >
+                    {tr.t("whatsIncluded")}
+                  </div>
+                  <ul className="flex flex-col gap-1.5">
+                    {chosen.inclusions.map((inc, i) => (
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-[13.5px] text-[#4a4236]"
+                      >
+                        <span
+                          className="mt-[6px] h-[6px] w-[6px] flex-none rounded-[1px] bg-accent"
+                          style={{ transform: "rotate(45deg)" }}
+                        />
+                        {inc}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          )}
           <div className="mb-4 flex items-baseline justify-between border-t border-divider pt-4">
             <span className="text-sm text-secondary">
               {tr.t("totalNights", { n: nights })}

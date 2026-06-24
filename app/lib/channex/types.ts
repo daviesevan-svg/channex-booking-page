@@ -116,6 +116,18 @@ export interface RatePlan {
   availability?: number;
   taxes?: Tax[];
   cancellationPolicy?: CancellationPolicy;
+  /** Stable id of the logical rate plan; virtual per-occupancy variants share it.
+   *  Used as the mapping key for admin rate-plan content overrides. */
+  parentRatePlanId?: string;
+  mealType?: string | null;
+  isPrimary?: boolean;
+  virtualId?: string | null;
+  // Admin content overrides (applied server-side, not returned by Channex):
+  description?: string;
+  inclusions?: string[];
+  images?: string[];
+  /** Custom cancellation text shown verbatim to guests (overrides the policy title). */
+  cancellationNote?: string;
 }
 
 export interface BedOption {
