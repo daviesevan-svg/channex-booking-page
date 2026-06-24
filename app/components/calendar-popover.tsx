@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 import { useT } from "~/lib/i18n";
 import type { DayCell, DateRangeState } from "~/lib/use-date-range";
@@ -31,10 +31,22 @@ export function CalendarPopover({
 }) {
   const tr = useT();
   const weekdays = tr.t("weekdays").split(",");
+  const ref = useRef<HTMLDivElement>(null);
+
+  // When opened low on the page the popover can fall below the fold; nudge it
+  // fully into view (no-op when it's already visible).
+  useEffect(() => {
+    const id = requestAnimationFrame(() =>
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+    );
+    return () => cancelAnimationFrame(id);
+  }, []);
+
   return (
     <>
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
+        ref={ref}
         className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
         style={{ boxShadow: "var(--shadow-popover)" }}
       >
