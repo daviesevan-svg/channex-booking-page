@@ -58,16 +58,41 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         {tr.t("reference")} {b.reference}
       </div>
 
-      <div
-        className="rounded-[18px] border border-line bg-surface p-[26px]"
-        style={{ boxShadow: "var(--shadow-confirm)" }}
-      >
-        <div className="flex flex-col gap-4 border-b border-divider pb-5">
+      <div className="grid gap-5 sm:grid-cols-2">
+        <section className="rounded-[16px] border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionBooking")}</h2>
+          <Row label={tr.t("reference")} value={<span className="font-mono text-[13px]">{b.reference}</span>} />
+          <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
+          <Row label={tr.t("checkOut")} value={fmt(b.checkout, "EEE d MMM yyyy")} />
+          <Row label={tr.t("nights")} value={String(b.nights)} />
+          <Row label={tr.t("bookedOn")} value={fmt(b.createdAt, "d MMM yyyy, HH:mm")} />
+        </section>
+
+        <section className="rounded-[16px] border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionGuest")}</h2>
+          <Row label={tr.t("guestName")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
+          <Row
+            label={tr.t("emailAddress")}
+            value={
+              <a href={`mailto:${b.guest.email}`} className="text-accent hover:underline">
+                {b.guest.email}
+              </a>
+            }
+          />
+          <Row label={tr.t("phone")} value={b.guest.phone} />
+          {b.guest.arrival && <Row label={tr.t("estimatedArrival")} value={b.guest.arrival} />}
+          {b.guest.requests && <Row label={tr.t("specialRequests")} value={b.guest.requests} />}
+        </section>
+      </div>
+
+      <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionRooms")}</h2>
+        <div className="flex flex-col divide-y divide-divider">
           {b.rooms.map((r, i) => (
-            <div key={i} className="flex items-start justify-between gap-4">
+            <div key={i} className="flex items-start justify-between gap-4 py-3 first:pt-0">
               <div className="min-w-0">
-                <div className="font-serif text-[18px] font-semibold">{r.roomTitle}</div>
-                <div className="mt-[3px] text-[13px] text-muted-2">
+                <div className="font-semibold">{r.roomTitle}</div>
+                <div className="text-[13px] text-muted-2">
                   {r.rateTitle} · {occLabel(tr, r.adults, Array(r.children).fill(8))}
                 </div>
               </div>
@@ -75,19 +100,16 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             </div>
           ))}
         </div>
-
-        <div className="flex flex-col gap-1 py-4">
-          <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
-          <Row label={tr.t("checkOut")} value={fmt(b.checkout, "EEE d MMM yyyy")} />
-          <Row label={tr.t("nights")} value={String(b.nights)} />
-          <Row label={tr.t("guests")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
-        </div>
-
-        <div className="flex items-baseline justify-between border-t border-divider pt-4">
+        <div className="mt-4 flex items-baseline justify-between border-t border-divider pt-4">
           <span className="text-[16px] font-semibold">{tr.t("total")}</span>
           <span className="font-serif text-[28px] font-semibold">{formatMoney(b.total, cur)}</span>
         </div>
-      </div>
+      </section>
+
+      <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionPayment")}</h2>
+        <p className="text-[14px] text-muted-2">{tr.t("noPaymentInfo")}</p>
+      </section>
     </main>
   );
 }
