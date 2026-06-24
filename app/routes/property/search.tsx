@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/search";
@@ -49,6 +49,26 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const [occupancy, setOccupancy] = useState<Occupancy>(() => readOccupancy(searchParams));
   const [promoCode, setPromoCode] = useState(() => searchParams.get("promo") ?? "");
   const [showPromo, setShowPromo] = useState(() => Boolean(searchParams.get("promo")));
+
+  // Keep the landing-page URL in sync with the chosen dates/guests so it's a
+  // shareable deep link (and matches the format 3rd parties can link in with).
+  // Uses replaceState to avoid re-running the loader on every change.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (dates.checkinIso) sp.set("checkin", dates.checkinIso);
+    else sp.delete("checkin");
+    if (dates.checkoutIso) sp.set("checkout", dates.checkoutIso);
+    else sp.delete("checkout");
+    sp.set("adults", String(occupancy.adults));
+    if (occupancy.childrenAge.length) sp.set("childrenAge", occupancy.childrenAge.join(","));
+    else sp.delete("childrenAge");
+    const qs = sp.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+    );
+  }, [dates.checkinIso, dates.checkoutIso, occupancy]);
   const navigation = useNavigation();
   const searching = navigation.state === "loading";
 
