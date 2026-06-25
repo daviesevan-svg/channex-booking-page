@@ -17,7 +17,7 @@ import {
   serializeCart,
   type ResolvedLine,
 } from "~/lib/cart";
-import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getCatalogRooms } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -44,17 +44,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(`/${params.channelId}`);
   }
 
-  const rooms = await getRoomsWithOverrides(
-    params.channelId,
-    {
-      checkinDate: checkin,
-      checkoutDate: checkout,
-      currency,
-      adults: occ.adults,
-      childrenAge: childrenAgeParam(occ.childrenAge),
-    },
-    lang,
-  );
+  const rooms = await getCatalogRooms(params.channelId, {
+    checkinDate: checkin,
+    checkoutDate: checkout,
+    currency,
+    adults: occ.adults,
+    childrenAge: childrenAgeParam(occ.childrenAge),
+  });
 
   const party = partySize(occ);
   const cheapest = (room: RoomWithRates) =>

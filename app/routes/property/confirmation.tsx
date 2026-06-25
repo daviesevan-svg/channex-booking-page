@@ -10,7 +10,7 @@ import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
 import { getPageText } from "~/lib/overrides.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
-import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getCatalogRooms } from "~/lib/catalog.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -27,12 +27,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-    const apiRooms = await getRoomsWithOverrides(
-      params.channelId,
-      { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults },
-      lang,
-    );
-    const lines = resolveCart(parseCart(url.searchParams), apiRooms);
+    const catalogRooms = await getCatalogRooms(params.channelId, {
+      checkinDate: checkin,
+      checkoutDate: checkout,
+      currency,
+      adults: occ.adults,
+    });
+    const lines = resolveCart(parseCart(url.searchParams), catalogRooms);
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     if (lines.length) total = cartCoverage(lines).total;
   }

@@ -1,5 +1,6 @@
+import { getRates } from "./catalog.server";
 import type { DeadlineUnit } from "./content";
-import { getRatePlanOverrides, getSettings, rateKey } from "./overrides.server";
+import { getSettings } from "./overrides.server";
 
 export interface CancellationSnapshot {
   refundable: boolean;
@@ -19,21 +20,23 @@ function deadlineMs(value?: number, unit?: DeadlineUnit): number | null {
  *  cancel-by deadline across rooms. */
 export async function resolveBookingCancellation(
   pid: string,
-  rateTitles: string[],
+  rateIds: string[],
   checkinISO: string,
 ): Promise<CancellationSnapshot> {
-  const [overrides, settings] = await Promise.all([getRatePlanOverrides(pid), getSettings(pid)]);
+  const [rates, settings] = await Promise.all([getRates(pid), getSettings(pid)]);
+  const byId = new Map(rates.map((r) => [r.id, r]));
   const checkinMs = Date.parse(checkinISO);
 
   let refundable = true;
   let earliestCancelBy: number | null = null;
 
-  for (const title of rateTitles) {
-    const ov = overrides[rateKey(title)];
-    if ((ov?.refundable ?? true) === false) refundable = false;
+  for (const id of rateIds) {
+    const rate = byId.get(id);
+    if (!rate) continue;
+    if (rate.refundable === false) refundable = false;
 
-    let value = ov?.cancelDeadlineValue;
-    let unit = ov?.cancelDeadlineUnit;
+    let value = rate.cancelDeadlineValue;
+    let unit = rate.cancelDeadlineUnit;
     if (value == null) {
       value = settings.cancelDeadlineValue;
       unit = settings.cancelDeadlineUnit;

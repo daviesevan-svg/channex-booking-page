@@ -23,7 +23,7 @@ import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getPageText } from "~/lib/overrides.server";
-import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getCatalogRooms } from "~/lib/catalog.server";
 
 interface Stay {
   channelId: string;
@@ -49,18 +49,13 @@ function readStay(url: URL, channelId: string): Stay | null {
 async function resolveStayCart(
   stay: Stay,
   url: URL,
-  lang: string,
 ): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
-  const rooms = await getRoomsWithOverrides(
-    stay.channelId,
-    {
-      checkinDate: stay.checkin,
-      checkoutDate: stay.checkout,
-      currency: stay.currency,
-      adults: stay.occ.adults,
-    },
-    lang,
-  );
+  const rooms = await getCatalogRooms(stay.channelId, {
+    checkinDate: stay.checkin,
+    checkoutDate: stay.checkout,
+    currency: stay.currency,
+    adults: stay.occ.adults,
+  });
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 
@@ -70,7 +65,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!stay) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
-  const { rooms, lines } = await resolveStayCart(stay, url, lang);
+  const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }
@@ -102,7 +97,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const intent = String(form.get("intent") || "book");
   const promoCode = String(form.get("promoCode") || "");
 
-  const { rooms, lines } = await resolveStayCart(stay, url, langFromRequest(request));
+  const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }
@@ -186,7 +181,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   );
   const cancellation = await resolveBookingCancellation(
     stay.channelId,
-    lines.map((l) => l.rateTitle),
+    lines.map((l) => l.rateId),
     stay.checkin,
   );
   await recordBooking(stay.channelId, {

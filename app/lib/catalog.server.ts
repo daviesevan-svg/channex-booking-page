@@ -2,6 +2,9 @@
 // replacing the live Channex shopping source. Stored in KV per property. Prices
 // here are the base nightly price; per-date ARI pushed via the Open Channel API
 // (D1) will later override these.
+import { differenceInCalendarDays, parseISO } from "date-fns";
+
+import type { RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
 
@@ -101,4 +104,54 @@ export async function saveRate(pid: string, rate: CatalogRate): Promise<void> {
 export async function deleteRate(pid: string, id: string): Promise<void> {
   const list = (await getRates(pid)).filter((r) => r.id !== id);
   await writeArr(ratesKey(pid), list);
+}
+
+// ---- public read: build RoomWithRates from the catalog ----
+/** The catalog as `RoomWithRates[]` for a given stay, so the guest-facing
+ *  loaders, cart and occupancy logic work unchanged. Total = nightly × nights;
+ *  availability is assumed open until per-date ARI arrives via Open Channel. */
+export async function getCatalogRooms(pid: string, query: RoomsQuery = {}): Promise<RoomWithRates[]> {
+  const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  const nights =
+    query.checkinDate && query.checkoutDate
+      ? Math.max(1, differenceInCalendarDays(parseISO(query.checkoutDate), parseISO(query.checkinDate)))
+      : 1;
+  const currency = query.currency || "GBP";
+
+  return rooms
+    .map((room): RoomWithRates => {
+      // Occupancy drives the search "fits" check and cart coverage, so it
+      // reflects the room's capacity (not the rate's priced occupancy).
+      const occupancy = {
+        adults: room.maxAdults,
+        children: Math.max(0, room.maxGuests - room.maxAdults),
+        infants: 0,
+      };
+      const ratePlans: RatePlan[] = rates
+        .filter((r) => r.roomId === room.id && r.active)
+        .map((r) => {
+          const total = (r.nightlyPrice * nights).toFixed(2);
+          return {
+            id: r.id,
+            title: r.title,
+            occupancy,
+            mealPlan: r.mealPlan ?? null,
+            currency,
+            totalPrice: total,
+            netPrice: total, // no separate tax for manual rates
+            availability: 99,
+            inclusions: r.inclusions.length ? r.inclusions : undefined,
+            cancellationNote: r.cancellationNote || (r.refundable ? undefined : "Non-refundable"),
+          };
+        });
+      return {
+        id: room.id,
+        title: room.title,
+        description: room.description,
+        facilities: room.facilities,
+        photos: room.images.map((url) => ({ url })),
+        ratePlans,
+      };
+    })
+    .filter((room) => room.ratePlans.length > 0);
 }

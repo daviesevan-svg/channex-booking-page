@@ -5,7 +5,7 @@ import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "rea
 import type { Route } from "./+types/detail";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
-import { getRoomsWithOverrides } from "~/lib/rooms.server";
+import { getCatalogRooms } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
@@ -23,17 +23,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!checkin || !checkout) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
-  const rooms = await getRoomsWithOverrides(
-    params.channelId,
-    {
-      checkinDate: checkin,
-      checkoutDate: checkout,
-      currency,
-      adults,
-      childrenAge: childrenAgeParam(childrenAge),
-    },
-    lang,
-  );
+  const rooms = await getCatalogRooms(params.channelId, {
+    checkinDate: checkin,
+    checkoutDate: checkout,
+    currency,
+    adults,
+    childrenAge: childrenAgeParam(childrenAge),
+  });
   const room = rooms.find((r) => r.id === params.roomId);
   if (!room) throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
 
