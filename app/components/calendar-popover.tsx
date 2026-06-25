@@ -13,14 +13,15 @@ function cellStyle(cell: DayCell): CSSProperties {
   if (cell.inRange) {
     return { background: "var(--accent-soft)", color: "#2a2521", fontWeight: 600 };
   }
-  // Past dates are greyed out; sold-out (but present) dates stay readable black
-  // with a strike-through so they read as "exists, just not bookable to arrive".
   if (cell.past) {
     return { color: "#c9bdac", cursor: "default", fontWeight: 400 };
   }
   if (cell.disabled) {
+    // The first sold night after an available run reads as readable black with a
+    // strike-through (you can still check out on it). Deeper sold/closed nights
+    // use the plain greyed-out unavailable style.
     return {
-      color: cell.sold ? "#2a2521" : "#c9bdac",
+      color: cell.checkoutBoundary ? "#2a2521" : "#c9bdac",
       cursor: "default",
       fontWeight: 400,
       textDecoration: cell.sold ? "line-through" : "none",

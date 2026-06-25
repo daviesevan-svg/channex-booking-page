@@ -25,6 +25,9 @@ export interface DayCell {
   sold: boolean;
   /** Past dates render greyed; sold (non-past) dates render struck-through. */
   past: boolean;
+  /** A sold night whose previous night is available — i.e. reachable as a
+   *  check-out. Styled black+struck; deeper sold nights stay plain grey. */
+  checkoutBoundary: boolean;
   /** Native-tooltip hint, e.g. "Unavailable" or "Check-out only". */
   title?: string;
   isCheckin: boolean;
@@ -150,6 +153,7 @@ export function useDateRange({
           disabled: true,
           sold: false,
           past: false,
+          checkoutBoundary: false,
           isCheckin: false,
           isCheckout: false,
           inRange: false,
@@ -162,11 +166,13 @@ export function useDateRange({
         const sold = isSold(date);
         // Sold nights stay un-pickable for arrival, but open up as a check-out.
         const asCheckout = checkoutAllowed(date);
+        // First sold night after an available run — you can still check out here.
+        const prev = addDays(date, -1);
+        const checkoutBoundary = sold && !isSold(prev) && !isBefore(prev, today);
         const disabled = past ? true : asCheckout ? false : sold;
         let title: string | undefined;
         if (!past) {
-          if (asCheckout && sold) title = tr.t("checkoutOnly");
-          else if (sold) title = tr.t("unavailable");
+          if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
         }
         const isCheckin = !!checkin && differenceInCalendarDays(date, checkin) === 0;
@@ -186,6 +192,7 @@ export function useDateRange({
           disabled,
           sold,
           past,
+          checkoutBoundary,
           title,
           isCheckin,
           isCheckout,
