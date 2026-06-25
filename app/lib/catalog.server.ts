@@ -2,9 +2,10 @@
 // replacing the live Channex shopping source. Stored in KV per property. Prices
 // here are the base nightly price; per-date ARI pushed via the Open Channel API
 // (D1) will later override these.
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import type { RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
+import { getInventory } from "./ari.server";
+import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
 
@@ -154,4 +155,45 @@ export async function getCatalogRooms(pid: string, query: RoomsQuery = {}): Prom
       };
     })
     .filter((room) => room.ratePlans.length > 0);
+}
+
+/** Calendar availability for [from, to] (inclusive), in the Channex ClosedDates
+ *  shape the date picker consumes. A date is closed when no room is bookable
+ *  (availability 0, or every active rate stop-sold). minStayArrival is the
+ *  smallest min-stay among the bookable rates that day. Dates with no inventory
+ *  row are treated as open (default-available, same as the booking flow). */
+export async function getCalendarAvailability(
+  pid: string,
+  from: string,
+  to: string,
+): Promise<ClosedDates> {
+  const [rooms, rates, inv] = await Promise.all([getRooms(pid), getRates(pid), getInventory(pid, from, to)]);
+  const ratesByRoom = new Map<string, CatalogRate[]>();
+  for (const r of rates) {
+    if (!r.active) continue;
+    (ratesByRoom.get(r.roomId) ?? ratesByRoom.set(r.roomId, []).get(r.roomId)!).push(r);
+  }
+
+  const closed: string[] = [];
+  const minStayArrival: Record<string, number> = {};
+  const end = parseISO(to);
+  for (let d = parseISO(from); d <= end; d = addDays(d, 1)) {
+    const date = format(d, "yyyy-MM-dd");
+    let bookable = false;
+    let minStay = Infinity;
+    for (const room of rooms) {
+      const roomRates = ratesByRoom.get(room.id);
+      if (!roomRates?.length) continue;
+      const avail = inv.availability[`${room.id}|${date}`];
+      if (avail !== undefined && avail <= 0) continue; // sold out (undefined = open)
+      const openRates = roomRates.filter((rt) => !inv.restrictions[`${rt.id}|${date}`]?.stopSell);
+      if (!openRates.length) continue;
+      bookable = true;
+      for (const rt of openRates) minStay = Math.min(minStay, inv.restrictions[`${rt.id}|${date}`]?.minStay || 1);
+    }
+    if (!bookable) closed.push(date);
+    else if (Number.isFinite(minStay) && minStay > 1) minStayArrival[date] = minStay;
+  }
+
+  return { closed, closedToArrival: [], closedToDeparture: [], minStayArrival, minStayThrough: {} };
 }

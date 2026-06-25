@@ -1,3 +1,4 @@
+import { addMonths, format } from "date-fns";
 import { useEffect, useState } from "react";
 import { useNavigate, useNavigation, useSearchParams } from "react-router";
 
@@ -10,14 +11,21 @@ import { DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getSearchContent } from "~/lib/overrides.server";
+import { getCalendarAvailability } from "~/lib/catalog.server";
 import { useDateRange } from "~/lib/use-date-range";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
-  const content = await getSearchContent(params.channelId, lang);
-  // No live availability source yet — every date is open until per-date ARI
-  // arrives via the Open Channel API.
-  return { closedDates: null, content };
+  // Availability + min-stay for the calendar, from our inventory (D1). Cover the
+  // calendar's horizon (it pages up to ~12 months out).
+  const now = new Date();
+  const [content, closedDates] = await Promise.all([
+    getSearchContent(params.channelId, lang),
+    getCalendarAvailability(params.channelId, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
+      () => null, // fail open: a calendar data hiccup shouldn't break the page
+    ),
+  ]);
+  return { closedDates, content };
 }
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
