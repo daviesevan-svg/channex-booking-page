@@ -1,4 +1,5 @@
-import { Form, Link, NavLink, Outlet, useSearchParams } from "react-router";
+import { useState } from "react";
+import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
@@ -31,6 +32,10 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const { email, propertyId, lang, languages } = loaderData;
   const context: AdminContext = { propertyId, lang };
+  const [navOpen, setNavOpen] = useState(true);
+  // Wide pages (the inventory grid) break out of the centred column.
+  const wide = useLocation().pathname.startsWith("/admin/inventory");
+  const shell = wide ? "max-w-none" : "max-w-[960px]";
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) =>
     setSearchParams((prev) => {
@@ -43,14 +48,24 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-page text-ink">
       <header className="border-b border-nav-border bg-surface-alt">
-        <div className="mx-auto flex max-w-[960px] items-center justify-between gap-4 px-6 py-4">
-          <Link to="/admin" className="flex items-center gap-3">
-            <span
-              className="inline-block h-3 w-3 rounded-[2px] bg-accent"
-              style={{ transform: "rotate(45deg)" }}
-            />
-            <span className="font-serif text-[19px] font-semibold">Booking Admin</span>
-          </Link>
+        <div className={`mx-auto flex ${shell} items-center justify-between gap-4 px-6 py-4`}>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setNavOpen((v) => !v)}
+              aria-label={navOpen ? "Hide menu" : "Show menu"}
+              className="rounded-[8px] border border-line-alt px-2.5 py-1.5 text-[15px] leading-none text-muted hover:border-accent hover:text-accent"
+            >
+              ☰
+            </button>
+            <Link to="/admin" className="flex items-center gap-3">
+              <span
+                className="inline-block h-3 w-3 rounded-[2px] bg-accent"
+                style={{ transform: "rotate(45deg)" }}
+              />
+              <span className="font-serif text-[19px] font-semibold">Booking Admin</span>
+            </Link>
+          </div>
           <div className="flex items-center gap-5 text-[13px] text-muted">
             {languages.length > 1 && (
               <label className="flex items-center gap-1.5">
@@ -83,8 +98,8 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-[960px] gap-8 px-6 py-8">
-        <nav className="w-44 flex-none space-y-1">
+      <div className={`mx-auto flex ${shell} gap-8 px-6 py-8`}>
+        <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
           {[
             { to: "/admin", label: "Property details", end: true },
             { to: "/admin/general", label: "General", end: false },
