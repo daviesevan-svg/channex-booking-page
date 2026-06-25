@@ -17,8 +17,11 @@ export interface AppConfig extends ChannexConfig {
   sessionSecret: string;
   appUrl: string;
   resendApiKey?: string;
-  /** Open Channel API: key Channex sends (and we send back on booking push). */
+  /** Open Channel inbound key: the one Channex sends to our /api endpoints. */
   openChannelApiKey: string;
+  /** Open Channel outbound key: Channex-provided, used when WE call Channex's
+   *  new_booking / full-sync webhooks. Falls back to the inbound key if unset. */
+  openChannelBookingKey: string;
   /** Our provider code, used when calling Channex's full-sync/booking webhooks. */
   providerCode?: string;
   /** Channex Open Channel new_booking webhook (staging vs production host). */
@@ -48,6 +51,7 @@ export function getConfig(): AppConfig {
     appUrl: read("APP_URL", "http://localhost:5173"),
     resendApiKey: read("RESEND_API_KEY") || undefined,
     openChannelApiKey: read("OPEN_CHANNEL_API_KEY"),
+    openChannelBookingKey: read("OPEN_CHANNEL_BOOKING_KEY") || read("OPEN_CHANNEL_API_KEY"),
     providerCode: read("PROVIDER_CODE") || undefined,
     openChannelBookingUrl: read(
       "OPEN_CHANNEL_BOOKING_URL",

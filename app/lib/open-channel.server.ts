@@ -10,10 +10,10 @@ export interface OpenChannelBookingResult {
 /** POST a booking to Channex's Open Channel new_booking webhook. Throws with the
  *  Channex error on a non-2xx response. */
 export async function pushOpenChannelBooking(booking: unknown): Promise<OpenChannelBookingResult> {
-  const { openChannelApiKey, openChannelBookingUrl } = getConfig();
+  const { openChannelBookingKey, openChannelBookingUrl } = getConfig();
   const res = await fetch(openChannelBookingUrl, {
     method: "POST",
-    headers: { "api-key": openChannelApiKey, "Content-Type": "application/json" },
+    headers: { "api-key": openChannelBookingKey, "Content-Type": "application/json" },
     body: JSON.stringify({ booking }),
   });
   const text = await res.text();
