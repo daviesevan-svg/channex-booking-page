@@ -21,6 +21,8 @@ export interface AppConfig extends ChannexConfig {
   openChannelApiKey: string;
   /** Our provider code, used when calling Channex's full-sync/booking webhooks. */
   providerCode?: string;
+  /** Channex Open Channel new_booking webhook (staging vs production host). */
+  openChannelBookingUrl: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -47,6 +49,10 @@ export function getConfig(): AppConfig {
     resendApiKey: read("RESEND_API_KEY") || undefined,
     openChannelApiKey: read("OPEN_CHANNEL_API_KEY"),
     providerCode: read("PROVIDER_CODE") || undefined,
+    openChannelBookingUrl: read(
+      "OPEN_CHANNEL_BOOKING_URL",
+      "https://secure-staging.channex.io/api/v1/channel_webhooks/open_channel/new_booking",
+    ),
   };
 }
 

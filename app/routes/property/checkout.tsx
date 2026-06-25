@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
 
@@ -22,7 +22,8 @@ import {
 import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode } from "~/lib/promotions";
-import { getChannexClient, getConfig } from "~/lib/config.server";
+import { getConfig } from "~/lib/config.server";
+import { pushOpenChannelBooking } from "~/lib/open-channel.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
@@ -135,47 +136,59 @@ export async function action({ params, request }: Route.ActionArgs) {
   const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
 
   const g = parsed.data;
+  const config = getConfig();
+  const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
+  // Random, unguessable reference — also the guest's manage-booking credential.
+  const reference = generateReference();
+
+  // Open Channel booking payload. Each room's (promo-adjusted) total is spread
+  // across the stay nights as days[], so the price we send is exactly what we
+  // charge — no separate "amount" override needed.
+  const stayDates = Array.from({ length: nights }, (_, i) =>
+    format(addDays(parseISO(stay.checkin), i), "yyyy-MM-dd"),
+  );
+  const ratio = totals.total > 0 ? discountedTotal / totals.total : 1;
   const booking = {
     status: "new",
-    arrivalDate: stay.checkin,
-    departureDate: stay.checkout,
+    provider_code: config.providerCode,
+    hotel_code: stay.channelId,
+    ota_name: config.providerCode || "Direct",
+    reservation_id: reference,
     currency: stay.currency,
-    arrivalHour: g.arrival || undefined,
+    arrival_date: stay.checkin,
+    departure_date: stay.checkout,
+    arrival_hour: g.arrival || undefined,
     customer: { name: g.firstName, surname: g.lastName, mail: g.email, phone: g.phone },
-    notes:
-      [
-        g.requests || null,
-        applied ? `Promo ${applied.code} applied (-${discount.toFixed(2)} ${stay.currency})` : null,
-      ]
-        .filter(Boolean)
-        .join("\n") || undefined,
-    // A promo sends the discounted price as the booking's custom amount. Channex
-    // accepts a custom price; confirm the exact field(s) against your account
-    // before enabling live booking.
-    ...(discount > 0 ? { amount: discountedTotal.toFixed(2) } : {}),
-    rooms: lines.map((l, index) => ({
-      index,
-      roomTypeCode: l.roomId,
-      ratePlanCode: l.rateId,
-      occupancy: l.occupancy,
-    })),
+    rooms: lines.map((l, index) => {
+      const lineTotal = Math.round(l.total * ratio * 100) / 100;
+      const per = Math.round((lineTotal / nights) * 100) / 100;
+      return {
+        index,
+        room_type_code: l.roomId,
+        occupancy: {
+          adults: l.occupancy.adults,
+          children: l.occupancy.children,
+          infants: l.occupancy.infants ?? 0,
+        },
+        guests: [{ name: g.firstName, surname: g.lastName }],
+        days: stayDates.map((date, i) => ({
+          date,
+          // last night absorbs the rounding remainder so days sum to lineTotal
+          price: (i === nights - 1 ? Math.round((lineTotal - per * (nights - 1)) * 100) / 100 : per).toFixed(2),
+          rate_plan_code: l.rateId,
+        })),
+      };
+    }),
   };
 
-  const config = getConfig();
-  // Always a random, unguessable reference — it's the guest's manage-booking
-  // credential. The Channex reservation id is kept separately in `channexId`.
-  const reference = generateReference();
   let status: BookingStatus;
   let channexId: string | undefined;
   let error: string | undefined;
 
   if (config.allowLiveBooking) {
     try {
-      const result = await getChannexClient().pushBooking<{ id?: string; reservationId?: string }>(
-        stay.channelId,
-        booking,
-      );
-      channexId = result?.reservationId || result?.id || undefined;
+      const result = await pushOpenChannelBooking(booking);
+      channexId = result?.reservation_id || result?.id || undefined;
       status = "confirmed";
     } catch (e) {
       status = "failed";
@@ -185,10 +198,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     status = "simulated";
   }
 
-  const nights = Math.max(
-    1,
-    differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)),
-  );
   const cancellation = await resolveBookingCancellation(
     stay.channelId,
     lines.map((l) => l.rateId),
