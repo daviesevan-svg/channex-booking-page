@@ -68,6 +68,8 @@ export function useDateRange({
     () => closedDates?.minStayArrival ?? {},
     [closedDates],
   );
+  const ctaSet = useMemo(() => new Set(closedDates?.closedToArrival ?? []), [closedDates]);
+  const ctdSet = useMemo(() => new Set(closedDates?.closedToDeparture ?? []), [closedDates]);
 
   const minStayFor = (d: Date) => minStayMap[iso(d)] ?? 1;
   const isSold = (d: Date) => soldSet.has(iso(d));
@@ -75,6 +77,10 @@ export function useDateRange({
 
   function handleDay(date: Date) {
     if (!checkin || checkout || !isBefore(checkin, date)) {
+      if (ctaSet.has(iso(date))) {
+        setHelper(tr.t("helperClosedToArrival", { date: fmt(date, "EEE d MMM") }));
+        return;
+      }
       const minS = minStayFor(date);
       setCheckin(date);
       setCheckout(null);
@@ -83,6 +89,10 @@ export function useDateRange({
           ? tr.t("helperMinStayArrival", { n: minS, date: fmt(date, "EEE d MMM") })
           : "",
       );
+      return;
+    }
+    if (ctdSet.has(iso(date))) {
+      setHelper(tr.t("helperClosedToDeparture", { date: fmt(date, "EEE d MMM") }));
       return;
     }
     const nights = differenceInCalendarDays(date, checkin);

@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
 
@@ -24,6 +24,7 @@ import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getPageText } from "~/lib/overrides.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
+import { decrementAvailability } from "~/lib/ari.server";
 
 interface Stay {
   channelId: string;
@@ -225,6 +226,18 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (status === "failed") {
     return { bookingError: error };
   }
+
+  // Decrement availability for the booked rooms across the stay nights (rooms
+  // with no availability row are treated as unlimited and left untouched).
+  const stayNights = Array.from({ length: nights }, (_, i) =>
+    format(addDays(parseISO(stay.checkin), i), "yyyy-MM-dd"),
+  );
+  const byRoom = new Map<string, number>();
+  for (const l of lines) byRoom.set(l.roomId, (byRoom.get(l.roomId) ?? 0) + 1);
+  const decrements = [...byRoom].flatMap(([roomId, by]) =>
+    stayNights.map((date) => ({ roomId, date, by })),
+  );
+  await decrementAvailability(stay.channelId, decrements);
 
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", config.allowLiveBooking ? "0" : "1");

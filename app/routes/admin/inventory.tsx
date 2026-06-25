@@ -82,6 +82,8 @@ export async function action({ request }: Route.ActionArgs) {
         date,
         stopSell: form.get(`s:${rateId}:${date}`) != null,
         minStay: Math.max(0, Math.round(Number(form.get(`m:${rateId}:${date}`)) || 0)),
+        cta: form.get(`ca:${rateId}:${date}`) != null,
+        ctd: form.get(`cd:${rateId}:${date}`) != null,
       });
     }
   }
@@ -96,6 +98,32 @@ export function meta() {
 
 const cellInput =
   "w-full rounded-[6px] border border-line-alt bg-surface px-1.5 py-1 text-center text-[13px] text-ink outline-none focus:border-accent";
+
+function Toggle({
+  name,
+  label,
+  title,
+  checked,
+  danger,
+}: {
+  name: string;
+  label: string;
+  title: string;
+  checked?: boolean;
+  danger?: boolean;
+}) {
+  const on = danger
+    ? "peer-checked:border-[#c0392b] peer-checked:bg-[#fbe9e7] peer-checked:text-[#c0392b]"
+    : "peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep";
+  return (
+    <label title={title} className="cursor-pointer">
+      <input type="checkbox" name={name} defaultChecked={checked} className="peer sr-only" />
+      <span className={`flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border border-line-alt text-[10px] font-semibold text-muted-2 ${on}`}>
+        {label}
+      </span>
+    </label>
+  );
+}
 
 export default function AdminInventory({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
@@ -146,7 +174,10 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
       </div>
       <p className="mb-5 text-[14px] text-muted">
         Availability per room, and price + restrictions per rate, for each date. Empty price uses the
-        rate&rsquo;s base nightly price. Prices in {currency}.
+        rate&rsquo;s base nightly price. Prices in {currency}. Per cell: minimum stay,{" "}
+        <span className="font-semibold text-[#c0392b]">✕</span> closed,{" "}
+        <span className="font-semibold text-accent">A</span> no arrival,{" "}
+        <span className="font-semibold text-accent">D</span> no departure.
       </p>
 
       <Form method="post">
@@ -171,7 +202,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
               <tr>
                 <th className={`${labelCell} ${headCell} min-w-[200px]`} />
                 {dates.map((d) => (
-                  <th key={d} className={`${headCell} min-w-[78px] ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
+                  <th key={d} className={`${headCell} min-w-[96px] ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
                     <div>{format(parseISO(d), "EEE")}</div>
                     <div className="text-[13px] font-bold text-ink">{format(parseISO(d), "d")}</div>
                     <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM")}</div>
@@ -208,7 +239,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                       <tr key={rate.id} className="border-t border-divider/60">
                         <td className={labelCell}>
                           <div className="font-medium">{rate.title}</div>
-                          <div className="text-[11px] text-muted-2">Price · min stay · closed</div>
+                          <div className="text-[11px] text-muted-2">Price · min stay · ✕ A D</div>
                         </td>
                         {dates.map((d) => {
                           const restr = inventory.restrictions[`${rate.id}|${d}`];
@@ -223,7 +254,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                 placeholder={rate.nightlyPrice.toFixed(0)}
                                 className={cellInput}
                               />
-                              <div className="mt-1 flex items-center justify-center gap-1.5">
+                              <div className="mt-1 flex items-center justify-center gap-1">
                                 <input
                                   name={`m:${rate.id}:${d}`}
                                   type="number"
@@ -231,19 +262,11 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                   defaultValue={restr?.minStay || ""}
                                   title="Minimum stay"
                                   placeholder="0"
-                                  className="w-9 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
+                                  className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
                                 />
-                                <label title="Closed / stop sell" className="cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    name={`s:${rate.id}:${d}`}
-                                    defaultChecked={restr?.stopSell}
-                                    className="peer sr-only"
-                                  />
-                                  <span className="flex h-5 w-5 items-center justify-center rounded-[5px] border border-line-alt text-[11px] text-muted-2 peer-checked:border-[#c0392b] peer-checked:bg-[#fbe9e7] peer-checked:text-[#c0392b]">
-                                    ✕
-                                  </span>
-                                </label>
+                                <Toggle name={`s:${rate.id}:${d}`} label="✕" title="Closed / stop sell" checked={restr?.stopSell} danger />
+                                <Toggle name={`ca:${rate.id}:${d}`} label="A" title="Closed to arrival (no check-in)" checked={restr?.cta} />
+                                <Toggle name={`cd:${rate.id}:${d}`} label="D" title="Closed to departure (no check-out)" checked={restr?.ctd} />
                               </div>
                             </td>
                           );

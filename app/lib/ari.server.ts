@@ -229,13 +229,22 @@ export async function getMappingDetails(hotelCode: string): Promise<MappingRoomT
 }
 
 // ---- inventory grid (admin-editable ARI) ----
+export interface RestrictionCell {
+  stopSell: boolean;
+  minStay: number;
+  /** closed to arrival — can't start a stay on this date */
+  cta: boolean;
+  /** closed to departure — can't end a stay on this date */
+  ctd: boolean;
+}
+
 export interface InventoryData {
   /** key `${roomId}|${date}` → units available */
   availability: Record<string, number>;
   /** key `${rateId}|${date}` → price in major currency units */
   prices: Record<string, number>;
   /** key `${rateId}|${date}` → restriction flags */
-  restrictions: Record<string, { stopSell: boolean; minStay: number }>;
+  restrictions: Record<string, RestrictionCell>;
 }
 
 /** Read the ARI for a [from, to] inclusive window, as lookup maps. */
@@ -249,9 +258,19 @@ export async function getInventory(hotelCode: string, from: string, to: string):
     D.prepare(`SELECT rate_plan_id, date, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=? AND occupancy=0`)
       .bind(hotelCode, from, to)
       .all<{ rate_plan_id: string; date: string; price_minor: number; fraction_size: number }>(),
-    D.prepare(`SELECT rate_plan_id, date, stop_sell, min_stay_arrival FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`)
+    D.prepare(
+      `SELECT rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
+       FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`,
+    )
       .bind(hotelCode, from, to)
-      .all<{ rate_plan_id: string; date: string; stop_sell: number; min_stay_arrival: number }>(),
+      .all<{
+        rate_plan_id: string;
+        date: string;
+        stop_sell: number;
+        min_stay_arrival: number;
+        closed_to_arrival: number;
+        closed_to_departure: number;
+      }>(),
   ]);
 
   const data: InventoryData = { availability: {}, prices: {}, restrictions: {} };
@@ -262,6 +281,8 @@ export async function getInventory(hotelCode: string, from: string, to: string):
     data.restrictions[`${r.rate_plan_id}|${r.date}`] = {
       stopSell: Boolean(r.stop_sell),
       minStay: r.min_stay_arrival || 0,
+      cta: Boolean(r.closed_to_arrival),
+      ctd: Boolean(r.closed_to_departure),
     };
   return data;
 }
@@ -270,7 +291,15 @@ export interface InventoryEdits {
   currency: string;
   availability: { roomId: string; date: string; avail: number }[];
   prices: { rateId: string; roomId: string; date: string; price: number }[];
-  restrictions: { rateId: string; roomId: string; date: string; stopSell: boolean; minStay: number }[];
+  restrictions: {
+    rateId: string;
+    roomId: string;
+    date: string;
+    stopSell: boolean;
+    minStay: number;
+    cta: boolean;
+    ctd: boolean;
+  }[];
 }
 
 /** Upsert manual ARI edits from the inventory grid. */
@@ -288,10 +317,10 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits): P
      DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency`,
   );
   const restrStmt = D.prepare(
-    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival)
-     VALUES (?,?,?,?,?,?)
+    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival,closed_to_arrival,closed_to_departure)
+     VALUES (?,?,?,?,?,?,?,?)
      ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
-     DO UPDATE SET stop_sell=excluded.stop_sell,min_stay_arrival=excluded.min_stay_arrival`,
+     DO UPDATE SET stop_sell=excluded.stop_sell,min_stay_arrival=excluded.min_stay_arrival,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure`,
   );
 
   const stmts: D1PreparedStatement[] = [];
@@ -299,7 +328,25 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits): P
   for (const p of edits.prices)
     stmts.push(rateStmt.bind(hotelCode, p.roomId, p.rateId, p.date, Math.round(p.price * 100), edits.currency));
   for (const r of edits.restrictions)
-    stmts.push(restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay));
+    stmts.push(
+      restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay, r.cta ? 1 : 0, r.ctd ? 1 : 0),
+    );
 
+  for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
+}
+
+/** Reduce availability by `by` units for each (room, date), never below 0.
+ *  Only affects rooms/dates with an availability row (unset = unlimited). */
+export async function decrementAvailability(
+  hotelCode: string,
+  items: { roomId: string; date: string; by: number }[],
+): Promise<void> {
+  if (!items.length) return;
+  await ensureSchema();
+  const D = db();
+  const stmt = D.prepare(
+    `UPDATE availability SET avail = MAX(0, avail - ?) WHERE hotel_code=? AND room_type_id=? AND date=?`,
+  );
+  const stmts = items.map((i) => stmt.bind(i.by, hotelCode, i.roomId, i.date));
   for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
 }

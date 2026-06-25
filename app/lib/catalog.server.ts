@@ -132,8 +132,9 @@ export async function getCatalogRooms(
   const nightDates = checkinDate
     ? Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkinDate), i), "yyyy-MM-dd"))
     : [];
+  // Query through the checkout date too, so the CTD check below sees it.
   const inv = nightDates.length
-    ? await getInventory(pid, nightDates[0], nightDates[nightDates.length - 1])
+    ? await getInventory(pid, nightDates[0], checkoutDate ?? nightDates[nightDates.length - 1])
     : { availability: {}, prices: {}, restrictions: {} };
 
   return rooms
@@ -161,6 +162,8 @@ export async function getCatalogRooms(
                 if (nightDates.some((d) => inv.restrictions[`${r.id}|${d}`]?.stopSell)) return null;
                 const minStay = (checkinDate && inv.restrictions[`${r.id}|${checkinDate}`]?.minStay) || 1;
                 if (nights < minStay) return null;
+                if (checkinDate && inv.restrictions[`${r.id}|${checkinDate}`]?.cta) return null; // closed to arrival
+                if (checkoutDate && inv.restrictions[`${r.id}|${checkoutDate}`]?.ctd) return null; // closed to departure
               }
               const raw = nightDates.length
                 ? nightDates.reduce((s, d) => s + (inv.prices[`${r.id}|${d}`] ?? r.nightlyPrice), 0)
@@ -195,9 +198,10 @@ export async function getCatalogRooms(
 
 /** Calendar availability for [from, to] (inclusive), in the Channex ClosedDates
  *  shape the date picker consumes. A date is closed when no room is bookable
- *  (availability 0, or every active rate stop-sold). minStayArrival is the
- *  smallest min-stay among the bookable rates that day. Dates with no inventory
- *  row are treated as open (default-available, same as the booking flow). */
+ *  (availability 0, or every active rate stop-sold); closedToArrival/Departure
+ *  when every otherwise-bookable rate is closed to arrival/departure that day;
+ *  minStayArrival is the smallest min-stay among the bookable rates. Dates with
+ *  no inventory row are open (default-available, same as the booking flow). */
 export async function getCalendarAvailability(
   pid: string,
   from: string,
@@ -211,25 +215,38 @@ export async function getCalendarAvailability(
   }
 
   const closed: string[] = [];
+  const closedToArrival: string[] = [];
+  const closedToDeparture: string[] = [];
   const minStayArrival: Record<string, number> = {};
   const end = parseISO(to);
   for (let d = parseISO(from); d <= end; d = addDays(d, 1)) {
     const date = format(d, "yyyy-MM-dd");
     let bookable = false;
     let minStay = Infinity;
+    let arrivalOpen = false;
+    let departureOpen = false;
     for (const room of rooms) {
       const roomRates = ratesByRoom.get(room.id);
       if (!roomRates?.length) continue;
       const avail = inv.availability[`${room.id}|${date}`];
       if (avail !== undefined && avail <= 0) continue; // sold out (undefined = open)
-      const openRates = roomRates.filter((rt) => !inv.restrictions[`${rt.id}|${date}`]?.stopSell);
-      if (!openRates.length) continue;
-      bookable = true;
-      for (const rt of openRates) minStay = Math.min(minStay, inv.restrictions[`${rt.id}|${date}`]?.minStay || 1);
+      for (const rt of roomRates) {
+        const r = inv.restrictions[`${rt.id}|${date}`];
+        if (r?.stopSell) continue; // rate not bookable this day
+        bookable = true;
+        minStay = Math.min(minStay, r?.minStay || 1);
+        if (!r?.cta) arrivalOpen = true;
+        if (!r?.ctd) departureOpen = true;
+      }
     }
-    if (!bookable) closed.push(date);
-    else if (Number.isFinite(minStay) && minStay > 1) minStayArrival[date] = minStay;
+    if (!bookable) {
+      closed.push(date);
+      continue;
+    }
+    if (Number.isFinite(minStay) && minStay > 1) minStayArrival[date] = minStay;
+    if (!arrivalOpen) closedToArrival.push(date);
+    if (!departureOpen) closedToDeparture.push(date);
   }
 
-  return { closed, closedToArrival: [], closedToDeparture: [], minStayArrival, minStayThrough: {} };
+  return { closed, closedToArrival, closedToDeparture, minStayArrival, minStayThrough: {} };
 }

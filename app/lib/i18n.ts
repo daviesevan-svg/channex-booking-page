@@ -81,6 +81,8 @@ const EN: Dict = {
   helperMinStayArrival: "Minimum {n}-night stay for arrivals on {date}.",
   helperMinStayCheckout: "Minimum {n}-night stay — please choose a check-out on or after {date}.",
   helperSoldOut: "Those dates include unavailable nights. Please choose another range.",
+  helperClosedToArrival: "Check-in isn’t available on {date}. Please choose another arrival date.",
+  helperClosedToDeparture: "Check-out isn’t available on {date}. Please choose another departure date.",
 
   from: "from",
   perNightInclTaxes: "per night · incl. taxes",
