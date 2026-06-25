@@ -2,6 +2,7 @@ import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/page";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { langParam, pageDef, pickLang } from "~/lib/content";
 import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
@@ -11,7 +12,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const def = pageDef(params.page);
   if (!def) throw redirect("/admin");
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   const lang = langParam(request);
   const overrides = propertyId ? await getPageOverridesRaw(propertyId, params.page, lang) : {};
   return { configured: Boolean(propertyId), page: params.page, label: def.label, fields: def.fields, overrides, lang };
@@ -19,7 +20,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   const form = await request.formData();
   await savePageContent(propertyId, params.page, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));

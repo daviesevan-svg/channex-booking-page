@@ -4,13 +4,14 @@ import { Link } from "react-router";
 import type { Route } from "./+types/bookings";
 import { BookingStatusBadge } from "~/components/booking-status";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getBookings } from "~/lib/bookings.server";
 import { getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   return { configured: true as const, bookings: await getBookings(propertyId) };
 }

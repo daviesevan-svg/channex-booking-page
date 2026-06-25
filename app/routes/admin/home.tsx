@@ -2,6 +2,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
 import {
@@ -15,7 +16,7 @@ import { Field, FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
@@ -26,7 +27,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
   const form = await request.formData();

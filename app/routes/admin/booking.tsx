@@ -6,13 +6,14 @@ import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getBooking } from "~/lib/bookings.server";
 import { getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) throw redirect("/admin/bookings");
   const booking = await getBooking(propertyId, params.id);
   if (!booking) throw redirect("/admin/bookings");

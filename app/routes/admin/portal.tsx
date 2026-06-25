@@ -2,19 +2,20 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/portal";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, savePortalSettings } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   return { configured: true as const, settings: await getSettings(propertyId) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   await savePortalSettings(propertyId, await request.formData());
   return { ok: true };

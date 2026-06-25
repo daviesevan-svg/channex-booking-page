@@ -4,6 +4,7 @@ import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 import { getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
@@ -21,7 +22,7 @@ function windowDates(start: string, n: number): string[] {
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
 
   const url = new URL(request.url);
@@ -47,7 +48,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
   const form = await request.formData();

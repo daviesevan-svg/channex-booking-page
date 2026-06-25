@@ -3,14 +3,16 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  if (!getConfig().defaultPropertyId) return { configured: false as const };
-  const settings = await getSettings(getConfig().defaultPropertyId!);
+  const propertyId = await currentPropertyId(request);
+  if (!propertyId) return { configured: false as const };
+  const settings = await getSettings(propertyId);
   return {
     configured: true as const,
     settings,
@@ -21,7 +23,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   await saveSettings(propertyId, await request.formData());
   return { ok: true };

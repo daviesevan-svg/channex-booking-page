@@ -3,7 +3,7 @@ import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
-import { getConfig } from "~/lib/config.server";
+import { currentPropertyId, getProperties } from "~/lib/properties.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 
@@ -14,11 +14,12 @@ export interface AdminContext {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const [propertyId, properties] = await Promise.all([currentPropertyId(request), getProperties()]);
   const settings = propertyId ? await getSettings(propertyId) : {};
   return {
     email,
     propertyId,
+    properties,
     lang: langParam(request),
     languages: enabledLanguages(settings),
   };
@@ -30,11 +31,12 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, lang, languages } = loaderData;
+  const { email, propertyId, properties, lang, languages } = loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
+  const { pathname } = useLocation();
   // Wide pages (the inventory grid) break out of the centred column.
-  const wide = useLocation().pathname.startsWith("/admin/inventory");
+  const wide = pathname.startsWith("/admin/inventory");
   const shell = wide ? "max-w-none" : "max-w-[960px]";
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) =>
@@ -67,6 +69,24 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             </Link>
           </div>
           <div className="flex items-center gap-5 text-[13px] text-muted">
+            {properties.length > 0 && (
+              <Form method="post" action="/admin/select-property" className="flex items-center gap-1.5">
+                <input type="hidden" name="redirectTo" value={pathname} />
+                <select
+                  name="propertyId"
+                  defaultValue={propertyId ?? ""}
+                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
+                  aria-label="Current property"
+                  className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[13px] font-semibold text-ink outline-none focus:border-accent"
+                >
+                  {properties.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </Form>
+            )}
             {languages.length > 1 && (
               <label className="flex items-center gap-1.5">
                 <span className="text-faint">Editing</span>
@@ -101,6 +121,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
           {[
+            { to: "/admin/properties", label: "Properties", end: false },
             { to: "/admin", label: "Property details", end: true },
             { to: "/admin/general", label: "General", end: false },
             { to: "/admin/portal", label: "Customer Portal", end: false },

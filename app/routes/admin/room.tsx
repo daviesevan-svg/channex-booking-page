@@ -2,6 +2,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
@@ -9,7 +10,7 @@ import { FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) throw redirect("/admin/rooms");
 
   const isNew = params.roomId === "new";
@@ -20,7 +21,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
   const form = await request.formData();

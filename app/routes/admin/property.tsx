@@ -3,13 +3,14 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { Field } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
@@ -19,7 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
-  const propertyId = getConfig().defaultPropertyId;
+  const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID is configured." };
   const form = await request.formData();
   await saveOverrides(propertyId, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));

@@ -96,6 +96,23 @@ export async function requireAdmin(request: Request): Promise<string> {
   return email;
 }
 
+/** The property id the admin last selected (multi-property switcher). */
+export async function getSessionProperty(request: Request): Promise<string | null> {
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  const p = session.get("property");
+  return typeof p === "string" ? p : null;
+}
+
+/** Set the selected property, preserving the rest of the session. Returns the
+ *  Set-Cookie header value for the caller to attach to its response. */
+export async function setSessionProperty(request: Request, propertyId: string): Promise<string> {
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  session.set("property", propertyId);
+  return storage.commitSession(session);
+}
+
 export async function logout(request: Request) {
   const storage = sessionStorage();
   const session = await storage.getSession(request.headers.get("Cookie"));
