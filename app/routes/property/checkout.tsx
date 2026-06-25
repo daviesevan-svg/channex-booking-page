@@ -50,12 +50,16 @@ async function resolveStayCart(
   stay: Stay,
   url: URL,
 ): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
-  const rooms = await getCatalogRooms(stay.channelId, {
-    checkinDate: stay.checkin,
-    checkoutDate: stay.checkout,
-    currency: stay.currency,
-    adults: stay.occ.adults,
-  });
+  const rooms = await getCatalogRooms(
+    stay.channelId,
+    {
+      checkinDate: stay.checkin,
+      checkoutDate: stay.checkout,
+      currency: stay.currency,
+      adults: stay.occ.adults,
+    },
+    { gate: true },
+  );
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 

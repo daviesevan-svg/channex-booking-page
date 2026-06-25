@@ -108,43 +108,79 @@ export async function deleteRate(pid: string, id: string): Promise<void> {
 }
 
 // ---- public read: build RoomWithRates from the catalog ----
-/** The catalog as `RoomWithRates[]` for a given stay, so the guest-facing
- *  loaders, cart and occupancy logic work unchanged. Total = nightly × nights;
- *  availability is assumed open until per-date ARI arrives via Open Channel. */
-export async function getCatalogRooms(pid: string, query: RoomsQuery = {}): Promise<RoomWithRates[]> {
+/** The catalog as `RoomWithRates[]` for a given stay. Each night is priced from
+ *  the D1 ARI (falling back to the rate's base nightly price), and availability
+ *  reflects the room's lowest nightly count over the stay.
+ *
+ *  With `gate: true` (results/detail/checkout) sold-out rooms, stop-sold rates
+ *  and stays under a rate's min-stay are dropped, so only bookable options
+ *  appear. Confirmation omits the gate — it's showing a completed booking. */
+export async function getCatalogRooms(
+  pid: string,
+  query: RoomsQuery = {},
+  opts: { gate?: boolean } = {},
+): Promise<RoomWithRates[]> {
+  const gate = opts.gate ?? false;
   const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  const { checkinDate, checkoutDate, currency: cur } = query;
   const nights =
-    query.checkinDate && query.checkoutDate
-      ? Math.max(1, differenceInCalendarDays(parseISO(query.checkoutDate), parseISO(query.checkinDate)))
+    checkinDate && checkoutDate
+      ? Math.max(1, differenceInCalendarDays(parseISO(checkoutDate), parseISO(checkinDate)))
       : 1;
-  const currency = query.currency || "GBP";
+  const currency = cur || "GBP";
+  // The nights occupied by the stay: checkin .. checkout-1.
+  const nightDates = checkinDate
+    ? Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkinDate), i), "yyyy-MM-dd"))
+    : [];
+  const inv = nightDates.length
+    ? await getInventory(pid, nightDates[0], nightDates[nightDates.length - 1])
+    : { availability: {}, prices: {}, restrictions: {} };
 
   return rooms
     .map((room): RoomWithRates => {
-      // Occupancy drives the search "fits" check and cart coverage, so it
-      // reflects the room's capacity (not the rate's priced occupancy).
       const occupancy = {
         adults: room.maxAdults,
         children: Math.max(0, room.maxGuests - room.maxAdults),
         infants: 0,
       };
-      const ratePlans: RatePlan[] = rates
-        .filter((r) => r.roomId === room.id && r.active)
-        .map((r) => {
-          const total = (r.nightlyPrice * nights).toFixed(2);
-          return {
-            id: r.id,
-            title: r.title,
-            occupancy,
-            mealPlan: r.mealPlan ?? null,
-            currency,
-            totalPrice: total,
-            netPrice: total, // no separate tax for manual rates
-            availability: 99,
-            inclusions: r.inclusions.length ? r.inclusions : undefined,
-            cancellationNote: r.cancellationNote || (r.refundable ? undefined : "Non-refundable"),
-          };
-        });
+      // Room availability = the lowest nightly count over the stay (unset = open).
+      let roomAvail = Infinity;
+      for (const d of nightDates) {
+        const a = inv.availability[`${room.id}|${d}`];
+        if (a !== undefined) roomAvail = Math.min(roomAvail, a);
+      }
+      const soldOut = gate && nightDates.length > 0 && roomAvail <= 0;
+      const availForRate = Number.isFinite(roomAvail) ? roomAvail : 99;
+
+      const ratePlans = soldOut
+        ? []
+        : rates
+            .filter((r) => r.roomId === room.id && r.active)
+            .map((r): RatePlan | null => {
+              if (gate) {
+                if (nightDates.some((d) => inv.restrictions[`${r.id}|${d}`]?.stopSell)) return null;
+                const minStay = (checkinDate && inv.restrictions[`${r.id}|${checkinDate}`]?.minStay) || 1;
+                if (nights < minStay) return null;
+              }
+              const raw = nightDates.length
+                ? nightDates.reduce((s, d) => s + (inv.prices[`${r.id}|${d}`] ?? r.nightlyPrice), 0)
+                : r.nightlyPrice * nights;
+              const total = (Math.round(raw * 100) / 100).toFixed(2);
+              return {
+                id: r.id,
+                title: r.title,
+                occupancy,
+                mealPlan: r.mealPlan ?? null,
+                currency,
+                totalPrice: total,
+                netPrice: total, // no separate tax for manual rates
+                availability: availForRate,
+                inclusions: r.inclusions.length ? r.inclusions : undefined,
+                cancellationNote: r.cancellationNote || (r.refundable ? undefined : "Non-refundable"),
+              };
+            })
+            .filter((rp): rp is RatePlan => rp !== null);
+
       return {
         id: room.id,
         title: room.title,

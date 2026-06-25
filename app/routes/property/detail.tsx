@@ -23,13 +23,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!checkin || !checkout) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
-  const rooms = await getCatalogRooms(params.channelId, {
-    checkinDate: checkin,
-    checkoutDate: checkout,
-    currency,
-    adults,
-    childrenAge: childrenAgeParam(childrenAge),
-  });
+  const rooms = await getCatalogRooms(
+    params.channelId,
+    {
+      checkinDate: checkin,
+      checkoutDate: checkout,
+      currency,
+      adults,
+      childrenAge: childrenAgeParam(childrenAge),
+    },
+    { gate: true },
+  );
   const room = rooms.find((r) => r.id === params.roomId);
   if (!room) throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
 

@@ -44,13 +44,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(`/${params.channelId}`);
   }
 
-  const rooms = await getCatalogRooms(params.channelId, {
-    checkinDate: checkin,
-    checkoutDate: checkout,
-    currency,
-    adults: occ.adults,
-    childrenAge: childrenAgeParam(occ.childrenAge),
-  });
+  const rooms = await getCatalogRooms(
+    params.channelId,
+    {
+      checkinDate: checkin,
+      checkoutDate: checkout,
+      currency,
+      adults: occ.adults,
+      childrenAge: childrenAgeParam(occ.childrenAge),
+    },
+    { gate: true },
+  );
 
   const party = partySize(occ);
   const cheapest = (room: RoomWithRates) =>
