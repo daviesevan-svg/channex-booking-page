@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { Field } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
-import { getChannexClient, getConfig } from "~/lib/config.server";
+import { getConfig } from "~/lib/config.server";
 import { langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
 
@@ -13,21 +13,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
   const overrides = await getOverridesRaw(propertyId, lang);
-  return {
-    configured: true as const,
-    propertyId,
-    lang,
-    overrides,
-    defaults: {
-      hotelName: property?.title ?? "",
-      address: property?.address ?? "",
-      description: property?.description ?? "",
-      phone: property?.phone ?? "",
-      email: property?.email ?? "",
-    },
-  };
+  return { configured: true as const, propertyId, lang, overrides };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -59,7 +46,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, defaults, lang } = loaderData;
+  const { overrides, lang } = loaderData;
 
   return (
     <div>
@@ -72,7 +59,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        These override what guests see in the booking engine. Empty fields fall back to Channex.
+        The hotel details guests see across the booking engine.
       </p>
 
       <Form
@@ -81,12 +68,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder={defaults.hotelName} channexHint />
-        <Field name="address" label="Address" value={overrides.address} placeholder={defaults.address} channexHint />
-        <Field name="description" label="Description" value={overrides.description} placeholder={defaults.description} textarea rows={4} channexHint />
+        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
+        <Field name="address" label="Address" value={overrides.address} placeholder="123 High Street, Carmarthen" />
+        <Field name="description" label="Description" value={overrides.description} textarea rows={4} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="phone" label="Phone" value={overrides.phone} placeholder={defaults.phone} channexHint />
-          <Field name="email" label="Email" value={overrides.email} placeholder={defaults.email} channexHint />
+          <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
+          <Field name="email" label="Email" value={overrides.email} placeholder="stay@hotel.com" />
         </div>
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
         <div>

@@ -2,7 +2,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
-import { getChannexClient, getConfig } from "~/lib/config.server";
+import { getConfig } from "~/lib/config.server";
 import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,
@@ -19,12 +19,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const property = await getChannexClient().getPropertyInfo(propertyId).catch(() => null);
   const content = await getSearchContentRaw(propertyId, lang);
   const heroImage = await getHeroImage(propertyId);
-  const channexPhoto = property?.photos?.[0]?.url;
-  const eyebrowDefault = (property?.address?.split(",")[1] ?? property?.title ?? "").trim();
-  return { configured: true as const, content, heroImage, channexPhoto, eyebrowDefault, lang };
+  return { configured: true as const, content, heroImage, lang };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -89,8 +86,8 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { content, heroImage, channexPhoto, eyebrowDefault, lang } = loaderData;
-  const currentHero = heroImage || channexPhoto;
+  const { content, heroImage, lang } = loaderData;
+  const currentHero = heroImage;
 
   return (
     <div>
@@ -113,7 +110,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="eyebrow" label="Eyebrow (small label above the heading)" value={content.eyebrow} placeholder={eyebrowDefault} />
+        <Field name="eyebrow" label="Eyebrow (small label above the heading)" value={content.eyebrow} placeholder="Carmarthen" />
         <Field name="heading" label="Heading" value={content.heading} placeholder={DEFAULT_SEARCH.heading} />
         <Field name="intro" label="Intro paragraph" value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -153,7 +150,6 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
           <div className="mb-1 font-serif text-[18px] font-semibold">Feature image</div>
           <p className="mb-3 text-[13px] text-muted">
             The large image near the bottom of the landing page. Shared across all languages.
-            {!heroImage && channexPhoto && " Currently using the property photo from Channex."}
           </p>
           <div className="flex flex-wrap items-start gap-4">
             <div className="h-[120px] w-[200px] flex-none overflow-hidden rounded-[12px] border border-line-alt bg-surface-alt">
@@ -180,7 +176,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
               {heroImage && (
                 <label className="flex items-center gap-2 text-[13px] text-secondary">
                   <input type="checkbox" name="removeHero" value="1" />
-                  Remove custom image{channexPhoto ? " (revert to the Channex photo)" : ""}
+                  Remove custom image
                 </label>
               )}
             </div>

@@ -3,7 +3,8 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/promotions";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
-import { getChannexClient, getConfig } from "~/lib/config.server";
+import { getConfig } from "~/lib/config.server";
+import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { normalizeCode, type DiscountType, type Promotion } from "~/lib/promotions";
 import {
@@ -18,15 +19,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
-  const [promotions, property] = await Promise.all([
-    getPromotions(propertyId),
-    getChannexClient().getPropertyInfo(propertyId).catch(() => null),
-  ]);
+  const [promotions, settings] = await Promise.all([getPromotions(propertyId), getSettings(propertyId)]);
   const editId = new URL(request.url).searchParams.get("edit");
   return {
     configured: true as const,
     promotions,
-    currency: property?.currency || "GBP",
+    currency: settings.currency || "GBP",
     editing: promotions.find((p) => p.id === editId) ?? null,
   };
 }

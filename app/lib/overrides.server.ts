@@ -402,6 +402,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
         .trim()
         .replace(/^https?:\/\//, "")
         .replace(/\/.*$/, "") || undefined,
+    currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
     languages: form.getAll("languages").map(String),
   };
   await writeJson(settingsKey(pid), next);

@@ -1,9 +1,7 @@
 import { Link, Outlet, useLocation, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
-import { ChannexApiError } from "~/lib/channex/client";
 import type { PropertyOutletContext } from "~/lib/booking-context";
-import { getChannexClient, getConfig } from "~/lib/config.server";
 import {
   DEFAULT_LANG,
   DEFAULT_THEME,
@@ -16,42 +14,17 @@ import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const { channelCode } = getConfig();
-  if (!channelCode) {
-    throw new Response("CHANNEL_CODE is not configured", { status: 500 });
-  }
-
-  const client = getChannexClient();
-  let property;
-  try {
-    property = await client.getPropertyInfo(params.channelId);
-  } catch (error) {
-    if (error instanceof ChannexApiError && error.status === 404) {
-      throw new Response("Property not found", { status: 404 });
-    }
-    throw error;
-  }
-
-  // Apply admin content overrides (fall back to Channex when unset).
+  // Property details and currency come from the admin settings (no live Channex).
   const lang = langFromRequest(request);
   const [overrides, settings] = await Promise.all([
     getOverrides(params.channelId, lang),
     getSettings(params.channelId),
   ]);
-  const merged = {
-    ...property,
-    title: overrides.hotelName || property.title,
-    address: overrides.address || property.address,
-    description: overrides.description || property.description,
-    phone: overrides.phone || property.phone,
-    email: overrides.email || property.email,
-  };
 
-  const currency = merged.currency || merged.hotelPolicy?.currency || "GBP";
   return {
-    property: merged,
-    currency,
-    hotelName: merged.title,
+    property: { address: overrides.address, phone: overrides.phone, photos: [] },
+    currency: settings.currency || "GBP",
+    hotelName: overrides.hotelName || "Your hotel",
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,

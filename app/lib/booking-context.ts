@@ -1,9 +1,14 @@
 import { useOutletContext } from "react-router";
 
-import type { PropertyInfo } from "./channex/types";
+/** Light property context for the guest pages, sourced from admin settings. */
+export interface PropertyContext {
+  address?: string;
+  phone?: string;
+  photos?: { url: string }[];
+}
 
 export interface PropertyOutletContext {
-  property: PropertyInfo;
+  property: PropertyContext;
   currency: string;
   hotelName: string;
   lang: string;

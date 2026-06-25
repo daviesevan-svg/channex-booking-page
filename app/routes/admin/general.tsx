@@ -162,6 +162,21 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           </div>
         </section>
 
+        {/* Currency */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Currency</div>
+          <p className="mb-3 text-[13.5px] text-muted">The currency all prices are shown and charged in.</p>
+          <select
+            name="currency"
+            defaultValue={settings.currency || "GBP"}
+            className="block w-full max-w-[200px] rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+          >
+            {["GBP", "EUR", "USD", "AUD", "CAD", "CHF", "JPY", "NZD"].map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </section>
+
         {/* Custom domain */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Custom domain</div>

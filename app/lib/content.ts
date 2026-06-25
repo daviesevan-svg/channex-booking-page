@@ -128,6 +128,8 @@ export interface SiteSettings {
   customColor?: string;
   customBg?: string;
   customDomain?: string;
+  /** ISO currency code for all prices (e.g. GBP). Defaults to GBP when unset. */
+  currency?: string;
   languages?: string[]; // enabled languages (always includes the default)
   // ----- Customer Portal (manage-my-booking) -----
   allowCancel?: boolean;
