@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Form, Link, useNavigation } from "react-router";
+import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
 import { requireAdmin } from "~/lib/auth.server";
@@ -8,11 +9,14 @@ import { getRates, getRooms } from "~/lib/catalog.server";
 import { getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 
-const WINDOW = 14; // days shown at once
+// Generous server window; the client renders only as many columns as fit the
+// screen and pages by that visible count.
+const FETCH_DAYS = 31;
+const DEFAULT_COLS = 14;
 
-function windowDates(start: string): string[] {
+function windowDates(start: string, n: number): string[] {
   const base = parseISO(start);
-  return Array.from({ length: WINDOW }, (_, i) => format(addDays(base, i), "yyyy-MM-dd"));
+  return Array.from({ length: n }, (_, i) => format(addDays(base, i), "yyyy-MM-dd"));
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -22,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const url = new URL(request.url);
   const start = url.searchParams.get("start") || format(new Date(), "yyyy-MM-dd");
-  const dates = windowDates(start);
+  const dates = windowDates(start, FETCH_DAYS);
   const [rooms, rates, settings, inventory] = await Promise.all([
     getRooms(propertyId),
     getRates(propertyId),
@@ -37,8 +41,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     currency: settings.currency || "GBP",
     dates,
     start,
-    prevStart: format(addDays(parseISO(start), -WINDOW), "yyyy-MM-dd"),
-    nextStart: format(addDays(parseISO(start), WINDOW), "yyyy-MM-dd"),
     inventory,
   };
 }
@@ -50,7 +52,10 @@ export async function action({ request }: Route.ActionArgs) {
 
   const form = await request.formData();
   const start = String(form.get("start") || format(new Date(), "yyyy-MM-dd"));
-  const dates = windowDates(start);
+  // Only the columns the client actually rendered are saved, so paging by a
+  // smaller visible window never clears restrictions on off-screen dates.
+  const cols = Math.min(FETCH_DAYS, Math.max(1, Math.round(Number(form.get("cols")) || DEFAULT_COLS)));
+  const dates = windowDates(start, cols);
   const rateRoom = new Map((await getRates(propertyId)).map((r) => [r.id, r.roomId]));
   const settings = await getSettings(propertyId);
 
@@ -127,7 +132,27 @@ function Toggle({
 
 export default function AdminInventory({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
+  const navigate = useNavigate();
   const saving = nav.state === "submitting";
+  // Render only the date columns that fit the available width — no horizontal
+  // scroll. Recomputed on resize; SSR/first paint uses DEFAULT_COLS to match.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(DEFAULT_COLS);
+  const datesLen = loaderData.configured ? loaderData.dates.length : 0;
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const LABEL = 200;
+      const COL = 92;
+      const fit = Math.floor((el.clientWidth - LABEL) / COL);
+      setVisible(Math.max(1, Math.min(datesLen || 1, fit)));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [datesLen]);
 
   if (!loaderData.configured) {
     return (
@@ -141,7 +166,12 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
     );
   }
 
-  const { rooms, rates, currency, dates, start, prevStart, nextStart, inventory } = loaderData;
+  const { rooms, rates, currency, dates, start, inventory } = loaderData;
+  const shown = dates.slice(0, visible);
+  const go = (s: string) => navigate(`/admin/inventory?start=${s}`);
+  const today = format(new Date(), "yyyy-MM-dd");
+  const prevStart = format(addDays(parseISO(start), -visible), "yyyy-MM-dd");
+  const nextStart = format(addDays(parseISO(start), visible), "yyyy-MM-dd");
   const dow = (d: string) => parseISO(d).getUTCDay();
   const isWeekend = (d: string) => dow(d) === 0 || dow(d) === 6;
 
@@ -165,11 +195,21 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-[26px] font-semibold">Inventory</h1>
         <div className="flex items-center gap-2 text-[13px] font-semibold">
-          <Link to={`/admin/inventory?start=${prevStart}`} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">←</Link>
+          <input
+            type="date"
+            value={start}
+            onChange={(e) => e.target.value && go(e.target.value)}
+            aria-label="Jump to date"
+            className="rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-ink outline-none focus:border-accent"
+          />
+          <button type="button" onClick={() => go(today)} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">
+            Today
+          </button>
+          <button type="button" onClick={() => go(prevStart)} aria-label="Previous dates" className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">←</button>
           <span className="text-muted-2">
-            {format(parseISO(dates[0]), "d MMM")} – {format(parseISO(dates[dates.length - 1]), "d MMM yyyy")}
+            {format(parseISO(shown[0]), "d MMM")} – {format(parseISO(shown[shown.length - 1]), "d MMM yyyy")}
           </span>
-          <Link to={`/admin/inventory?start=${nextStart}`} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</Link>
+          <button type="button" onClick={() => go(nextStart)} aria-label="Next dates" className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</button>
         </div>
       </div>
       <p className="mb-5 text-[14px] text-muted">
@@ -182,6 +222,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
 
       <Form method="post">
         <input type="hidden" name="start" value={start} />
+        <input type="hidden" name="cols" value={visible} />
         <div className="mb-4 flex items-center gap-3">
           <button
             type="submit"
@@ -196,13 +237,19 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
         </div>
 
-        <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
-          <table className="border-collapse text-[13px]">
+        <div ref={gridRef} className="overflow-hidden rounded-[14px] border border-line bg-surface">
+          <table className="w-full table-fixed border-collapse text-[13px]">
+            <colgroup>
+              <col style={{ width: 200 }} />
+              {shown.map((d) => (
+                <col key={d} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
-                <th className={`${labelCell} ${headCell} min-w-[200px]`} />
-                {dates.map((d) => (
-                  <th key={d} className={`${headCell} min-w-[96px] ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
+                <th className={`${labelCell} ${headCell}`} />
+                {shown.map((d) => (
+                  <th key={d} className={`${headCell} ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
                     <div>{format(parseISO(d), "EEE")}</div>
                     <div className="text-[13px] font-bold text-ink">{format(parseISO(d), "d")}</div>
                     <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM")}</div>
@@ -221,7 +268,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                         {room.title}
                         <div className="text-[11px] font-normal text-muted-2">Availability</div>
                       </td>
-                      {dates.map((d) => (
+                      {shown.map((d) => (
                         <td key={d} className={`px-1.5 py-1.5 ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
                           <input
                             name={`a:${room.id}:${d}`}
@@ -241,7 +288,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                           <div className="font-medium">{rate.title}</div>
                           <div className="text-[11px] text-muted-2">Price · min stay · ✕ A D</div>
                         </td>
-                        {dates.map((d) => {
+                        {shown.map((d) => {
                           const restr = inventory.restrictions[`${rate.id}|${d}`];
                           return (
                             <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
