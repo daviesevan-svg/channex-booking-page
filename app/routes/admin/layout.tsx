@@ -48,7 +48,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-page text-ink">
       <header className="border-b border-nav-border bg-surface-alt">
-        <div className={`mx-auto flex ${shell} items-center justify-between gap-4 px-6 py-4`}>
+        <div className={`flex ${shell} items-center justify-between gap-4 px-6 py-4`}>
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -98,7 +98,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         </div>
       </header>
 
-      <div className={`mx-auto flex ${shell} gap-8 px-6 py-8`}>
+      <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
           {[
             { to: "/admin", label: "Property details", end: true },
