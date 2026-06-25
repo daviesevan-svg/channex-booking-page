@@ -1,4 +1,5 @@
 import { getConfigKV } from "./config.server";
+import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
   DEFAULT_LANG,
   isDeadlineUnit,
@@ -193,6 +194,71 @@ const posInt = (v: FormDataEntryValue | null): number | undefined => {
   const n = parseInt(String(v ?? ""), 10);
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
+
+// ===== taxes & fees =====
+const num = (v: unknown, min = 0): number => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= min ? n : min;
+};
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+const rid = () => Math.random().toString(36).slice(2, 10);
+
+function parseJson<T>(form: FormData, key: string): T[] {
+  try {
+    const v = JSON.parse(String(form.get(key) ?? "[]"));
+    return Array.isArray(v) ? (v as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTaxSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+
+  const taxes: TaxRule[] = parseJson<Partial<TaxRule>>(form, "taxesJson")
+    .map((t) => ({
+      id: String(t.id || rid()),
+      name: String(t.name ?? "").trim() || "VAT",
+      rate: clamp(num(t.rate), 0, 100),
+    }))
+    .filter((t) => t.rate > 0);
+
+  const fees: FeeRule[] = parseJson<Partial<FeeRule>>(form, "feesJson")
+    .map((f): FeeRule => ({
+      id: String(f.id || rid()),
+      name: String(f.name ?? "").trim() || "Fee",
+      kind: f.kind === "fixed" ? "fixed" : "percent",
+      amount: num(f.amount),
+      taxable: f.taxable === true,
+    }))
+    .filter((f) => f.amount > 0);
+
+  const ctRaw = parseJson<Partial<CityTaxConfig>>(form, "cityTaxJson")[0];
+  const cityTax: CityTaxConfig | undefined = ctRaw
+    ? {
+        enabled: ctRaw.enabled === true,
+        name: String(ctRaw.name ?? "").trim() || "City tax",
+        amount: num(ctRaw.amount),
+        basis:
+          ctRaw.basis === "room_night" || ctRaw.basis === "room_stay"
+            ? ctRaw.basis
+            : "person_night",
+        taxable: ctRaw.taxable === true,
+        childrenExempt: ctRaw.childrenExempt === true,
+        maxNights: Math.round(num(ctRaw.maxNights)),
+      }
+    : undefined;
+
+  const next: SiteSettings = {
+    ...existing,
+    taxesInclusive: form.get("taxesInclusive") === "on",
+    taxes,
+    fees,
+    cityTax,
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
 
 export async function savePortalSettings(pid: string, form: FormData): Promise<SiteSettings> {
   const existing = await getSettings(pid);

@@ -1,6 +1,8 @@
 // Editable page content (admin-overridable). Shared by the search screen and
 // the admin editor so defaults stay in one place.
 
+import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
+
 export interface Highlight {
   title: string;
   description: string;
@@ -134,6 +136,12 @@ export interface SiteSettings {
   /** When true, checkout pushes real bookings to Channex; when false it simulates.
    *  Unset (never saved) falls back to the ALLOW_LIVE_BOOKING env var. */
   liveBooking?: boolean;
+  // ----- Taxes & fees -----
+  /** true = inventory prices already include the taxes; false/undefined = add on top. */
+  taxesInclusive?: boolean;
+  taxes?: TaxRule[];
+  fees?: FeeRule[];
+  cityTax?: CityTaxConfig;
   // ----- Customer Portal (manage-my-booking) -----
   allowCancel?: boolean;
   allowModify?: boolean;

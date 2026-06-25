@@ -24,6 +24,7 @@ import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode } from "~/lib/promotions";
 import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
+import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { pushOpenChannelBooking } from "~/lib/open-channel.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
@@ -85,10 +86,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   const text = await getPageText(params.channelId, "checkout", lang);
   const totals = cartCoverage(lines);
+  const settings = await getSettings(params.channelId);
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
   const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
-  return { stay, lines, nights, totals, text, urlPromo };
+  return { stay, lines, nights, totals, text, urlPromo, taxConfig: taxConfigFrom(settings) };
 }
 
 const GuestSchema = z.object({
@@ -145,6 +147,14 @@ export async function action({ params, request }: Route.ActionArgs) {
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   // Random, unguessable reference — also the guest's manage-booking credential.
   const reference = generateReference();
+
+  // Full price the guest pays = discounted room + taxes/fees.
+  const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
+  const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
+  const pricing = computePricing(
+    { base: discountedTotal, nights, adults, children, rooms: lines.length },
+    taxConfigFrom(settings),
+  );
 
   // Open Channel booking payload. Each room's (promo-adjusted) total is spread
   // across the stay nights as days[], so the price we send is exactly what we
@@ -221,7 +231,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     checkin: stay.checkin,
     checkout: stay.checkout,
     nights,
-    total: discountedTotal,
+    total: pricing.total,
     promo: applied ?? undefined,
     inventoryHeld: status !== "failed",
     guest: {
@@ -316,13 +326,15 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const promoCodeValue = actionData?.promoCode ?? appliedPromo?.code ?? "";
   const submitting = nav.state === "submitting";
 
-  const taxes = Math.max(0, totals.total - totals.net);
   const discount = appliedPromo?.discount ?? 0;
-  const grandTotal = Math.round((totals.total - discount) * 100) / 100;
-  // Rates are tax-inclusive, so the discount lowers the tax proportionally.
-  // Show the tax actually contained in the amount paid.
-  const taxAfter =
-    totals.total > 0 ? Math.round(taxes * (grandTotal / totals.total) * 100) / 100 : taxes;
+  const discountedRoom = Math.round((totals.total - discount) * 100) / 100;
+  const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
+  const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
+  const pricing = computePricing(
+    { base: discountedRoom, nights, adults, children, rooms: lines.length },
+    loaderData.taxConfig,
+  );
+  const grandTotal = pricing.total;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -448,15 +460,26 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             )}
           </div>
 
+          {(pricing.charges.length > 0 || pricing.taxLines.length > 0) && (
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+              {pricing.charges.map((c, i) => (
+                <Row key={`charge-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
+              ))}
+              {pricing.taxLines.map((c, i) => (
+                <Row key={`tax-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
+              ))}
+            </div>
+          )}
+
           <div className="flex items-baseline justify-between pt-4">
             <span className="text-[16px] font-semibold">{tr.t("total")}</span>
             <span className="font-serif text-[30px] font-semibold">
               {formatMoney(grandTotal, currency)}
             </span>
           </div>
-          {taxAfter > 0 && (
+          {pricing.taxIncluded > 0 && (
             <p className="pb-4 pt-1 text-right text-[12px] text-muted-2">
-              {tr.t("includesTaxes", { amount: formatMoney(taxAfter, currency) })}
+              {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
             </p>
           )}
           <button

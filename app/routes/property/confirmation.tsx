@@ -8,8 +8,9 @@ import { formatMoney } from "~/lib/money";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
-import { getPageText } from "~/lib/overrides.server";
+import { getPageText, getSettings } from "~/lib/overrides.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
+import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { getCatalogRooms } from "~/lib/catalog.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -41,14 +42,28 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const applied =
     total > 0 ? await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", total) : null;
 
+  const discount = applied?.discount ?? 0;
+  const settings = await getSettings(params.channelId);
+  const pricing = computePricing(
+    {
+      base: Math.round((total - discount) * 100) / 100,
+      nights,
+      adults: occ.adults,
+      children: occ.childrenAge?.length ?? 0,
+      rooms: rooms.length,
+    },
+    taxConfigFrom(settings),
+  );
+
   return {
     reference: params.ref,
     simulated,
     rooms,
     currency,
     total,
-    discount: applied?.discount ?? 0,
+    discount,
     promoCode: applied?.code ?? null,
+    pricing,
     checkin,
     checkout,
     nights,
@@ -59,7 +74,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, currency, total, discount, promoCode, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, rooms, currency, total, discount, promoCode, pricing, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -138,12 +153,31 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
               <span className="font-semibold">−{formatMoney(discount, currency)}</span>
             </div>
           )}
+          {total > 0 &&
+            pricing.charges.map((c, i) => (
+              <div key={`charge-${i}`} className="flex justify-between">
+                <span className="text-secondary">{c.label}</span>
+                <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
+              </div>
+            ))}
+          {total > 0 &&
+            pricing.taxLines.map((c, i) => (
+              <div key={`tax-${i}`} className="flex justify-between">
+                <span className="text-secondary">{c.label}</span>
+                <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
+              </div>
+            ))}
           {total > 0 && (
             <div className="flex items-baseline justify-between border-t border-divider pt-3">
               <span className="text-secondary">{tr.t("total")}</span>
               <span className="font-serif text-[24px] font-semibold">
-                {formatMoney(total - discount, currency)}
+                {formatMoney(pricing.total, currency)}
               </span>
+            </div>
+          )}
+          {total > 0 && pricing.taxIncluded > 0 && (
+            <div className="text-right text-[12px] text-muted-2">
+              {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
             </div>
           )}
         </div>
