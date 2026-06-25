@@ -1,6 +1,23 @@
+import { addDays, format, parseISO } from "date-fns";
+
 import type { CancellationSnapshot } from "./policy.server";
 import type { AppliedPromo } from "./promotions";
 import { getConfigKV } from "./config.server";
+
+/** Per-(room, night) availability units a stay occupies — for decrement on
+ *  booking and restore on cancel. */
+export function stayAvailabilityItems(
+  rooms: { roomId: string }[],
+  checkin: string,
+  nights: number,
+): { roomId: string; date: string; by: number }[] {
+  const dates = Array.from({ length: Math.max(1, nights) }, (_, i) =>
+    format(addDays(parseISO(checkin), i), "yyyy-MM-dd"),
+  );
+  const byRoom = new Map<string, number>();
+  for (const r of rooms) byRoom.set(r.roomId, (byRoom.get(r.roomId) ?? 0) + 1);
+  return [...byRoom].flatMap(([roomId, by]) => dates.map((date) => ({ roomId, date, by })));
+}
 
 export type BookingStatus = "confirmed" | "simulated" | "failed";
 export type BookingLifecycle = "active" | "cancelled";
@@ -32,6 +49,8 @@ export interface BookingRecord {
   cancellation?: CancellationSnapshot;
   /** Promo code applied at checkout, if any. `total` is the post-discount total. */
   promo?: AppliedPromo;
+  /** True once the booking has decremented inventory (so cancel restores it once). */
+  inventoryHeld?: boolean;
   createdAt: string;
   currency: string;
   checkin: string;

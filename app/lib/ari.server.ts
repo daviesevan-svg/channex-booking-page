@@ -335,18 +335,31 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits): P
   for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
 }
 
-/** Reduce availability by `by` units for each (room, date), never below 0.
- *  Only affects rooms/dates with an availability row (unset = unlimited). */
-export async function decrementAvailability(
+/** Adjust availability by `delta` per (room, date), clamped at 0. Only affects
+ *  rooms/dates with an availability row (unset = unlimited). */
+async function adjustAvailability(
   hotelCode: string,
   items: { roomId: string; date: string; by: number }[],
+  delta: 1 | -1,
 ): Promise<void> {
   if (!items.length) return;
   await ensureSchema();
   const D = db();
   const stmt = D.prepare(
-    `UPDATE availability SET avail = MAX(0, avail - ?) WHERE hotel_code=? AND room_type_id=? AND date=?`,
+    `UPDATE availability SET avail = MAX(0, avail + ?) WHERE hotel_code=? AND room_type_id=? AND date=?`,
   );
-  const stmts = items.map((i) => stmt.bind(i.by, hotelCode, i.roomId, i.date));
+  const stmts = items.map((i) => stmt.bind(delta * i.by, hotelCode, i.roomId, i.date));
   for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
 }
+
+/** Reduce availability when a booking is made. */
+export const decrementAvailability = (
+  hotelCode: string,
+  items: { roomId: string; date: string; by: number }[],
+) => adjustAvailability(hotelCode, items, -1);
+
+/** Restore availability when a booking is cancelled. */
+export const incrementAvailability = (
+  hotelCode: string,
+  items: { roomId: string; date: string; by: number }[],
+) => adjustAvailability(hotelCode, items, 1);

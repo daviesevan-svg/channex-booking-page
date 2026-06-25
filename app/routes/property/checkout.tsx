@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
 
@@ -13,7 +13,12 @@ import {
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
-import { generateReference, recordBooking, type BookingStatus } from "~/lib/bookings.server";
+import {
+  generateReference,
+  recordBooking,
+  stayAvailabilityItems,
+  type BookingStatus,
+} from "~/lib/bookings.server";
 import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode } from "~/lib/promotions";
@@ -204,6 +209,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     nights,
     total: discountedTotal,
     promo: applied ?? undefined,
+    inventoryHeld: status !== "failed",
     guest: {
       firstName: g.firstName,
       lastName: g.lastName,
@@ -229,15 +235,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   // Decrement availability for the booked rooms across the stay nights (rooms
   // with no availability row are treated as unlimited and left untouched).
-  const stayNights = Array.from({ length: nights }, (_, i) =>
-    format(addDays(parseISO(stay.checkin), i), "yyyy-MM-dd"),
-  );
-  const byRoom = new Map<string, number>();
-  for (const l of lines) byRoom.set(l.roomId, (byRoom.get(l.roomId) ?? 0) + 1);
-  const decrements = [...byRoom].flatMap(([roomId, by]) =>
-    stayNights.map((date) => ({ roomId, date, by })),
-  );
-  await decrementAvailability(stay.channelId, decrements);
+  await decrementAvailability(stay.channelId, stayAvailabilityItems(lines, stay.checkin, nights));
 
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", config.allowLiveBooking ? "0" : "1");

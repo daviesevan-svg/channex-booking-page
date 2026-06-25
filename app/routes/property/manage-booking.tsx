@@ -2,7 +2,8 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage-booking";
 import { useProperty } from "~/lib/booking-context";
-import { getBooking, updateBooking } from "~/lib/bookings.server";
+import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { incrementAvailability } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -63,7 +64,15 @@ export async function action({ params, request }: Route.ActionArgs) {
       await updateBooking(params.channelId, booking.id, {
         lifecycle: "cancelled",
         cancelledAt: new Date().toISOString(),
+        inventoryHeld: false,
       });
+      // Give the nights back to inventory (only if this booking held them).
+      if (booking.inventoryHeld) {
+        await incrementAvailability(
+          params.channelId,
+          stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights),
+        );
+      }
     }
   }
   return redirect(`/${params.channelId}/manage/${params.id}`);
