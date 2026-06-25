@@ -183,6 +183,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
         .replace(/\/.*$/, "") || undefined,
     currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
     languages: form.getAll("languages").map(String),
+    liveBooking: form.get("liveBooking") === "on",
   };
   await writeJson(settingsKey(pid), next);
   return next;

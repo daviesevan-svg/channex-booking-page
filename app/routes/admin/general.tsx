@@ -11,7 +11,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   if (!getConfig().defaultPropertyId) return { configured: false as const };
   const settings = await getSettings(getConfig().defaultPropertyId!);
-  return { configured: true as const, settings, host: new URL(request.url).host };
+  return {
+    configured: true as const,
+    settings,
+    host: new URL(request.url).host,
+    envLive: getConfig().allowLiveBooking,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -42,8 +47,9 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, host } = loaderData;
+  const { settings, host, envLive } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
+  const [live, setLive] = useState(settings.liveBooking ?? envLive);
   const [hex, setHex] = useState(settings.customColor || "#b5651d");
   const validHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
   const [bgHex, setBgHex] = useState(settings.customBg || "");
@@ -229,6 +235,39 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               );
             })}
           </div>
+        </section>
+
+        {/* Booking mode */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Booking mode</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            In <strong>Test mode</strong> checkout simulates the booking and nothing is sent to
+            Channex. In <strong>Live mode</strong> real bookings are pushed to Channex.
+          </p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input
+              type="checkbox"
+              name="liveBooking"
+              checked={live}
+              onChange={(e) => setLive(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">Enable live bookings</span>
+              <span className="block text-[12.5px] text-muted">
+                {live
+                  ? "Live — real reservations will be created in Channex."
+                  : "Test — bookings are simulated only."}
+              </span>
+            </span>
+          </label>
+          {live && (
+            <div className="mt-3 rounded-[10px] border border-[#e7c9a3] bg-[#fbf2e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a5a23]">
+              <strong>Live mode is on.</strong> Every completed checkout will create a real booking
+              in Channex. Make sure your Open Channel connection and the outbound booking key are set
+              before taking real reservations.
+            </div>
+          )}
         </section>
 
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}

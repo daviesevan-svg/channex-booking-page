@@ -23,6 +23,7 @@ import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode } from "~/lib/promotions";
 import { getConfig } from "~/lib/config.server";
+import { getSettings } from "~/lib/overrides.server";
 import { pushOpenChannelBooking } from "~/lib/open-channel.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
@@ -137,6 +138,10 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const g = parsed.data;
   const config = getConfig();
+  // Live vs test booking is controlled from admin General settings; an unsaved
+  // setting falls back to the ALLOW_LIVE_BOOKING env var.
+  const settings = await getSettings(stay.channelId);
+  const live = settings.liveBooking ?? config.allowLiveBooking;
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   // Random, unguessable reference — also the guest's manage-booking credential.
   const reference = generateReference();
@@ -185,7 +190,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   let channexId: string | undefined;
   let error: string | undefined;
 
-  if (config.allowLiveBooking) {
+  if (live) {
     try {
       const result = await pushOpenChannelBooking(booking);
       channexId = result?.reservation_id || result?.id || undefined;
@@ -247,7 +252,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   await decrementAvailability(stay.channelId, stayAvailabilityItems(lines, stay.checkin, nights));
 
   const next = new URLSearchParams(url.searchParams);
-  next.set("sim", config.allowLiveBooking ? "0" : "1");
+  next.set("sim", live ? "0" : "1");
   if (applied) next.set("promo", applied.code);
   return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
 }

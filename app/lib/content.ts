@@ -131,6 +131,9 @@ export interface SiteSettings {
   /** ISO currency code for all prices (e.g. GBP). Defaults to GBP when unset. */
   currency?: string;
   languages?: string[]; // enabled languages (always includes the default)
+  /** When true, checkout pushes real bookings to Channex; when false it simulates.
+   *  Unset (never saved) falls back to the ALLOW_LIVE_BOOKING env var. */
+  liveBooking?: boolean;
   // ----- Customer Portal (manage-my-booking) -----
   allowCancel?: boolean;
   allowModify?: boolean;
