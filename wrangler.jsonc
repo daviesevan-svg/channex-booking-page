@@ -38,7 +38,7 @@
 	// Holds ARI pushed via the Open Channel API. Create for production with
 	// `wrangler d1 create channex-ari` and paste the returned database_id here.
 	"d1_databases": [
-		{ "binding": "DB", "database_name": "channex-ari", "database_id": "local-dev-placeholder" }
+		{ "binding": "DB", "database_name": "channex-ari", "database_id": "36c91859-bf71-43af-a8f0-9b6fcadeb132" }
 	],
 	"observability": {
 		"enabled": true
