@@ -3,28 +3,26 @@ import { Link } from "react-router";
 import type { Route } from "./+types/rates";
 import { requireAdmin } from "~/lib/auth.server";
 import { getConfig } from "~/lib/config.server";
-import { getRatePlanList } from "~/lib/rateplans.server";
-import { getRatePlanOverrides } from "~/lib/overrides.server";
+import { getRates, getRooms } from "~/lib/catalog.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = getConfig().defaultPropertyId;
   if (!propertyId) return { configured: false as const };
 
-  const [rates, overrides] = await Promise.all([
-    getRatePlanList(propertyId).catch(() => []),
-    getRatePlanOverrides(propertyId),
-  ]);
-
+  const [rates, rooms] = await Promise.all([getRates(propertyId), getRooms(propertyId)]);
+  const roomTitle = new Map(rooms.map((r) => [r.id, r.title]));
   return {
     configured: true as const,
+    hasRooms: rooms.length > 0,
     rates: rates.map((r) => ({
-      key: r.key,
-      channexTitle: r.channexTitle,
-      rooms: r.rooms,
-      cancellationTitle: r.cancellationTitle,
-      name: overrides[r.key]?.name,
-      customised: Boolean(overrides[r.key] && Object.keys(overrides[r.key]).length),
+      id: r.id,
+      title: r.title,
+      room: roomTitle.get(r.roomId) ?? "—",
+      mealPlan: r.mealPlan,
+      nightlyPrice: r.nightlyPrice,
+      occupancy: { adults: r.adults, children: r.children },
+      active: r.active,
     })),
   };
 }
@@ -39,58 +37,70 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
       <div className="rounded-[14px] border border-line bg-surface p-6">
         <h1 className="mb-2 font-serif text-[22px] font-semibold">Rates</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to map rate
-          plans.
+          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to add rates.
         </p>
       </div>
     );
   }
 
-  const { rates } = loaderData;
+  const { rates, hasRooms } = loaderData;
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Rates</h1>
+      <div className="mb-1 flex items-center justify-between">
+        <h1 className="font-serif text-[26px] font-semibold">Rates</h1>
+        {hasRooms && (
+          <Link
+            to="/admin/rates/new"
+            className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep"
+          >
+            + New rate
+          </Link>
+        )}
+      </div>
       <p className="mb-6 text-[14px] text-muted">
-        {rates.length} rate plan{rates.length === 1 ? "" : "s"} from Channex. Edit one and it applies
-        to every room that offers it — rename, add a description, photos, what&rsquo;s included and a
-        cancellation policy.
+        A rate is a bookable price for a room — meal plan, nightly price, occupancy and cancellation
+        policy.
       </p>
 
-      {rates.length === 0 ? (
+      {!hasRooms ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No bookable rate plans were found in the next 6 months. Rate plans only appear here when
-          they have availability open on Channex.
+          Create a <Link to="/admin/rooms/new" className="font-semibold text-accent">room</Link> first,
+          then add rates to it.
+        </div>
+      ) : rates.length === 0 ? (
+        <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
+          No rates yet. Create your first one.
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
           {rates.map((rate, i) => (
             <Link
-              key={rate.key}
-              to={`/admin/rates/${rate.key}`}
+              key={rate.id}
+              to={`/admin/rates/${rate.id}`}
               className={`flex items-center justify-between gap-4 px-5 py-4 hover:bg-field-hover ${
                 i > 0 ? "border-t border-divider" : ""
               }`}
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
-                  <span className="truncate font-semibold">{rate.name || rate.channexTitle}</span>
-                  {rate.customised && (
-                    <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
-                      Customised
+                  <span className="truncate font-semibold">{rate.title}</span>
+                  {!rate.active && (
+                    <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">
+                      Inactive
                     </span>
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {rate.name && rate.name !== rate.channexTitle && (
-                    <>Channex: {rate.channexTitle} · </>
-                  )}
-                  {rate.rooms.length} room{rate.rooms.length === 1 ? "" : "s"}
-                  {rate.cancellationTitle && <> · Cancellation: {rate.cancellationTitle}</>}
+                  {rate.room} · {rate.mealPlan || "Room only"} · {rate.occupancy.adults} adult
+                  {rate.occupancy.adults === 1 ? "" : "s"}
+                  {rate.occupancy.children ? `, ${rate.occupancy.children} child` : ""}
                 </div>
-                <div className="mt-0.5 truncate text-[11px] text-faint">{rate.rooms.join(", ")}</div>
               </div>
-              <span className="flex-none text-[13px] font-semibold text-accent">Edit →</span>
+              <div className="flex flex-none items-center gap-4">
+                <span className="font-semibold">{rate.nightlyPrice.toFixed(2)}/night</span>
+                <span className="text-[13px] font-semibold text-accent">Edit →</span>
+              </div>
             </Link>
           ))}
         </div>

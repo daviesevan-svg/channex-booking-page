@@ -26,6 +26,10 @@ export function uploadHomeImage(propertyId: string, file: File): Promise<string>
   return uploadImage(`home/${propertyId}`, file);
 }
 
+export function uploadCatalogRoomImage(propertyId: string, roomId: string, file: File): Promise<string> {
+  return uploadImage(`catalog/${propertyId}/${roomId}`, file);
+}
+
 export function uploadRatePlanImage(
   propertyId: string,
   rateId: string,
