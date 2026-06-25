@@ -23,6 +23,8 @@ export interface DayCell {
   date?: Date;
   disabled: boolean;
   sold: boolean;
+  /** Native-tooltip hint, e.g. "Unavailable" or "Check-out only". */
+  title?: string;
   isCheckin: boolean;
   isCheckout: boolean;
   inRange: boolean;
@@ -74,6 +76,17 @@ export function useDateRange({
   const minStayFor = (d: Date) => minStayMap[iso(d)] ?? 1;
   const isSold = (d: Date) => soldSet.has(iso(d));
   const today = startOfToday();
+
+  // A sold-out night can still be a valid CHECK-OUT (you don't sleep there):
+  // true when picking a check-out, `date` is after check-in, meets min-stay,
+  // isn't closed-to-departure, and every night in between is available.
+  const checkoutAllowed = (date: Date) => {
+    if (!checkin || checkout || !isBefore(checkin, date)) return false;
+    if (ctdSet.has(iso(date))) return false;
+    if (differenceInCalendarDays(date, checkin) < minStayFor(checkin)) return false;
+    for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) if (isSold(d)) return false;
+    return true;
+  };
 
   function handleDay(date: Date) {
     if (!checkin || checkout || !isBefore(checkin, date)) {
@@ -144,7 +157,15 @@ export function useDateRange({
         const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
         const past = isBefore(date, today);
         const sold = isSold(date);
-        const disabled = past || sold;
+        // Sold nights stay un-pickable for arrival, but open up as a check-out.
+        const asCheckout = checkoutAllowed(date);
+        const disabled = past ? true : asCheckout ? false : sold;
+        let title: string | undefined;
+        if (!past) {
+          if (asCheckout && sold) title = tr.t("checkoutOnly");
+          else if (sold) title = tr.t("unavailable");
+          else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
+        }
         const isCheckin = !!checkin && differenceInCalendarDays(date, checkin) === 0;
         const isCheckout = !!checkout && differenceInCalendarDays(date, checkout) === 0;
         const inRange =
@@ -161,6 +182,7 @@ export function useDateRange({
           date,
           disabled,
           sold,
+          title,
           isCheckin,
           isCheckout,
           inRange,
@@ -170,7 +192,7 @@ export function useDateRange({
       return { title, cells };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkin, checkout, monthOffset, soldSet, minStayMap]);
+  }, [checkin, checkout, monthOffset, soldSet, minStayMap, ctaSet, ctdSet]);
 
   let rangeSummary: string;
   if (checkin && checkout) {

@@ -73,6 +73,7 @@ const EN: Dict = {
 
   selectYourDates: "Select your dates",
   unavailable: "Unavailable",
+  checkoutOnly: "Check-out only — you can’t arrive on this day",
   minStayApplies: "Min. stay applies",
   selectCheckout: "Select a check-out date",
   nightsSelected_one: "{n} night selected",

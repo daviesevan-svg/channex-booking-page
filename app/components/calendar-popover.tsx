@@ -90,6 +90,7 @@ export function CalendarPopover({
                 {month.cells.map((cell) => (
                   <div
                     key={cell.key}
+                    title={cell.title}
                     onClick={cell.disabled ? undefined : () => cell.date && state.handleDay(cell.date)}
                     style={cellStyle(cell)}
                     className="relative flex h-10 items-center justify-center rounded-[10px] text-sm"
