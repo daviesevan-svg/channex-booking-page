@@ -25,6 +25,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let rooms: { title: string; rate: string }[] = [];
   let total = 0;
   let nights = 0;
+  let cleaningFee = 0;
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -37,6 +38,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     const lines = resolveCart(parseCart(url.searchParams), catalogRooms);
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     if (lines.length) total = cartCoverage(lines).total;
+    cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
   }
 
   const applied =
@@ -51,6 +53,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       adults: occ.adults,
       children: occ.childrenAge?.length ?? 0,
       rooms: rooms.length,
+      cleaningFee,
     },
     taxConfigFrom(settings),
   );

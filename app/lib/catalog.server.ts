@@ -19,6 +19,8 @@ export interface CatalogRoom {
   maxAdults: number;
   /** Total heads (adults + children) this room sleeps. */
   maxGuests: number;
+  /** Flat cleaning fee, charged once per room per stay (VAT always applies). */
+  cleaningFee?: number;
   facilities: string[];
   position: number;
   createdAt: string;
@@ -215,6 +217,7 @@ export async function getCatalogRooms(
         description: room.description,
         facilities: room.facilities,
         photos: room.images.map((url) => ({ url })),
+        cleaningFee: room.cleaningFee,
         ratePlans,
       };
     })

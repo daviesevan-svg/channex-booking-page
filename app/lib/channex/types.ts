@@ -151,6 +151,8 @@ export interface RoomWithRates {
   photos?: Photo[];
   codes?: Record<string, unknown>;
   isBestOffer?: boolean;
+  /** Flat cleaning fee per room per stay (from the manual catalog). */
+  cleaningFee?: number;
   ratePlans: RatePlan[];
 }
 

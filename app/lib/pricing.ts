@@ -53,6 +53,8 @@ export interface PricingInput {
   children: number;
   /** Number of rooms booked. */
   rooms: number;
+  /** Total cleaning fee across the booked rooms (per stay). VAT always applies. */
+  cleaningFee?: number;
 }
 
 export interface PriceLine {
@@ -85,6 +87,14 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   let chargesTotal = 0;
   // The portion of fees/city-tax that VAT also applies to (on top of the room).
   let taxableExtra = 0;
+
+  // Cleaning fee — flat, per stay, always counts towards VAT (part of the room price).
+  const cleaning = round2(input.cleaningFee ?? 0);
+  if (cleaning > 0) {
+    charges.push({ label: "Cleaning fee", amount: cleaning });
+    chargesTotal += cleaning;
+    taxableExtra += cleaning;
+  }
 
   for (const f of fees) {
     const amount = round2(f.kind === "percent" ? (base * (f.amount || 0)) / 100 : f.amount || 0);

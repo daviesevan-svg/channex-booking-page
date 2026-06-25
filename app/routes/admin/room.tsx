@@ -59,6 +59,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     images: [...keep, ...uploaded, ...urls],
     maxAdults: posInt(form.get("maxAdults")),
     maxGuests: posInt(form.get("maxGuests")),
+    cleaningFee: Math.max(0, Math.round((Number(form.get("cleaningFee")) || 0) * 100) / 100) || undefined,
     facilities: String(form.get("facilities") ?? "")
       .split("\n")
       .map((s) => s.trim())
@@ -130,6 +131,19 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
             <input name="maxGuests" type="number" min={1} defaultValue={room?.maxGuests ?? 2} className={FIELD_INPUT} />
           </label>
         </div>
+
+        <label className="block text-[13px] font-semibold text-secondary">
+          Cleaning fee <span className="font-normal text-faint">(per stay, optional — VAT applies)</span>
+          <input
+            name="cleaningFee"
+            type="number"
+            min={0}
+            step="0.01"
+            defaultValue={room?.cleaningFee ?? ""}
+            placeholder="0.00"
+            className={FIELD_INPUT}
+          />
+        </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
           Facilities <span className="font-normal text-faint">(one per line)</span>

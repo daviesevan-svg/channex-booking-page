@@ -151,8 +151,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   // Full price the guest pays = discounted room + taxes/fees.
   const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
   const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
+  const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
   const pricing = computePricing(
-    { base: discountedTotal, nights, adults, children, rooms: lines.length },
+    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee },
     taxConfigFrom(settings),
   );
 
@@ -330,8 +331,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const discountedRoom = Math.round((totals.total - discount) * 100) / 100;
   const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
   const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
+  const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
   const pricing = computePricing(
-    { base: discountedRoom, nights, adults, children, rooms: lines.length },
+    { base: discountedRoom, nights, adults, children, rooms: lines.length, cleaningFee },
     loaderData.taxConfig,
   );
   const grandTotal = pricing.total;

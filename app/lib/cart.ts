@@ -40,6 +40,8 @@ export interface ResolvedLine extends CartLine {
   occupancy: { adults: number; children: number; infants: number };
   total: number;
   net: number;
+  /** Flat cleaning fee for this room (per stay). */
+  cleaningFee: number;
   photo?: string;
 }
 
@@ -56,6 +58,7 @@ export function resolveCart(lines: CartLine[], rooms: RoomWithRates[]): Resolved
         occupancy: rate.occupancy,
         total: Number(rate.totalPrice),
         net: Number(rate.netPrice ?? rate.totalPrice),
+        cleaningFee: Number(room.cleaningFee ?? 0),
         photo: room.photos?.[0]?.url,
       });
     }
