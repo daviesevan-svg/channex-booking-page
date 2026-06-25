@@ -23,6 +23,8 @@ export interface DayCell {
   date?: Date;
   disabled: boolean;
   sold: boolean;
+  /** Past dates render greyed; sold (non-past) dates render struck-through. */
+  past: boolean;
   /** Native-tooltip hint, e.g. "Unavailable" or "Check-out only". */
   title?: string;
   isCheckin: boolean;
@@ -147,6 +149,7 @@ export function useDateRange({
           label: "",
           disabled: true,
           sold: false,
+          past: false,
           isCheckin: false,
           isCheckout: false,
           inRange: false,
@@ -182,6 +185,7 @@ export function useDateRange({
           date,
           disabled,
           sold,
+          past,
           title,
           isCheckin,
           isCheckout,

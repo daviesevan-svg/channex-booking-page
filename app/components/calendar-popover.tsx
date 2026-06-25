@@ -5,19 +5,26 @@ import type { DayCell, DateRangeState } from "~/lib/use-date-range";
 
 function cellStyle(cell: DayCell): CSSProperties {
   if (cell.blank) return { visibility: "hidden" };
-  if (cell.disabled) {
-    return {
-      color: "#c9bdac",
-      cursor: "default",
-      fontWeight: 400,
-      textDecoration: cell.sold ? "line-through" : "none",
-    };
-  }
+  // A selected day always looks selected — even a sold-out night chosen as the
+  // check-out (which is otherwise un-clickable).
   if (cell.isCheckin || cell.isCheckout) {
     return { background: "var(--accent)", color: "#fff", fontWeight: 600 };
   }
   if (cell.inRange) {
     return { background: "var(--accent-soft)", color: "#2a2521", fontWeight: 600 };
+  }
+  // Past dates are greyed out; sold-out (but present) dates stay readable black
+  // with a strike-through so they read as "exists, just not bookable to arrive".
+  if (cell.past) {
+    return { color: "#c9bdac", cursor: "default", fontWeight: 400 };
+  }
+  if (cell.disabled) {
+    return {
+      color: cell.sold ? "#2a2521" : "#c9bdac",
+      cursor: "default",
+      fontWeight: 400,
+      textDecoration: cell.sold ? "line-through" : "none",
+    };
   }
   return { color: "#2a2521", fontWeight: 500, cursor: "pointer" };
 }
