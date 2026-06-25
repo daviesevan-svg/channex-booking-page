@@ -91,6 +91,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/portal", label: "Customer Portal", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
             { to: "/admin/rates", label: "Rates", end: false },
+            { to: "/admin/inventory", label: "Inventory", end: false },
             { to: "/admin/promotions", label: "Promotions", end: false },
             { to: "/admin/bookings", label: "Bookings", end: false },
           ].map((item) => (

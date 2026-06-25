@@ -25,6 +25,7 @@ export default [
     route("rooms/:roomId", "routes/admin/room.tsx"),
     route("rates", "routes/admin/rates.tsx"),
     route("rates/:rateId", "routes/admin/rate.tsx"),
+    route("inventory", "routes/admin/inventory.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),

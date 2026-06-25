@@ -27,10 +27,11 @@ export async function ensureSchema(): Promise<void> {
   if (schemaReady) return;
   await db().batch([
     db().prepare(
+      // Availability is per room-type (rate plans of a room share inventory).
       `CREATE TABLE IF NOT EXISTS availability (
-        hotel_code TEXT NOT NULL, room_type_id TEXT NOT NULL, rate_plan_id TEXT NOT NULL,
+        hotel_code TEXT NOT NULL, room_type_id TEXT NOT NULL,
         date TEXT NOT NULL, avail INTEGER NOT NULL,
-        PRIMARY KEY (hotel_code, room_type_id, rate_plan_id, date)
+        PRIMARY KEY (hotel_code, room_type_id, date)
       )`,
     ),
     db().prepare(
@@ -95,8 +96,8 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   const D = db();
 
   const availStmt = D.prepare(
-    `INSERT INTO availability (hotel_code,room_type_id,rate_plan_id,date,avail) VALUES (?,?,?,?,?)
-     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date) DO UPDATE SET avail=excluded.avail`,
+    `INSERT INTO availability (hotel_code,room_type_id,date,avail) VALUES (?,?,?,?)
+     ON CONFLICT(hotel_code,room_type_id,date) DO UPDATE SET avail=excluded.avail`,
   );
   const rateStmt = D.prepare(
     `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
@@ -125,7 +126,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
       if (type === "availability_changes") {
         const avail = Number(a.availability) || 0;
         for (const d of dates) {
-          stmts.push(availStmt.bind(hotel, room, plan, d, avail));
+          stmts.push(availStmt.bind(hotel, room, d, avail));
           counts.availability++;
         }
       } else if (type === "restriction_changes") {
@@ -178,7 +179,7 @@ export async function queryRates(hotelCode: string, checkin: string, checkout: s
       `SELECT r.room_type_id, r.rate_plan_id, r.date, r.occupancy, r.price_minor, r.currency, r.fraction_size,
               a.avail AS avail, COALESCE(x.stop_sell,0) AS stop_sell
        FROM rate r
-       LEFT JOIN availability a ON a.hotel_code=r.hotel_code AND a.room_type_id=r.room_type_id AND a.rate_plan_id=r.rate_plan_id AND a.date=r.date
+       LEFT JOIN availability a ON a.hotel_code=r.hotel_code AND a.room_type_id=r.room_type_id AND a.date=r.date
        LEFT JOIN restriction x ON x.hotel_code=r.hotel_code AND x.room_type_id=r.room_type_id AND x.rate_plan_id=r.rate_plan_id AND x.date=r.date
        WHERE r.hotel_code=? AND r.date>=? AND r.date<?
        ORDER BY r.room_type_id, r.rate_plan_id, r.occupancy, r.date`,
@@ -225,4 +226,80 @@ export async function getMappingDetails(hotelCode: string): Promise<MappingRoomT
     });
   }
   return [...byRoom.values()];
+}
+
+// ---- inventory grid (admin-editable ARI) ----
+export interface InventoryData {
+  /** key `${roomId}|${date}` → units available */
+  availability: Record<string, number>;
+  /** key `${rateId}|${date}` → price in major currency units */
+  prices: Record<string, number>;
+  /** key `${rateId}|${date}` → restriction flags */
+  restrictions: Record<string, { stopSell: boolean; minStay: number }>;
+}
+
+/** Read the ARI for a [from, to] inclusive window, as lookup maps. */
+export async function getInventory(hotelCode: string, from: string, to: string): Promise<InventoryData> {
+  await ensureSchema();
+  const D = db();
+  const [av, rt, rs] = await Promise.all([
+    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND date>=? AND date<=?`)
+      .bind(hotelCode, from, to)
+      .all<{ room_type_id: string; date: string; avail: number }>(),
+    D.prepare(`SELECT rate_plan_id, date, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=? AND occupancy=0`)
+      .bind(hotelCode, from, to)
+      .all<{ rate_plan_id: string; date: string; price_minor: number; fraction_size: number }>(),
+    D.prepare(`SELECT rate_plan_id, date, stop_sell, min_stay_arrival FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`)
+      .bind(hotelCode, from, to)
+      .all<{ rate_plan_id: string; date: string; stop_sell: number; min_stay_arrival: number }>(),
+  ]);
+
+  const data: InventoryData = { availability: {}, prices: {}, restrictions: {} };
+  for (const r of av.results ?? []) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
+  for (const r of rt.results ?? [])
+    data.prices[`${r.rate_plan_id}|${r.date}`] = r.price_minor / 10 ** (r.fraction_size || 2);
+  for (const r of rs.results ?? [])
+    data.restrictions[`${r.rate_plan_id}|${r.date}`] = {
+      stopSell: Boolean(r.stop_sell),
+      minStay: r.min_stay_arrival || 0,
+    };
+  return data;
+}
+
+export interface InventoryEdits {
+  currency: string;
+  availability: { roomId: string; date: string; avail: number }[];
+  prices: { rateId: string; roomId: string; date: string; price: number }[];
+  restrictions: { rateId: string; roomId: string; date: string; stopSell: boolean; minStay: number }[];
+}
+
+/** Upsert manual ARI edits from the inventory grid. */
+export async function saveInventory(hotelCode: string, edits: InventoryEdits): Promise<void> {
+  await ensureSchema();
+  const D = db();
+  const availStmt = D.prepare(
+    `INSERT INTO availability (hotel_code,room_type_id,date,avail) VALUES (?,?,?,?)
+     ON CONFLICT(hotel_code,room_type_id,date) DO UPDATE SET avail=excluded.avail`,
+  );
+  const rateStmt = D.prepare(
+    `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
+     VALUES (?,?,?,?,0,?,?,2)
+     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date,occupancy)
+     DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency`,
+  );
+  const restrStmt = D.prepare(
+    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival)
+     VALUES (?,?,?,?,?,?)
+     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
+     DO UPDATE SET stop_sell=excluded.stop_sell,min_stay_arrival=excluded.min_stay_arrival`,
+  );
+
+  const stmts: D1PreparedStatement[] = [];
+  for (const a of edits.availability) stmts.push(availStmt.bind(hotelCode, a.roomId, a.date, a.avail));
+  for (const p of edits.prices)
+    stmts.push(rateStmt.bind(hotelCode, p.roomId, p.rateId, p.date, Math.round(p.price * 100), edits.currency));
+  for (const r of edits.restrictions)
+    stmts.push(restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay));
+
+  for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
 }
