@@ -30,6 +30,13 @@ export async function pushOpenChannelBooking(booking: unknown): Promise<OpenChan
         : String(body);
     throw new Error(`Channex booking push failed (${res.status}): ${detail}`.slice(0, 400));
   }
-  const data = (body as { data?: OpenChannelBookingResult })?.data ?? (body as OpenChannelBookingResult);
+  // Channex replies { success: true, bookings: [{ id, unique_id }] }. Older/other
+  // shapes (a bare object or { data }) are tolerated as a fallback.
+  const obj = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const first = Array.isArray(obj.bookings) ? (obj.bookings[0] as Record<string, unknown>) : undefined;
+  if (first) {
+    return { id: first.id as string | undefined, reservation_id: first.unique_id as string | undefined };
+  }
+  const data = (obj.data as OpenChannelBookingResult) ?? (obj as OpenChannelBookingResult);
   return data ?? {};
 }
