@@ -4,10 +4,11 @@
 // (D1) will later override these.
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { getInventory } from "./ari.server";
+import { getInventory, type MappingRoomType } from "./ari.server";
 import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
+import { getSettings } from "./overrides.server";
 
 export interface CatalogRoom {
   id: string;
@@ -105,6 +106,30 @@ export async function saveRate(pid: string, rate: CatalogRate): Promise<void> {
 export async function deleteRate(pid: string, id: string): Promise<void> {
   const list = (await getRates(pid)).filter((r) => r.id !== id);
   await writeArr(ratesKey(pid), list);
+}
+
+/** The catalog as Open Channel mapping_details: our room types + active rate
+ *  plans, with our ids, so Channex can map the hotel's rooms onto them and then
+ *  push ARI keyed by these same ids. */
+export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]> {
+  const [rooms, rates, settings] = await Promise.all([getRooms(pid), getRates(pid), getSettings(pid)]);
+  const currency = settings.currency || "GBP";
+  return rooms
+    .map((room) => ({
+      id: room.id,
+      title: room.title,
+      rate_plans: rates
+        .filter((r) => r.roomId === room.id && r.active)
+        .map((r) => ({
+          id: r.id,
+          title: r.title,
+          sell_mode: "per_room",
+          max_persons: room.maxGuests,
+          currency,
+          read_only: false,
+        })),
+    }))
+    .filter((rt) => rt.rate_plans.length > 0);
 }
 
 // ---- public read: build RoomWithRates from the catalog ----
