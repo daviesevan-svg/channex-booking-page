@@ -21,7 +21,9 @@
 		"ADMIN_EMAILS": "",
 		"SESSION_SECRET": "",
 		"APP_URL": "",
-		"RESEND_API_KEY": ""
+		"RESEND_API_KEY": "",
+		// Open Channel API (Channex pushes ARI to us, we push bookings back).
+		"PROVIDER_CODE": ""
 	},
 	// Per-property content overrides edited in the admin. Create the namespace for
 	// production with `wrangler kv namespace create CONFIG` and paste the id here.
@@ -32,6 +34,11 @@
 	// channex-booking-images` (and enable R2 on the account) for production.
 	"r2_buckets": [
 		{ "binding": "IMAGES", "bucket_name": "channex-booking-images" }
+	],
+	// Holds ARI pushed via the Open Channel API. Create for production with
+	// `wrangler d1 create channex-ari` and paste the returned database_id here.
+	"d1_databases": [
+		{ "binding": "DB", "database_name": "channex-ari", "database_id": "local-dev-placeholder" }
 	],
 	"observability": {
 		"enabled": true

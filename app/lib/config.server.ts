@@ -17,6 +17,10 @@ export interface AppConfig extends ChannexConfig {
   sessionSecret: string;
   appUrl: string;
   resendApiKey?: string;
+  /** Open Channel API: key Channex sends (and we send back on booking push). */
+  openChannelApiKey: string;
+  /** Our provider code, used when calling Channex's full-sync/booking webhooks. */
+  providerCode?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -41,6 +45,8 @@ export function getConfig(): AppConfig {
     sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
     appUrl: read("APP_URL", "http://localhost:5173"),
     resendApiKey: read("RESEND_API_KEY") || undefined,
+    openChannelApiKey: read("OPEN_CHANNEL_API_KEY"),
+    providerCode: read("PROVIDER_CODE") || undefined,
   };
 }
 
@@ -57,4 +63,9 @@ export function getConfigKV(): KVNamespace {
 /** The R2 bucket holding uploaded images (undefined if not bound). */
 export function getImagesBucket(): R2Bucket | undefined {
   return (env as unknown as { IMAGES?: R2Bucket }).IMAGES;
+}
+
+/** The D1 database holding pushed ARI (availability, rates, restrictions). */
+export function getDB(): D1Database | undefined {
+  return (env as unknown as { DB?: D1Database }).DB;
 }

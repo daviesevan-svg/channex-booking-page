@@ -6,6 +6,11 @@ export default [
   // Public image server (R2-backed)
   route("images/*", "routes/image.tsx"),
 
+  // Open Channel API (Channex → us): ARI push + handshake endpoints.
+  route("api/test_connection", "routes/api.test_connection.tsx"),
+  route("api/mapping_details", "routes/api.mapping_details.tsx"),
+  route("api/changes", "routes/api.changes.tsx"),
+
   // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/verify", "routes/admin/verify.tsx"),
