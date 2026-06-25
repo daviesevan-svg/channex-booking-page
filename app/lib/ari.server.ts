@@ -255,9 +255,9 @@ export async function getInventory(hotelCode: string, from: string, to: string):
     D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND date>=? AND date<=?`)
       .bind(hotelCode, from, to)
       .all<{ room_type_id: string; date: string; avail: number }>(),
-    D.prepare(`SELECT rate_plan_id, date, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=? AND occupancy=0`)
+    D.prepare(`SELECT rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=?`)
       .bind(hotelCode, from, to)
-      .all<{ rate_plan_id: string; date: string; price_minor: number; fraction_size: number }>(),
+      .all<{ rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number }>(),
     D.prepare(
       `SELECT rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
        FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`,
@@ -275,8 +275,18 @@ export async function getInventory(hotelCode: string, from: string, to: string):
 
   const data: InventoryData = { availability: {}, prices: {}, restrictions: {} };
   for (const r of av.results ?? []) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
-  for (const r of rt.results ?? [])
-    data.prices[`${r.rate_plan_id}|${r.date}`] = r.price_minor / 10 ** (r.fraction_size || 2);
+  // A rate may have several occupancy rows (per_person pushes from Channex);
+  // prefer the manual occupancy=0 price, else the highest occupancy (the full rate).
+  const priceOcc: Record<string, number> = {};
+  for (const r of rt.results ?? []) {
+    const key = `${r.rate_plan_id}|${r.date}`;
+    const price = r.price_minor / 10 ** (r.fraction_size || 2);
+    const prevOcc = priceOcc[key];
+    if (prevOcc === undefined || r.occupancy === 0 || (prevOcc !== 0 && r.occupancy > prevOcc)) {
+      data.prices[key] = price;
+      priceOcc[key] = r.occupancy;
+    }
+  }
   for (const r of rs.results ?? [])
     data.restrictions[`${r.rate_plan_id}|${r.date}`] = {
       stopSell: Boolean(r.stop_sell),
