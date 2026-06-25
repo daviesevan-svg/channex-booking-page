@@ -4,7 +4,6 @@ import type { Route } from "./+types/promotions";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { normalizeCode, type DiscountType, type Promotion } from "~/lib/promotions";

@@ -3,7 +3,6 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,

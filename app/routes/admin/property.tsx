@@ -4,7 +4,6 @@ import type { Route } from "./+types/property";
 import { Field } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
 

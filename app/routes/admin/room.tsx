@@ -3,7 +3,6 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { FIELD_INPUT } from "~/components/admin-form";

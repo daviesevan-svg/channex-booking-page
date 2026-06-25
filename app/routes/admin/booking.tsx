@@ -8,7 +8,6 @@ import { makeTranslator } from "~/lib/i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getBooking } from "~/lib/bookings.server";
-import { getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 
 export async function loader({ params, request }: Route.LoaderArgs) {

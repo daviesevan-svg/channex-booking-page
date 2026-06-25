@@ -5,7 +5,6 @@ import type { Route } from "./+types/taxes";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { getSettings, saveTaxSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {

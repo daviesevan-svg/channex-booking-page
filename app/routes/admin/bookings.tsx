@@ -6,7 +6,6 @@ import { BookingStatusBadge } from "~/components/booking-status";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getBookings } from "~/lib/bookings.server";
-import { getConfig } from "~/lib/config.server";
 import { formatMoney } from "~/lib/money";
 
 export async function loader({ request }: Route.LoaderArgs) {

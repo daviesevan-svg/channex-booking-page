@@ -3,7 +3,6 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/rate";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { isDeadlineUnit } from "~/lib/content";
 import { deleteRate, getRate, getRooms, saveRate, type CatalogRate } from "~/lib/catalog.server";
 import { FIELD_INPUT } from "~/components/admin-form";

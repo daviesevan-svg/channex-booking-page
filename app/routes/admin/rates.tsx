@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import type { Route } from "./+types/rates";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
 export async function loader({ request }: Route.LoaderArgs) {

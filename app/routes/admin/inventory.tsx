@@ -5,7 +5,6 @@ import { Form, Link, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/inventory";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 import { getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";

@@ -3,7 +3,6 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/page";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getConfig } from "~/lib/config.server";
 import { langParam, pageDef, pickLang } from "~/lib/content";
 import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
 import { FIELD_INPUT } from "~/components/admin-form";
