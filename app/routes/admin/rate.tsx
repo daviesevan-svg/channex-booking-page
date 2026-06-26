@@ -36,11 +36,20 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const existing = isNew ? undefined : await getRate(propertyId, params.rateId);
   const title = String(form.get("title") ?? "").trim();
-  const roomId = String(form.get("roomId") ?? "");
-  const nightlyPrice = Math.round(Number(form.get("nightlyPrice")) * 100) / 100;
-  if (!roomId) return { error: "Choose a room." };
   if (!title) return { error: "Enter a rate name." };
-  if (!Number.isFinite(nightlyPrice) || nightlyPrice <= 0) return { error: "Enter a nightly price greater than 0." };
+
+  // One price per room — a room is offered this rate only when it has a price.
+  const prices: Record<string, number> = {};
+  const rooms = await getRooms(propertyId);
+  for (const room of rooms) {
+    const raw = form.get(`price:${room.id}`);
+    if (raw == null || String(raw).trim() === "") continue;
+    const p = Math.round(Number(raw) * 100) / 100;
+    if (Number.isFinite(p) && p > 0) prices[room.id] = p;
+  }
+  if (Object.keys(prices).length === 0) {
+    return { error: "Enter a nightly price for at least one room." };
+  }
 
   const posInt = (v: FormDataEntryValue | null) => {
     const n = Math.round(Number(v));
@@ -53,12 +62,9 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const rate: CatalogRate = {
     id: existing?.id ?? crypto.randomUUID(),
-    roomId,
     title,
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
-    nightlyPrice,
-    adults: posInt(form.get("adults")) ?? 2,
-    children: Math.max(0, Math.round(Number(form.get("children")) || 0)),
+    prices,
     refundable: form.get("refundable") != null,
     cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
     cancelDeadlineUnit: unit(form.get("cancelDeadlineUnit")),
@@ -104,40 +110,43 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
       <Form method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
-            Room
-            <select name="roomId" defaultValue={rate?.roomId ?? rooms[0]?.id} className={FIELD_INPUT}>
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>{r.title}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
             Rate name
             <input name="title" defaultValue={rate?.title} placeholder="Breakfast Rate" className={FIELD_INPUT} />
           </label>
-        </div>
-
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
             Meal plan <span className="font-normal text-faint">(optional)</span>
             <input name="mealPlan" defaultValue={rate?.mealPlan} placeholder="Breakfast included" className={FIELD_INPUT} />
           </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Price per night
-            <input name="nightlyPrice" type="number" min={0} step="0.01" defaultValue={rate?.nightlyPrice ?? ""} placeholder="120.00" className={FIELD_INPUT} />
-            <span className="mt-1 block text-[11px] font-normal text-faint">In your property currency.</span>
-          </label>
         </div>
 
-        <div className="grid grid-cols-2 gap-5">
-          <label className="block text-[13px] font-semibold text-secondary">
-            Adults
-            <input name="adults" type="number" min={1} defaultValue={rate?.adults ?? 2} className={FIELD_INPUT} />
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Children
-            <input name="children" type="number" min={0} defaultValue={rate?.children ?? 0} className={FIELD_INPUT} />
-          </label>
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[17px] font-semibold">Nightly price per room</div>
+          <p className="mb-3 text-[13px] text-muted">
+            This rate applies to every room you price below — leave a room blank to not offer it
+            there. Occupancy is taken from each room&rsquo;s settings. Prices in your property
+            currency.
+          </p>
+          <div className="overflow-hidden rounded-[12px] border border-line">
+            {rooms.map((r, i) => (
+              <label
+                key={r.id}
+                className={`flex items-center justify-between gap-3 px-4 py-3 ${
+                  i > 0 ? "border-t border-divider" : ""
+                }`}
+              >
+                <span className="text-[14px] font-semibold text-secondary">{r.title}</span>
+                <input
+                  name={`price:${r.id}`}
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={rate?.prices[r.id] ?? ""}
+                  placeholder="—"
+                  className="w-32 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2 text-right text-[15px] text-ink outline-none focus:border-accent"
+                />
+              </label>
+            ))}
+          </div>
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">

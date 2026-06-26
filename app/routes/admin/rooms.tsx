@@ -19,7 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       maxAdults: r.maxAdults,
       maxGuests: r.maxGuests,
       images: r.images.length,
-      rateCount: rates.filter((rt) => rt.roomId === r.id).length,
+      rateCount: rates.filter((rt) => rt.prices[r.id] !== undefined).length,
     })),
   };
 }

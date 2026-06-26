@@ -28,14 +28,12 @@ export interface CatalogRoom {
 
 export interface CatalogRate {
   id: string;
-  roomId: string;
   title: string;
   mealPlan?: string;
-  /** Base price per night in the property currency. */
-  nightlyPrice: number;
-  /** Occupancy this rate is priced for. */
-  adults: number;
-  children: number;
+  /** Base nightly price keyed by room id (in the property currency). A rate is
+   *  offered on a room only when it has a price here, so one rate plan can apply
+   *  to every room at its own price. Occupancy is taken from each room. */
+  prices: Record<string, number>;
   // Cancellation policy (mirrors the structured rate-plan override fields).
   refundable: boolean;
   cancelDeadlineValue?: number;
@@ -44,6 +42,28 @@ export interface CatalogRate {
   inclusions: string[];
   active: boolean;
   createdAt: string;
+}
+
+/** Legacy rates were single-room (`roomId` + one `nightlyPrice`, plus `adults`/
+ *  `children` that the booking flow already ignored in favour of the room). Map
+ *  them onto the per-room `prices` shape on read so old KV data keeps working. */
+function normalizeRate(raw: CatalogRate & { roomId?: string; nightlyPrice?: number }): CatalogRate {
+  if (raw.prices && typeof raw.prices === "object") return raw;
+  const prices: Record<string, number> = {};
+  if (raw.roomId && typeof raw.nightlyPrice === "number") prices[raw.roomId] = raw.nightlyPrice;
+  const { roomId: _r, nightlyPrice: _n, ...rest } = raw as CatalogRate & {
+    roomId?: string;
+    nightlyPrice?: number;
+    adults?: number;
+    children?: number;
+  };
+  return { ...rest, prices };
+}
+
+/** Lowest price across the rooms a rate is offered on (undefined if none). */
+export function rateFromPrice(rate: CatalogRate): number | undefined {
+  const vals = Object.values(rate.prices);
+  return vals.length ? Math.min(...vals) : undefined;
 }
 
 const roomsKey = (pid: string) => `catalog_rooms:${pid}`;
@@ -83,17 +103,22 @@ export async function saveRoom(pid: string, room: CatalogRoom): Promise<void> {
 export async function deleteRoom(pid: string, id: string): Promise<void> {
   const rooms = (await readArr<CatalogRoom>(roomsKey(pid))).filter((r) => r.id !== id);
   await writeArr(roomsKey(pid), rooms);
-  // Cascade: drop rates that belonged to the room.
-  const rates = (await readArr<CatalogRate>(ratesKey(pid))).filter((r) => r.roomId !== id);
+  // Cascade: drop this room's price from every rate (a rate priced for no rooms
+  // simply isn't offered anywhere — the rate plan itself is kept).
+  const rates = (await getRates(pid)).map((r) => {
+    if (r.prices[id] === undefined) return r;
+    const { [id]: _drop, ...prices } = r.prices;
+    return { ...r, prices };
+  });
   await writeArr(ratesKey(pid), rates);
 }
 
 // ---- rates ----
 export async function getRates(pid: string): Promise<CatalogRate[]> {
-  return readArr<CatalogRate>(ratesKey(pid));
+  return (await readArr<CatalogRate>(ratesKey(pid))).map(normalizeRate);
 }
 export async function getRatesForRoom(pid: string, roomId: string): Promise<CatalogRate[]> {
-  return (await getRates(pid)).filter((r) => r.roomId === roomId);
+  return (await getRates(pid)).filter((r) => r.prices[roomId] !== undefined);
 }
 export async function getRate(pid: string, id: string): Promise<CatalogRate | undefined> {
   return (await getRates(pid)).find((r) => r.id === id);
@@ -121,7 +146,7 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
       id: room.id,
       title: room.title,
       rate_plans: rates
-        .filter((r) => r.roomId === room.id && r.active)
+        .filter((r) => r.active && r.prices[room.id] !== undefined)
         .map((r) => ({
           id: r.id,
           title: r.title,
@@ -183,18 +208,20 @@ export async function getCatalogRooms(
       const ratePlans = soldOut
         ? []
         : rates
-            .filter((r) => r.roomId === room.id && r.active)
+            .filter((r) => r.active && r.prices[room.id] !== undefined)
             .map((r): RatePlan | null => {
+              const base = r.prices[room.id];
+              const k = (d: string) => `${room.id}|${r.id}|${d}`;
               if (gate) {
-                if (nightDates.some((d) => inv.restrictions[`${r.id}|${d}`]?.stopSell)) return null;
-                const minStay = (checkinDate && inv.restrictions[`${r.id}|${checkinDate}`]?.minStay) || 1;
+                if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) return null;
+                const minStay = (checkinDate && inv.restrictions[k(checkinDate)]?.minStay) || 1;
                 if (nights < minStay) return null;
-                if (checkinDate && inv.restrictions[`${r.id}|${checkinDate}`]?.cta) return null; // closed to arrival
-                if (checkoutDate && inv.restrictions[`${r.id}|${checkoutDate}`]?.ctd) return null; // closed to departure
+                if (checkinDate && inv.restrictions[k(checkinDate)]?.cta) return null; // closed to arrival
+                if (checkoutDate && inv.restrictions[k(checkoutDate)]?.ctd) return null; // closed to departure
               }
               const raw = nightDates.length
-                ? nightDates.reduce((s, d) => s + (inv.prices[`${r.id}|${d}`] ?? r.nightlyPrice), 0)
-                : r.nightlyPrice * nights;
+                ? nightDates.reduce((s, d) => s + (inv.prices[k(d)] ?? base), 0)
+                : base * nights;
               const total = (Math.round(raw * 100) / 100).toFixed(2);
               return {
                 id: r.id,
@@ -239,7 +266,10 @@ export async function getCalendarAvailability(
   const ratesByRoom = new Map<string, CatalogRate[]>();
   for (const r of rates) {
     if (!r.active) continue;
-    (ratesByRoom.get(r.roomId) ?? ratesByRoom.set(r.roomId, []).get(r.roomId)!).push(r);
+    // A rate is offered on every room it has a price for.
+    for (const roomId of Object.keys(r.prices)) {
+      (ratesByRoom.get(roomId) ?? ratesByRoom.set(roomId, []).get(roomId)!).push(r);
+    }
   }
 
   const closed: string[] = [];
