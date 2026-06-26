@@ -3,11 +3,25 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/users";
 import { requireSuperadmin } from "~/lib/auth.server";
 import { getProperties } from "~/lib/properties.server";
-import { getUsers, isEnvSuperadmin, removeUser, setUserRole } from "~/lib/users.server";
+import { getUsers, isEnvSuperadmin, removeUser, setUserRole, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const me = await requireSuperadmin(request);
-  const [users, properties] = await Promise.all([getUsers(), getProperties()]);
+  let [users, properties] = await Promise.all([getUsers(), getProperties()]);
+  // Reconcile: anyone referenced as a property owner or teammate must have a
+  // user record, so a record lost to an earlier bug (or an owner set outside the
+  // normal sign-in flow) still appears here and can be managed.
+  const known = new Set(users.map((u) => u.email));
+  const referenced = new Set<string>();
+  for (const p of properties) {
+    if (p.owner) referenced.add(p.owner.toLowerCase());
+    for (const m of p.members ?? []) referenced.add(m.toLowerCase());
+  }
+  const missing = [...referenced].filter((e) => !known.has(e));
+  if (missing.length) {
+    await Promise.all(missing.map((e) => upsertUser(e)));
+    users = await getUsers();
+  }
   // property count per owner
   const counts: Record<string, number> = {};
   for (const p of properties) if (p.owner) counts[p.owner] = (counts[p.owner] ?? 0) + 1;

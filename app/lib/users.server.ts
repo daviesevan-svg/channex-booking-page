@@ -68,6 +68,10 @@ export async function getUsers(): Promise<User[]> {
   if (!kv) return [];
   const map = new Map((await listPerKey(kv)).map((u) => [u.email, u]));
   // Fold any not-yet-migrated legacy users into per-key records (per-key wins).
+  // We intentionally do NOT delete the legacy key: KV is eventually consistent,
+  // so removing it before the new per-key writes have propagated to every region
+  // opens a window where a read sees neither and returns an empty list. Keeping
+  // it as a permanent fallback is cheap; removeUser() scrubs it on deletion.
   const legacy = await readLegacy();
   for (const u of legacy) {
     if (!map.has(u.email)) {
@@ -75,8 +79,6 @@ export async function getUsers(): Promise<User[]> {
       await kv.put(userKey(u.email), JSON.stringify(u));
     }
   }
-  // Everyone is per-key now — drop the legacy blob so it can't resurrect anyone.
-  if (legacy.length) await kv.delete(LEGACY_KEY);
   return [...map.values()];
 }
 
