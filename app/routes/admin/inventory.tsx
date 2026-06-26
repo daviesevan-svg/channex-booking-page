@@ -145,6 +145,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   // scroll. Recomputed on resize; SSR/first paint uses DEFAULT_COLS to match.
   const gridRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(DEFAULT_COLS);
+  // Which room's card to show ("all" = every room). Purely a view filter —
+  // hidden cards stay in the DOM so Save still submits their values.
+  const [roomFilter, setRoomFilter] = useState<string>("all");
   const datesLen = loaderData.configured ? loaderData.dates.length : 0;
   useEffect(() => {
     const el = gridRef.current;
@@ -242,38 +245,63 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
           )}
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
+          <div className="ml-auto flex items-center gap-2 text-[13px] font-semibold">
+            <label htmlFor="roomFilter" className="text-muted-2">Show</label>
+            <select
+              id="roomFilter"
+              value={roomFilter}
+              onChange={(e) => setRoomFilter(e.target.value)}
+              className="cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-ink outline-none focus:border-accent"
+            >
+              <option value="all">All rooms</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>{r.title}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div ref={gridRef} className="overflow-hidden rounded-[14px] border border-line bg-surface">
-          <table className="w-full table-fixed border-collapse text-[13px]">
-            <colgroup>
-              <col style={{ width: 200 }} />
-              {shown.map((d) => (
-                <col key={d} />
-              ))}
-            </colgroup>
-            <thead>
-              <tr>
-                <th className={`${labelCell} ${headCell}`} />
-                {shown.map((d) => (
-                  <th key={d} className={`${headCell} ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
-                    <div>{format(parseISO(d), "EEE")}</div>
-                    <div className="text-[13px] font-bold text-ink">{format(parseISO(d), "d")}</div>
-                    <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM")}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rooms.map((room) => {
-                const roomRates = rates.filter((r) => r.prices[room.id] !== undefined);
-                return (
-                  <>
+        <div ref={gridRef} className="flex flex-col gap-5">
+          {rooms.map((room) => {
+            const roomRates = rates.filter((r) => r.prices[room.id] !== undefined);
+            // Hidden (not unmounted) when filtered out, so inputs still submit.
+            const hidden = roomFilter !== "all" && roomFilter !== room.id;
+            return (
+              <div
+                key={room.id}
+                hidden={hidden}
+                className="overflow-hidden rounded-[14px] border border-line bg-surface"
+              >
+                <div className="flex items-center justify-between gap-3 border-b border-divider bg-surface-alt/50 px-4 py-3">
+                  <div className="font-serif text-[16px] font-semibold">{room.title}</div>
+                  <div className="text-[12px] text-muted-2">
+                    {roomRates.length} rate{roomRates.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <table className="w-full table-fixed border-collapse text-[13px]">
+                  <colgroup>
+                    <col style={{ width: 200 }} />
+                    {shown.map((d) => (
+                      <col key={d} />
+                    ))}
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th className={`${labelCell} ${headCell}`} />
+                      {shown.map((d) => (
+                        <th key={d} className={`${headCell} ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
+                          <div>{format(parseISO(d), "EEE")}</div>
+                          <div className="text-[13px] font-bold text-ink">{format(parseISO(d), "d")}</div>
+                          <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM")}</div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
                     {/* Room availability row */}
-                    <tr key={room.id} className="border-t border-divider bg-surface-alt/40">
+                    <tr className="border-t border-divider bg-surface-alt/40">
                       <td className={`${labelCell} bg-surface-alt/40 font-semibold`}>
-                        {room.title}
-                        <div className="text-[11px] font-normal text-muted-2">Availability</div>
+                        Availability
                       </td>
                       {shown.map((d) => (
                         <td key={d} className={`px-1.5 py-1.5 ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
@@ -329,11 +357,20 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                         })}
                       </tr>
                     ))}
-                  </>
-                );
-              })}
-            </tbody>
-          </table>
+                    {roomRates.length === 0 && (
+                      <tr className="border-t border-divider/60">
+                        <td className={labelCell} colSpan={shown.length + 1}>
+                          <span className="text-[12px] text-muted-2">
+                            No rates priced for this room yet.
+                          </span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })}
         </div>
       </Form>
     </div>
