@@ -191,7 +191,9 @@ export async function getCatalogRooms(
   const daysAhead = checkinDate
     ? differenceInCalendarDays(parseISO(checkinDate), parseISO(format(new Date(), "yyyy-MM-dd")))
     : 0;
-  const offer = checkinDate ? bestAutoOffer(promotions, { daysAhead, nights }) : null;
+  const offer = checkinDate
+    ? bestAutoOffer(promotions, { daysAhead, nights, checkin: checkinDate, checkout: checkoutDate })
+    : null;
   const currency = cur || "GBP";
   // The nights occupied by the stay: checkin .. checkout-1.
   const nightDates = checkinDate
