@@ -14,7 +14,7 @@ import {
   type ExtraOption,
   type ExtraUnit,
 } from "~/lib/extras";
-import { deleteExtra, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
+import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
 
 const UNITS: ExtraUnit[] = ["stay", "night", "person", "trip"];
 
@@ -62,6 +62,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
+  // Seed example extras on first visit so owners start from something editable.
+  await ensureExampleExtras(propertyId);
   const [extras, settings] = await Promise.all([getExtras(propertyId), getSettings(propertyId)]);
   const editId = new URL(request.url).searchParams.get("edit");
   return {

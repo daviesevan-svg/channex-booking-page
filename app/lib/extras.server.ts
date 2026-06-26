@@ -52,3 +52,82 @@ export async function toggleExtra(pid: string, id: string): Promise<void> {
   e.active = !e.active;
   await writeExtras(pid, list);
 }
+
+const seededKey = (pid: string) => `extras_seeded:${pid}`;
+
+/** Seed a starter set of example extras the first time a property's Extras page
+ *  is opened, so owners have something to edit/delete rather than a blank page.
+ *  Guarded by a one-time marker: once seeded (or if the catalog already has
+ *  extras), it never seeds again — deleting all examples won't bring them back. */
+export async function ensureExampleExtras(pid: string): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  if (await kv.get(seededKey(pid))) return;
+  const existing = await getExtras(pid);
+  await kv.put(seededKey(pid), "1");
+  if (existing.length > 0) return; // never overwrite an owner's own extras
+
+  const now = new Date().toISOString();
+  const examples: Extra[] = [
+    {
+      id: crypto.randomUUID(),
+      name: "Daily breakfast",
+      desc: "Full breakfast served each morning of your stay.",
+      unit: "night",
+      price: 24,
+      active: true,
+      position: 0,
+      createdAt: now,
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Parking",
+      desc: "Secure on-site parking for one vehicle.",
+      unit: "night",
+      price: 15,
+      active: true,
+      position: 1,
+      createdAt: now,
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Champagne on arrival",
+      desc: "A chilled bottle of brut Champagne waiting in your room.",
+      unit: "stay",
+      price: 55,
+      active: true,
+      position: 2,
+      createdAt: now,
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Late checkout (2pm)",
+      desc: "Keep your room until 2pm on departure day — no rush.",
+      unit: "stay",
+      price: 30,
+      active: true,
+      position: 3,
+      createdAt: now,
+    },
+    {
+      id: crypto.randomUUID(),
+      name: "Airport pickup",
+      desc: "Private door-to-door transfer with meet & greet at arrivals.",
+      unit: "trip",
+      infoTitle: "Flight details",
+      options: [
+        { id: "car", name: "Private car · 1–4 guests", price: 65, desc: "Comfortable saloon, room for luggage." },
+        { id: "van", name: "Private van · 5–8 guests", price: 95, desc: "Spacious minivan, ideal for groups." },
+        { id: "sedan", name: "Luxury sedan · 1–3 guests", price: 120, desc: "Premium Mercedes E-Class." },
+      ],
+      fields: [
+        { id: "flight", label: "Flight number", short: "Flight", placeholder: "e.g. EI 462", required: true },
+        { id: "arrival", label: "Expected arrival time", short: "Arr", placeholder: "e.g. 14:30", required: false },
+      ],
+      active: true,
+      position: 4,
+      createdAt: now,
+    },
+  ];
+  await writeExtras(pid, examples);
+}
