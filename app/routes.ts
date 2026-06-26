@@ -18,6 +18,7 @@ export default [
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
+    route("users", "routes/admin/users.tsx"),
     route("select-property", "routes/admin/select-property.tsx"),
     route("general", "routes/admin/general.tsx"),
     route("portal", "routes/admin/portal.tsx"),

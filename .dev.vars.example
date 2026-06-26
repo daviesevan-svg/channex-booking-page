@@ -6,7 +6,8 @@ PCI_URL="https://pci.vaultera.co"
 GOOGLE_MAP_KEY=""
 ALLOW_LIVE_BOOKING="false"
 # Admin (magic-link login)
-ADMIN_EMAILS="you@example.com"          # comma-separated allowlist
+ADMIN_EMAILS="you@example.com"          # comma-separated login allowlist; empty = open self-signup
+SUPERADMIN_EMAILS="you@example.com"     # see every property + manage users; empty bootstraps first user
 SESSION_SECRET="change-me-to-a-long-random-string"
 APP_URL="http://localhost:5173"         # used to build magic links
 RESEND_API_KEY=""                       # set to send real emails (else link shown on screen)

@@ -3,7 +3,8 @@ import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getProperties } from "~/lib/properties.server";
+import { currentPropertyId, getVisibleProperties } from "~/lib/properties.server";
+import { isSuperadmin } from "~/lib/users.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 
@@ -14,12 +15,17 @@ export interface AdminContext {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
-  const [propertyId, properties] = await Promise.all([currentPropertyId(request), getProperties()]);
+  const [propertyId, properties, superadmin] = await Promise.all([
+    currentPropertyId(request),
+    getVisibleProperties(request),
+    isSuperadmin(email),
+  ]);
   const settings = propertyId ? await getSettings(propertyId) : {};
   return {
     email,
     propertyId,
     properties,
+    isSuperadmin: superadmin,
     lang: langParam(request),
     languages: enabledLanguages(settings),
   };
@@ -31,7 +37,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, properties, lang, languages } = loaderData;
+  const { email, propertyId, properties, isSuperadmin, lang, languages } = loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
   const { pathname } = useLocation();
@@ -122,6 +128,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
           {[
             { to: "/admin/properties", label: "Properties", end: false },
+            ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
             { to: "/admin", label: "Property details", end: true },
             { to: "/admin/general", label: "General", end: false },
             { to: "/admin/portal", label: "Customer Portal", end: false },

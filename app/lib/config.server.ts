@@ -14,6 +14,9 @@ export interface AppConfig extends ChannexConfig {
   defaultPropertyId?: string;
   /** Admin */
   adminEmails: string[];
+  /** Platform superadmins: see every property + manage users. Bootstraps the
+   *  first superadmin; roles can also be granted from the Users page. */
+  superadminEmails: string[];
   sessionSecret: string;
   appUrl: string;
   resendApiKey?: string;
@@ -43,6 +46,10 @@ export function getConfig(): AppConfig {
     allowLiveBooking: read("ALLOW_LIVE_BOOKING") === "true",
     defaultPropertyId: read("DEFAULT_PROPERTY_ID") || undefined,
     adminEmails: read("ADMIN_EMAILS")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+    superadminEmails: read("SUPERADMIN_EMAILS")
       .split(",")
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),

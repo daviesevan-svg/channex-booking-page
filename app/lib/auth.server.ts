@@ -1,6 +1,7 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
 import { getConfig } from "./config.server";
+import { isSuperadmin, upsertUser } from "./users.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -75,6 +76,8 @@ function sessionStorage() {
 }
 
 export async function createAdminSession(email: string, redirectTo: string) {
+  // First sign-in creates the user record (member by default).
+  await upsertUser(email);
   const storage = sessionStorage();
   const session = await storage.getSession();
   session.set("email", email.toLowerCase());
@@ -93,6 +96,13 @@ export async function getAdminEmail(request: Request): Promise<string | null> {
 export async function requireAdmin(request: Request): Promise<string> {
   const email = await getAdminEmail(request);
   if (!email) throw redirect("/admin/login");
+  return email;
+}
+
+/** Requires the signed-in user to be a superadmin; bounces members to /admin. */
+export async function requireSuperadmin(request: Request): Promise<string> {
+  const email = await requireAdmin(request);
+  if (!(await isSuperadmin(email))) throw redirect("/admin");
   return email;
 }
 

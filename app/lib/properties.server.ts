@@ -2,9 +2,10 @@
 // keyed by property id (catalog_rooms:{id}, settings:{id}, …); this just tracks
 // which ids exist and which one the admin is currently editing (stored in the
 // signed admin session). User accounts / per-user access come later.
-import { getSessionProperty } from "./auth.server";
+import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
 import { getOverrides } from "./overrides.server";
+import { isSuperadmin } from "./users.server";
 
 export interface PropertyRef {
   id: string;
@@ -12,6 +13,9 @@ export interface PropertyRef {
   /** Listed on the public root picker. Opt-in so staging/test properties stay
    *  off the public page; the seeded default property is public. */
   public?: boolean;
+  /** Email of the user who owns (can see/edit) this property. Ownerless =
+   *  legacy/unclaimed → visible to superadmins only. */
+  owner?: string;
 }
 
 const KEY = "properties";
@@ -52,14 +56,45 @@ export async function getPublicProperties(): Promise<PropertyRef[]> {
   return (await getProperties()).filter((p) => p.public);
 }
 
-export async function addProperty(id: string, name: string): Promise<PropertyRef> {
+export async function addProperty(
+  id: string,
+  name: string,
+  owner?: string,
+): Promise<PropertyRef> {
   const list = await getProperties();
-  const ref: PropertyRef = { id, name: name.trim() || "Untitled property" };
+  const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner };
   if (!list.some((p) => p.id === id)) {
     list.push(ref);
     await write(list);
   }
   return ref;
+}
+
+/** Assigns (or clears) the owner of a property. Superadmin-only at the route. */
+export async function setPropertyOwner(id: string, owner: string | undefined): Promise<void> {
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (p) {
+    p.owner = owner;
+    await write(list);
+  }
+}
+
+/** Properties the signed-in user may see/edit: superadmins see all; members see
+ *  only the ones they own. This is the isolation chokepoint — every admin route
+ *  resolves its active property through currentPropertyId(), which is scoped to
+ *  this list. */
+export async function getVisibleProperties(request: Request): Promise<PropertyRef[]> {
+  const email = await getAdminEmail(request);
+  if (!email) return [];
+  const list = await getProperties();
+  if (await isSuperadmin(email)) return list;
+  return list.filter((p) => p.owner === email);
+}
+
+/** Whether the signed-in user may act on a specific property. */
+export async function canAccess(request: Request, id: string): Promise<boolean> {
+  return (await getVisibleProperties(request)).some((p) => p.id === id);
 }
 
 export async function renameProperty(id: string, name: string): Promise<void> {
@@ -88,10 +123,12 @@ export async function removeProperty(id: string): Promise<void> {
 }
 
 /** The property the admin is currently editing: the session selection if it's
- *  still a valid property, else the first registered (or DEFAULT_PROPERTY_ID). */
+ *  one they can access, else the first property visible to them. Returns
+ *  undefined when the user owns no properties (new self-signup). Scoping here
+ *  isolates every admin route that resolves its property through this. */
 export async function currentPropertyId(request: Request): Promise<string | undefined> {
-  const list = await getProperties();
+  const list = await getVisibleProperties(request);
   const selected = await getSessionProperty(request);
   if (selected && list.some((p) => p.id === selected)) return selected;
-  return list[0]?.id ?? getConfig().defaultPropertyId;
+  return list[0]?.id;
 }

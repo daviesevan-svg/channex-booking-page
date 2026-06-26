@@ -20,7 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
-  if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID is configured." };
+  if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
   await saveOverrides(propertyId, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));
   return { ok: true };
@@ -39,8 +39,11 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       <div className="rounded-[14px] border border-line bg-surface p-6">
         <h1 className="mb-2 font-serif text-[22px] font-semibold">Property details</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to edit a
-          property here.
+          Add a property on the{" "}
+          <a href="/admin/properties" className="font-semibold text-accent hover:underline">
+            Properties
+          </a>{" "}
+          page to get started.
         </p>
       </div>
     );

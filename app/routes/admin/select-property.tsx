@@ -2,6 +2,7 @@ import { redirect } from "react-router";
 
 import type { Route } from "./+types/select-property";
 import { requireAdmin, setSessionProperty } from "~/lib/auth.server";
+import { canAccess } from "~/lib/properties.server";
 
 // Resource route: the header switcher posts here to change which property the
 // admin is editing, then bounces back to where they were.
@@ -11,7 +12,9 @@ export async function action({ request }: Route.ActionArgs) {
   const id = String(form.get("propertyId") || "");
   const back = String(form.get("redirectTo") || "/admin");
   const safeBack = back.startsWith("/admin") ? back : "/admin";
-  if (!id) return redirect(safeBack);
+  // Only switch to a property the user can access — a member can't jump to
+  // someone else's property by posting an arbitrary id.
+  if (!id || !(await canAccess(request, id))) return redirect(safeBack);
   return redirect(safeBack, { headers: { "Set-Cookie": await setSessionProperty(request, id) } });
 }
 
