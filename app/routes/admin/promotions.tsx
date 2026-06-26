@@ -27,12 +27,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const [promotions, settings] = await Promise.all([getPromotions(propertyId), getSettings(propertyId)]);
-  const editId = new URL(request.url).searchParams.get("edit");
+  const url = new URL(request.url);
+  const editId = url.searchParams.get("edit");
   return {
     configured: true as const,
     promotions,
     currency: settings.currency || "GBP",
     editing: promotions.find((p) => p.id === editId) ?? null,
+    creating: url.searchParams.get("new") != null,
   };
 }
 
@@ -166,10 +168,13 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
     );
   }
 
-  const { promotions, currency, editing } = loaderData;
+  const { promotions, currency, editing, creating } = loaderData;
   const v = actionData && "values" in actionData ? actionData.values : undefined;
   const cur = (k: keyof NonNullable<typeof v>, fallback = "") => (v?.[k] as string | undefined) ?? fallback;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
+  // Show the form for the first promotion, when editing, or when "New
+  // promotion" was clicked. Otherwise show an "Add promotion" button instead.
+  const showForm = !!editing || creating || promotions.length === 0;
 
   const [trigger, setTrigger] = useState<PromoTrigger>(
     (v?.trigger as PromoTrigger) ?? editing?.trigger ?? "code",
@@ -186,7 +191,19 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
         offers show their discounted price as guests browse.
       </p>
 
+      {!showForm && (
+        <div className="mb-7">
+          <Link
+            to="/admin/promotions?new=1"
+            className="inline-block rounded-[10px] bg-accent px-5 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
+          >
+            + New promotion
+          </Link>
+        </div>
+      )}
+
       {/* create / edit form */}
+      {showForm && (
       <Form
         method="post"
         key={editing?.id ?? "new"}
@@ -199,9 +216,9 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           <h2 className="font-serif text-[18px] font-semibold">
             {editing ? "Edit promotion" : "New promotion"}
           </h2>
-          {editing && (
+          {(editing || creating) && (
             <Link to="/admin/promotions" className="text-[13px] font-semibold text-muted hover:text-accent">
-              Cancel edit
+              Cancel
             </Link>
           )}
         </div>
@@ -380,6 +397,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           </button>
         </div>
       </Form>
+      )}
 
       {/* list */}
       {promotions.length === 0 ? (
