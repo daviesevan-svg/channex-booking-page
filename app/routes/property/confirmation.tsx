@@ -12,6 +12,8 @@ import { getPageText, getSettings } from "~/lib/overrides.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { getCatalogRooms } from "~/lib/catalog.server";
+import { getActiveExtras } from "~/lib/extras.server";
+import { extrasTotal, parseExtras, resolveExtras } from "~/lib/extras";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -74,6 +76,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
 
+  const guests = occ.adults + (occ.childrenAge?.length ?? 0);
+  const extraLines =
+    checkin && checkout
+      ? resolveExtras(await getActiveExtras(params.channelId), parseExtras(url.searchParams), nights, guests)
+      : [];
+  const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
+
   return {
     reference: params.ref,
     simulated,
@@ -84,6 +93,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     promoCode: applied?.code ?? null,
     offer,
     pricing,
+    extraLines,
+    grandTotal,
     checkin,
     checkout,
     nights,
@@ -94,7 +105,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, currency, total, discount, promoCode, offer, pricing, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, rooms, currency, total, discount, promoCode, offer, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -195,11 +206,21 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
                 <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
               </div>
             ))}
+          {extraLines.map((l) => (
+            <div key={l.id} className="flex justify-between">
+              <span className="text-secondary">
+                {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
+                {l.qty > 1 ? ` ×${l.qty}` : ""}
+                {l.infoLine ? <span className="block text-[12px] text-muted-2">{l.infoLine}</span> : null}
+              </span>
+              <span className="font-semibold">{formatMoney(l.amount, currency)}</span>
+            </div>
+          ))}
           {total > 0 && (
             <div className="flex items-baseline justify-between border-t border-divider pt-3">
               <span className="text-secondary">{tr.t("total")}</span>
               <span className="font-serif text-[24px] font-semibold">
-                {formatMoney(pricing.total, currency)}
+                {formatMoney(grandTotal, currency)}
               </span>
             </div>
           )}

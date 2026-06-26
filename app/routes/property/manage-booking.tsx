@@ -188,6 +188,23 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             </div>
           ))}
         </div>
+        {b.extras && b.extras.length > 0 && (
+          <div className="mt-3 flex flex-col gap-1.5 border-t border-divider pt-3">
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+            {b.extras.map((x, i) => (
+              <div key={i} className="flex items-start justify-between gap-3 text-[14px]">
+                <div className="min-w-0">
+                  <span>
+                    {x.optionName ? `${x.name} · ${x.optionName}` : x.name}
+                    {x.qty > 1 ? ` ×${x.qty}` : ""}
+                  </span>
+                  {x.infoLine && <div className="text-[12px] text-muted-2">{x.infoLine}</div>}
+                </div>
+                <span className="whitespace-nowrap font-semibold">{formatMoney(x.amount, cur)}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {b.offer && (
           <div className="mt-3 flex justify-between text-[14px] text-[#3f7a52]">
             <span>

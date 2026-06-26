@@ -2,6 +2,7 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { CancellationSnapshot } from "./policy.server";
 import type { AppliedPromo } from "./promotions";
+import type { ResolvedExtra } from "./extras";
 import { getConfigKV } from "./config.server";
 
 /** Per-(room, night) availability units a stay occupies — for decrement on
@@ -68,6 +69,8 @@ export interface BookingRecord {
     requests?: string;
   };
   rooms: BookingRoom[];
+  /** Extras ("Enhance your stay") purchased, priced at booking time. */
+  extras?: ResolvedExtra[];
 }
 
 const bookingsKey = (pid: string) => `bookings:${pid}`;
