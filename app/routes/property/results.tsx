@@ -332,7 +332,8 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   const onRemove = (index: number) => go(serializeCart(removeIndex(cart, index)));
   const onContinue = () => {
     setContinuePending(true);
-    navigate(`/${params.channelId}/checkout?${searchParams.toString()}`);
+    // Insert the "Enhance your stay" (extras) step before checkout.
+    navigate(`/${params.channelId}/extras?${searchParams.toString()}`);
   };
 
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });

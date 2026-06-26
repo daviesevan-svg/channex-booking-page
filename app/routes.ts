@@ -42,6 +42,7 @@ export default [
     index("routes/property/search.tsx"),
     route("rooms", "routes/property/results.tsx"),
     route("rooms/:roomId", "routes/property/detail.tsx"),
+    route("extras", "routes/property/extras.tsx"),
     route("checkout", "routes/property/checkout.tsx"),
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
     route("manage", "routes/property/manage.tsx"),

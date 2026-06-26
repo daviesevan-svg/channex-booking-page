@@ -22,6 +22,8 @@ import {
 import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
+import { getActiveExtras } from "~/lib/extras.server";
+import { extrasTotal, parseExtras, resolveExtras } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
@@ -116,6 +118,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
   const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
+  // Extras ("Enhance your stay") carried in the URL, re-priced from the catalog.
+  const guests = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
+  const extraLines = resolveExtras(await getActiveExtras(params.channelId), parseExtras(url.searchParams), nights, guests);
   return {
     stay,
     lines: linesView,
@@ -125,6 +130,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     offer,
     text,
     urlPromo,
+    extraLines,
+    extrasSum: extrasTotal(extraLines),
     taxConfig: taxConfigFrom(settings),
   };
 }
@@ -194,6 +201,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee },
     taxConfigFrom(settings),
   );
+  // Extras are re-priced server-side and added on top of the (taxed) room total.
+  const guests = adults + children;
+  const extraLines = resolveExtras(await getActiveExtras(stay.channelId), parseExtras(url.searchParams), nights, guests);
+  const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
 
   // Open Channel booking payload. Each room's (promo-adjusted) total is spread
   // across the stay nights as days[], so the price we send is exactly what we
@@ -270,9 +281,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     checkin: stay.checkin,
     checkout: stay.checkout,
     nights,
-    total: pricing.total,
+    total: grandTotal,
     promo: applied ?? undefined,
     offer: offer ?? undefined,
+    extras: extraLines.length ? extraLines : undefined,
     inventoryHeld: status !== "failed",
     guest: {
       firstName: g.firstName,
@@ -346,7 +358,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, extrasSum } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -375,7 +387,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     { base: discountedRoom, nights, adults, children, rooms: lines.length, cleaningFee },
     loaderData.taxConfig,
   );
-  const grandTotal = pricing.total;
+  const grandTotal = Math.round((pricing.total + extrasSum) * 100) / 100;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -510,6 +522,24 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               <p className="mt-1.5 text-[12px] text-[#3f7a52]">{tr.t("promoApplied")}</p>
             )}
           </div>
+
+          {extraLines.length > 0 && (
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+              {extraLines.map((l) => (
+                <div key={l.id} className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span>
+                      {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
+                      {l.qty > 1 ? ` ×${l.qty}` : ""}
+                    </span>
+                    {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
+                  </div>
+                  <span className="whitespace-nowrap font-semibold">{formatMoney(l.amount, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {(pricing.charges.length > 0 || pricing.taxLines.length > 0) && (
             <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
