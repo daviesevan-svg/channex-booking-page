@@ -9,6 +9,7 @@ import {
   getProperties,
   removeProperty,
   renameProperty,
+  setPropertyPublic,
 } from "~/lib/properties.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -37,6 +38,10 @@ export async function action({ request }: Route.ActionArgs) {
     await removeProperty(String(form.get("id")));
     return redirect("/admin/properties");
   }
+  if (intent === "togglePublic") {
+    await setPropertyPublic(String(form.get("id")), form.get("public") === "on");
+    return redirect("/admin/properties");
+  }
   if (intent === "switch") {
     return redirect("/admin", {
       headers: { "Set-Cookie": await setSessionProperty(request, String(form.get("id"))) },
@@ -59,7 +64,8 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
       <h1 className="mb-1 font-serif text-[26px] font-semibold">Properties</h1>
       <p className="mb-6 text-[14px] text-muted">
         Each property has its own rooms, rates, inventory, taxes, content and bookings. Use the
-        switcher in the header (or “Edit” below) to choose which one you’re managing.
+        switcher in the header (or “Edit” below) to choose which one you’re managing. Mark a
+        property <strong>Public</strong> to list it on the booking-engine home page.
       </p>
 
       {/* list */}
@@ -83,6 +89,22 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
               <div className="mt-0.5 font-mono text-[12px] text-muted-2">{p.id}</div>
             </div>
             <div className="flex flex-none items-center gap-3 text-[13px] font-semibold">
+              <Form method="post" title={p.public ? "Listed on the public home page" : "Hidden from the public home page"}>
+                <input type="hidden" name="intent" value="togglePublic" />
+                <input type="hidden" name="id" value={p.id} />
+                {/* flips the current value: send "on" only when turning it public */}
+                {!p.public && <input type="hidden" name="public" value="on" />}
+                <button
+                  type="submit"
+                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                    p.public
+                      ? "bg-[#e8f0e6] text-[#3f7a52] hover:bg-[#dbe8d8]"
+                      : "bg-chip text-muted hover:bg-line"
+                  }`}
+                >
+                  {p.public ? "Public" : "Private"}
+                </button>
+              </Form>
               <Link to={`/${p.id}`} target="_blank" className="text-muted hover:text-accent">
                 View ↗
               </Link>

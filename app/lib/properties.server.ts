@@ -9,6 +9,9 @@ import { getOverrides } from "./overrides.server";
 export interface PropertyRef {
   id: string;
   name: string;
+  /** Listed on the public root picker. Opt-in so staging/test properties stay
+   *  off the public page; the seeded default property is public. */
+  public?: boolean;
 }
 
 const KEY = "properties";
@@ -39,9 +42,14 @@ export async function getProperties(): Promise<PropertyRef[]> {
   const def = getConfig().defaultPropertyId;
   if (!def) return [];
   const ov = await getOverrides(def);
-  const seeded: PropertyRef[] = [{ id: def, name: ov.hotelName || "Property 1" }];
+  const seeded: PropertyRef[] = [{ id: def, name: ov.hotelName || "Property 1", public: true }];
   await write(seeded);
   return seeded;
+}
+
+/** Properties shown on the public root picker (opt-in via the `public` flag). */
+export async function getPublicProperties(): Promise<PropertyRef[]> {
+  return (await getProperties()).filter((p) => p.public);
 }
 
 export async function addProperty(id: string, name: string): Promise<PropertyRef> {
@@ -59,6 +67,16 @@ export async function renameProperty(id: string, name: string): Promise<void> {
   const p = list.find((x) => x.id === id);
   if (p && name.trim()) {
     p.name = name.trim();
+    await write(list);
+  }
+}
+
+/** Toggles whether a property is listed on the public root picker. */
+export async function setPropertyPublic(id: string, isPublic: boolean): Promise<void> {
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (p) {
+    p.public = isPublic;
     await write(list);
   }
 }
