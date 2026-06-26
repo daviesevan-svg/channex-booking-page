@@ -1,6 +1,13 @@
 // User registry for the multi-tenant admin. A "user" is just an email that has
 // signed in via magic link (no passwords). Members see only the properties they
 // own (see properties.server.ts); superadmins see everything and manage users.
+//
+// Each user is stored under its OWN key (`user:{email}`) rather than in a single
+// JSON blob. Cloudflare KV is eventually consistent and "concurrent writes to
+// the same key … overwrite one another" — so a shared list would silently drop a
+// user when two people sign in at once. Per-key writes never touch the same key,
+// so concurrent sign-ins are safe. The old single-blob `users` key is migrated
+// into per-key records on read (see getUsers) and then removed.
 import { getConfig, getConfigKV } from "./config.server";
 
 export type Role = "member" | "superadmin";
@@ -11,12 +18,26 @@ export interface User {
   createdAt: number;
 }
 
-const KEY = "users";
+const LEGACY_KEY = "users"; // pre-migration single-blob list
+const PREFIX = "user:";
+const norm = (email: string) => email.trim().toLowerCase();
+const userKey = (email: string) => `${PREFIX}${norm(email)}`;
 
-async function read(): Promise<User[]> {
+function parse(raw: string | null): User | undefined {
+  if (!raw) return undefined;
+  try {
+    const u = JSON.parse(raw);
+    return u && typeof u.email === "string" ? (u as User) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Reads the legacy single-blob list (only present until migrated away). */
+async function readLegacy(): Promise<User[]> {
   const kv = getConfigKV();
   if (!kv) return [];
-  const raw = await kv.get(KEY);
+  const raw = await kv.get(LEGACY_KEY);
   if (!raw) return [];
   try {
     const arr = JSON.parse(raw);
@@ -26,70 +47,104 @@ async function read(): Promise<User[]> {
   }
 }
 
-async function write(list: User[]): Promise<void> {
-  const kv = getConfigKV();
-  if (kv) await kv.put(KEY, JSON.stringify(list));
+/** Lists every per-key user record. */
+async function listPerKey(kv: KVNamespace): Promise<User[]> {
+  const out: User[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await kv.list({ prefix: PREFIX, cursor });
+    const raws = await Promise.all(res.keys.map((k) => kv.get(k.name)));
+    for (const raw of raws) {
+      const u = parse(raw);
+      if (u) out.push(u);
+    }
+    cursor = res.list_complete ? undefined : res.cursor;
+  } while (cursor);
+  return out;
 }
 
-const norm = (email: string) => email.trim().toLowerCase();
-
 export async function getUsers(): Promise<User[]> {
-  return read();
+  const kv = getConfigKV();
+  if (!kv) return [];
+  const map = new Map((await listPerKey(kv)).map((u) => [u.email, u]));
+  // Fold any not-yet-migrated legacy users into per-key records (per-key wins).
+  const legacy = await readLegacy();
+  for (const u of legacy) {
+    if (!map.has(u.email)) {
+      map.set(u.email, u);
+      await kv.put(userKey(u.email), JSON.stringify(u));
+    }
+  }
+  // Everyone is per-key now — drop the legacy blob so it can't resurrect anyone.
+  if (legacy.length) await kv.delete(LEGACY_KEY);
+  return [...map.values()];
 }
 
 export async function getUser(email: string): Promise<User | undefined> {
+  const kv = getConfigKV();
+  if (!kv) return undefined;
+  const own = parse(await kv.get(userKey(email)));
+  if (own) return own;
+  // Fallback for a user not yet migrated off the legacy blob.
   const e = norm(email);
-  return (await read()).find((u) => u.email === e);
+  return (await readLegacy()).find((u) => u.email === e);
 }
 
 /** Ensures a user record exists (created as a member). Called on every login so
  *  the Users page reflects everyone who has signed in. */
 export async function upsertUser(email: string): Promise<User> {
-  const e = norm(email);
-  const list = await read();
-  let user = list.find((u) => u.email === e);
-  if (!user) {
-    user = { email: e, role: "member", createdAt: Date.now() };
-    list.push(user);
-    await write(list);
-  }
+  const existing = await getUser(email);
+  if (existing) return existing;
+  const user: User = { email: norm(email), role: "member", createdAt: Date.now() };
+  const kv = getConfigKV();
+  if (kv) await kv.put(userKey(email), JSON.stringify(user));
   return user;
 }
 
 export async function setUserRole(email: string, role: Role): Promise<void> {
-  const e = norm(email);
-  const list = await read();
-  const u = list.find((x) => x.email === e);
-  if (u) {
-    u.role = role;
-    await write(list);
-  }
+  const u = await getUser(email);
+  if (!u) return;
+  const kv = getConfigKV();
+  if (kv) await kv.put(userKey(email), JSON.stringify({ ...u, role }));
 }
 
 /** Removes a user record. Their properties are left in place (ownerless), so a
  *  superadmin can reassign them. */
 export async function removeUser(email: string): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  await kv.delete(userKey(email));
+  // Scrub from any not-yet-migrated legacy blob so the merge can't bring them back.
   const e = norm(email);
-  await write((await read()).filter((u) => u.email !== e));
+  const legacy = await readLegacy();
+  if (legacy.some((u) => u.email === e)) {
+    await kv.put(LEGACY_KEY, JSON.stringify(legacy.filter((u) => u.email !== e)));
+  }
+}
+
+/** Whether any stored (non-env) superadmin exists. */
+async function hasStoredSuperadmin(): Promise<boolean> {
+  return (await getUsers()).some((u) => u.role === "superadmin");
 }
 
 /** True once any superadmin exists — via env list or a stored superadmin record. */
 export async function hasAnySuperadmin(): Promise<boolean> {
   if (getConfig().superadminEmails.length > 0) return true;
-  return (await read()).some((u) => u.role === "superadmin");
+  return hasStoredSuperadmin();
 }
 
 /** Effective superadmin check. No-lockout bootstrap: while NO superadmin exists
  *  anywhere, every signed-in user is treated as a superadmin (mirrors the
  *  "empty ADMIN_EMAILS = open" posture) so a fresh deploy is never locked out. */
 export async function isSuperadmin(email: string): Promise<boolean> {
-  const e = norm(email);
-  if (getConfig().superadminEmails.includes(e)) return true;
-  const list = await read();
-  if (!list.some((u) => u.role === "superadmin") && getConfig().superadminEmails.length === 0) {
-    return true; // bootstrap: nobody is superadmin yet
-  }
-  return list.some((u) => u.email === e && u.role === "superadmin");
+  const { superadminEmails } = getConfig();
+  if (superadminEmails.includes(norm(email))) return true;
+  const u = await getUser(email);
+  if (u?.role === "superadmin") return true;
+  // Bootstrap only applies when no env superadmin is configured at all — this is
+  // the only path that scans all users, and it stops once a superadmin exists.
+  if (superadminEmails.length === 0 && !(await hasStoredSuperadmin())) return true;
+  return false;
 }
 
 /** True if this user's superadmin status comes from the env list (can't be
