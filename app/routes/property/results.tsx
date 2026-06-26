@@ -3,11 +3,9 @@ import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/results";
-import type { RatePlan, RoomWithRates } from "~/lib/channex/types";
+import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
-import { RateDetailsModal } from "~/components/rate-details-modal";
 import {
-  addLine,
   cartCoverage,
   cartCovers,
   parseCart,
@@ -95,9 +93,6 @@ function RoomCard({
   party,
   channelId,
   qs,
-  onAdd,
-  pending,
-  disabled,
   inCart,
 }: {
   room: EnrichedRoom;
@@ -107,9 +102,6 @@ function RoomCard({
   party: number;
   channelId: string;
   qs: string;
-  onAdd: (rateId: string) => void;
-  pending: boolean;
-  disabled: boolean;
   inCart: number;
 }) {
   const tr = useT();
@@ -119,13 +111,13 @@ function RoomCard({
   const sorted = ratePlansForParty(room, party).sort(
     (a, b) => Number(a.totalPrice) - Number(b.totalPrice),
   );
-  const [rateId, setRateId] = useState(sorted[0]?.id);
-  const [showDetails, setShowDetails] = useState(false);
-  const chosen: RatePlan | undefined = sorted.find((r) => r.id === rateId) ?? sorted[0];
-  const perNight = chosen ? Number(chosen.totalPrice) / nights : 0;
+  // The card is a summary; the guest picks a rate on the room detail page.
+  const cheapest = sorted[0];
+  const perNight = cheapest ? Number(cheapest.totalPrice) / nights : 0;
   const photo = room.photos?.[0]?.url;
   const amenities = (room.facilities ?? []).slice(0, 4);
   const { capacity } = roomCapacity(room);
+  const detailHref = `/${channelId}/rooms/${room.id}?${qs}`;
 
   return (
     <div
@@ -133,10 +125,7 @@ function RoomCard({
         isBestMatch ? "ring-2 ring-accent" : ""
       }`}
     >
-      <Link
-        to={`/${channelId}/rooms/${room.id}?${qs}`}
-        className="relative min-h-[200px] w-[230px] flex-none self-stretch"
-      >
+      <Link to={detailHref} className="relative min-h-[200px] w-[230px] flex-none self-stretch">
         {photo ? (
           <img src={photo} alt={room.title} className="h-full w-full object-cover" />
         ) : (
@@ -155,7 +144,7 @@ function RoomCard({
         )}
       </Link>
       <div className="flex min-w-[240px] flex-1 flex-col p-6">
-        <Link to={`/${channelId}/rooms/${room.id}?${qs}`}>
+        <Link to={detailHref}>
           <h3 className="mb-1.5 font-serif text-[24px] font-semibold tracking-[-0.01em] hover:text-accent">
             {room.title}
           </h3>
@@ -185,53 +174,22 @@ function RoomCard({
           </span>
           <div className="text-[12px] text-muted-2">{tr.t("perNightInclTaxes")}</div>
         </div>
-        {sorted.length > 1 && (
-          <select
-            value={rateId}
-            onChange={(e) => setRateId(e.target.value)}
-            aria-label="Rate"
-            className="w-full truncate rounded-[10px] border border-line-alt bg-surface-alt py-2 pl-3 pr-8 text-[13px] text-ink outline-none focus:border-accent"
-          >
-            {sorted.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.title}
-              </option>
-            ))}
-          </select>
-        )}
-        {chosen && (
-          <button
-            type="button"
-            onClick={() => setShowDetails(true)}
-            className="self-end text-[13px] font-medium text-muted-2 underline decoration-dotted underline-offset-2 hover:text-accent"
-          >
-            {sorted.length > 1 ? tr.t("rateDetails") : chosen.title}
-          </button>
+        {!atMax && remaining <= 5 && (
+          <div className="text-[12px] font-medium text-accent">{tr.t("onlyLeft", { n: remaining })}</div>
         )}
         {atMax ? (
-          <div className="text-[12px] font-medium text-muted-2">
+          <div className="rounded-[10px] bg-surface-alt py-[11px] text-center text-[13px] font-medium text-muted-2">
             {tr.t("allAvailableAdded", { n: available })}
           </div>
-        ) : remaining <= 5 ? (
-          <div className="text-[12px] font-medium text-accent">{tr.t("onlyLeft", { n: remaining })}</div>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => chosen && onAdd(chosen.id)}
-          disabled={disabled || atMax}
-          className="w-full rounded-[10px] bg-accent py-[11px] text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {pending ? tr.t("adding") : tr.t("addRoom")}
-        </button>
+        ) : (
+          <Link
+            to={detailHref}
+            className="w-full rounded-[10px] bg-accent py-[11px] text-center text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep"
+          >
+            {tr.t("chooseRate")}
+          </Link>
+        )}
       </div>
-      {showDetails && chosen && (
-        <RateDetailsModal
-          rate={chosen}
-          currency={currency}
-          nights={nights}
-          onClose={() => setShowDetails(false)}
-        />
-      )}
     </div>
   );
 }
@@ -350,15 +308,10 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   const cart = parseCart(searchParams);
   const counts = roomCounts(cart);
 
-  const [pendingAddId, setPendingAddId] = useState<string | null>(null);
   const [continuePending, setContinuePending] = useState(false);
   useEffect(() => {
-    if (navigation.state === "idle") {
-      setPendingAddId(null);
-      setContinuePending(false);
-    }
+    if (navigation.state === "idle") setContinuePending(false);
   }, [navigation.state]);
-  const busy = navigation.state !== "idle";
 
   function go(sel: string) {
     const next = new URLSearchParams(searchParams);
@@ -366,10 +319,6 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
     else next.delete("sel");
     navigate(`/${params.channelId}/rooms?${next.toString()}`);
   }
-  const onAdd = (roomId: string, rateId: string) => {
-    setPendingAddId(roomId);
-    go(serializeCart(addLine(cart, { roomId, rateId })));
-  };
   const onRemove = (index: number) => go(serializeCart(removeIndex(cart, index)));
   const onContinue = () => {
     setContinuePending(true);
@@ -420,9 +369,6 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
                 party={party}
                 channelId={params.channelId}
                 qs={qs}
-                onAdd={(rateId) => onAdd(room.id, rateId)}
-                pending={pendingAddId === room.id}
-                disabled={busy}
                 inCart={counts.get(room.id) ?? 0}
               />
             ))}
