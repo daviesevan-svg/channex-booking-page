@@ -65,12 +65,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Seed example extras on first visit so owners start from something editable.
   await ensureExampleExtras(propertyId);
   const [extras, settings] = await Promise.all([getExtras(propertyId), getSettings(propertyId)]);
-  const editId = new URL(request.url).searchParams.get("edit");
+  const url = new URL(request.url);
+  const editId = url.searchParams.get("edit");
   return {
     configured: true as const,
     extras,
     currency: settings.currency || "GBP",
     editing: extras.find((e) => e.id === editId) ?? null,
+    creating: url.searchParams.get("new") != null,
   };
 }
 
@@ -178,10 +180,13 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
     );
   }
 
-  const { extras, currency, editing } = loaderData;
+  const { extras, currency, editing, creating } = loaderData;
   const v = actionData && "values" in actionData ? actionData.values : undefined;
   const cur = (k: keyof NonNullable<typeof v>, fallback = "") => (v?.[k] as string | undefined) ?? fallback;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
+  // Show the form for the first extra, when editing, or when "New extra" was
+  // clicked. Otherwise (extras already exist) show an "Add extra" button instead.
+  const showForm = !!editing || creating || extras.length === 0;
 
   return (
     <div>
@@ -192,6 +197,18 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         guests choose (e.g. vehicle type), and <strong>info fields</strong> to collect details.
       </p>
 
+      {!showForm && (
+        <div className="mb-7">
+          <Link
+            to="/admin/extras?new=1"
+            className="inline-block rounded-[10px] bg-accent px-5 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
+          >
+            + New extra
+          </Link>
+        </div>
+      )}
+
+      {showForm && (
       <Form
         method="post"
         key={editing?.id ?? "new"}
@@ -202,9 +219,9 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
 
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-[18px] font-semibold">{editing ? "Edit extra" : "New extra"}</h2>
-          {editing && (
+          {(editing || creating) && (
             <Link to="/admin/extras" className="text-[13px] font-semibold text-muted hover:text-accent">
-              Cancel edit
+              Cancel
             </Link>
           )}
         </div>
@@ -301,6 +318,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
           </button>
         </div>
       </Form>
+      )}
 
       {extras.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
