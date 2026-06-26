@@ -2,9 +2,9 @@ import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/login";
 import {
+  canSignIn,
   createMagicToken,
   getAdminEmail,
-  isAllowedEmail,
   sendMagicLink,
 } from "~/lib/auth.server";
 
@@ -17,7 +17,7 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Enter your email address." };
-  if (!isAllowedEmail(email)) {
+  if (!(await canSignIn(email))) {
     return { error: "That email isn't on the admin allowlist." };
   }
   const token = await createMagicToken(email);

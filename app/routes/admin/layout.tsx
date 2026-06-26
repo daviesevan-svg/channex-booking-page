@@ -3,7 +3,7 @@ import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getVisibleProperties } from "~/lib/properties.server";
+import { currentPropertyId, getVisibleProperties, isOwnerOrSuper } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
@@ -21,11 +21,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     isSuperadmin(email),
   ]);
   const settings = propertyId ? await getSettings(propertyId) : {};
+  const canManageCurrent = propertyId ? await isOwnerOrSuper(request, propertyId) : false;
   return {
     email,
     propertyId,
     properties,
     isSuperadmin: superadmin,
+    canManageCurrent,
     lang: langParam(request),
     languages: enabledLanguages(settings),
   };
@@ -37,7 +39,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, properties, isSuperadmin, lang, languages } = loaderData;
+  const { email, propertyId, properties, isSuperadmin, canManageCurrent, lang, languages } =
+    loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
   const { pathname } = useLocation();
@@ -130,6 +133,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/properties", label: "Properties", end: false },
             ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
             { to: "/admin", label: "Property details", end: true },
+            ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
             { to: "/admin/general", label: "General", end: false },
             { to: "/admin/portal", label: "Customer Portal", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },

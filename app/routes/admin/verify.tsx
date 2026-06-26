@@ -1,12 +1,12 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/verify";
-import { createAdminSession, isAllowedEmail, verifyMagicToken } from "~/lib/auth.server";
+import { canSignIn, createAdminSession, verifyMagicToken } from "~/lib/auth.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const token = new URL(request.url).searchParams.get("token") ?? "";
   const email = await verifyMagicToken(token);
-  if (!email || !isAllowedEmail(email)) {
+  if (!email || !(await canSignIn(email))) {
     return { error: "This sign-in link is invalid or has expired." };
   }
   // Sets the session cookie and redirects to /admin.

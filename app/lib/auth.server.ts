@@ -1,7 +1,7 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
 import { getConfig } from "./config.server";
-import { isSuperadmin, upsertUser } from "./users.server";
+import { getUser, isSuperadmin, upsertUser } from "./users.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -59,6 +59,15 @@ export function isAllowedEmail(email: string): boolean {
   return adminEmails.includes(email.trim().toLowerCase());
 }
 
+/** Whether this email may sign in: on the ADMIN_EMAILS allowlist (or it's empty,
+ *  = open self-signup), OR they're an already-known user — so a teammate invited
+ *  by an owner can sign in even after sign-up is locked down with ADMIN_EMAILS. */
+export async function canSignIn(email: string): Promise<boolean> {
+  if (isAllowedEmail(email)) return true;
+  if (await isSuperadmin(email)) return true;
+  return Boolean(await getUser(email));
+}
+
 // ---------- session ----------
 function sessionStorage() {
   const { sessionSecret, appUrl } = getConfig();
@@ -90,7 +99,7 @@ export async function getAdminEmail(request: Request): Promise<string | null> {
   const storage = sessionStorage();
   const session = await storage.getSession(request.headers.get("Cookie"));
   const email = session.get("email");
-  return typeof email === "string" && isAllowedEmail(email) ? email : null;
+  return typeof email === "string" && (await canSignIn(email)) ? email : null;
 }
 
 export async function requireAdmin(request: Request): Promise<string> {

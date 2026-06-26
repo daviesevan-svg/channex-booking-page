@@ -1,7 +1,8 @@
 // Property registry for the multi-property admin. The data layer is already
-// keyed by property id (catalog_rooms:{id}, settings:{id}, …); this just tracks
-// which ids exist and which one the admin is currently editing (stored in the
-// signed admin session). User accounts / per-user access come later.
+// keyed by property id (catalog_rooms:{id}, settings:{id}, …); this tracks which
+// ids exist, who owns / is on the team for each, and which one the admin is
+// currently editing (stored in the signed admin session). Access scoping for
+// every admin route flows through getVisibleProperties()/currentPropertyId().
 import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
 import { getOverrides } from "./overrides.server";
@@ -16,6 +17,9 @@ export interface PropertyRef {
   /** Email of the user who owns (can see/edit) this property. Ownerless =
    *  legacy/unclaimed → visible to superadmins only. */
   owner?: string;
+  /** Teammate emails the owner has invited to co-manage this property. They get
+   *  full edit access to it, but can't manage the team, delete, or transfer it. */
+  members?: string[];
 }
 
 const KEY = "properties";
@@ -80,21 +84,59 @@ export async function setPropertyOwner(id: string, owner: string | undefined): P
   }
 }
 
-/** Properties the signed-in user may see/edit: superadmins see all; members see
- *  only the ones they own. This is the isolation chokepoint — every admin route
- *  resolves its active property through currentPropertyId(), which is scoped to
- *  this list. */
+/** Properties the signed-in user may see/edit: superadmins see all; everyone
+ *  else sees the ones they own OR are a teammate on. This is the isolation
+ *  chokepoint — every admin route resolves its active property through
+ *  currentPropertyId(), which is scoped to this list. */
 export async function getVisibleProperties(request: Request): Promise<PropertyRef[]> {
   const email = await getAdminEmail(request);
   if (!email) return [];
   const list = await getProperties();
   if (await isSuperadmin(email)) return list;
-  return list.filter((p) => p.owner === email);
+  return list.filter((p) => p.owner === email || p.members?.includes(email));
 }
 
-/** Whether the signed-in user may act on a specific property. */
+/** Whether the signed-in user may see/edit a property (owner, teammate, or superadmin). */
 export async function canAccess(request: Request, id: string): Promise<boolean> {
   return (await getVisibleProperties(request)).some((p) => p.id === id);
+}
+
+/** A single property by id (unscoped). */
+export async function getProperty(id: string): Promise<PropertyRef | undefined> {
+  return (await getProperties()).find((p) => p.id === id);
+}
+
+/** Whether the user may MANAGE a property — manage its team, rename, toggle
+ *  public, delete, transfer. Owner or superadmin only (teammates can edit
+ *  content but not destroy/transfer/re-team the property). */
+export async function isOwnerOrSuper(request: Request, id: string): Promise<boolean> {
+  const email = await getAdminEmail(request);
+  if (!email) return false;
+  if (await isSuperadmin(email)) return true;
+  return (await getProperty(id))?.owner === email;
+}
+
+/** Adds a teammate email to a property's team (dedup, lowercase; skips the owner). */
+export async function addPropertyMember(id: string, email: string): Promise<void> {
+  const e = email.trim().toLowerCase();
+  if (!e) return;
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (!p || p.owner === e) return;
+  const members = new Set(p.members ?? []);
+  members.add(e);
+  p.members = [...members];
+  await write(list);
+}
+
+/** Removes a teammate from a property's team. */
+export async function removePropertyMember(id: string, email: string): Promise<void> {
+  const e = email.trim().toLowerCase();
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (!p?.members) return;
+  p.members = p.members.filter((m) => m !== e);
+  await write(list);
 }
 
 export async function renameProperty(id: string, name: string): Promise<void> {

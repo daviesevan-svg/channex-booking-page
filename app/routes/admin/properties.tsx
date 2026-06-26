@@ -8,6 +8,7 @@ import {
   canAccess,
   currentPropertyId,
   getVisibleProperties,
+  isOwnerOrSuper,
   removeProperty,
   renameProperty,
   setPropertyOwner,
@@ -23,7 +24,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     currentPropertyId(request),
     su ? getUsers() : Promise.resolve([]),
   ]);
-  return { properties, current, isSuperadmin: su, userEmails: users.map((u) => u.email) };
+  // Per-row: can this user manage (rename/delete/transfer/public) the property,
+  // or are they just a teammate who can edit its content?
+  const rows = properties.map((p) => ({ ...p, canManage: su || p.owner === email }));
+  return { properties: rows, current, isSuperadmin: su, userEmails: users.map((u) => u.email) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -49,8 +53,19 @@ export async function action({ request }: Route.ActionArgs) {
     return redirect("/admin/properties");
   }
 
-  // All other mutations require the user to be able to access the property.
-  if (!(await canAccess(request, id))) return redirect("/admin/properties");
+  // Switching the active property only needs access (teammates included).
+  if (intent === "switch") {
+    if (await canAccess(request, id)) {
+      return redirect("/admin", {
+        headers: { "Set-Cookie": await setSessionProperty(request, id) },
+      });
+    }
+    return redirect("/admin/properties");
+  }
+
+  // Destructive / structural changes require ownership (or superadmin) — a
+  // teammate must not delete, rename, or change the public state of a property.
+  if (!(await isOwnerOrSuper(request, id))) return redirect("/admin/properties");
 
   if (intent === "rename") {
     await renameProperty(id, String(form.get("name") || ""));
@@ -58,10 +73,6 @@ export async function action({ request }: Route.ActionArgs) {
     await removeProperty(id);
   } else if (intent === "togglePublic") {
     await setPropertyPublic(id, form.get("public") === "on");
-  } else if (intent === "switch") {
-    return redirect("/admin", {
-      headers: { "Set-Cookie": await setSessionProperty(request, id) },
-    });
   }
   return redirect("/admin/properties");
 }
@@ -109,11 +120,21 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                       Editing
                     </span>
                   )}
+                  {!p.canManage && (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
+                      Teammate
+                    </span>
+                  )}
                 </div>
                 <div className="mt-0.5 font-mono text-[12px] text-muted-2">{p.id}</div>
                 {su && (
                   <div className="mt-0.5 text-[12px] text-muted">
                     Owner: {p.owner ?? <span className="italic text-faint">unassigned</span>}
+                    {p.members && p.members.length > 0 && (
+                      <span className="text-muted-2">
+                        {" "}· {p.members.length} teammate{p.members.length === 1 ? "" : "s"}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -139,22 +160,30 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     </select>
                   </Form>
                 )}
-                <Form method="post" title={p.public ? "Listed on the public home page" : "Hidden from the public home page"}>
-                  <input type="hidden" name="intent" value="togglePublic" />
-                  <input type="hidden" name="id" value={p.id} />
-                  {/* flips the current value: send "on" only when turning it public */}
-                  {!p.public && <input type="hidden" name="public" value="on" />}
-                  <button
-                    type="submit"
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                      p.public
-                        ? "bg-[#e8f0e6] text-[#3f7a52] hover:bg-[#dbe8d8]"
-                        : "bg-chip text-muted hover:bg-line"
-                    }`}
-                  >
-                    {p.public ? "Public" : "Private"}
-                  </button>
-                </Form>
+                {p.canManage ? (
+                  <Form method="post" title={p.public ? "Listed on the public home page" : "Hidden from the public home page"}>
+                    <input type="hidden" name="intent" value="togglePublic" />
+                    <input type="hidden" name="id" value={p.id} />
+                    {/* flips the current value: send "on" only when turning it public */}
+                    {!p.public && <input type="hidden" name="public" value="on" />}
+                    <button
+                      type="submit"
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                        p.public
+                          ? "bg-[#e8f0e6] text-[#3f7a52] hover:bg-[#dbe8d8]"
+                          : "bg-chip text-muted hover:bg-line"
+                      }`}
+                    >
+                      {p.public ? "Public" : "Private"}
+                    </button>
+                  </Form>
+                ) : (
+                  p.public && (
+                    <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
+                      Public
+                    </span>
+                  )
+                )}
                 <Link to={`/${p.id}`} target="_blank" className="text-muted hover:text-accent">
                   View ↗
                 </Link>
@@ -167,7 +196,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     </button>
                   </Form>
                 )}
-                {properties.length > 1 && (
+                {p.canManage && properties.length > 1 && (
                   <Form
                     method="post"
                     onSubmit={(e) => {
