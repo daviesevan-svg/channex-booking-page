@@ -9,6 +9,8 @@ import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
+import { getPromotions } from "./promotions.server";
+import { bestAutoOffer } from "./promotions";
 
 export interface CatalogRoom {
   id: string;
@@ -173,12 +175,23 @@ export async function getCatalogRooms(
   opts: { gate?: boolean } = {},
 ): Promise<RoomWithRates[]> {
   const gate = opts.gate ?? false;
-  const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  const [rooms, rates, promotions] = await Promise.all([
+    getRooms(pid),
+    getRates(pid),
+    getPromotions(pid),
+  ]);
   const { checkinDate, checkoutDate, currency: cur } = query;
   const nights =
     checkinDate && checkoutDate
       ? Math.max(1, differenceInCalendarDays(parseISO(checkoutDate), parseISO(checkinDate)))
       : 1;
+  // Best automatic offer for this stay (early bird / last-minute / length-of-stay),
+  // baked into each rate price below so the sale shows consistently on results,
+  // detail, cart, checkout and confirmation (all of which call this function).
+  const daysAhead = checkinDate
+    ? differenceInCalendarDays(parseISO(checkinDate), parseISO(format(new Date(), "yyyy-MM-dd")))
+    : 0;
+  const offer = checkinDate ? bestAutoOffer(promotions, { daysAhead, nights }) : null;
   const currency = cur || "GBP";
   // The nights occupied by the stay: checkin .. checkout-1.
   const nightDates = checkinDate
@@ -222,7 +235,9 @@ export async function getCatalogRooms(
               const raw = nightDates.length
                 ? nightDates.reduce((s, d) => s + (inv.prices[k(d)] ?? base), 0)
                 : base * nights;
-              const total = (Math.round(raw * 100) / 100).toFixed(2);
+              const gross = Math.round(raw * 100) / 100;
+              const sale = offer ? Math.round(gross * (1 - offer.value / 100) * 100) / 100 : gross;
+              const total = sale.toFixed(2);
               return {
                 id: r.id,
                 title: r.title,
@@ -234,6 +249,13 @@ export async function getCatalogRooms(
                 availability: availForRate,
                 inclusions: r.inclusions.length ? r.inclusions : undefined,
                 cancellationNote: r.cancellationNote || (r.refundable ? undefined : "Non-refundable"),
+                offer: offer
+                  ? {
+                      name: offer.name || "Offer",
+                      percent: offer.value,
+                      originalTotalPrice: gross.toFixed(2),
+                    }
+                  : undefined,
               };
             })
             .filter((rp): rp is RatePlan => rp !== null);

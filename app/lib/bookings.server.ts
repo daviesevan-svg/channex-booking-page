@@ -49,6 +49,8 @@ export interface BookingRecord {
   cancellation?: CancellationSnapshot;
   /** Promo code applied at checkout, if any. `total` is the post-discount total. */
   promo?: AppliedPromo;
+  /** Automatic offer baked into the room prices for this stay, if any. */
+  offer?: AppliedPromo;
   /** True once the booking has decremented inventory (so cancel restores it once). */
   inventoryHeld?: boolean;
   createdAt: string;

@@ -26,6 +26,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let total = 0;
   let nights = 0;
   let cleaningFee = 0;
+  let offer: { name: string; percent: number; discount: number } | null = null;
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -39,6 +40,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     if (lines.length) total = cartCoverage(lines).total;
     cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
+    // The automatic offer baked into the prices, for the breakdown line.
+    let orig = 0;
+    let oName = "";
+    let oPct = 0;
+    for (const l of lines) {
+      const rp = catalogRooms.find((r) => r.id === l.roomId)?.ratePlans.find((p) => p.id === l.rateId);
+      orig += rp?.offer ? Number(rp.offer.originalTotalPrice) : l.total;
+      if (rp?.offer) {
+        oName = rp.offer.name;
+        oPct = rp.offer.percent;
+      }
+    }
+    if (oName) {
+      offer = { name: oName, percent: oPct, discount: Math.round((Math.round(orig * 100) / 100 - total) * 100) / 100 };
+    }
   }
 
   const applied =
@@ -66,6 +82,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     total,
     discount,
     promoCode: applied?.code ?? null,
+    offer,
     pricing,
     checkin,
     checkout,
@@ -77,7 +94,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, currency, total, discount, promoCode, pricing, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, rooms, currency, total, discount, promoCode, offer, pricing, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -148,6 +165,14 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             <span className="text-secondary">{tr.t("guests")}</span>
             <span className="font-semibold">{guests}</span>
           </div>
+          {total > 0 && offer && offer.discount > 0 && (
+            <div className="flex justify-between text-[#3f7a52]">
+              <span>
+                {offer.name} (−{offer.percent}%)
+              </span>
+              <span className="font-semibold">−{formatMoney(offer.discount, currency)}</span>
+            </div>
+          )}
           {total > 0 && discount > 0 && promoCode && (
             <div className="flex justify-between text-[#3f7a52]">
               <span>
