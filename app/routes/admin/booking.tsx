@@ -126,6 +126,12 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
             </div>
           ))}
         </div>
+        {b.offer && (
+          <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
+            <span>{b.offer.name || "Offer"} (−{b.offer.value}%)</span>
+            <span className="font-semibold">−{formatMoney(b.offer.discount, b.currency)}</span>
+          </div>
+        )}
         {b.promo && (
           <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
             <span>Promo ({b.promo.code})</span>

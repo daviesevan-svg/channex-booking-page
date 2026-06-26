@@ -128,6 +128,9 @@ export interface RatePlan {
   images?: string[];
   /** Custom cancellation text shown verbatim to guests (overrides the policy title). */
   cancellationNote?: string;
+  /** Automatic offer baked into totalPrice (set by getCatalogRooms). The
+   *  original (pre-discount) price is kept so the UI can show the saving. */
+  offer?: { name: string; percent: number; originalTotalPrice: string };
 }
 
 export interface BedOption {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/promotions";
@@ -6,7 +7,13 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
-import { normalizeCode, type DiscountType, type Promotion } from "~/lib/promotions";
+import {
+  normalizeCode,
+  type DiscountType,
+  type PromoConditions,
+  type PromoTrigger,
+  type Promotion,
+} from "~/lib/promotions";
 import {
   deletePromotion,
   getPromotions,
@@ -29,6 +36,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
+const posInt = (v: FormDataEntryValue | null): number | undefined => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
+
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
@@ -48,26 +60,57 @@ export async function action({ request }: Route.ActionArgs) {
 
   // intent === "save"
   const id = String(form.get("id") || "").trim();
+  const trigger: PromoTrigger = form.get("trigger") === "auto" ? "auto" : "code";
   const code = normalizeCode(String(form.get("code") ?? ""));
   const name = String(form.get("name") ?? "").trim();
-  const type = (String(form.get("type")) === "fixed" ? "fixed" : "percent") as DiscountType;
   const value = Number(form.get("value"));
   const enabled = form.get("enabled") != null;
-  const values = { id, code, name, type, value: form.get("value") as string };
+  // Automatic offers are percent-only (so the % can be shown per-room while browsing).
+  const type = (trigger === "auto"
+    ? "percent"
+    : String(form.get("type")) === "fixed"
+      ? "fixed"
+      : "percent") as DiscountType;
+  const values = {
+    id,
+    trigger,
+    code,
+    name,
+    type,
+    value: form.get("value") as string,
+    minDaysAhead: String(form.get("minDaysAhead") ?? ""),
+    maxDaysAhead: String(form.get("maxDaysAhead") ?? ""),
+    minNights: String(form.get("minNights") ?? ""),
+  };
 
-  if (!code) return { error: "Enter a promo code.", values };
   if (!Number.isFinite(value) || value <= 0) return { error: "Enter a discount greater than 0.", values };
   if (type === "percent" && value > 100) return { error: "A percentage can’t be more than 100.", values };
 
   const existing = await getPromotions(propertyId);
-  const clash = existing.find((p) => p.code === code && p.id !== id);
-  if (clash) return { error: `The code “${code}” is already used by another promotion.`, values };
+  let conditions: PromoConditions | undefined;
+
+  if (trigger === "code") {
+    if (!code) return { error: "Enter a promo code.", values };
+    const clash = existing.find((p) => p.trigger === "code" && p.code === code && p.id !== id);
+    if (clash) return { error: `The code “${code}” is already used by another promotion.`, values };
+  } else {
+    if (!name) return { error: "Give the offer a name guests will see (e.g. “Early Bird”).", values };
+    const minDaysAhead = posInt(form.get("minDaysAhead"));
+    const maxDaysAhead = posInt(form.get("maxDaysAhead"));
+    const minNights = posInt(form.get("minNights"));
+    if (minDaysAhead != null && maxDaysAhead != null && minDaysAhead > maxDaysAhead) {
+      return { error: "“Book at least … days ahead” can’t be more than “…at most”.", values };
+    }
+    conditions = { minDaysAhead, maxDaysAhead, minNights };
+  }
 
   const prev = existing.find((p) => p.id === id);
   const promo: Promotion = {
     id: id || crypto.randomUUID(),
-    code,
+    trigger,
+    code: trigger === "code" ? code : "",
     name: name || undefined,
+    conditions: trigger === "auto" ? conditions : undefined,
     type,
     value: type === "percent" ? Math.round(value) : Math.round(value * 100) / 100,
     enabled,
@@ -81,8 +124,18 @@ export function meta() {
   return [{ title: "Admin · Promotions" }];
 }
 
-function summary(p: Promotion, currency: string): string {
+function discountSummary(p: Promotion, currency: string): string {
   return p.type === "percent" ? `${p.value}% off` : `${formatMoney(p.value, currency)} off`;
+}
+
+/** Human-readable list of an automatic offer's conditions. */
+function conditionSummary(c?: PromoConditions): string {
+  if (!c) return "Always on";
+  const parts: string[] = [];
+  if (c.minDaysAhead != null) parts.push(`book ${c.minDaysAhead}+ days ahead`);
+  if (c.maxDaysAhead != null) parts.push(`book within ${c.maxDaysAhead} days`);
+  if (c.minNights != null) parts.push(`${c.minNights}+ nights`);
+  return parts.length ? parts.join(" · ") : "Always on";
 }
 
 export default function AdminPromotions({ loaderData, actionData }: Route.ComponentProps) {
@@ -103,17 +156,22 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
 
   const { promotions, currency, editing } = loaderData;
   const v = actionData && "values" in actionData ? actionData.values : undefined;
-  const cur = (k: keyof NonNullable<typeof v>, fallback = "") =>
-    (v?.[k] as string | undefined) ?? fallback;
-  const type = (v?.type ?? editing?.type ?? "percent") as DiscountType;
+  const cur = (k: keyof NonNullable<typeof v>, fallback = "") => (v?.[k] as string | undefined) ?? fallback;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
+
+  const [trigger, setTrigger] = useState<PromoTrigger>(
+    (v?.trigger as PromoTrigger) ?? editing?.trigger ?? "code",
+  );
+  const [type, setType] = useState<DiscountType>((v?.type as DiscountType) ?? editing?.type ?? "percent");
+  const isAuto = trigger === "auto";
 
   return (
     <div>
       <h1 className="mb-1 font-serif text-[26px] font-semibold">Promotions</h1>
       <p className="mb-6 text-[14px] text-muted">
-        Create a code guests can enter at checkout for a percentage or fixed amount off their
-        booking total.
+        Two kinds: a <strong>code</strong> guests type at checkout, or an <strong>automatic offer</strong>{" "}
+        that applies with no code when its rules match (e.g. an early-bird discount). Automatic
+        offers show their discounted price as guests browse.
       </p>
 
       {/* create / edit form */}
@@ -136,52 +194,133 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           )}
         </div>
 
+        {/* trigger */}
+        <div className="flex flex-wrap gap-2">
+          {(["code", "auto"] as PromoTrigger[]).map((t) => (
+            <label
+              key={t}
+              className={`cursor-pointer rounded-[10px] border px-4 py-2.5 text-[13.5px] font-semibold ${
+                trigger === t ? "border-accent bg-accent-soft text-accent-deep" : "border-line-alt text-muted"
+              }`}
+            >
+              <input
+                type="radio"
+                name="trigger"
+                value={t}
+                checked={trigger === t}
+                onChange={() => setTrigger(t)}
+                className="sr-only"
+              />
+              {t === "code" ? "Promo code" : "Automatic offer"}
+            </label>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {!isAuto && (
+            <label className="block text-[13px] font-semibold text-secondary">
+              Promo code
+              <input
+                name="code"
+                defaultValue={editing?.code ?? cur("code")}
+                placeholder="SUMMER10"
+                autoComplete="off"
+                className={`${FIELD_INPUT} uppercase`}
+              />
+            </label>
+          )}
           <label className="block text-[13px] font-semibold text-secondary">
-            Promo code
-            <input
-              name="code"
-              defaultValue={editing?.code ?? cur("code")}
-              placeholder="SUMMER10"
-              autoComplete="off"
-              className={`${FIELD_INPUT} uppercase`}
-            />
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Name <span className="font-normal text-faint">(optional, internal)</span>
+            Name{" "}
+            <span className="font-normal text-faint">
+              {isAuto ? "(shown to guests)" : "(optional, internal)"}
+            </span>
             <input
               name="name"
               defaultValue={editing?.name ?? cur("name")}
-              placeholder="Summer sale"
+              placeholder={isAuto ? "Early Bird" : "Summer sale"}
               className={FIELD_INPUT}
             />
           </label>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {!isAuto && (
+            <label className="block text-[13px] font-semibold text-secondary">
+              Discount type
+              <select
+                name="type"
+                value={type}
+                onChange={(e) => setType(e.target.value as DiscountType)}
+                className={FIELD_INPUT}
+              >
+                <option value="percent">Percentage off</option>
+                <option value="fixed">Fixed amount off</option>
+              </select>
+            </label>
+          )}
           <label className="block text-[13px] font-semibold text-secondary">
-            Discount type
-            <select name="type" defaultValue={type} className={FIELD_INPUT}>
-              <option value="percent">Percentage off</option>
-              <option value="fixed">Fixed amount off</option>
-            </select>
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Discount value
+            {isAuto || type === "percent" ? "Percentage off" : "Amount off"}
             <input
               name="value"
               type="number"
               min={0}
-              step="any"
+              step={isAuto || type === "percent" ? 1 : "any"}
               defaultValue={cur("value", editing ? String(editing.value) : "")}
-              placeholder={type === "fixed" ? "20" : "10"}
+              placeholder={isAuto || type === "percent" ? "10" : "20"}
               className={FIELD_INPUT}
             />
             <span className="mt-1 block text-[11px] font-normal text-faint">
-              Percentage (1–100), or a fixed amount in {currency}.
+              {isAuto || type === "percent" ? "1–100." : `Fixed amount in ${currency}.`}
             </span>
           </label>
         </div>
+
+        {isAuto && (
+          <div className="rounded-[12px] border border-line bg-surface-alt/40 p-4">
+            <div className="mb-1 text-[13px] font-semibold text-secondary">Rules</div>
+            <p className="mb-3 text-[12px] text-faint">
+              The offer applies when every rule you set is met. Leave a field blank to ignore it.
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="block text-[12.5px] font-semibold text-secondary">
+                Book at least … days ahead
+                <input
+                  name="minDaysAhead"
+                  type="number"
+                  min={0}
+                  defaultValue={cur("minDaysAhead", editing?.conditions?.minDaysAhead?.toString() ?? "")}
+                  placeholder="60"
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-faint">Early bird</span>
+              </label>
+              <label className="block text-[12.5px] font-semibold text-secondary">
+                …or at most … days ahead
+                <input
+                  name="maxDaysAhead"
+                  type="number"
+                  min={0}
+                  defaultValue={cur("maxDaysAhead", editing?.conditions?.maxDaysAhead?.toString() ?? "")}
+                  placeholder="7"
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-faint">Last minute</span>
+              </label>
+              <label className="block text-[12.5px] font-semibold text-secondary">
+                Stay of at least … nights
+                <input
+                  name="minNights"
+                  type="number"
+                  min={0}
+                  defaultValue={cur("minNights", editing?.conditions?.minNights?.toString() ?? "")}
+                  placeholder="7"
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-faint">Length of stay</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input
@@ -223,7 +362,16 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
-                  <span className="font-mono text-[14px] font-semibold">{p.code}</span>
+                  {p.trigger === "code" ? (
+                    <span className="font-mono text-[14px] font-semibold">{p.code}</span>
+                  ) : (
+                    <span className="text-[14px] font-semibold">{p.name || "Offer"}</span>
+                  )}
+                  {p.trigger === "auto" && (
+                    <span className="rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
+                      Automatic
+                    </span>
+                  )}
                   {p.enabled ? (
                     <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
                       Active
@@ -235,8 +383,12 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {summary(p, currency)}
-                  {p.name ? ` · ${p.name}` : ""}
+                  {discountSummary(p, currency)}
+                  {p.trigger === "auto"
+                    ? ` · ${conditionSummary(p.conditions)}`
+                    : p.name
+                      ? ` · ${p.name}`
+                      : ""}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-3">
@@ -260,7 +412,8 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                 <Form
                   method="post"
                   onSubmit={(e) => {
-                    if (!confirm(`Delete promo code ${p.code}?`)) e.preventDefault();
+                    if (!confirm(`Delete ${p.trigger === "code" ? `promo code ${p.code}` : p.name || "this offer"}?`))
+                      e.preventDefault();
                   }}
                 >
                   <input type="hidden" name="id" value={p.id} />

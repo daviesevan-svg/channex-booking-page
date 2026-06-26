@@ -175,8 +175,20 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   />
                   <span className="flex-1">
                     <span className="flex items-baseline justify-between gap-2.5">
-                      <span className="text-[15.5px] font-semibold">{plan.title}</span>
+                      <span className="text-[15.5px] font-semibold">
+                        {plan.title}
+                        {plan.offer && (
+                          <span className="ml-2 rounded-full bg-[#ece6f0] px-2 py-0.5 align-middle text-[11px] font-semibold text-[#6b4f8a]">
+                            {plan.offer.name} −{plan.offer.percent}%
+                          </span>
+                        )}
+                      </span>
                       <span className="whitespace-nowrap text-[15.5px] font-semibold">
+                        {plan.offer && (
+                          <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
+                            {formatMoney(Number(plan.offer.originalTotalPrice) / nights, currency)}
+                          </span>
+                        )}
                         {formatMoney(perNight, currency)} {tr.t("perNight")}
                       </span>
                     </span>
@@ -225,7 +237,18 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               {tr.t("totalNights", { n: nights })}
             </span>
             <span className="font-serif text-[28px] font-semibold">
-              {chosen ? formatMoney(chosen.totalPrice, currency) : "—"}
+              {chosen ? (
+                <>
+                  {chosen.offer && (
+                    <span className="mr-2 text-[18px] font-normal text-muted-2 line-through">
+                      {formatMoney(chosen.offer.originalTotalPrice, currency)}
+                    </span>
+                  )}
+                  {formatMoney(chosen.totalPrice, currency)}
+                </>
+              ) : (
+                "—"
+              )}
             </span>
           </div>
           <button

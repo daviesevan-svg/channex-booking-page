@@ -10,7 +10,8 @@ export async function getPromotions(pid: string): Promise<Promotion[]> {
   if (!raw) return [];
   try {
     const arr = JSON.parse(raw) as Promotion[];
-    return Array.isArray(arr) ? arr : [];
+    // Legacy promos predate the trigger field — they were all code-based.
+    return Array.isArray(arr) ? arr.map((p) => ({ ...p, trigger: p.trigger ?? "code" })) : [];
   } catch {
     return [];
   }

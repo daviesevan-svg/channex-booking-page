@@ -188,6 +188,14 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             </div>
           ))}
         </div>
+        {b.offer && (
+          <div className="mt-3 flex justify-between text-[14px] text-[#3f7a52]">
+            <span>
+              {b.offer.name || "Offer"} (−{b.offer.value}%)
+            </span>
+            <span className="font-semibold">−{formatMoney(b.offer.discount, cur)}</span>
+          </div>
+        )}
         {b.promo && (
           <div className="mt-3 flex justify-between text-[14px] text-[#3f7a52]">
             <span>

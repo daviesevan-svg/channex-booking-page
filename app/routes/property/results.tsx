@@ -167,8 +167,18 @@ function RoomCard({
         </div>
       </div>
       <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
+        {cheapest?.offer && (
+          <div className="self-end rounded-full bg-[#ece6f0] px-2.5 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
+            {cheapest.offer.name} · −{cheapest.offer.percent}%
+          </div>
+        )}
         <div>
           <span className="text-[13px] text-muted-2">{tr.t("from")} </span>
+          {cheapest?.offer && (
+            <span className="mr-1.5 text-[15px] text-muted-2 line-through">
+              {formatMoney(Number(cheapest.offer.originalTotalPrice) / nights, currency)}
+            </span>
+          )}
           <span className="font-serif text-[28px] font-semibold">
             {formatMoney(perNight, currency)}
           </span>

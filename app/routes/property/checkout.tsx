@@ -21,7 +21,7 @@ import {
 } from "~/lib/bookings.server";
 import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
-import { normalizeCode } from "~/lib/promotions";
+import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
@@ -72,6 +72,29 @@ async function resolveStayCart(
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 
+/** Derive the automatic offer baked into the resolved lines (by getCatalogRooms)
+ *  plus each line's pre-discount price, so checkout can itemise the saving. */
+function deriveOffer(lines: ResolvedLine[], rooms: RoomWithRates[]) {
+  let name = "";
+  let percent = 0;
+  let hasOffer = false;
+  const view = lines.map((l) => {
+    const rp = rooms.find((r) => r.id === l.roomId)?.ratePlans.find((p) => p.id === l.rateId);
+    if (rp?.offer) {
+      hasOffer = true;
+      name = rp.offer.name;
+      percent = rp.offer.percent;
+    }
+    return { ...l, originalTotal: rp?.offer ? Number(rp.offer.originalTotalPrice) : l.total };
+  });
+  const originalSubtotal = Math.round(view.reduce((s, l) => s + l.originalTotal, 0) * 100) / 100;
+  const saleSubtotal = Math.round(lines.reduce((s, l) => s + l.total, 0) * 100) / 100;
+  const offer: AppliedPromo | null = hasOffer
+    ? { name, type: "percent", value: percent, discount: Math.round((originalSubtotal - saleSubtotal) * 100) / 100 }
+    : null;
+  return { offer, originalSubtotal, lines: view };
+}
+
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const stay = readStay(url, params.channelId);
@@ -87,10 +110,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const text = await getPageText(params.channelId, "checkout", lang);
   const totals = cartCoverage(lines);
   const settings = await getSettings(params.channelId);
+  // The automatic offer (if any) is already baked into the line totals; derive
+  // it for the itemised breakdown and each line's pre-discount price.
+  const { offer, originalSubtotal, lines: linesView } = deriveOffer(lines, rooms);
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
   const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
-  return { stay, lines, nights, totals, text, urlPromo, taxConfig: taxConfigFrom(settings) };
+  return {
+    stay,
+    lines: linesView,
+    nights,
+    totals,
+    originalSubtotal,
+    offer,
+    text,
+    urlPromo,
+    taxConfig: taxConfigFrom(settings),
+  };
 }
 
 const GuestSchema = z.object({
@@ -116,6 +152,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
   }
   const totals = cartCoverage(lines);
+  // The automatic offer is baked into the line totals; snapshot it on the booking.
+  const { offer } = deriveOffer(lines, rooms);
 
   // "Apply" — preview the discount without booking, so typed guest details stay.
   if (intent === "applyPromo") {
@@ -234,6 +272,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     nights,
     total: pricing.total,
     promo: applied ?? undefined,
+    offer: offer ?? undefined,
     inventoryHeld: status !== "failed",
     guest: {
       firstName: g.firstName,
@@ -307,7 +346,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -409,7 +448,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                   <div className="text-[12.5px] text-muted-2">{l.rateTitle}</div>
                 </div>
                 <span className="whitespace-nowrap text-[14px] font-semibold">
-                  {formatMoney(l.total, currency)}
+                  {formatMoney(l.originalTotal, currency)}
                 </span>
               </div>
             ))}
@@ -420,15 +459,25 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
-          {discount > 0 && appliedPromo && (
+          {(offer || (discount > 0 && appliedPromo)) && (
             <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
-              <Row label={tr.t("subtotal")} value={formatMoney(totals.total, currency)} />
-              <div className="flex justify-between text-[#3f7a52]">
-                <span>
-                  {tr.t("discount")} ({appliedPromo.code})
-                </span>
-                <span className="font-semibold">−{formatMoney(discount, currency)}</span>
-              </div>
+              <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
+              {offer && offer.discount > 0 && (
+                <div className="flex justify-between text-[#3f7a52]">
+                  <span>
+                    {offer.name} (−{offer.value}%)
+                  </span>
+                  <span className="font-semibold">−{formatMoney(offer.discount, currency)}</span>
+                </div>
+              )}
+              {discount > 0 && appliedPromo && (
+                <div className="flex justify-between text-[#3f7a52]">
+                  <span>
+                    {tr.t("discount")} ({appliedPromo.code})
+                  </span>
+                  <span className="font-semibold">−{formatMoney(discount, currency)}</span>
+                </div>
+              )}
             </div>
           )}
 
