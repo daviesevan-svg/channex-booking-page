@@ -19,6 +19,10 @@ export interface PromoConditions {
   maxDaysAhead?: number;
   /** Length of stay: the stay is at least this many nights. */
   minNights?: number;
+  /** Date window: check-in on or after this date (YYYY-MM-DD). */
+  stayFrom?: string;
+  /** Date window: check-out on or before this date (YYYY-MM-DD). */
+  stayTo?: string;
 }
 
 export interface Promotion {
@@ -56,6 +60,10 @@ export interface StayContext {
   daysAhead: number;
   /** Number of nights in the stay. */
   nights: number;
+  /** Check-in date (YYYY-MM-DD), for date-window conditions. */
+  checkin?: string;
+  /** Check-out date (YYYY-MM-DD), for date-window conditions. */
+  checkout?: string;
 }
 
 /** Codes are matched case- and whitespace-insensitively. */
@@ -79,6 +87,10 @@ export function offerMatches(p: Promotion, ctx: StayContext): boolean {
   if (c.minDaysAhead != null && ctx.daysAhead < c.minDaysAhead) return false;
   if (c.maxDaysAhead != null && ctx.daysAhead > c.maxDaysAhead) return false;
   if (c.minNights != null && ctx.nights < c.minNights) return false;
+  // Date window — ISO dates compare lexically. When a window is set but we don't
+  // know the stay dates, the offer can't be verified, so it doesn't apply.
+  if (c.stayFrom && (!ctx.checkin || ctx.checkin < c.stayFrom)) return false;
+  if (c.stayTo && (!ctx.checkout || ctx.checkout > c.stayTo)) return false;
   return true;
 }
 

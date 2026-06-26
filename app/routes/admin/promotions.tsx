@@ -81,6 +81,8 @@ export async function action({ request }: Route.ActionArgs) {
     minDaysAhead: String(form.get("minDaysAhead") ?? ""),
     maxDaysAhead: String(form.get("maxDaysAhead") ?? ""),
     minNights: String(form.get("minNights") ?? ""),
+    stayFrom: String(form.get("stayFrom") ?? ""),
+    stayTo: String(form.get("stayTo") ?? ""),
   };
 
   if (!Number.isFinite(value) || value <= 0) return { error: "Enter a discount greater than 0.", values };
@@ -98,10 +100,19 @@ export async function action({ request }: Route.ActionArgs) {
     const minDaysAhead = posInt(form.get("minDaysAhead"));
     const maxDaysAhead = posInt(form.get("maxDaysAhead"));
     const minNights = posInt(form.get("minNights"));
+    const isoDate = (val: FormDataEntryValue | null) => {
+      const s = String(val ?? "").trim();
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : undefined;
+    };
+    const stayFrom = isoDate(form.get("stayFrom"));
+    const stayTo = isoDate(form.get("stayTo"));
     if (minDaysAhead != null && maxDaysAhead != null && minDaysAhead > maxDaysAhead) {
       return { error: "“Book at least … days ahead” can’t be more than “…at most”.", values };
     }
-    conditions = { minDaysAhead, maxDaysAhead, minNights };
+    if (stayFrom && stayTo && stayFrom > stayTo) {
+      return { error: "“Check-in on or after” can’t be later than “Check-out on or before”.", values };
+    }
+    conditions = { minDaysAhead, maxDaysAhead, minNights, stayFrom, stayTo };
   }
 
   const prev = existing.find((p) => p.id === id);
@@ -135,6 +146,7 @@ function conditionSummary(c?: PromoConditions): string {
   if (c.minDaysAhead != null) parts.push(`book ${c.minDaysAhead}+ days ahead`);
   if (c.maxDaysAhead != null) parts.push(`book within ${c.maxDaysAhead} days`);
   if (c.minNights != null) parts.push(`${c.minNights}+ nights`);
+  if (c.stayFrom || c.stayTo) parts.push(`stay ${c.stayFrom ?? "…"} → ${c.stayTo ?? "…"}`);
   return parts.length ? parts.join(" · ") : "Always on";
 }
 
@@ -317,6 +329,29 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   className={FIELD_INPUT}
                 />
                 <span className="mt-1 block text-[11px] font-normal text-faint">Length of stay</span>
+              </label>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="block text-[12.5px] font-semibold text-secondary">
+                Check-in on or after
+                <input
+                  name="stayFrom"
+                  type="date"
+                  defaultValue={cur("stayFrom", editing?.conditions?.stayFrom ?? "")}
+                  className={FIELD_INPUT}
+                />
+              </label>
+              <label className="block text-[12.5px] font-semibold text-secondary">
+                Check-out on or before
+                <input
+                  name="stayTo"
+                  type="date"
+                  defaultValue={cur("stayTo", editing?.conditions?.stayTo ?? "")}
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[11px] font-normal text-faint">
+                  Date window — e.g. a low-season sale
+                </span>
               </label>
             </div>
           </div>
