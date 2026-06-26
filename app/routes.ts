@@ -32,6 +32,7 @@ export default [
     route("inventory", "routes/admin/inventory.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
+    route("extras", "routes/admin/extras.tsx"),
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),
   ]),
