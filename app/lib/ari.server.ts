@@ -241,9 +241,9 @@ export interface RestrictionCell {
 export interface InventoryData {
   /** key `${roomId}|${date}` → units available */
   availability: Record<string, number>;
-  /** key `${rateId}|${date}` → price in major currency units */
+  /** key `${roomId}|${rateId}|${date}` → price in major currency units */
   prices: Record<string, number>;
-  /** key `${rateId}|${date}` → restriction flags */
+  /** key `${roomId}|${rateId}|${date}` → restriction flags */
   restrictions: Record<string, RestrictionCell>;
 }
 
@@ -255,15 +255,16 @@ export async function getInventory(hotelCode: string, from: string, to: string):
     D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND date>=? AND date<=?`)
       .bind(hotelCode, from, to)
       .all<{ room_type_id: string; date: string; avail: number }>(),
-    D.prepare(`SELECT rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=?`)
+    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=?`)
       .bind(hotelCode, from, to)
-      .all<{ rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number }>(),
+      .all<{ room_type_id: string; rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number }>(),
     D.prepare(
-      `SELECT rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
+      `SELECT room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
        FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`,
     )
       .bind(hotelCode, from, to)
       .all<{
+        room_type_id: string;
         rate_plan_id: string;
         date: string;
         stop_sell: number;
@@ -279,7 +280,7 @@ export async function getInventory(hotelCode: string, from: string, to: string):
   // prefer the manual occupancy=0 price, else the highest occupancy (the full rate).
   const priceOcc: Record<string, number> = {};
   for (const r of rt.results ?? []) {
-    const key = `${r.rate_plan_id}|${r.date}`;
+    const key = `${r.room_type_id}|${r.rate_plan_id}|${r.date}`;
     const price = r.price_minor / 10 ** (r.fraction_size || 2);
     const prevOcc = priceOcc[key];
     if (prevOcc === undefined || r.occupancy === 0 || (prevOcc !== 0 && r.occupancy > prevOcc)) {
@@ -288,7 +289,7 @@ export async function getInventory(hotelCode: string, from: string, to: string):
     }
   }
   for (const r of rs.results ?? [])
-    data.restrictions[`${r.rate_plan_id}|${r.date}`] = {
+    data.restrictions[`${r.room_type_id}|${r.rate_plan_id}|${r.date}`] = {
       stopSell: Boolean(r.stop_sell),
       minStay: r.min_stay_arrival || 0,
       cta: Boolean(r.closed_to_arrival),

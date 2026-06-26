@@ -11,19 +11,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const [rates, rooms] = await Promise.all([getRates(propertyId), getRooms(propertyId)]);
-  const roomTitle = new Map(rooms.map((r) => [r.id, r.title]));
   return {
     configured: true as const,
     hasRooms: rooms.length > 0,
-    rates: rates.map((r) => ({
-      id: r.id,
-      title: r.title,
-      room: roomTitle.get(r.roomId) ?? "—",
-      mealPlan: r.mealPlan,
-      nightlyPrice: r.nightlyPrice,
-      occupancy: { adults: r.adults, children: r.children },
-      active: r.active,
-    })),
+    rates: rates.map((r) => {
+      const prices = Object.values(r.prices);
+      return {
+        id: r.id,
+        title: r.title,
+        mealPlan: r.mealPlan,
+        roomCount: prices.length,
+        fromPrice: prices.length ? Math.min(...prices) : null,
+        active: r.active,
+      };
+    }),
   };
 }
 
@@ -59,8 +60,8 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        A rate is a bookable price for a room — meal plan, nightly price, occupancy and cancellation
-        policy.
+        A rate is a bookable plan — meal plan, cancellation policy and a nightly price per room. It
+        applies to every room you give it a price. Occupancy comes from each room.
       </p>
 
       {!hasRooms ? (
@@ -92,13 +93,16 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {rate.room} · {rate.mealPlan || "Room only"} · {rate.occupancy.adults} adult
-                  {rate.occupancy.adults === 1 ? "" : "s"}
-                  {rate.occupancy.children ? `, ${rate.occupancy.children} child` : ""}
+                  {rate.mealPlan || "Room only"} ·{" "}
+                  {rate.roomCount === 0
+                    ? "no rooms priced"
+                    : `${rate.roomCount} room${rate.roomCount === 1 ? "" : "s"}`}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">
-                <span className="font-semibold">{rate.nightlyPrice.toFixed(2)}/night</span>
+                <span className="font-semibold">
+                  {rate.fromPrice == null ? "—" : `from ${rate.fromPrice.toFixed(2)}/night`}
+                </span>
                 <span className="text-[13px] font-semibold text-accent">Edit →</span>
               </div>
             </Link>

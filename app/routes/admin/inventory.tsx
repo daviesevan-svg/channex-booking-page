@@ -37,7 +37,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     configured: true as const,
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
-    rates: rates.map((r) => ({ id: r.id, roomId: r.roomId, title: r.title, nightlyPrice: r.nightlyPrice })),
+    rates: rates.map((r) => ({ id: r.id, title: r.title, prices: r.prices })),
     currency: settings.currency || "GBP",
     dates,
     start,
@@ -56,7 +56,7 @@ export async function action({ request }: Route.ActionArgs) {
   // smaller visible window never clears restrictions on off-screen dates.
   const cols = Math.min(FETCH_DAYS, Math.max(1, Math.round(Number(form.get("cols")) || DEFAULT_COLS)));
   const dates = windowDates(start, cols);
-  const rateRoom = new Map((await getRates(propertyId)).map((r) => [r.id, r.roomId]));
+  const rates = await getRates(propertyId);
   const settings = await getSettings(propertyId);
 
   const edits: InventoryEdits = {
@@ -68,28 +68,35 @@ export async function action({ request }: Route.ActionArgs) {
 
   for (const [key, value] of form.entries()) {
     const v = String(value).trim();
-    const [kind, a, date] = key.split(":");
-    if (!date) continue;
-    if (kind === "a" && v !== "") {
-      edits.availability.push({ roomId: a, date, avail: Math.max(0, Math.round(Number(v)) || 0) });
-    } else if (kind === "p" && v !== "") {
+    const parts = key.split(":");
+    if (parts[0] === "a") {
+      // availability: a:roomId:date
+      const [, roomId, date] = parts;
+      if (date && v !== "") edits.availability.push({ roomId, date, avail: Math.max(0, Math.round(Number(v)) || 0) });
+    } else if (parts[0] === "p") {
+      // price: p:roomId:rateId:date
+      const [, roomId, rateId, date] = parts;
+      if (!date || v === "") continue;
       const price = Math.round(Number(v) * 100) / 100;
-      if (price > 0) edits.prices.push({ rateId: a, roomId: rateRoom.get(a) ?? "", date, price });
+      if (price > 0) edits.prices.push({ roomId, rateId, date, price });
     }
   }
-  // Restrictions cover every rate × date in the window so toggles clear too.
-  const rates = [...rateRoom.keys()];
-  for (const rateId of rates) {
-    for (const date of dates) {
-      edits.restrictions.push({
-        rateId,
-        roomId: rateRoom.get(rateId) ?? "",
-        date,
-        stopSell: form.get(`s:${rateId}:${date}`) != null,
-        minStay: Math.max(0, Math.round(Number(form.get(`m:${rateId}:${date}`)) || 0)),
-        cta: form.get(`ca:${rateId}:${date}`) != null,
-        ctd: form.get(`cd:${rateId}:${date}`) != null,
-      });
+  // Restrictions cover every (room, its rates) × date in the window so toggles
+  // clear too. A rate is offered on a room only when it has a price for it.
+  for (const rate of rates) {
+    for (const roomId of Object.keys(rate.prices)) {
+      for (const date of dates) {
+        const suffix = `${roomId}:${rate.id}:${date}`;
+        edits.restrictions.push({
+          rateId: rate.id,
+          roomId,
+          date,
+          stopSell: form.get(`s:${suffix}`) != null,
+          minStay: Math.max(0, Math.round(Number(form.get(`m:${suffix}`)) || 0)),
+          cta: form.get(`ca:${suffix}`) != null,
+          ctd: form.get(`cd:${suffix}`) != null,
+        });
+      }
     }
   }
 
@@ -259,7 +266,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             </thead>
             <tbody>
               {rooms.map((room) => {
-                const roomRates = rates.filter((r) => r.roomId === room.id);
+                const roomRates = rates.filter((r) => r.prices[room.id] !== undefined);
                 return (
                   <>
                     {/* Room availability row */}
@@ -289,21 +296,23 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                           <div className="text-[11px] text-muted-2">Price · min stay · ✕ A D</div>
                         </td>
                         {shown.map((d) => {
-                          const restr = inventory.restrictions[`${rate.id}|${d}`];
+                          const key = `${room.id}|${rate.id}|${d}`;
+                          const suffix = `${room.id}:${rate.id}:${d}`;
+                          const restr = inventory.restrictions[key];
                           return (
                             <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
                               <input
-                                name={`p:${rate.id}:${d}`}
+                                name={`p:${suffix}`}
                                 type="number"
                                 min={0}
                                 step="0.01"
-                                defaultValue={inventory.prices[`${rate.id}|${d}`] ?? ""}
-                                placeholder={rate.nightlyPrice.toFixed(0)}
+                                defaultValue={inventory.prices[key] ?? ""}
+                                placeholder={rate.prices[room.id].toFixed(0)}
                                 className={cellInput}
                               />
                               <div className="mt-1 flex items-center justify-center gap-1">
                                 <input
-                                  name={`m:${rate.id}:${d}`}
+                                  name={`m:${suffix}`}
                                   type="number"
                                   min={0}
                                   defaultValue={restr?.minStay || ""}
@@ -311,9 +320,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                   placeholder="0"
                                   className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
                                 />
-                                <Toggle name={`s:${rate.id}:${d}`} label="✕" title="Closed / stop sell" checked={restr?.stopSell} danger />
-                                <Toggle name={`ca:${rate.id}:${d}`} label="A" title="Closed to arrival (no check-in)" checked={restr?.cta} />
-                                <Toggle name={`cd:${rate.id}:${d}`} label="D" title="Closed to departure (no check-out)" checked={restr?.ctd} />
+                                <Toggle name={`s:${suffix}`} label="✕" title="Closed / stop sell" checked={restr?.stopSell} danger />
+                                <Toggle name={`ca:${suffix}`} label="A" title="Closed to arrival (no check-in)" checked={restr?.cta} />
+                                <Toggle name={`cd:${suffix}`} label="D" title="Closed to departure (no check-out)" checked={restr?.ctd} />
                               </div>
                             </td>
                           );
