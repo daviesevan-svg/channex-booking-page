@@ -68,19 +68,21 @@ async function resolveStayCart(
       checkoutDate: stay.checkout,
       currency: stay.currency,
       adults: stay.occ.adults,
+      childrenAge: stay.occ.childrenAge,
     },
     { gate: true },
   );
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 
-/** Each cart line's context for pricing its attached extras. */
-function extraContext(lines: ResolvedLine[]): ExtraContextLine[] {
+/** Each cart line's context for pricing its attached extras. Per-person extras
+ *  price for the searched party (single-room assumption). */
+function extraContext(lines: ResolvedLine[], guests: number): ExtraContextLine[] {
   return lines.map((l) => ({
     roomId: l.roomId,
     rateId: l.rateId,
     roomTitle: l.roomTitle,
-    guests: l.occupancy.adults + l.occupancy.children,
+    guests,
   }));
 }
 
@@ -134,7 +136,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const extraLines = resolveAllExtras(
     await getActiveExtras(params.channelId),
     parseExtrasState(url.searchParams),
-    extraContext(lines),
+    extraContext(lines, party),
     nights,
     party,
   );
@@ -219,12 +221,13 @@ export async function action({ params, request }: Route.ActionArgs) {
     taxConfigFrom(settings),
   );
   // Extras are re-priced server-side and added on top of the (taxed) room total.
+  const party = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
   const extraLines = resolveAllExtras(
     await getActiveExtras(stay.channelId),
     parseExtrasState(url.searchParams),
-    extraContext(lines),
+    extraContext(lines, party),
     nights,
-    adults + children,
+    party,
   );
   const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
 
