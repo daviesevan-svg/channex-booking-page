@@ -28,6 +28,22 @@ export interface CatalogRoom {
   createdAt: string;
 }
 
+/** Per-person pricing rules for a rate. The base price (in inventory) covers
+ *  `defaultOccupancy` adults; extra adults add, fewer adults discount, and each
+ *  child is priced by age band — all per night. Absent = flat pricing. */
+export interface OccupancyPricing {
+  /** Adults the base/inventory price covers. */
+  defaultOccupancy: number;
+  /** Added per adult above default occupancy, per night. */
+  extraAdultPrice?: number;
+  /** Subtracted per adult below default occupancy, per night. */
+  lessGuestDiscount?: number;
+  /** Per child per night, by age band (0–3, 4–12, 13+). */
+  child0to3?: number;
+  child4to12?: number;
+  child13plus?: number;
+}
+
 export interface CatalogRate {
   id: string;
   title: string;
@@ -36,6 +52,8 @@ export interface CatalogRate {
    *  offered on a room only when it has a price here, so one rate plan can apply
    *  to every room at its own price. Occupancy is taken from each room. */
   prices: Record<string, number>;
+  /** Optional per-person pricing rules (absent = flat price for any party). */
+  occupancyPricing?: OccupancyPricing;
   // Cancellation policy (mirrors the structured rate-plan override fields).
   refundable: boolean;
   cancelDeadlineValue?: number;
@@ -60,6 +78,27 @@ function normalizeRate(raw: CatalogRate & { roomId?: string; nightlyPrice?: numb
     children?: number;
   };
   return { ...rest, prices };
+}
+
+/** Per-night price adjustment for a party under a rate's occupancy pricing.
+ *  Adults above/below the default occupancy add/discount; each child is priced
+ *  by age band. Returns 0 when the rate has no occupancy pricing. */
+export function occupancyNightlyDelta(
+  op: OccupancyPricing | undefined,
+  adults: number,
+  childrenAge: number[],
+): number {
+  if (!op) return 0;
+  const def = Math.max(1, Math.round(op.defaultOccupancy) || 1);
+  let d = 0;
+  if (adults > def) d += (adults - def) * (op.extraAdultPrice ?? 0);
+  else if (adults < def) d -= (def - adults) * (op.lessGuestDiscount ?? 0);
+  for (const age of childrenAge) {
+    if (age <= 3) d += op.child0to3 ?? 0;
+    else if (age <= 12) d += op.child4to12 ?? 0;
+    else d += op.child13plus ?? 0;
+  }
+  return d;
 }
 
 /** Lowest price across the rooms a rate is offered on (undefined if none). */
@@ -181,6 +220,8 @@ export async function getCatalogRooms(
     getPromotions(pid),
   ]);
   const { checkinDate, checkoutDate, currency: cur } = query;
+  // Searched party — drives per-person (occupancy) rate pricing below.
+  const childrenAge = query.childrenAge ?? [];
   const nights =
     checkinDate && checkoutDate
       ? Math.max(1, differenceInCalendarDays(parseISO(checkoutDate), parseISO(checkinDate)))
@@ -235,9 +276,14 @@ export async function getCatalogRooms(
                 if (checkinDate && inv.restrictions[k(checkinDate)]?.cta) return null; // closed to arrival
                 if (checkoutDate && inv.restrictions[k(checkoutDate)]?.ctd) return null; // closed to departure
               }
+              // Per-person pricing: adjust each night for the searched party. With
+              // no adults given, price at the rate's default occupancy (no delta).
+              const op = r.occupancyPricing;
+              const adults = query.adults && query.adults > 0 ? query.adults : (op?.defaultOccupancy ?? 1);
+              const delta = occupancyNightlyDelta(op, adults, childrenAge);
               const raw = nightDates.length
-                ? nightDates.reduce((s, d) => s + (inv.prices[k(d)] ?? base), 0)
-                : base * nights;
+                ? nightDates.reduce((s, d) => s + Math.max(0, (inv.prices[k(d)] ?? base) + delta), 0)
+                : Math.max(0, base + delta) * nights;
               const gross = Math.round(raw * 100) / 100;
               const sale = offer ? Math.round(gross * (1 - offer.value / 100) * 100) / 100 : gross;
               const total = sale.toFixed(2);

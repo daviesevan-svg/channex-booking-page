@@ -38,6 +38,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       checkoutDate: checkout,
       currency,
       adults: occ.adults,
+      childrenAge: occ.childrenAge,
     });
     const lines = resolveCart(parseCart(url.searchParams), catalogRooms);
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
@@ -66,7 +67,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         roomId: l.roomId,
         rateId: l.rateId,
         roomTitle: l.roomTitle,
-        guests: l.occupancy.adults + l.occupancy.children,
+        guests: occ.adults + (occ.childrenAge?.length ?? 0),
       })),
       nights,
       occ.adults + (occ.childrenAge?.length ?? 0),

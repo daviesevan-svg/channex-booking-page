@@ -38,7 +38,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const rooms = await getCatalogRooms(
     params.channelId,
-    { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults },
+    { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
     { gate: true },
   );
   const cartLines = resolveCart(parseCart(url.searchParams), rooms);
@@ -62,7 +62,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lineIndex,
     nights,
     currency,
-    roomGuests: line.occupancy.adults + line.occupancy.children,
+    // Per-person extras price for the searched party (single-room assumption).
+    roomGuests: partySize(occ),
     party: partySize(occ),
     roomTitle: line.roomTitle,
     rateTitle: line.rateTitle,

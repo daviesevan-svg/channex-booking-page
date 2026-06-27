@@ -4,7 +4,7 @@ import type { Route } from "./+types/rate";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { isDeadlineUnit } from "~/lib/content";
-import { deleteRate, getRate, getRooms, saveRate, type CatalogRate } from "~/lib/catalog.server";
+import { deleteRate, getRate, getRooms, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -59,12 +59,30 @@ export async function action({ params, request }: Route.ActionArgs) {
     const s = String(v ?? "");
     return isDeadlineUnit(s) ? s : undefined;
   };
+  const money = (v: FormDataEntryValue | null) => {
+    const n = Math.round(Number(v) * 100) / 100;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  // Per-person pricing is opt-in: only stored when a default occupancy is set.
+  const defaultOccupancy = posInt(form.get("defaultOccupancy"));
+  const occupancyPricing: OccupancyPricing | undefined = defaultOccupancy
+    ? {
+        defaultOccupancy,
+        extraAdultPrice: money(form.get("extraAdultPrice")),
+        lessGuestDiscount: money(form.get("lessGuestDiscount")),
+        child0to3: money(form.get("child0to3")),
+        child4to12: money(form.get("child4to12")),
+        child13plus: money(form.get("child13plus")),
+      }
+    : undefined;
 
   const rate: CatalogRate = {
     id: existing?.id ?? crypto.randomUUID(),
     title,
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
     prices,
+    occupancyPricing,
     refundable: form.get("refundable") != null,
     cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
     cancelDeadlineUnit: unit(form.get("cancelDeadlineUnit")),
@@ -146,6 +164,69 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                 />
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[17px] font-semibold">Occupancy pricing</div>
+          <p className="mb-3 text-[13px] text-muted">
+            Optional. Set a default occupancy to price by party size — the nightly price above covers
+            that many adults; extra adults add, fewer adults discount, and children are priced by age
+            band (all per night). Leave the default occupancy blank to charge a flat price for any party.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Default occupancy <span className="font-normal text-faint">(adults)</span>
+              <input
+                name="defaultOccupancy"
+                type="number"
+                min={1}
+                defaultValue={rate?.occupancyPricing?.defaultOccupancy ?? ""}
+                placeholder="2"
+                className={FIELD_INPUT}
+              />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Price per extra adult <span className="font-normal text-faint">(/night)</span>
+              <input
+                name="extraAdultPrice"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={rate?.occupancyPricing?.extraAdultPrice ?? ""}
+                placeholder="30"
+                className={FIELD_INPUT}
+              />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Discount per fewer adult <span className="font-normal text-faint">(/night)</span>
+              <input
+                name="lessGuestDiscount"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={rate?.occupancyPricing?.lessGuestDiscount ?? ""}
+                placeholder="20"
+                className={FIELD_INPUT}
+              />
+            </label>
+          </div>
+          <div className="mt-3 text-[13px] font-semibold text-secondary">
+            Child price per night <span className="font-normal text-faint">(per child, by age)</span>
+          </div>
+          <div className="mt-1.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <label className="block text-[12.5px] font-semibold text-muted-2">
+              Age 0–3
+              <input name="child0to3" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child0to3 ?? ""} placeholder="0" className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[12.5px] font-semibold text-muted-2">
+              Age 4–12
+              <input name="child4to12" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child4to12 ?? ""} placeholder="15" className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[12.5px] font-semibold text-muted-2">
+              Age 13+
+              <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
+            </label>
           </div>
         </div>
 
