@@ -115,7 +115,13 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         <Field name="intro" label="Intro paragraph" value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field name="searchButton" label="Search button label" value={content.searchButton} placeholder={DEFAULT_SEARCH.searchButton} />
-          <Field name="promoText" label="Promo link text" value={content.promoText} placeholder={DEFAULT_SEARCH.promoText} />
+          <Field
+            name="promoText"
+            label="Promo code link text"
+            value={content.promoText}
+            placeholder={DEFAULT_SEARCH.promoText}
+            hint="The collapsible “add a promo code” link shown above the search button."
+          />
         </div>
 
         <div className="border-t border-divider pt-5">
