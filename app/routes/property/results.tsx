@@ -14,7 +14,8 @@ import {
   serializeCart,
   type ResolvedLine,
 } from "~/lib/cart";
-import { parseExtrasState, removeExtrasLine, serializeExtrasState } from "~/lib/extras";
+import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, serializeExtrasState } from "~/lib/extras";
+import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
@@ -75,6 +76,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const coverage = cartCoverage(cartLines);
   const covered = cartCovers(cartLines, occ);
 
+  // Extras selected so far, so the cart total here matches checkout.
+  const extraLines = resolveAllExtras(
+    await getActiveExtras(params.channelId),
+    parseExtrasState(url.searchParams),
+    cartLines.map((l) => ({
+      roomId: l.roomId,
+      rateId: l.rateId,
+      roomTitle: l.roomTitle,
+      guests: l.occupancy.adults + l.occupancy.children,
+    })),
+    nights,
+    party,
+  );
+  const extrasSum = extrasTotal(extraLines);
+
   return {
     rooms: enriched,
     nights,
@@ -83,6 +99,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     cartLines,
     coverage,
     covered,
+    extrasSum,
     text,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
@@ -223,6 +240,7 @@ function CartPanel({
   channelId,
   qs,
   extrasCounts,
+  extrasSum,
 }: {
   lines: ResolvedLine[];
   coverage: { capacity: number; total: number };
@@ -237,6 +255,7 @@ function CartPanel({
   channelId: string;
   qs: string;
   extrasCounts: number[];
+  extrasSum: number;
 }) {
   const tr = useT();
   return (
@@ -304,10 +323,16 @@ function CartPanel({
           : tr.t("sleepsOf", { x: coverage.capacity, y: party })}
       </div>
 
+      {extrasSum > 0 && (
+        <div className="mb-2 flex items-baseline justify-between text-[13.5px]">
+          <span className="text-secondary">{tr.t("extrasLabel")}</span>
+          <span className="font-semibold">{formatMoney(extrasSum, currency)}</span>
+        </div>
+      )}
       <div className="mb-4 flex items-baseline justify-between">
         <span className="text-[15px] font-semibold">{tr.t("total")}</span>
         <span className="font-serif text-[26px] font-semibold">
-          {formatMoney(coverage.total, currency)}
+          {formatMoney(coverage.total + extrasSum, currency)}
         </span>
       </div>
 
@@ -324,7 +349,7 @@ function CartPanel({
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, text, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -425,6 +450,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
               channelId={params.channelId}
               qs={qs}
               extrasCounts={extrasCounts}
+              extrasSum={extrasSum}
             />
           </div>
         </div>
