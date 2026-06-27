@@ -10,6 +10,11 @@ import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
+import { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
+import type { CartLine, ResolvedLine } from "./cart";
+
+// Re-export so existing importers (admin rate editor) keep their import path.
+export { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
 import { bestAutoOffer } from "./promotions";
 
 export interface CatalogRoom {
@@ -26,22 +31,6 @@ export interface CatalogRoom {
   facilities: string[];
   position: number;
   createdAt: string;
-}
-
-/** Per-person pricing rules for a rate. The base price (in inventory) covers
- *  `defaultOccupancy` adults; extra adults add, fewer adults discount, and each
- *  child is priced by age band — all per night. Absent = flat pricing. */
-export interface OccupancyPricing {
-  /** Adults the base/inventory price covers. */
-  defaultOccupancy: number;
-  /** Added per adult above default occupancy, per night. */
-  extraAdultPrice?: number;
-  /** Subtracted per adult below default occupancy, per night. */
-  lessGuestDiscount?: number;
-  /** Per child per night, by age band (0–3, 4–12, 13+). */
-  child0to3?: number;
-  child4to12?: number;
-  child13plus?: number;
 }
 
 export interface CatalogRate {
@@ -78,27 +67,6 @@ function normalizeRate(raw: CatalogRate & { roomId?: string; nightlyPrice?: numb
     children?: number;
   };
   return { ...rest, prices };
-}
-
-/** Per-night price adjustment for a party under a rate's occupancy pricing.
- *  Adults above/below the default occupancy add/discount; each child is priced
- *  by age band. Returns 0 when the rate has no occupancy pricing. */
-export function occupancyNightlyDelta(
-  op: OccupancyPricing | undefined,
-  adults: number,
-  childrenAge: number[],
-): number {
-  if (!op) return 0;
-  const def = Math.max(1, Math.round(op.defaultOccupancy) || 1);
-  let d = 0;
-  if (adults > def) d += (adults - def) * (op.extraAdultPrice ?? 0);
-  else if (adults < def) d -= (def - adults) * (op.lessGuestDiscount ?? 0);
-  for (const age of childrenAge) {
-    if (age <= 3) d += op.child0to3 ?? 0;
-    else if (age <= 12) d += op.child4to12 ?? 0;
-    else d += op.child13plus ?? 0;
-  }
-  return d;
 }
 
 /** Lowest price across the rooms a rate is offered on (undefined if none). */
@@ -305,6 +273,7 @@ export async function getCatalogRooms(
                       originalTotalPrice: gross.toFixed(2),
                     }
                   : undefined,
+                occupancyPricing: op,
               };
             })
             .filter((rp): rp is RatePlan => rp !== null);
@@ -320,6 +289,72 @@ export async function getCatalogRooms(
       };
     })
     .filter((room) => room.ratePlans.length > 0);
+}
+
+/** Resolve cart lines to priced lines, honouring each line's own occupancy.
+ *  Lines are grouped by occupancy and priced via getCatalogRooms once per group
+ *  (so per-room party pricing, offers and ARI all apply consistently); a line
+ *  with no occupancy falls back to the searched party. Order is preserved. */
+export async function resolveCartByOccupancy(
+  pid: string,
+  stay: { checkin: string; checkout: string; currency: string },
+  lines: CartLine[],
+  searched: { adults: number; childrenAge: number[] },
+): Promise<ResolvedLine[]> {
+  const occOf = (l: CartLine) => ({
+    adults: l.adults ?? searched.adults,
+    childrenAge: l.childrenAge ?? searched.childrenAge,
+  });
+  const sig = (o: { adults: number; childrenAge: number[] }) =>
+    `${o.adults}|${[...o.childrenAge].sort((a, b) => a - b).join(".")}`;
+
+  const groups = new Map<string, { adults: number; childrenAge: number[] }>();
+  for (const l of lines) groups.set(sig(occOf(l)), occOf(l));
+
+  const roomsByGroup = new Map<string, RoomWithRates[]>();
+  for (const [key, occ] of groups) {
+    roomsByGroup.set(
+      key,
+      await getCatalogRooms(
+        pid,
+        {
+          checkinDate: stay.checkin,
+          checkoutDate: stay.checkout,
+          currency: stay.currency,
+          adults: occ.adults,
+          childrenAge: occ.childrenAge,
+        },
+        { gate: true },
+      ),
+    );
+  }
+
+  const out: ResolvedLine[] = [];
+  for (const l of lines) {
+    const occ = occOf(l);
+    const rooms = roomsByGroup.get(sig(occ));
+    const room = rooms?.find((r) => r.id === l.roomId);
+    const rate = room?.ratePlans.find((p) => p.id === l.rateId);
+    if (room && rate) {
+      out.push({
+        roomId: l.roomId,
+        rateId: l.rateId,
+        adults: l.adults,
+        childrenAge: l.childrenAge,
+        roomTitle: room.title,
+        rateTitle: rate.title,
+        occupancy: { adults: occ.adults, children: occ.childrenAge.length, infants: 0 },
+        total: Number(rate.totalPrice),
+        net: Number(rate.netPrice ?? rate.totalPrice),
+        cleaningFee: Number(room.cleaningFee ?? 0),
+        photo: room.photos?.[0]?.url,
+        originalTotal: rate.offer ? Number(rate.offer.originalTotalPrice) : Number(rate.totalPrice),
+        offerName: rate.offer?.name,
+        offerPercent: rate.offer?.percent,
+      });
+    }
+  }
+  return out;
 }
 
 /** Calendar availability for [from, to] (inclusive), in the Channex ClosedDates

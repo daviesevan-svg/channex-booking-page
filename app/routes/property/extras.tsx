@@ -4,8 +4,8 @@ import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/extras";
 import { useProperty } from "~/lib/booking-context";
-import { parseCart, resolveCart } from "~/lib/cart";
-import { getCatalogRooms } from "~/lib/catalog.server";
+import { parseCart } from "~/lib/cart";
+import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import {
   UNIT_LABEL,
@@ -36,12 +36,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lineIndex = Number(url.searchParams.get("line"));
   if (!Number.isInteger(lineIndex) || lineIndex < 0) throw redirect(`/${params.channelId}/rooms?${sp}`);
 
-  const rooms = await getCatalogRooms(
+  const cartLines = await resolveCartByOccupancy(
     params.channelId,
-    { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
-    { gate: true },
+    { checkin, checkout, currency },
+    parseCart(url.searchParams),
+    { adults: occ.adults, childrenAge: occ.childrenAge },
   );
-  const cartLines = resolveCart(parseCart(url.searchParams), rooms);
   const line = cartLines[lineIndex];
   if (!line) throw redirect(`/${params.channelId}/rooms?${sp}`);
 
@@ -62,8 +62,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lineIndex,
     nights,
     currency,
-    // Per-person extras price for the searched party (single-room assumption).
-    roomGuests: partySize(occ),
+    // Per-room extras price for this room's occupancy; booking extras for the party.
+    roomGuests: line.occupancy.adults + line.occupancy.children,
     party: partySize(occ),
     roomTitle: line.roomTitle,
     rateTitle: line.rateTitle,

@@ -2,12 +2,18 @@ import type { RoomWithRates } from "./channex/types";
 import type { Occupancy } from "./occupancy";
 import { partySize, roomAvailability } from "./occupancy";
 
-// The cart lives in the URL (`sel` param) as `roomId:rateId,roomId:rateId…`,
-// so it's SSR-resolvable, shareable, and survives reloads. A room may appear
-// multiple times (e.g. two single rooms).
+// The cart lives in the URL (`sel` param). Each line is
+// `roomId:rateId[:adults[:age.age]]` — the optional occupancy lets one room be
+// booked for a specific party (e.g. two singles for a business trip). Absent
+// occupancy means "the searched party" (back-compat with older links). A room
+// may appear multiple times. SSR-resolvable, shareable, survives reloads.
 export interface CartLine {
   roomId: string;
   rateId: string;
+  /** Adults in this room (absent = the searched party's adults). */
+  adults?: number;
+  /** Children ages in this room (absent = the searched party's children). */
+  childrenAge?: number[];
 }
 
 export function parseCart(sp: URLSearchParams): CartLine[] {
@@ -15,15 +21,30 @@ export function parseCart(sp: URLSearchParams): CartLine[] {
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean)
-    .map((tok) => {
-      const [roomId, rateId] = tok.split(":");
-      return roomId && rateId ? { roomId, rateId } : null;
+    .map((tok): CartLine | null => {
+      const [roomId, rateId, adultsRaw, childRaw] = tok.split(":");
+      if (!roomId || !rateId) return null;
+      const adults =
+        adultsRaw != null && adultsRaw !== "" ? Math.max(1, parseInt(adultsRaw, 10) || 1) : undefined;
+      const childrenAge = childRaw
+        ? childRaw.split(".").map((n) => parseInt(n, 10)).filter((n) => !Number.isNaN(n) && n >= 0)
+        : undefined;
+      return { roomId, rateId, adults, childrenAge: childrenAge?.length ? childrenAge : undefined };
     })
     .filter((l): l is CartLine => l !== null);
 }
 
 export function serializeCart(lines: CartLine[]): string {
-  return lines.map((l) => `${l.roomId}:${l.rateId}`).join(",");
+  return lines
+    .map((l) => {
+      let t = `${l.roomId}:${l.rateId}`;
+      if (l.adults != null) {
+        t += `:${l.adults}`;
+        if (l.childrenAge?.length) t += `:${l.childrenAge.join(".")}`;
+      }
+      return t;
+    })
+    .join(",");
 }
 
 export function addLine(lines: CartLine[], line: CartLine): CartLine[] {
@@ -43,6 +64,11 @@ export interface ResolvedLine extends CartLine {
   /** Flat cleaning fee for this room (per stay). */
   cleaningFee: number;
   photo?: string;
+  /** Pre-discount total for this line (= total when no automatic offer). */
+  originalTotal?: number;
+  /** Automatic offer baked into `total`, for the itemised breakdown. */
+  offerName?: string;
+  offerPercent?: number;
 }
 
 export function resolveCart(lines: CartLine[], rooms: RoomWithRates[]): ResolvedLine[] {

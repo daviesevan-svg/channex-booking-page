@@ -10,9 +10,10 @@ import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
+import { occupancyNightlyDelta } from "~/lib/rate-pricing";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
-import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy } from "~/lib/occupancy";
+import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -40,7 +41,62 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(params.channelId, "detail", lang);
-  return { room, nights, party: partySize({ adults, childrenAge }), text, query: { checkin, checkout, currency, adults } };
+
+  // Per-room occupancy: default this room to the still-unassigned slice of the
+  // searched party, so adding a 2nd room auto-fills the remainder. Capacity comes
+  // from the room type.
+  const { maxAdults, capacity } = roomCapacity(room);
+  let assignedAdults = 0;
+  const assignedChildren: number[] = [];
+  for (const l of parseCart(url.searchParams)) {
+    assignedAdults += l.adults ?? adults;
+    for (const a of l.childrenAge ?? childrenAge) assignedChildren.push(a);
+  }
+  const childrenPool = [...childrenAge];
+  for (const a of assignedChildren) {
+    const i = childrenPool.indexOf(a);
+    if (i >= 0) childrenPool.splice(i, 1);
+  }
+  const defaultAdults = Math.min(maxAdults, Math.max(1, adults - assignedAdults));
+  const defaultChildrenCount = Math.min(childrenPool.length, Math.max(0, capacity - defaultAdults));
+
+  return {
+    room,
+    nights,
+    party: partySize({ adults, childrenAge }),
+    searched: { adults, childrenAge },
+    maxAdults,
+    capacity,
+    defaultAdults,
+    defaultChildrenCount,
+    childrenPool,
+    text,
+    query: { checkin, checkout, currency, adults },
+  };
+}
+
+function Stepper({
+  value,
+  min,
+  max,
+  onDec,
+  onInc,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onDec: () => void;
+  onInc: () => void;
+}) {
+  const btn =
+    "flex h-8 w-8 flex-none items-center justify-center rounded-[8px] border border-line-alt text-[17px] leading-none text-ink disabled:opacity-40 enabled:hover:border-accent enabled:hover:text-accent";
+  return (
+    <div className="flex items-center gap-3">
+      <button type="button" aria-label="Decrease" onClick={onDec} disabled={value <= min} className={btn}>−</button>
+      <span className="min-w-[18px] text-center text-[15px] font-semibold">{value}</span>
+      <button type="button" aria-label="Increase" onClick={onInc} disabled={value >= max} className={btn}>+</button>
+    </div>
+  );
 }
 
 function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): string {
@@ -52,8 +108,10 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
   return parts.join(" · ") || tr.t("standardRate");
 }
 
+type DetailRate = RoomWithRates["ratePlans"][number];
+
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
-  const { room, nights, party, text, query } = loaderData;
+  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, text, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -66,6 +124,31 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const ratePlans = ratePlansForParty(room, party);
   const [selectedRate, setSelectedRate] = useState(ratePlans[0]?.id);
   const chosen = ratePlans.find((r) => r.id === selectedRate) ?? ratePlans[0];
+
+  // Per-room occupancy the guest is booking (defaults to the unassigned party).
+  const [adults, setAdults] = useState(defaultAdults);
+  const [childrenCount, setChildrenCount] = useState(defaultChildrenCount);
+  const maxChildren = Math.min(childrenPool.length, Math.max(0, capacity - adults));
+  const childCount = Math.min(childrenCount, maxChildren);
+  const childrenAges = childrenPool.slice(0, childCount);
+  const hasChildrenChoice = childrenPool.length > 0;
+
+  // Live price for a rate plan at the selected occupancy. The occupancy delta is
+  // flat per night, so reverse out the searched-party delta to get the zero-delta
+  // base, then re-apply for this room's party. The server re-prices identically.
+  const priceFor = (plan: DetailRate) => {
+    const op = plan.occupancyPricing;
+    const grossSearched = plan.offer ? Number(plan.offer.originalTotalPrice) : Number(plan.totalPrice);
+    const baseGross = grossSearched - occupancyNightlyDelta(op, searched.adults, searched.childrenAge) * nights;
+    const gross = Math.max(0, baseGross + occupancyNightlyDelta(op, adults, childrenAges) * nights);
+    const offerPct = plan.offer?.percent ?? 0;
+    return {
+      gross: Math.round(gross * 100) / 100,
+      sale: Math.round(gross * (1 - offerPct / 100) * 100) / 100,
+      hasOffer: offerPct > 0,
+    };
+  };
+  const chosenPrice = chosen ? priceFor(chosen) : { gross: 0, sale: 0, hasOffer: false };
 
   const summary = `${tr.p("night", nights)} · ${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
     parseISO(query.checkout),
@@ -80,7 +163,12 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
   function addToStay() {
     if (!chosen) return;
-    const lines = addLine(parseCart(searchParams), { roomId: room.id, rateId: chosen.id });
+    const lines = addLine(parseCart(searchParams), {
+      roomId: room.id,
+      rateId: chosen.id,
+      adults,
+      childrenAge: childrenAges.length ? childrenAges : undefined,
+    });
     const newIndex = lines.length - 1;
     // Keep the per-line extras buckets aligned with the cart, then send the guest
     // to that room's "enhance" step (it redirects straight to results if there's
@@ -159,11 +247,43 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-1 font-serif text-[21px] font-semibold">{text.rateTitle}</h3>
-          <div className="mb-[18px] text-[13.5px] text-muted-2">{summary}</div>
+          <div className="mb-4 text-[13.5px] text-muted-2">{summary}</div>
+
+          {/* Per-room occupancy — book this room for a specific party. */}
+          <div className="mb-5 rounded-[12px] border border-line-alt bg-surface-alt/40 p-3.5">
+            <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+              {tr.t("guests")}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[14px] font-medium text-secondary">{tr.t("adults")}</span>
+              <Stepper
+                value={adults}
+                min={1}
+                max={maxAdults}
+                onDec={() => setAdults((a) => Math.max(1, a - 1))}
+                onInc={() => setAdults((a) => Math.min(maxAdults, a + 1))}
+              />
+            </div>
+            {hasChildrenChoice && (
+              <div className="mt-2.5 flex items-center justify-between">
+                <span className="text-[14px] font-medium text-secondary">{tr.t("children")}</span>
+                <Stepper
+                  value={childCount}
+                  min={0}
+                  max={maxChildren}
+                  onDec={() => setChildrenCount((c) => Math.max(0, c - 1))}
+                  onInc={() => setChildrenCount((c) => Math.min(maxChildren, c + 1))}
+                />
+              </div>
+            )}
+            <div className="mt-2.5 text-[11.5px] text-faint">{tr.t("sleeps", { n: capacity })}</div>
+          </div>
+
           <div className="mb-5 flex flex-col gap-2.5">
             {ratePlans.map((plan) => {
               const active = plan.id === chosen?.id;
-              const perNight = Number(plan.totalPrice) / nights;
+              const pr = priceFor(plan);
+              const perNight = pr.sale / nights;
               return (
                 <button
                   key={plan.id}
@@ -193,9 +313,9 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                         )}
                       </span>
                       <span className="whitespace-nowrap text-[15.5px] font-semibold">
-                        {plan.offer && (
+                        {pr.hasOffer && (
                           <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
-                            {formatMoney(Number(plan.offer.originalTotalPrice) / nights, currency)}
+                            {formatMoney(pr.gross / nights, currency)}
                           </span>
                         )}
                         {formatMoney(perNight, currency)} {tr.t("perNight")}
@@ -248,12 +368,12 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             <span className="font-serif text-[28px] font-semibold">
               {chosen ? (
                 <>
-                  {chosen.offer && (
+                  {chosenPrice.hasOffer && (
                     <span className="mr-2 text-[18px] font-normal text-muted-2 line-through">
-                      {formatMoney(chosen.offer.originalTotalPrice, currency)}
+                      {formatMoney(chosenPrice.gross, currency)}
                     </span>
                   )}
-                  {formatMoney(chosen.totalPrice, currency)}
+                  {formatMoney(chosenPrice.sale, currency)}
                 </>
               ) : (
                 "—"
