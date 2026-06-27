@@ -385,8 +385,8 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         </fieldset>
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
-          <input type="checkbox" name="taxable" defaultChecked={editing ? !!editing.taxable : false} className={checkbox} />
-          VAT applies <span className="font-normal text-faint">(taxed at the property’s VAT rate, like the room)</span>
+          <input type="checkbox" name="taxable" defaultChecked={editing ? editing.taxable !== false : true} className={checkbox} />
+          VAT applies <span className="font-normal text-faint">(taxed at the property’s VAT rate, like the room — untick to exempt, e.g. a transfer)</span>
         </label>
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
@@ -436,8 +436,8 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                   ) : (e.excludeRooms?.length || e.excludeRates?.length) ? (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">limited rooms/rates</span>
                   ) : null}
-                  {e.taxable ? (
-                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">VAT</span>
+                  {e.taxable === false ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">VAT exempt</span>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency)}</div>

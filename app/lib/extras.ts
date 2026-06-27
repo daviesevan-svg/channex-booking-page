@@ -48,7 +48,8 @@ export interface Extra {
   /** Per-room (default) or once-per-booking. Undefined = "room" (back-compat). */
   scope?: ExtraScope;
   /** VAT applies to this extra (the property's tax rate, same inclusive/on-top
-   *  mode as the room). Default false — extras are untaxed unless flagged. */
+   *  mode as the room). Default-on: only an explicit `false` is exempt — see
+   *  isExtraTaxable(). */
   taxable?: boolean;
   /** Room type ids this extra is NOT offered for (room-scoped only). */
   excludeRooms?: string[];
@@ -62,6 +63,13 @@ export interface Extra {
 /** An extra's effective scope (undefined defaults to per-room). */
 export function scopeOf(e: Extra): ExtraScope {
   return e.scope === "booking" ? "booking" : "room";
+}
+
+/** Whether the property's VAT applies to this extra. Default-on: most extras
+ *  (breakfast, parking, spa) carry VAT, so only an explicit `taxable: false`
+ *  (e.g. a VAT-exempt transfer) is untaxed. */
+export function isExtraTaxable(e: { taxable?: boolean }): boolean {
+  return e.taxable !== false;
 }
 
 /** Whether a room-scoped extra is offered for a given room + rate plan. Booking
@@ -240,7 +248,7 @@ export function resolveExtras(
         qty,
         amount,
         infoLine,
-        taxable: extra.taxable,
+        taxable: isExtraTaxable(extra),
       });
     } else {
       if (extra.price == null) continue;
@@ -253,7 +261,7 @@ export function resolveExtras(
         qty,
         amount,
         infoLine,
-        taxable: extra.taxable,
+        taxable: isExtraTaxable(extra),
       });
     }
   }
