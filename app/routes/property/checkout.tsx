@@ -309,8 +309,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { bookingError: error };
   }
 
-  // Decrement availability for the booked rooms across the stay nights (rooms
-  // with no availability row are treated as unlimited and left untouched).
+  // Decrement availability for the booked rooms across the stay nights. A room
+  // can only reach checkout if it had a positive availability row for every
+  // night (the booking gate enforces this), so each decrement hits a real row.
   await decrementAvailability(stay.channelId, stayAvailabilityItems(lines, stay.checkin, nights));
 
   const next = new URLSearchParams(url.searchParams);
