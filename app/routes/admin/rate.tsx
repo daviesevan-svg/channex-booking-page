@@ -5,6 +5,19 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { isDeadlineUnit } from "~/lib/content";
 import { deleteRate, getRate, getRooms, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
+import {
+  CARD_HANDLINGS,
+  CARD_HANDLING_LABEL,
+  DEPOSIT_TYPES,
+  DEPOSIT_TYPE_LABEL,
+  PAYMENT_TIMINGS,
+  PAYMENT_TIMING_LABEL,
+  PENALTY_LABEL,
+  PENALTY_TYPES,
+  ratePolicyOf,
+  type CancelTier,
+  type RatePolicy,
+} from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -64,6 +77,53 @@ export async function action({ params, request }: Route.ActionArgs) {
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
 
+  const pickEnum = <T extends string>(v: FormDataEntryValue | null, allowed: readonly T[], fallback: T): T => {
+    const s = String(v ?? "");
+    return (allowed as readonly string[]).includes(s) ? (s as T) : fallback;
+  };
+  const pnum = (v: FormDataEntryValue | null) => {
+    const n = Math.round(Number(v) * 100) / 100;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+
+  // ---- payment + cancellation + no-show policy ----
+  const refundable = form.get("refundable") != null;
+  const cancelDeadlineValue = posInt(form.get("cancelDeadlineValue"));
+  const cancelDeadlineUnit = unit(form.get("cancelDeadlineUnit")) ?? "hours";
+  const latePenalty = pickEnum(form.get("latePenalty"), PENALTY_TYPES, "full_stay");
+  const overrideNote = String(form.get("cancellationNote") ?? "").trim() || undefined;
+  // Single tier for now (free until the deadline, then the late penalty); stored
+  // as an array so multi-tier can land without a migration. Non-refundable rates
+  // carry no free window.
+  const tiers: CancelTier[] =
+    refundable && cancelDeadlineValue
+      ? [
+          {
+            deadlineValue: cancelDeadlineValue,
+            deadlineUnit: cancelDeadlineUnit,
+            penalty: latePenalty,
+            penaltyValue: latePenalty === "percent" || latePenalty === "fixed" ? pnum(form.get("latePenaltyValue")) : undefined,
+          },
+        ]
+      : [];
+  const payTiming = pickEnum(form.get("payTiming"), PAYMENT_TIMINGS, "pay_at_hotel");
+  const depositType = pickEnum(form.get("depositType"), DEPOSIT_TYPES, "percent");
+  const depositValue = pnum(form.get("depositValue"));
+  const noShowPenalty = pickEnum(form.get("noShowPenalty"), PENALTY_TYPES, "first_night");
+  const policy: RatePolicy = {
+    payment: {
+      timing: payTiming,
+      card: pickEnum(form.get("cardHandling"), CARD_HANDLINGS, "guarantee"),
+      deposit: payTiming === "deposit" && depositValue ? { type: depositType, value: depositValue } : undefined,
+    },
+    cancellation: { refundable, tiers },
+    noShow: {
+      penalty: noShowPenalty,
+      penaltyValue: noShowPenalty === "percent" || noShowPenalty === "fixed" ? pnum(form.get("noShowPenaltyValue")) : undefined,
+    },
+    overrideNote,
+  };
+
   // Per-person pricing is opt-in: only stored when a default occupancy is set.
   const defaultOccupancy = posInt(form.get("defaultOccupancy"));
   const occupancyPricing: OccupancyPricing | undefined = defaultOccupancy
@@ -83,10 +143,12 @@ export async function action({ params, request }: Route.ActionArgs) {
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
     prices,
     occupancyPricing,
-    refundable: form.get("refundable") != null,
-    cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
-    cancelDeadlineUnit: unit(form.get("cancelDeadlineUnit")),
-    cancellationNote: String(form.get("cancellationNote") ?? "").trim() || undefined,
+    policy,
+    // Legacy mirrors so the existing cancellation engine keeps working until PR2.
+    refundable,
+    cancelDeadlineValue,
+    cancelDeadlineUnit: cancelDeadlineValue ? cancelDeadlineUnit : undefined,
+    cancellationNote: overrideNote,
     inclusions: String(form.get("inclusions") ?? "")
       .split("\n")
       .map((s) => s.trim())
@@ -107,6 +169,9 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
+  // Effective policy (from rate.policy or legacy fields) for prefilling the form.
+  const pol = ratePolicyOf(rate ?? {});
+  const tier0 = pol.cancellation.tiers[0];
 
   return (
     <div>
@@ -164,6 +229,44 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                 />
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[17px] font-semibold">Payment</div>
+          <p className="mb-3 text-[13px] text-muted">
+            How and when the guest pays. This drives the checkout breakdown and policy text — it
+            doesn&rsquo;t charge cards (no payment gateway is connected yet).
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Payment timing
+              <select name="payTiming" defaultValue={pol.payment.timing} className={FIELD_INPUT}>
+                {PAYMENT_TIMINGS.map((t) => (
+                  <option key={t} value={t}>{PAYMENT_TIMING_LABEL[t]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Card handling
+              <select name="cardHandling" defaultValue={pol.payment.card} className={FIELD_INPUT}>
+                {CARD_HANDLINGS.map((c) => (
+                  <option key={c} value={c}>{CARD_HANDLING_LABEL[c]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Deposit type <span className="font-normal text-faint">(when timing = Deposit)</span>
+              <select name="depositType" defaultValue={pol.payment.deposit?.type ?? "percent"} className={FIELD_INPUT}>
+                {DEPOSIT_TYPES.map((d) => (
+                  <option key={d} value={d}>{DEPOSIT_TYPE_LABEL[d]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Deposit value <span className="font-normal text-faint">(% , amount, or no. of nights)</span>
+              <input name="depositValue" type="number" min={0} step="0.01" defaultValue={pol.payment.deposit?.value ?? ""} placeholder="e.g. 30" className={FIELD_INPUT} />
+            </label>
           </div>
         </div>
 
@@ -267,10 +370,43 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </select>
             <span className="text-[13px] text-muted-2">before arrival</span>
           </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Late-cancellation charge <span className="font-normal text-faint">(after the deadline)</span>
+              <select name="latePenalty" defaultValue={tier0?.penalty ?? "full_stay"} className={FIELD_INPUT}>
+                {PENALTY_TYPES.map((p) => (
+                  <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
+              <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" className={FIELD_INPUT} />
+            </label>
+          </div>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
-            Cancellation note <span className="font-normal text-faint">(shown to guests, optional)</span>
-            <input name="cancellationNote" defaultValue={rate?.cancellationNote} placeholder="Free cancellation up to 24h before arrival." className={FIELD_INPUT} />
+            Override note <span className="font-normal text-faint">(optional — replaces the auto-generated policy text)</span>
+            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder="Leave blank to show the policy generated from the fields above." className={FIELD_INPUT} />
           </label>
+        </div>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[17px] font-semibold">No-show</div>
+          <p className="mb-3 text-[13px] text-muted">What&rsquo;s charged if the guest never arrives and doesn&rsquo;t cancel.</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              No-show charge
+              <select name="noShowPenalty" defaultValue={pol.noShow.penalty} className={FIELD_INPUT}>
+                {PENALTY_TYPES.map((p) => (
+                  <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
+              <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder="e.g. 100" className={FIELD_INPUT} />
+            </label>
+          </div>
         </div>
 
         <label className="flex items-center gap-2.5 border-t border-divider pt-5 text-[14px] font-semibold">
