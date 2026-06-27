@@ -211,11 +211,12 @@ export async function getCatalogRooms(
         children: Math.max(0, room.maxGuests - room.maxAdults),
         infants: 0,
       };
-      // Room availability = the lowest nightly count over the stay (unset = open).
+      // Room availability = the lowest nightly count over the stay. A night with
+      // no inventory row counts as 0 (not bookable) — owners must set availability
+      // before a room can be sold. (No dates selected = nothing to gate on.)
       let roomAvail = Infinity;
       for (const d of nightDates) {
-        const a = inv.availability[`${room.id}|${d}`];
-        if (a !== undefined) roomAvail = Math.min(roomAvail, a);
+        roomAvail = Math.min(roomAvail, inv.availability[`${room.id}|${d}`] ?? 0);
       }
       const soldOut = gate && nightDates.length > 0 && roomAvail <= 0;
       const availForRate = Number.isFinite(roomAvail) ? roomAvail : 99;
@@ -280,7 +281,7 @@ export async function getCatalogRooms(
  *  (availability 0, or every active rate stop-sold); closedToArrival/Departure
  *  when every otherwise-bookable rate is closed to arrival/departure that day;
  *  minStayArrival is the smallest min-stay among the bookable rates. Dates with
- *  no inventory row are open (default-available, same as the booking flow). */
+ *  no inventory row are closed (not bookable, same as the booking flow). */
 export async function getCalendarAvailability(
   pid: string,
   from: string,
@@ -310,8 +311,8 @@ export async function getCalendarAvailability(
     for (const room of rooms) {
       const roomRates = ratesByRoom.get(room.id);
       if (!roomRates?.length) continue;
-      const avail = inv.availability[`${room.id}|${date}`];
-      if (avail !== undefined && avail <= 0) continue; // sold out (undefined = open)
+      const avail = inv.availability[`${room.id}|${date}`] ?? 0;
+      if (avail <= 0) continue; // no inventory set = not bookable
       for (const rt of roomRates) {
         const r = inv.restrictions[`${rt.id}|${date}`];
         if (r?.stopSell) continue; // rate not bookable this day

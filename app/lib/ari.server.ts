@@ -347,7 +347,8 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits): P
 }
 
 /** Adjust availability by `delta` per (room, date), clamped at 0. Only affects
- *  rooms/dates with an availability row (unset = unlimited). */
+ *  rooms/dates that already have an availability row (a room with no row is not
+ *  bookable, so it never reaches this path). */
 async function adjustAvailability(
   hotelCode: string,
   items: { roomId: string; date: string; by: number }[],
