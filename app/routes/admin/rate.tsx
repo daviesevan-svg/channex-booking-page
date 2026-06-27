@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/rate";
@@ -15,11 +15,60 @@ import {
   PAYMENT_TIMING_LABEL,
   PENALTY_LABEL,
   PENALTY_TYPES,
+  describePolicy,
   ratePolicyOf,
   type CancelTier,
   type RatePolicy,
 } from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
+
+/** Build the structured policy from form field getters — shared by the save
+ *  action and the editor's live preview. Disabled inputs simply read as "". */
+function buildPolicy(get: (name: string) => string): RatePolicy {
+  const num = (v: string) => {
+    const n = Math.round(Number(v) * 100) / 100;
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const int = (v: string) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  };
+  const pick = <T extends string>(v: string, allowed: readonly T[], fb: T): T =>
+    (allowed as readonly string[]).includes(v) ? (v as T) : fb;
+
+  const refundable = get("refundable") !== "";
+  const cdv = int(get("cancelDeadlineValue"));
+  const rawUnit = get("cancelDeadlineUnit");
+  const cdu = isDeadlineUnit(rawUnit) ? rawUnit : "hours";
+  const latePenalty = pick(get("latePenalty"), PENALTY_TYPES, "full_stay");
+  const tiers: CancelTier[] =
+    refundable && cdv
+      ? [
+          {
+            deadlineValue: cdv,
+            deadlineUnit: cdu,
+            penalty: latePenalty,
+            penaltyValue: latePenalty === "percent" || latePenalty === "fixed" ? num(get("latePenaltyValue")) : undefined,
+          },
+        ]
+      : [];
+  const payTiming = pick(get("payTiming"), PAYMENT_TIMINGS, "pay_at_hotel");
+  const depositValue = num(get("depositValue"));
+  const noShowPenalty = pick(get("noShowPenalty"), PENALTY_TYPES, "first_night");
+  return {
+    payment: {
+      timing: payTiming,
+      card: pick(get("cardHandling"), CARD_HANDLINGS, "guarantee"),
+      deposit: payTiming === "deposit" && depositValue ? { type: pick(get("depositType"), DEPOSIT_TYPES, "percent"), value: depositValue } : undefined,
+    },
+    cancellation: { refundable, tiers },
+    noShow: {
+      penalty: noShowPenalty,
+      penaltyValue: noShowPenalty === "percent" || noShowPenalty === "fixed" ? num(get("noShowPenaltyValue")) : undefined,
+    },
+    overrideNote: get("cancellationNote").trim() || undefined,
+  };
+}
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -69,61 +118,14 @@ export async function action({ params, request }: Route.ActionArgs) {
     const n = Math.round(Number(v));
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
-  const unit = (v: FormDataEntryValue | null) => {
-    const s = String(v ?? "");
-    return isDeadlineUnit(s) ? s : undefined;
-  };
   const money = (v: FormDataEntryValue | null) => {
     const n = Math.round(Number(v) * 100) / 100;
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
 
-  const pickEnum = <T extends string>(v: FormDataEntryValue | null, allowed: readonly T[], fallback: T): T => {
-    const s = String(v ?? "");
-    return (allowed as readonly string[]).includes(s) ? (s as T) : fallback;
-  };
-  const pnum = (v: FormDataEntryValue | null) => {
-    const n = Math.round(Number(v) * 100) / 100;
-    return Number.isFinite(n) && n > 0 ? n : undefined;
-  };
-
-  // ---- payment + cancellation + no-show policy ----
-  const refundable = form.get("refundable") != null;
-  const cancelDeadlineValue = posInt(form.get("cancelDeadlineValue"));
-  const cancelDeadlineUnit = unit(form.get("cancelDeadlineUnit")) ?? "hours";
-  const latePenalty = pickEnum(form.get("latePenalty"), PENALTY_TYPES, "full_stay");
-  const overrideNote = String(form.get("cancellationNote") ?? "").trim() || undefined;
-  // Single tier for now (free until the deadline, then the late penalty); stored
-  // as an array so multi-tier can land without a migration. Non-refundable rates
-  // carry no free window.
-  const tiers: CancelTier[] =
-    refundable && cancelDeadlineValue
-      ? [
-          {
-            deadlineValue: cancelDeadlineValue,
-            deadlineUnit: cancelDeadlineUnit,
-            penalty: latePenalty,
-            penaltyValue: latePenalty === "percent" || latePenalty === "fixed" ? pnum(form.get("latePenaltyValue")) : undefined,
-          },
-        ]
-      : [];
-  const payTiming = pickEnum(form.get("payTiming"), PAYMENT_TIMINGS, "pay_at_hotel");
-  const depositType = pickEnum(form.get("depositType"), DEPOSIT_TYPES, "percent");
-  const depositValue = pnum(form.get("depositValue"));
-  const noShowPenalty = pickEnum(form.get("noShowPenalty"), PENALTY_TYPES, "first_night");
-  const policy: RatePolicy = {
-    payment: {
-      timing: payTiming,
-      card: pickEnum(form.get("cardHandling"), CARD_HANDLINGS, "guarantee"),
-      deposit: payTiming === "deposit" && depositValue ? { type: depositType, value: depositValue } : undefined,
-    },
-    cancellation: { refundable, tiers },
-    noShow: {
-      penalty: noShowPenalty,
-      penaltyValue: noShowPenalty === "percent" || noShowPenalty === "fixed" ? pnum(form.get("noShowPenaltyValue")) : undefined,
-    },
-    overrideNote,
-  };
+  // Payment + cancellation + no-show policy (same builder the live preview uses).
+  const policy = buildPolicy((n) => String(form.get(n) ?? ""));
+  const tier0 = policy.cancellation.tiers[0];
 
   // Per-person pricing is opt-in: only stored when a default occupancy is set.
   const defaultOccupancy = posInt(form.get("defaultOccupancy"));
@@ -145,11 +147,11 @@ export async function action({ params, request }: Route.ActionArgs) {
     prices,
     occupancyPricing,
     policy,
-    // Legacy mirrors so the existing cancellation engine keeps working until PR2.
-    refundable,
-    cancelDeadlineValue,
-    cancelDeadlineUnit: cancelDeadlineValue ? cancelDeadlineUnit : undefined,
-    cancellationNote: overrideNote,
+    // Legacy mirrors (derived from the policy) so the cancellation engine works.
+    refundable: policy.cancellation.refundable,
+    cancelDeadlineValue: tier0?.deadlineValue,
+    cancelDeadlineUnit: tier0?.deadlineUnit,
+    cancellationNote: policy.overrideNote,
     inclusions: String(form.get("inclusions") ?? "")
       .split("\n")
       .map((s) => s.trim())
@@ -182,6 +184,14 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const needsValue = (p: string) => p === "percent" || p === "fixed";
   const disabledInput = `${FIELD_INPUT} disabled:cursor-not-allowed disabled:opacity-50`;
 
+  // Live preview of the guest-facing policy text, recomputed from the form on any change.
+  const formRef = useRef<HTMLFormElement>(null);
+  const [preview, setPreview] = useState(() => describePolicy(pol));
+  const refreshPreview = () => {
+    const el = formRef.current;
+    if (el) setPreview(describePolicy(buildPolicy((n) => String(new FormData(el).get(n) ?? ""))));
+  };
+
   return (
     <div>
       <Link
@@ -199,7 +209,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         )}
       </div>
 
-      <Form method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+      <Form ref={formRef} onChange={refreshPreview} method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
             Rate name
@@ -422,6 +432,19 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <input type="checkbox" name="active" defaultChecked={rate ? rate.active : true} className={checkbox} />
           Active (bookable by guests)
         </label>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-2 font-serif text-[17px] font-semibold">What guests will see</div>
+          <p className="mb-3 text-[13px] text-muted">
+            Live preview of the policy text shown on the booking page (the guest sees it in their
+            language, with the actual amounts).
+          </p>
+          <div className="flex flex-col gap-1.5 rounded-[12px] border border-line bg-surface-alt/50 p-4 text-[14px] text-secondary">
+            <div>{preview.payment}</div>
+            <div>{preview.cancellation}</div>
+            {preview.noShow && <div>{preview.noShow}</div>}
+          </div>
+        </div>
 
         {actionData && "error" in actionData && actionData.error && (
           <p className="text-[13px] text-red-600">{actionData.error}</p>

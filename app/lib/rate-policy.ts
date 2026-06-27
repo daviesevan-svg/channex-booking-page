@@ -121,6 +121,58 @@ function withDefaults(p: RatePolicy): RatePolicy {
   };
 }
 
+/** Plain-English description of a penalty (admin-facing; the guest sees the
+ *  i18n version). Currency symbol omitted — the admin knows their currency. */
+export function describePenalty(penalty: PenaltyType, value?: number): string {
+  switch (penalty) {
+    case "first_night":
+      return "the first night";
+    case "full_stay":
+      return "the full stay";
+    case "percent":
+      return value ? `${value}% of the stay` : "a percentage of the stay";
+    case "fixed":
+      return value ? `a fixed ${value}` : "a fixed amount";
+    default:
+      return "no charge";
+  }
+}
+
+/** Plain-English summary lines for the admin preview — mirrors what the guest
+ *  sees at checkout (without live £ amounts). Override note wins for cancellation. */
+export function describePolicy(p: RatePolicy): { payment: string; cancellation: string; noShow: string } {
+  let payment: string;
+  if (p.payment.timing === "full_prepay") {
+    payment = "Full payment due now.";
+  } else if (p.payment.timing === "deposit" && p.payment.deposit) {
+    const d = p.payment.deposit;
+    const amt =
+      d.type === "percent" ? `${d.value}%` : d.type === "fixed" ? `${d.value}` : d.type === "first_night" ? "the first night" : `${d.value} nights`;
+    payment = `Deposit (${amt}) due now, balance at the hotel.`;
+  } else {
+    payment = "Pay at the hotel — nothing due today.";
+  }
+  payment += p.payment.card === "charge_at_booking" ? " Card charged at booking." : " Card only guarantees the booking.";
+
+  let cancellation: string;
+  if (p.overrideNote) {
+    cancellation = p.overrideNote;
+  } else if (!p.cancellation.refundable) {
+    cancellation = "Non-refundable.";
+  } else {
+    const t = p.cancellation.tiers[0];
+    if (!t) {
+      cancellation = "Free cancellation any time before arrival.";
+    } else {
+      cancellation = `Free cancellation until ${t.deadlineValue} ${t.deadlineUnit} before arrival`;
+      cancellation += t.penalty === "none" ? "." : `, then ${describePenalty(t.penalty, t.penaltyValue)} is charged.`;
+    }
+  }
+
+  const noShow = p.noShow.penalty === "none" ? "" : `No-show: ${describePenalty(p.noShow.penalty, p.noShow.penaltyValue)} charged.`;
+  return { payment, cancellation, noShow };
+}
+
 /** The effective policy for a rate — from the structured `policy` if present,
  *  else reconstructed from the legacy flat fields (no KV migration needed). */
 export function ratePolicyOf(rate: LegacyPolicyFields): RatePolicy {
