@@ -3,6 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/manage-booking";
 import { useProperty } from "~/lib/booking-context";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
@@ -189,18 +190,23 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           ))}
         </div>
         {b.extras && b.extras.length > 0 && (
-          <div className="mt-3 flex flex-col gap-1.5 border-t border-divider pt-3">
+          <div className="mt-3 flex flex-col gap-2 border-t border-divider pt-3">
             <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
-            {b.extras.map((x, i) => (
-              <div key={i} className="flex items-start justify-between gap-3 text-[14px]">
-                <div className="min-w-0">
-                  <span>
-                    {x.optionName ? `${x.name} · ${x.optionName}` : x.name}
-                    {x.qty > 1 ? ` ×${x.qty}` : ""}
-                  </span>
-                  {x.infoLine && <div className="text-[12px] text-muted-2">{x.infoLine}</div>}
-                </div>
-                <span className="whitespace-nowrap font-semibold">{formatMoney(x.amount, cur)}</span>
+            {groupExtrasByRoom(b.extras).map((g, gi) => (
+              <div key={gi} className="flex flex-col gap-1.5">
+                <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                {g.lines.map((x, i) => (
+                  <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[14px]">
+                    <div className="min-w-0">
+                      <span>
+                        {x.optionName ? `${x.name} · ${x.optionName}` : x.name}
+                        {x.qty > 1 ? ` ×${x.qty}` : ""}
+                      </span>
+                      {x.infoLine && <div className="text-[12px] text-muted-2">{x.infoLine}</div>}
+                    </div>
+                    <span className="whitespace-nowrap font-semibold">{formatMoney(x.amount, cur)}</span>
+                  </div>
+                ))}
               </div>
             ))}
           </div>

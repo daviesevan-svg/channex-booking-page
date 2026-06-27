@@ -8,6 +8,11 @@
 
 export type ExtraUnit = "stay" | "night" | "person" | "trip";
 
+/** Where an extra is offered:
+ *  - "room": attaches to each room, chosen on that room's "enhance" step.
+ *  - "booking": offered once for the whole stay (e.g. airport pickup). */
+export type ExtraScope = "room" | "booking";
+
 export interface ExtraOption {
   id: string;
   name: string;
@@ -40,9 +45,28 @@ export interface Extra {
   fields?: ExtraField[];
   /** Heading for the info-fields section in the popup. */
   infoTitle?: string;
+  /** Per-room (default) or once-per-booking. Undefined = "room" (back-compat). */
+  scope?: ExtraScope;
+  /** Room type ids this extra is NOT offered for (room-scoped only). */
+  excludeRooms?: string[];
+  /** Rate plan ids this extra is NOT offered for (room-scoped only). */
+  excludeRates?: string[];
   active: boolean;
   position: number;
   createdAt: string;
+}
+
+/** An extra's effective scope (undefined defaults to per-room). */
+export function scopeOf(e: Extra): ExtraScope {
+  return e.scope === "booking" ? "booking" : "room";
+}
+
+/** Whether a room-scoped extra is offered for a given room + rate plan. Booking
+ *  exclusions are ignored for booking-scoped extras (offered for the whole stay). */
+export function extraEligible(e: Extra, roomId: string, rateId: string): boolean {
+  if (e.excludeRooms?.includes(roomId)) return false;
+  if (e.excludeRates?.includes(rateId)) return false;
+  return true;
 }
 
 export const UNIT_LABEL: Record<ExtraUnit, string> = {
@@ -80,30 +104,70 @@ export interface ExtraSelection {
   info?: Record<string, string>;
 }
 
-export function parseExtras(sp: URLSearchParams): ExtraSelection[] {
-  const raw = sp.get("extras");
-  if (!raw) return [];
+/** Coerce an unknown JSON value into a clean ExtraSelection[] (drops junk). */
+function coerceSelections(arr: unknown): ExtraSelection[] {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((x): x is Record<string, unknown> => !!x && typeof (x as { id?: unknown }).id === "string")
+    .map((x) => ({
+      id: String(x.id),
+      optionId: x.optionId ? String(x.optionId) : undefined,
+      qty: Math.max(1, Math.round(Number(x.qty) || 1)),
+      info:
+        x.info && typeof x.info === "object"
+          ? Object.fromEntries(Object.entries(x.info as Record<string, unknown>).map(([k, v]) => [k, String(v)]))
+          : undefined,
+    }));
+}
+
+/** The whole guest extras selection: one bucket per cart line (aligned by index)
+ *  plus a stay-wide bucket for booking-scoped extras. Carried in the URL `xt`
+ *  param (JSON) so it survives reloads and is re-priced server-side. */
+export interface ExtrasState {
+  /** Per-cart-line selections, aligned to the cart's `sel` order. */
+  lines: ExtraSelection[][];
+  /** Booking-scoped selections (offered once for the whole stay). */
+  booking: ExtraSelection[];
+}
+
+export function emptyExtrasState(): ExtrasState {
+  return { lines: [], booking: [] };
+}
+
+export function parseExtrasState(sp: URLSearchParams): ExtrasState {
+  const raw = sp.get("xt");
+  if (!raw) return emptyExtrasState();
   try {
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((x) => x && typeof x.id === "string")
-      .map((x) => ({
-        id: String(x.id),
-        optionId: x.optionId ? String(x.optionId) : undefined,
-        qty: Math.max(1, Math.round(Number(x.qty) || 1)),
-        info:
-          x.info && typeof x.info === "object"
-            ? Object.fromEntries(Object.entries(x.info).map(([k, v]) => [k, String(v)]))
-            : undefined,
-      }));
+    const obj = JSON.parse(raw) as { l?: unknown; b?: unknown };
+    const lines = Array.isArray(obj?.l) ? obj.l.map(coerceSelections) : [];
+    return { lines, booking: coerceSelections(obj?.b) };
   } catch {
-    return [];
+    return emptyExtrasState();
   }
 }
 
-export function serializeExtras(sel: ExtraSelection[]): string {
-  return sel.length ? JSON.stringify(sel) : "";
+export function serializeExtrasState(state: ExtrasState): string {
+  const lines = state.lines.map((s) => s ?? []);
+  const hasLines = lines.some((s) => s.length > 0);
+  if (!hasLines && state.booking.length === 0) return "";
+  // Trim trailing empty line buckets to keep the URL short.
+  let end = lines.length;
+  while (end > 0 && lines[end - 1].length === 0) end--;
+  return JSON.stringify({ l: lines.slice(0, end), b: state.booking });
+}
+
+/** Keep the per-line buckets aligned with the cart when lines are added/removed. */
+export function addExtrasLine(state: ExtrasState): ExtrasState {
+  return { ...state, lines: [...state.lines, []] };
+}
+export function removeExtrasLine(state: ExtrasState, index: number): ExtrasState {
+  return { ...state, lines: state.lines.filter((_, i) => i !== index) };
+}
+export function setExtrasLine(state: ExtrasState, index: number, sels: ExtraSelection[]): ExtrasState {
+  const lines = state.lines.slice();
+  while (lines.length <= index) lines.push([]);
+  lines[index] = sels;
+  return { ...state, lines };
 }
 
 // ---- server-resolved lines (priced from the catalog, snapshotted) ----
@@ -119,6 +183,8 @@ export interface ResolvedExtra {
   amount: number;
   /** One-line summary of captured info, e.g. "Flight EI 462 · Arr 14:30". */
   infoLine?: string;
+  /** The room this extra is attached to (room-scoped). Undefined = whole stay. */
+  roomTitle?: string;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -187,4 +253,56 @@ export function resolveExtras(
 
 export function extrasTotal(lines: ResolvedExtra[]): number {
   return round2(lines.reduce((s, l) => s + l.amount, 0));
+}
+
+/** Group resolved extras by the room they're attached to, preserving order.
+ *  Booking-scoped extras (no roomTitle) collect under a final `undefined` group. */
+export function groupExtrasByRoom(lines: ResolvedExtra[]): { roomTitle?: string; lines: ResolvedExtra[] }[] {
+  const groups: { roomTitle?: string; lines: ResolvedExtra[] }[] = [];
+  for (const l of lines) {
+    let g = groups.find((x) => x.roomTitle === l.roomTitle);
+    if (!g) {
+      g = { roomTitle: l.roomTitle, lines: [] };
+      groups.push(g);
+    }
+    g.lines.push(l);
+  }
+  // Keep the stay-wide group last.
+  return groups.sort((a, b) => Number(a.roomTitle === undefined) - Number(b.roomTitle === undefined));
+}
+
+/** A cart line's context for pricing its attached extras. */
+export interface ExtraContextLine {
+  roomId: string;
+  rateId: string;
+  roomTitle: string;
+  /** Guests in this room (adults + children) — drives "per person" extras. */
+  guests: number;
+}
+
+/** Resolve the whole extras state into priced lines, authoritatively:
+ *  - per-line buckets only resolve room-scoped extras eligible for that
+ *    room+rate, priced against that room's guests;
+ *  - the booking bucket only resolves booking-scoped extras, priced against the
+ *    whole party. Each per-room line is tagged with its `roomTitle`. */
+export function resolveAllExtras(
+  catalog: Extra[],
+  state: ExtrasState,
+  lines: ExtraContextLine[],
+  nights: number,
+  party: number,
+): ResolvedExtra[] {
+  const active = catalog.filter((e) => e.active);
+  const out: ResolvedExtra[] = [];
+  state.lines.forEach((sels, i) => {
+    const line = lines[i];
+    if (!line || !sels?.length) return;
+    const eligible = active.filter((e) => scopeOf(e) === "room" && extraEligible(e, line.roomId, line.rateId));
+    for (const r of resolveExtras(eligible, sels, nights, line.guests)) out.push({ ...r, roomTitle: line.roomTitle });
+  });
+  if (state.booking?.length) {
+    const eligible = active.filter((e) => scopeOf(e) === "booking");
+    out.push(...resolveExtras(eligible, state.booking, nights, party));
+  }
+  return out;
 }

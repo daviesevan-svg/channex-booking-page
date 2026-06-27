@@ -105,6 +105,7 @@ export async function ensureExampleExtras(pid: string): Promise<void> {
       desc: "Keep your room until 2pm on departure day — no rush.",
       unit: "stay",
       price: 30,
+      scope: "booking",
       active: true,
       position: 3,
       createdAt: now,
@@ -114,6 +115,7 @@ export async function ensureExampleExtras(pid: string): Promise<void> {
       name: "Airport pickup",
       desc: "Private door-to-door transfer with meet & greet at arrivals.",
       unit: "trip",
+      scope: "booking",
       infoTitle: "Flight details",
       options: [
         { id: "car", name: "Private car · 1–4 guests", price: 65, desc: "Comfortable saloon, room for luggage." },

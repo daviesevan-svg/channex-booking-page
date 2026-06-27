@@ -15,6 +15,7 @@ import {
   serializeCart,
   type ResolvedLine,
 } from "~/lib/cart";
+import { parseExtrasState, removeExtrasLine, serializeExtrasState } from "~/lib/extras";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
@@ -215,6 +216,9 @@ function CartPanel({
   continuePending,
   cartTitle,
   continueLabel,
+  channelId,
+  qs,
+  extrasCounts,
 }: {
   lines: ResolvedLine[];
   coverage: { capacity: number; total: number };
@@ -226,6 +230,9 @@ function CartPanel({
   continuePending: boolean;
   cartTitle: string;
   continueLabel: string;
+  channelId: string;
+  qs: string;
+  extrasCounts: number[];
 }) {
   const tr = useT();
   return (
@@ -248,6 +255,12 @@ function CartPanel({
                   {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
                   {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
                 </div>
+                <Link
+                  to={`/${channelId}/extras?line=${i}&${qs}`}
+                  className="mt-1 inline-block text-[12.5px] font-semibold text-accent hover:underline"
+                >
+                  {extrasCounts[i] ? tr.t("editExtrasCount", { n: extrasCounts[i] }) : tr.t("addExtras")}
+                </Link>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <span className="text-[14px] font-semibold">{formatMoney(l.total, currency)}</span>
@@ -323,18 +336,27 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
     if (navigation.state === "idle") setContinuePending(false);
   }, [navigation.state]);
 
-  function go(sel: string) {
+  // Removing a room drops its row from both the cart and the aligned per-line
+  // extras buckets, so the remaining lines keep their own extras.
+  const onRemove = (index: number) => {
+    const sel = serializeCart(removeIndex(cart, index));
+    const xt = serializeExtrasState(removeExtrasLine(parseExtrasState(searchParams), index));
     const next = new URLSearchParams(searchParams);
     if (sel) next.set("sel", sel);
     else next.delete("sel");
+    if (xt) next.set("xt", xt);
+    else next.delete("xt");
     navigate(`/${params.channelId}/rooms?${next.toString()}`);
-  }
-  const onRemove = (index: number) => go(serializeCart(removeIndex(cart, index)));
+  };
   const onContinue = () => {
     setContinuePending(true);
-    // Insert the "Enhance your stay" (extras) step before checkout.
-    navigate(`/${params.channelId}/extras?${searchParams.toString()}`);
+    // Extras are now collected per room during selection, so go straight to checkout.
+    navigate(`/${params.channelId}/checkout?${searchParams.toString()}`);
   };
+
+  // Per-line extras count, for the "Edit extras" affordance in the cart.
+  const extrasState = parseExtrasState(searchParams);
+  const extrasCounts = cart.map((_, i) => extrasState.lines[i]?.length ?? 0);
 
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const summary = `${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
@@ -396,6 +418,9 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
               continuePending={continuePending}
               cartTitle={text.cartTitle}
               continueLabel={text.continueButton}
+              channelId={params.channelId}
+              qs={qs}
+              extrasCounts={extrasCounts}
             />
           </div>
         </div>
