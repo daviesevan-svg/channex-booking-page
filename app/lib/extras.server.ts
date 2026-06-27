@@ -75,6 +75,7 @@ export async function ensureExampleExtras(pid: string): Promise<void> {
       desc: "Full breakfast served each morning of your stay.",
       unit: "person_night",
       price: 18,
+      taxable: true,
       active: true,
       position: 0,
       createdAt: now,

@@ -22,7 +22,7 @@ import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
-import { extrasTotal, groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
+import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
@@ -156,7 +156,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     text,
     urlPromo,
     extraLines,
-    extrasSum: extrasTotal(extraLines),
     taxConfig: taxConfigFrom(settings),
   };
 }
@@ -222,11 +221,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
   const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
   const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
-  const pricing = computePricing(
-    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee },
-    taxConfigFrom(settings),
-  );
-  // Extras are re-priced server-side and added on top of the (taxed) room total.
+  // Extras re-priced server-side. VAT-applicable extras fold into the room's VAT
+  // base; the rest are added on top untaxed.
   const party = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
   const extraLines = resolveAllExtras(
     await getActiveExtras(stay.channelId),
@@ -235,7 +231,19 @@ export async function action({ params, request }: Route.ActionArgs) {
     nights,
     party,
   );
-  const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
+  const pricing = computePricing(
+    {
+      base: discountedTotal,
+      nights,
+      adults,
+      children,
+      rooms: lines.length,
+      cleaningFee,
+      taxableExtras: taxableExtrasTotal(extraLines),
+    },
+    taxConfigFrom(settings),
+  );
+  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   // Open Channel booking payload. Each room's (promo-adjusted) total is spread
   // across the stay nights as days[], so the price we send is exactly what we
@@ -390,7 +398,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, extrasSum } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -416,10 +424,18 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
   const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
   const pricing = computePricing(
-    { base: discountedRoom, nights, adults, children, rooms: lines.length, cleaningFee },
+    {
+      base: discountedRoom,
+      nights,
+      adults,
+      children,
+      rooms: lines.length,
+      cleaningFee,
+      taxableExtras: taxableExtrasTotal(extraLines),
+    },
     loaderData.taxConfig,
   );
-  const grandTotal = Math.round((pricing.total + extrasSum) * 100) / 100;
+  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">

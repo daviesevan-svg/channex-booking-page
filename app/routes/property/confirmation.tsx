@@ -13,7 +13,7 @@ import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
-import { extrasTotal, groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
+import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "~/lib/extras";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -84,11 +84,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       children: occ.childrenAge?.length ?? 0,
       rooms: rooms.length,
       cleaningFee,
+      taxableExtras: taxableExtrasTotal(extraLines),
     },
     taxConfigFrom(settings),
   );
 
-  const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
+  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   return {
     reference: params.ref,

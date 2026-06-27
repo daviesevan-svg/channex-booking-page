@@ -55,6 +55,9 @@ export interface PricingInput {
   rooms: number;
   /** Total cleaning fee across the booked rooms (per stay). VAT always applies. */
   cleaningFee?: number;
+  /** Sum of VAT-applicable extras. Folded into the VAT base and the total;
+   *  non-taxable extras are added on top by the caller. */
+  taxableExtras?: number;
 }
 
 export interface PriceLine {
@@ -122,8 +125,9 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
     }
   }
 
-  // VAT applies to the room plus any taxable fee/city-tax.
-  const taxableBase = base + taxableExtra;
+  // VAT applies to the room, taxable fees/city-tax, and any VAT-applicable extras.
+  const taxableExtras = round2(input.taxableExtras ?? 0);
+  const taxableBase = base + taxableExtra + taxableExtras;
   const taxLines: PriceLine[] = [];
   let taxIncluded = 0;
   let taxAdded = 0;
@@ -146,7 +150,9 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
     charges,
     taxLines,
     taxIncluded: round2(taxIncluded),
-    total: round2(base + chargesTotal + taxAdded),
+    // taxableExtras are part of the priced total here (inclusive: gross already
+    // holds VAT; on-top: their VAT is in taxAdded). Untaxed extras added by caller.
+    total: round2(base + chargesTotal + taxableExtras + taxAdded),
   };
 }
 
