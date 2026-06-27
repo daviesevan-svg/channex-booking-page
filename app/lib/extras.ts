@@ -6,7 +6,7 @@
 // flight number). Prices scale by unit: per stay/trip ×1, per night ×nights,
 // per person ×guests; quantity multiplies on top.
 
-export type ExtraUnit = "stay" | "night" | "person" | "trip";
+export type ExtraUnit = "stay" | "night" | "person" | "person_night" | "trip";
 
 /** Where an extra is offered:
  *  - "room": attaches to each room, chosen on that room's "enhance" step.
@@ -73,6 +73,7 @@ export const UNIT_LABEL: Record<ExtraUnit, string> = {
   stay: "per stay",
   night: "per night",
   person: "per person",
+  person_night: "per person/night",
   trip: "per trip",
 };
 
@@ -84,6 +85,7 @@ export function isConfigurable(e: Extra): boolean {
 export function unitMultiplier(unit: ExtraUnit, nights: number, guests: number): number {
   if (unit === "night") return Math.max(1, nights);
   if (unit === "person") return Math.max(1, guests);
+  if (unit === "person_night") return Math.max(1, nights) * Math.max(1, guests);
   return 1; // stay, trip
 }
 

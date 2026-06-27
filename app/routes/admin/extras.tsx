@@ -19,7 +19,7 @@ import {
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
-const UNITS: ExtraUnit[] = ["stay", "night", "person", "trip"];
+const UNITS: ExtraUnit[] = ["stay", "night", "person", "person_night", "trip"];
 
 function slug(s: string): string {
   return (
