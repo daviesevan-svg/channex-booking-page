@@ -403,10 +403,6 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" disabled={!needsValue(latePenalty)} className={disabledInput} />
             </label>
           </div>
-          <label className="mt-4 block text-[13px] font-semibold text-secondary">
-            Override note <span className="font-normal text-faint">(optional — replaces the auto-generated policy text)</span>
-            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder="Leave blank to show the policy generated from the fields above." className={FIELD_INPUT} />
-          </label>
         </div>
 
         <div className="border-t border-divider pt-5">
@@ -444,6 +440,10 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             <div>{preview.cancellation}</div>
             {preview.noShow && <div>{preview.noShow}</div>}
           </div>
+          <label className="mt-4 block text-[13px] font-semibold text-secondary">
+            Override note <span className="font-normal text-faint">(optional — replaces the cancellation line above)</span>
+            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder="Leave blank to show the policy generated from the fields above." className={FIELD_INPUT} />
+          </label>
         </div>
 
         {actionData && "error" in actionData && actionData.error && (
