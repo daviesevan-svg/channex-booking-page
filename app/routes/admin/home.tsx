@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
+import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,
   getSearchContentRaw,
@@ -44,6 +44,7 @@ export async function action({ request }: Route.ActionArgs) {
     heading: s(form.get("heading")) || undefined,
     intro: s(form.get("intro")) || undefined,
     promoText: s(form.get("promoText")) || undefined,
+    promoPlaceholder: s(form.get("promoPlaceholder")) || undefined,
     searchButton: s(form.get("searchButton")) || undefined,
     highlights: highlights.length ? highlights : undefined,
   };
@@ -121,6 +122,13 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
             value={content.promoText}
             placeholder={DEFAULT_SEARCH.promoText}
             hint="The collapsible “add a promo code” link shown above the search button."
+          />
+          <Field
+            name="promoPlaceholder"
+            label="Promo code box placeholder"
+            value={content.promoPlaceholder}
+            placeholder={DEFAULT_PROMO_PLACEHOLDER}
+            hint="The faint example text inside the promo-code box (e.g. SUMMER10)."
           />
         </div>
 

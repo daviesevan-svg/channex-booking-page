@@ -13,10 +13,16 @@ export interface SearchContent {
   heading?: string;
   intro?: string;
   promoText?: string;
+  /** Placeholder shown inside the promo-code input (an example code). */
+  promoPlaceholder?: string;
   searchButton?: string;
   highlights?: Highlight[];
   heroImage?: string; // language-independent; falls back to the Channex photo
 }
+
+/** Default promo-code input placeholder. Not in DEFAULT_SEARCH/translations
+ *  because it's an example code, not translated copy. */
+export const DEFAULT_PROMO_PLACEHOLDER = "SUMMER10";
 
 // ---- Editable copy for the remaining pages (flat string fields) ----
 export interface PageField {

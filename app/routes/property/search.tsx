@@ -7,7 +7,7 @@ import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
+import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getSearchContent } from "~/lib/overrides.server";
@@ -81,6 +81,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const heading = content.heading || DEFAULT_SEARCH.heading;
   const intro = content.intro || DEFAULT_SEARCH.intro;
   const promoText = content.promoText || DEFAULT_SEARCH.promoText;
+  const promoPlaceholder = content.promoPlaceholder || DEFAULT_PROMO_PLACEHOLDER;
   const searchButton = content.searchButton || DEFAULT_SEARCH.searchButton;
   const highlights = content.highlights?.length ? content.highlights : DEFAULT_SEARCH.highlights;
   const heroPhoto = content.heroImage || property.photos?.[0]?.url;
@@ -181,7 +182,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             onKeyDown={(e) => {
               if (e.key === "Enter") searchRooms();
             }}
-            placeholder="SUMMER10"
+            placeholder={promoPlaceholder}
             autoComplete="off"
             className="mt-2 block w-[240px] max-w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
           />
