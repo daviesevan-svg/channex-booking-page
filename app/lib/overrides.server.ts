@@ -2,6 +2,7 @@ import { getConfigKV } from "./config.server";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
   DEFAULT_LANG,
+  DEFAULT_PROMO_PLACEHOLDER,
   isDeadlineUnit,
   isThemeId,
   normalizeHex,
@@ -93,6 +94,7 @@ export async function getSearchContent(pid: string, lang = DEFAULT_LANG): Promis
     heading: loc.heading ?? base.heading ?? d.heading,
     intro: loc.intro ?? base.intro ?? d.intro,
     promoText: loc.promoText ?? base.promoText ?? d.promoText,
+    promoPlaceholder: loc.promoPlaceholder ?? base.promoPlaceholder ?? DEFAULT_PROMO_PLACEHOLDER,
     searchButton: loc.searchButton ?? base.searchButton ?? d.searchButton,
     highlights: loc.highlights ?? base.highlights ?? d.highlights,
     heroImage: base.heroImage, // language-independent — always from the base entry
