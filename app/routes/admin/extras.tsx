@@ -113,6 +113,7 @@ export async function action({ request }: Route.ActionArgs) {
   const fieldsText = String(form.get("fields") ?? "");
   const infoTitle = String(form.get("infoTitle") ?? "").trim() || undefined;
   const active = form.get("active") != null;
+  const taxable = form.get("taxable") != null;
   const scope: ExtraScope = form.get("scope") === "booking" ? "booking" : "room";
   // Exclusions only apply to room-scoped extras.
   const excludeRooms = scope === "room" ? form.getAll("excludeRooms").map(String).filter(Boolean) : [];
@@ -152,6 +153,7 @@ export async function action({ request }: Route.ActionArgs) {
     scope,
     excludeRooms: excludeRooms.length ? excludeRooms : undefined,
     excludeRates: excludeRates.length ? excludeRates : undefined,
+    taxable,
     active,
     position: prev?.position ?? existing.length,
     createdAt: prev?.createdAt ?? new Date().toISOString(),
@@ -383,6 +385,11 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         </fieldset>
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
+          <input type="checkbox" name="taxable" defaultChecked={editing ? !!editing.taxable : false} className={checkbox} />
+          VAT applies <span className="font-normal text-faint">(taxed at the property’s VAT rate, like the room)</span>
+        </label>
+
+        <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="active" defaultChecked={editing ? editing.active : true} className={checkbox} />
           Active (shown to guests)
         </label>
@@ -428,6 +435,9 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">per booking</span>
                   ) : (e.excludeRooms?.length || e.excludeRates?.length) ? (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">limited rooms/rates</span>
+                  ) : null}
+                  {e.taxable ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">VAT</span>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency)}</div>

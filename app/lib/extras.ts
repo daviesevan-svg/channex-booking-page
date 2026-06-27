@@ -47,6 +47,9 @@ export interface Extra {
   infoTitle?: string;
   /** Per-room (default) or once-per-booking. Undefined = "room" (back-compat). */
   scope?: ExtraScope;
+  /** VAT applies to this extra (the property's tax rate, same inclusive/on-top
+   *  mode as the room). Default false — extras are untaxed unless flagged. */
+  taxable?: boolean;
   /** Room type ids this extra is NOT offered for (room-scoped only). */
   excludeRooms?: string[];
   /** Rate plan ids this extra is NOT offered for (room-scoped only). */
@@ -187,6 +190,8 @@ export interface ResolvedExtra {
   infoLine?: string;
   /** The room this extra is attached to (room-scoped). Undefined = whole stay. */
   roomTitle?: string;
+  /** VAT applies to this line (folded into the room's VAT base at checkout). */
+  taxable?: boolean;
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -235,6 +240,7 @@ export function resolveExtras(
         qty,
         amount,
         infoLine,
+        taxable: extra.taxable,
       });
     } else {
       if (extra.price == null) continue;
@@ -247,10 +253,20 @@ export function resolveExtras(
         qty,
         amount,
         infoLine,
+        taxable: extra.taxable,
       });
     }
   }
   return lines;
+}
+
+/** Sum of extras the property's VAT applies to (folded into the VAT base). */
+export function taxableExtrasTotal(lines: ResolvedExtra[]): number {
+  return round2(lines.filter((l) => l.taxable).reduce((s, l) => s + l.amount, 0));
+}
+/** Sum of extras with no VAT (added on top of the taxed total untouched). */
+export function untaxedExtrasTotal(lines: ResolvedExtra[]): number {
+  return round2(lines.filter((l) => !l.taxable).reduce((s, l) => s + l.amount, 0));
 }
 
 export function extrasTotal(lines: ResolvedExtra[]): number {
