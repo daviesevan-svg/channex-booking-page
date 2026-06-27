@@ -11,6 +11,7 @@ import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { occupancyNightlyDelta } from "~/lib/rate-pricing";
+import { cancellationMessage } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
@@ -102,9 +103,17 @@ function Stepper({
 function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): string {
   const parts: string[] = [];
   if (plan.mealPlan) parts.push(plan.mealPlan);
-  if (plan.cancellationNote) parts.push(plan.cancellationNote);
-  else if (plan.cancellationPolicy?.title)
-    parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
+  if (plan.cancellationNote) {
+    parts.push(plan.cancellationNote); // owner override wins
+  } else {
+    // Derive the cancellation line (incl. the free-cancel deadline) from the policy.
+    const msg = cancellationMessage(
+      { refundable: plan.refundable ?? true, cancelByISO: plan.freeCancelUntilISO ?? null },
+      Date.now(),
+    );
+    if (msg) parts.push(tr.t(msg.key, "iso" in msg ? { date: format(parseISO(msg.iso), "d MMM", { locale: tr.locale }) } : undefined));
+    else if (plan.cancellationPolicy?.title) parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
+  }
   return parts.join(" · ") || tr.t("standardRate");
 }
 

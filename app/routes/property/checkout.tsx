@@ -18,7 +18,10 @@ import {
   stayAvailabilityItems,
   type BookingStatus,
 } from "~/lib/bookings.server";
-import { resolveBookingCancellation } from "~/lib/policy.server";
+import { resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
+import { dueNow, policyToCancellation } from "~/lib/policy-copy";
+import { CARD_HANDLING_LABEL, PAYMENT_TIMING_LABEL } from "~/lib/rate-policy";
+import { cancellationMessage } from "~/lib/cancellation";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
@@ -146,6 +149,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     nights,
     party,
   );
+  // Effective payment + cancellation + no-show policy for the booking, plus the
+  // cancellation snapshot (for the translated free-until line).
+  const policy = await resolveBookingPolicy(params.channelId, lines.map((l) => l.rateId));
+  const cancellation = await resolveBookingCancellation(params.channelId, lines.map((l) => l.rateId), stay.checkin);
   return {
     stay,
     lines: linesView,
@@ -156,6 +163,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     text,
     urlPromo,
     extraLines,
+    policy,
+    cancellation,
     taxConfig: taxConfigFrom(settings),
   };
 }
@@ -398,7 +407,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -436,6 +445,36 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     loaderData.taxConfig,
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
+
+  // ---- payment + policy summary (display only; no real charging) ----
+  const due = dueNow(policy, grandTotal, nights);
+  const atHotel = Math.round((grandTotal - due) * 100) / 100;
+  const cardCharged = policy.payment.card === "charge_at_booking" || policy.payment.timing === "full_prepay";
+  const penaltyPhrase = (penalty: string, value?: number) => {
+    switch (penalty) {
+      case "first_night":
+        return tr.t("penaltyFirstNight");
+      case "full_stay":
+        return tr.t("penaltyFullStay");
+      case "percent":
+        return value ? tr.t("penaltyPercent", { n: value }) : "";
+      case "fixed":
+        return value ? formatMoney(value, currency) : "";
+      default:
+        return "";
+    }
+  };
+  // Cancellation: the override note wins; else the translated free-until / non-refundable line.
+  const cancelMsg = cancellationMessage(policyToCancellation(policy, stay.checkin), Date.now());
+  const cancellationText =
+    policy.overrideNote ||
+    (cancelMsg ? tr.t(cancelMsg.key, "iso" in cancelMsg ? { date: fmt(parseISO(cancelMsg.iso), "EEE d MMM yyyy") } : undefined) : "");
+  const tier0 = policy.cancellation.tiers[0];
+  const latePhrase =
+    policy.cancellation.refundable && tier0 && tier0.penalty !== "none" && !policy.overrideNote
+      ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
+      : "";
+  const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -482,10 +521,32 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </section>
 
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-2 font-serif text-[20px] font-semibold">{text.paymentSection}</h3>
-            <p className="mb-[18px] whitespace-pre-line text-sm leading-[1.55] text-muted">
-              {text.paymentNote}
+            <h3 className="mb-3 font-serif text-[20px] font-semibold">{text.paymentSection}</h3>
+
+            <div className="mb-3 flex flex-col gap-1.5 text-[14.5px]">
+              <div className="flex justify-between">
+                <span className="text-secondary">{tr.t("dueNow")}</span>
+                <span className="font-semibold">{formatMoney(due, currency)}</span>
+              </div>
+              {atHotel > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-secondary">{tr.t("dueAtHotel")}</span>
+                  <span className="font-semibold">{formatMoney(atHotel, currency)}</span>
+                </div>
+              )}
+            </div>
+            <p className="mb-[18px] text-sm leading-[1.55] text-muted">
+              {cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
             </p>
+
+            {(cancellationText || latePhrase || noShowPhrase) && (
+              <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13.5px] text-secondary">
+                {cancellationText && <div>{cancellationText}</div>}
+                {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
+                {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
+              </div>
+            )}
+
             <div className="rounded-[10px] border border-dashed border-[#d8cdb9] bg-[#fbf7f0] p-[18px] text-[13px] text-muted-2">
               {tr.t("cardPlaceholder")}
             </div>

@@ -11,7 +11,8 @@ import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
 import { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
-import type { RatePolicy } from "./rate-policy";
+import { ratePolicyOf, type RatePolicy } from "./rate-policy";
+import { policyToCancellation } from "./policy-copy";
 import type { CartLine, ResolvedLine } from "./cart";
 
 // Re-export so existing importers (admin rate editor) keep their import path.
@@ -240,6 +241,7 @@ export async function getCatalogRooms(
             .filter((r) => r.active && r.prices[room.id] !== undefined)
             .map((r): RatePlan | null => {
               const base = r.prices[room.id];
+              const pol = ratePolicyOf(r);
               const k = (d: string) => `${room.id}|${r.id}|${d}`;
               if (gate) {
                 if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) return null;
@@ -269,7 +271,9 @@ export async function getCatalogRooms(
                 netPrice: total, // no separate tax for manual rates
                 availability: availForRate,
                 inclusions: r.inclusions.length ? r.inclusions : undefined,
-                cancellationNote: r.cancellationNote || (r.refundable ? undefined : "Non-refundable"),
+                cancellationNote: pol.overrideNote || undefined,
+                refundable: pol.cancellation.refundable,
+                freeCancelUntilISO: policyToCancellation(pol, checkinDate).cancelByISO,
                 offer: offer
                   ? {
                       name: offer.name || "Offer",
