@@ -13,7 +13,7 @@ import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
-import { extrasTotal, parseExtras, resolveExtras } from "~/lib/extras";
+import { extrasTotal, groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
@@ -29,6 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let nights = 0;
   let cleaningFee = 0;
   let offer: { name: string; percent: number; discount: number } | null = null;
+  let extraLines: ResolvedExtra[] = [];
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -57,6 +58,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     if (oName) {
       offer = { name: oName, percent: oPct, discount: Math.round((Math.round(orig * 100) / 100 - total) * 100) / 100 };
     }
+    // Extras carried in the URL, re-priced per room / per booking.
+    extraLines = resolveAllExtras(
+      await getActiveExtras(params.channelId),
+      parseExtrasState(url.searchParams),
+      lines.map((l) => ({
+        roomId: l.roomId,
+        rateId: l.rateId,
+        roomTitle: l.roomTitle,
+        guests: l.occupancy.adults + l.occupancy.children,
+      })),
+      nights,
+      occ.adults + (occ.childrenAge?.length ?? 0),
+    );
   }
 
   const applied =
@@ -76,11 +90,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
 
-  const guests = occ.adults + (occ.childrenAge?.length ?? 0);
-  const extraLines =
-    checkin && checkout
-      ? resolveExtras(await getActiveExtras(params.channelId), parseExtras(url.searchParams), nights, guests)
-      : [];
   const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
 
   return {
@@ -206,14 +215,19 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
                 <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
               </div>
             ))}
-          {extraLines.map((l) => (
-            <div key={l.id} className="flex justify-between">
-              <span className="text-secondary">
-                {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
-                {l.qty > 1 ? ` ×${l.qty}` : ""}
-                {l.infoLine ? <span className="block text-[12px] text-muted-2">{l.infoLine}</span> : null}
-              </span>
-              <span className="font-semibold">{formatMoney(l.amount, currency)}</span>
+          {groupExtrasByRoom(extraLines).map((g, gi) => (
+            <div key={gi} className="flex flex-col gap-1">
+              <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+              {g.lines.map((l) => (
+                <div key={`${l.id}-${l.optionId ?? ""}`} className="flex justify-between pl-2">
+                  <span className="text-secondary">
+                    {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
+                    {l.qty > 1 ? ` ×${l.qty}` : ""}
+                    {l.infoLine ? <span className="block text-[12px] text-muted-2">{l.infoLine}</span> : null}
+                  </span>
+                  <span className="font-semibold">{formatMoney(l.amount, currency)}</span>
+                </div>
+              ))}
             </div>
           ))}
           {total > 0 && (

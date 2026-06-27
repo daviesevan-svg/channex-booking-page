@@ -9,6 +9,7 @@ import { getCatalogRooms } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
+import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy } from "~/lib/occupancy";
@@ -80,9 +81,17 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   function addToStay() {
     if (!chosen) return;
     const lines = addLine(parseCart(searchParams), { roomId: room.id, rateId: chosen.id });
+    const newIndex = lines.length - 1;
+    // Keep the per-line extras buckets aligned with the cart, then send the guest
+    // to that room's "enhance" step (it redirects straight to results if there's
+    // nothing to offer for this room).
+    const state = addExtrasLine(parseExtrasState(searchParams));
     const next = new URLSearchParams(searchParams);
     next.set("sel", serializeCart(lines));
-    navigate(`/${params.channelId}/rooms?${next.toString()}`);
+    const xt = serializeExtrasState(state);
+    if (xt) next.set("xt", xt);
+    else next.delete("xt");
+    navigate(`/${params.channelId}/extras?line=${newIndex}&${next.toString()}`);
   }
 
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";

@@ -9,12 +9,15 @@ import { formatMoney } from "~/lib/money";
 import {
   UNIT_LABEL,
   isConfigurable,
+  scopeOf,
   type Extra,
   type ExtraField,
   type ExtraOption,
+  type ExtraScope,
   type ExtraUnit,
 } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
+import { getRates, getRooms } from "~/lib/catalog.server";
 
 const UNITS: ExtraUnit[] = ["stay", "night", "person", "trip"];
 
@@ -64,13 +67,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
   // Seed example extras on first visit so owners start from something editable.
   await ensureExampleExtras(propertyId);
-  const [extras, settings] = await Promise.all([getExtras(propertyId), getSettings(propertyId)]);
+  const [extras, settings, rooms, rates] = await Promise.all([
+    getExtras(propertyId),
+    getSettings(propertyId),
+    getRooms(propertyId),
+    getRates(propertyId),
+  ]);
   const url = new URL(request.url);
   const editId = url.searchParams.get("edit");
   return {
     configured: true as const,
     extras,
     currency: settings.currency || "GBP",
+    rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
+    rates: rates.map((r) => ({ id: r.id, title: r.title })),
     editing: extras.find((e) => e.id === editId) ?? null,
     creating: url.searchParams.get("new") != null,
   };
@@ -103,6 +113,10 @@ export async function action({ request }: Route.ActionArgs) {
   const fieldsText = String(form.get("fields") ?? "");
   const infoTitle = String(form.get("infoTitle") ?? "").trim() || undefined;
   const active = form.get("active") != null;
+  const scope: ExtraScope = form.get("scope") === "booking" ? "booking" : "room";
+  // Exclusions only apply to room-scoped extras.
+  const excludeRooms = scope === "room" ? form.getAll("excludeRooms").map(String).filter(Boolean) : [];
+  const excludeRates = scope === "room" ? form.getAll("excludeRates").map(String).filter(Boolean) : [];
   const values = { id, name, desc: desc ?? "", unit, price: priceRaw, options: optionsText, fields: fieldsText, infoTitle: infoTitle ?? "" };
 
   if (!name) return { error: "Enter a name for the extra.", values };
@@ -135,6 +149,9 @@ export async function action({ request }: Route.ActionArgs) {
     options: configurable ? options : undefined,
     fields: fields.length ? fields : undefined,
     infoTitle: fields.length ? infoTitle : undefined,
+    scope,
+    excludeRooms: excludeRooms.length ? excludeRooms : undefined,
+    excludeRates: excludeRates.length ? excludeRates : undefined,
     active,
     position: prev?.position ?? existing.length,
     createdAt: prev?.createdAt ?? new Date().toISOString(),
@@ -180,7 +197,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
     );
   }
 
-  const { extras, currency, editing, creating } = loaderData;
+  const { extras, currency, editing, creating, rooms, rates } = loaderData;
   const v = actionData && "values" in actionData ? actionData.values : undefined;
   const cur = (k: keyof NonNullable<typeof v>, fallback = "") => (v?.[k] as string | undefined) ?? fallback;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -300,6 +317,71 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
           <input name="infoTitle" defaultValue={editing?.infoTitle ?? cur("infoTitle")} placeholder="Flight details" className={FIELD_INPUT} />
         </label>
 
+        <fieldset className="rounded-[12px] border border-line bg-surface-alt/40 p-4">
+          <legend className="px-1 text-[13px] font-semibold text-secondary">Where it’s offered</legend>
+          <label className="block text-[13px] font-semibold text-secondary">
+            Offered
+            <select name="scope" defaultValue={editing ? scopeOf(editing) : "room"} className={FIELD_INPUT}>
+              <option value="room">Per room — guest picks it for each room</option>
+              <option value="booking">Per booking — offered once for the whole stay</option>
+            </select>
+            <span className="mt-1 block text-[11px] font-normal text-faint">
+              “Per room” extras appear on each room’s enhance step (breakfast, parking). “Per booking”
+              extras (airport pickup, late checkout) are offered once, with the first room.
+            </span>
+          </label>
+
+          {(rooms.length > 0 || rates.length > 0) && (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {rooms.length > 0 && (
+                <div>
+                  <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+                    Hide for rooms
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {rooms.map((r) => (
+                      <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
+                        <input
+                          type="checkbox"
+                          name="excludeRooms"
+                          value={r.id}
+                          defaultChecked={editing?.excludeRooms?.includes(r.id) ?? false}
+                          className={checkbox}
+                        />
+                        {r.title}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {rates.length > 0 && (
+                <div>
+                  <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+                    Hide for rate plans
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {rates.map((r) => (
+                      <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
+                        <input
+                          type="checkbox"
+                          name="excludeRates"
+                          value={r.id}
+                          defaultChecked={editing?.excludeRates?.includes(r.id) ?? false}
+                          className={checkbox}
+                        />
+                        {r.title}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <span className="text-[11px] font-normal text-faint sm:col-span-2">
+                Leave unticked to offer everywhere. Exclusions apply to “per room” extras only.
+              </span>
+            </div>
+          )}
+        </fieldset>
+
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="active" defaultChecked={editing ? editing.active : true} className={checkbox} />
           Active (shown to guests)
@@ -341,6 +423,11 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                   )}
                   {e.fields?.length ? (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">collects info</span>
+                  ) : null}
+                  {scopeOf(e) === "booking" ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">per booking</span>
+                  ) : (e.excludeRooms?.length || e.excludeRates?.length) ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">limited rooms/rates</span>
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency)}</div>

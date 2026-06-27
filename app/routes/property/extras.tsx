@@ -4,16 +4,19 @@ import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/extras";
 import { useProperty } from "~/lib/booking-context";
-import { cartCovers, cartCoverage, parseCart, resolveCart, withinAvailability } from "~/lib/cart";
+import { parseCart, resolveCart } from "~/lib/cart";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import {
   UNIT_LABEL,
+  extraEligible,
   fromPrice,
   isConfigurable,
-  parseExtras,
+  parseExtrasState,
   resolveExtras,
-  serializeExtras,
+  scopeOf,
+  serializeExtrasState,
+  setExtrasLine,
   type Extra,
   type ExtraSelection,
 } from "~/lib/extras";
@@ -29,27 +32,45 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const occ = readOccupancy(url.searchParams);
   if (!checkin || !checkout) throw redirect(`/${params.channelId}`);
 
+  const sp = url.searchParams.toString();
+  const lineIndex = Number(url.searchParams.get("line"));
+  if (!Number.isInteger(lineIndex) || lineIndex < 0) throw redirect(`/${params.channelId}/rooms?${sp}`);
+
   const rooms = await getCatalogRooms(
     params.channelId,
     { checkinDate: checkin, checkoutDate: checkout, currency, adults: occ.adults },
     { gate: true },
   );
-  const lines = resolveCart(parseCart(url.searchParams), rooms);
-  // Must have a valid room selection to enhance — otherwise back to results.
-  if (!cartCovers(lines, occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
-    throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+  const cartLines = resolveCart(parseCart(url.searchParams), rooms);
+  const line = cartLines[lineIndex];
+  if (!line) throw redirect(`/${params.channelId}/rooms?${sp}`);
+
+  // Room-scoped extras eligible for this room+rate; booking-scoped extras are
+  // offered once, on the first room's step.
+  const catalog = await getActiveExtras(params.channelId);
+  const roomExtras = catalog.filter((e) => scopeOf(e) === "room" && extraEligible(e, line.roomId, line.rateId));
+  const isFirst = lineIndex === 0;
+  const bookingExtras = isFirst ? catalog.filter((e) => scopeOf(e) === "booking") : [];
+  // Nothing to offer for this room → skip the step entirely.
+  if (roomExtras.length === 0 && bookingExtras.length === 0) {
+    throw redirect(`/${params.channelId}/rooms?${sp}`);
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-  const catalog = await getActiveExtras(params.channelId);
+  const state = parseExtrasState(url.searchParams);
   return {
+    lineIndex,
     nights,
-    guests: partySize(occ),
     currency,
-    catalog,
-    selection: parseExtras(url.searchParams),
-    roomLines: lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle, total: l.total })),
-    roomTotal: cartCoverage(lines).total,
+    roomGuests: line.occupancy.adults + line.occupancy.children,
+    party: partySize(occ),
+    roomTitle: line.roomTitle,
+    rateTitle: line.rateTitle,
+    roomTotal: line.total,
+    roomExtras,
+    bookingExtras,
+    roomSelection: state.lines[lineIndex] ?? [],
+    bookingSelection: state.booking,
   };
 }
 
@@ -73,16 +94,32 @@ function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc:
 
 const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 11px,#e7ddcc 11px,#e7ddcc 22px)";
 
-export default function Extras({ loaderData, params }: Route.ComponentProps) {
-  const { nights, guests, currency, catalog, roomLines, roomTotal } = loaderData;
-  const { currency: ctxCurrency } = useProperty();
-  const cur = ctxCurrency || currency;
-  const tr = useT();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [sel, setSel] = useState<ExtraSelection[]>(loaderData.selection);
-  const [modalId, setModalId] = useState<string | null>(null);
+type Tr = ReturnType<typeof useT>;
 
+/** One selectable group of extras (a room's add-ons, or the stay-wide set),
+ *  owning its own configure-modal state. Mutates the parent's selection list. */
+function ExtraSection({
+  title,
+  subtitle,
+  extras,
+  sel,
+  setSel,
+  currency,
+  nights,
+  guests,
+  tr,
+}: {
+  title: string;
+  subtitle?: string;
+  extras: Extra[];
+  sel: ExtraSelection[];
+  setSel: React.Dispatch<React.SetStateAction<ExtraSelection[]>>;
+  currency: string;
+  nights: number;
+  guests: number;
+  tr: Tr;
+}) {
+  const [modalId, setModalId] = useState<string | null>(null);
   const find = (id: string) => sel.find((s) => s.id === id);
   const setQty = (id: string, qty: number) =>
     setSel((prev) => {
@@ -91,124 +128,36 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
       return next;
     });
   const removeSel = (id: string) => setSel((prev) => prev.filter((s) => s.id !== id));
-  const commit = (entry: ExtraSelection) =>
-    setSel((prev) => [...prev.filter((s) => s.id !== entry.id), entry]);
+  const commit = (entry: ExtraSelection) => setSel((prev) => [...prev.filter((s) => s.id !== entry.id), entry]);
+  const modalExtra = extras.find((e) => e.id === modalId) ?? null;
 
-  const lines = resolveExtras(catalog, sel, nights, guests);
-  const extrasSum = lines.reduce((s, l) => s + l.amount, 0);
-  const total = Math.round((roomTotal + extrasSum) * 100) / 100;
-
-  const go = (skip: boolean) => {
-    const next = new URLSearchParams(searchParams);
-    const serialized = serializeExtras(skip ? [] : sel);
-    if (serialized) next.set("extras", serialized);
-    else next.delete("extras");
-    navigate(`/${params.channelId}/checkout?${next.toString()}`);
-  };
-
-  const modalExtra = catalog.find((e) => e.id === modalId) ?? null;
-
+  if (extras.length === 0) return null;
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
-      <Link
-        to={`/${params.channelId}/rooms?${searchParams.toString()}`}
-        className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
-      >
-        ← {tr.t("allRooms")}
-      </Link>
-      <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">{tr.t("enhanceTitle")}</h1>
-      <p className="mb-7 text-[15px] text-secondary">{tr.t("enhanceIntro")}</p>
-
-      <div className="flex flex-wrap items-start gap-9">
-        <div className="min-w-[340px] flex-[1.6]">
-          {catalog.length === 0 ? (
-            <div className="rounded-[16px] border border-line bg-surface p-6 text-[14px] text-secondary">
-              No extras available for this stay.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              {catalog.map((e) => (
-                <ExtraCard
-                  key={e.id}
-                  extra={e}
-                  currency={cur}
-                  nights={nights}
-                  guests={guests}
-                  selection={find(e.id)}
-                  onAdd={() => setQty(e.id, (find(e.id)?.qty ?? 0) + 1)}
-                  onInc={() => setQty(e.id, (find(e.id)?.qty ?? 0) + 1)}
-                  onDec={() => setQty(e.id, (find(e.id)?.qty ?? 0) - 1)}
-                  onConfigure={() => setModalId(e.id)}
-                  onRemove={() => removeSel(e.id)}
-                  tr={tr}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* summary */}
-        <aside
-          className="sticky top-24 min-w-[300px] flex-1 rounded-[18px] border border-line bg-surface p-6"
-          style={{ boxShadow: "var(--shadow-sticky)" }}
-        >
-          <h3 className="mb-4 font-serif text-[21px] font-semibold">{tr.p("yourStayRooms", roomLines.length)}</h3>
-          <div className="flex flex-col gap-3 border-b border-divider pb-4">
-            {roomLines.map((l, i) => (
-              <div key={i} className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[14.5px] font-semibold">{l.title}</div>
-                  <div className="text-[12.5px] text-muted-2">{l.rate}</div>
-                </div>
-                <span className="whitespace-nowrap text-[14px] font-semibold">{formatMoney(l.total, cur)}</span>
-              </div>
-            ))}
-          </div>
-
-          {lines.length > 0 && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
-              {lines.map((l) => (
-                <div key={l.id} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[13.5px] font-medium">
-                      {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
-                      {l.qty > 1 ? ` ×${l.qty}` : ""}
-                    </div>
-                    {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
-                  </div>
-                  <span className="whitespace-nowrap text-[13.5px] font-semibold">{formatMoney(l.amount, cur)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-baseline justify-between py-4">
-            <span className="text-[16px] font-semibold">{tr.t("total")}</span>
-            <span className="font-serif text-[28px] font-semibold">{formatMoney(total, cur)}</span>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => go(false)}
-            className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep"
-          >
-            {tr.t("continueToDetails")}
-          </button>
-          <button
-            type="button"
-            onClick={() => go(true)}
-            className="mt-2.5 w-full rounded-[10px] py-2.5 text-center text-[14px] font-semibold text-muted hover:text-accent"
-          >
-            {tr.t("skipForNow")}
-          </button>
-        </aside>
+    <section className="mb-9">
+      <h2 className="mb-1 font-serif text-[24px] font-medium tracking-[-0.01em]">{title}</h2>
+      {subtitle && <p className="mb-4 text-[14px] text-secondary">{subtitle}</p>}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {extras.map((e) => (
+          <ExtraCard
+            key={e.id}
+            extra={e}
+            currency={currency}
+            nights={nights}
+            guests={guests}
+            selection={find(e.id)}
+            onAdd={() => setQty(e.id, (find(e.id)?.qty ?? 0) + 1)}
+            onInc={() => setQty(e.id, (find(e.id)?.qty ?? 0) + 1)}
+            onDec={() => setQty(e.id, (find(e.id)?.qty ?? 0) - 1)}
+            onConfigure={() => setModalId(e.id)}
+            onRemove={() => removeSel(e.id)}
+            tr={tr}
+          />
+        ))}
       </div>
-
       {modalExtra && (
         <ConfigureModal
           extra={modalExtra}
-          currency={cur}
+          currency={currency}
           nights={nights}
           guests={guests}
           current={find(modalExtra.id)}
@@ -224,11 +173,126 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           tr={tr}
         />
       )}
-    </main>
+    </section>
   );
 }
 
-type Tr = ReturnType<typeof useT>;
+export default function Extras({ loaderData, params }: Route.ComponentProps) {
+  const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras } =
+    loaderData;
+  const { currency: ctxCurrency } = useProperty();
+  const cur = ctxCurrency || currency;
+  const tr = useT();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [roomSel, setRoomSel] = useState<ExtraSelection[]>(loaderData.roomSelection);
+  const [bookingSel, setBookingSel] = useState<ExtraSelection[]>(loaderData.bookingSelection);
+
+  const roomLines = resolveExtras(roomExtras, roomSel, nights, roomGuests);
+  const bookingLines = resolveExtras(bookingExtras, bookingSel, nights, party);
+  const allLines = [...roomLines, ...bookingLines];
+  const extrasSum = allLines.reduce((s, l) => s + l.amount, 0);
+
+  const go = (skip: boolean) => {
+    let state = setExtrasLine(parseExtrasState(searchParams), lineIndex, skip ? [] : roomSel);
+    if (bookingExtras.length) state = { ...state, booking: skip ? [] : bookingSel };
+    const next = new URLSearchParams(searchParams);
+    next.delete("line");
+    const xt = serializeExtrasState(state);
+    if (xt) next.set("xt", xt);
+    else next.delete("xt");
+    navigate(`/${params.channelId}/rooms?${next.toString()}`);
+  };
+
+  return (
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+      <Link
+        to={`/${params.channelId}/rooms?${searchParams.toString()}`}
+        className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
+      >
+        ← {tr.t("allRooms")}
+      </Link>
+
+      <div className="flex flex-wrap items-start gap-9">
+        <div className="min-w-[340px] flex-[1.6]">
+          <ExtraSection
+            title={tr.t("enhanceRoom", { room: roomTitle })}
+            subtitle={tr.t("enhanceIntro")}
+            extras={roomExtras}
+            sel={roomSel}
+            setSel={setRoomSel}
+            currency={cur}
+            nights={nights}
+            guests={roomGuests}
+            tr={tr}
+          />
+          <ExtraSection
+            title={tr.t("forYourStay")}
+            extras={bookingExtras}
+            sel={bookingSel}
+            setSel={setBookingSel}
+            currency={cur}
+            nights={nights}
+            guests={party}
+            tr={tr}
+          />
+        </div>
+
+        {/* summary */}
+        <aside
+          className="sticky top-24 min-w-[300px] flex-1 rounded-[18px] border border-line bg-surface p-6"
+          style={{ boxShadow: "var(--shadow-sticky)" }}
+        >
+          <h3 className="mb-4 font-serif text-[21px] font-semibold">{roomTitle}</h3>
+          <div className="flex items-start justify-between gap-3 border-b border-divider pb-4">
+            <div className="min-w-0">
+              <div className="text-[12.5px] text-muted-2">{rateTitle}</div>
+            </div>
+            <span className="whitespace-nowrap text-[14px] font-semibold">{formatMoney(roomTotal, cur)}</span>
+          </div>
+
+          {allLines.length > 0 && (
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4">
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+              {allLines.map((l) => (
+                <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[13.5px] font-medium">
+                      {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
+                      {l.qty > 1 ? ` ×${l.qty}` : ""}
+                    </div>
+                    {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
+                  </div>
+                  <span className="whitespace-nowrap text-[13.5px] font-semibold">{formatMoney(l.amount, cur)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-baseline justify-between py-4">
+            <span className="text-[15px] font-semibold">{tr.t("extrasLabel")}</span>
+            <span className="font-serif text-[24px] font-semibold">{formatMoney(extrasSum, cur)}</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => go(false)}
+            className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep"
+          >
+            {tr.t("extrasContinue")}
+          </button>
+          <button
+            type="button"
+            onClick={() => go(true)}
+            className="mt-2.5 w-full rounded-[10px] py-2.5 text-center text-[14px] font-semibold text-muted hover:text-accent"
+          >
+            {tr.t("skipForNow")}
+          </button>
+        </aside>
+      </div>
+    </main>
+  );
+}
 
 function ExtraCard({
   extra,
@@ -345,9 +409,7 @@ function ConfigureModal({
   tr: Tr;
 }) {
   const configurable = isConfigurable(extra);
-  const [optionId, setOptionId] = useState<string | undefined>(
-    current?.optionId ?? (configurable ? undefined : undefined),
-  );
+  const [optionId, setOptionId] = useState<string | undefined>(current?.optionId);
   const [qty, setQty] = useState(current?.qty ?? 1);
   const [info, setInfo] = useState<Record<string, string>>(current?.info ?? {});
 

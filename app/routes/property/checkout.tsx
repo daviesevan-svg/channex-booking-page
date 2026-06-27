@@ -23,7 +23,7 @@ import { resolveBookingCancellation } from "~/lib/policy.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
-import { extrasTotal, parseExtras, resolveExtras } from "~/lib/extras";
+import { extrasTotal, groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
 import { getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
@@ -74,6 +74,16 @@ async function resolveStayCart(
   return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
 }
 
+/** Each cart line's context for pricing its attached extras. */
+function extraContext(lines: ResolvedLine[]): ExtraContextLine[] {
+  return lines.map((l) => ({
+    roomId: l.roomId,
+    rateId: l.rateId,
+    roomTitle: l.roomTitle,
+    guests: l.occupancy.adults + l.occupancy.children,
+  }));
+}
+
 /** Derive the automatic offer baked into the resolved lines (by getCatalogRooms)
  *  plus each line's pre-discount price, so checkout can itemise the saving. */
 function deriveOffer(lines: ResolvedLine[], rooms: RoomWithRates[]) {
@@ -118,9 +128,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
   const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
-  // Extras ("Enhance your stay") carried in the URL, re-priced from the catalog.
-  const guests = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
-  const extraLines = resolveExtras(await getActiveExtras(params.channelId), parseExtras(url.searchParams), nights, guests);
+  // Extras carried in the URL, re-priced from the catalog: per-room extras
+  // against each room's guests, booking-scoped extras against the whole party.
+  const party = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
+  const extraLines = resolveAllExtras(
+    await getActiveExtras(params.channelId),
+    parseExtrasState(url.searchParams),
+    extraContext(lines),
+    nights,
+    party,
+  );
   return {
     stay,
     lines: linesView,
@@ -202,8 +219,13 @@ export async function action({ params, request }: Route.ActionArgs) {
     taxConfigFrom(settings),
   );
   // Extras are re-priced server-side and added on top of the (taxed) room total.
-  const guests = adults + children;
-  const extraLines = resolveExtras(await getActiveExtras(stay.channelId), parseExtras(url.searchParams), nights, guests);
+  const extraLines = resolveAllExtras(
+    await getActiveExtras(stay.channelId),
+    parseExtrasState(url.searchParams),
+    extraContext(lines),
+    nights,
+    adults + children,
+  );
   const grandTotal = Math.round((pricing.total + extrasTotal(extraLines)) * 100) / 100;
 
   // Open Channel booking payload. Each room's (promo-adjusted) total is spread
@@ -525,18 +547,23 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </div>
 
           {extraLines.length > 0 && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+            <div className="flex flex-col gap-3 border-b border-divider py-4 text-[14px]">
               <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
-              {extraLines.map((l) => (
-                <div key={l.id} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <span>
-                      {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
-                      {l.qty > 1 ? ` ×${l.qty}` : ""}
-                    </span>
-                    {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
-                  </div>
-                  <span className="whitespace-nowrap font-semibold">{formatMoney(l.amount, currency)}</span>
+              {groupExtrasByRoom(extraLines).map((g, gi) => (
+                <div key={gi} className="flex flex-col gap-1.5">
+                  <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                  {g.lines.map((l) => (
+                    <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3 pl-2">
+                      <div className="min-w-0">
+                        <span>
+                          {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
+                          {l.qty > 1 ? ` ×${l.qty}` : ""}
+                        </span>
+                        {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
+                      </div>
+                      <span className="whitespace-nowrap font-semibold">{formatMoney(l.amount, currency)}</span>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
