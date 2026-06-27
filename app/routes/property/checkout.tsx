@@ -9,7 +9,6 @@ import {
   cartCoverage,
   cartCovers,
   parseCart,
-  resolveCart,
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
@@ -33,7 +32,7 @@ import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getPageText } from "~/lib/overrides.server";
-import { getCatalogRooms } from "~/lib/catalog.server";
+import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { decrementAvailability } from "~/lib/ari.server";
 
 interface Stay {
@@ -72,34 +71,41 @@ async function resolveStayCart(
     },
     { gate: true },
   );
-  return { rooms, lines: resolveCart(parseCart(url.searchParams), rooms) };
+  const lines = await resolveCartByOccupancy(
+    stay.channelId,
+    { checkin: stay.checkin, checkout: stay.checkout, currency: stay.currency },
+    parseCart(url.searchParams),
+    { adults: stay.occ.adults, childrenAge: stay.occ.childrenAge },
+  );
+  return { rooms, lines };
 }
 
-/** Each cart line's context for pricing its attached extras. Per-person extras
- *  price for the searched party (single-room assumption). */
-function extraContext(lines: ResolvedLine[], guests: number): ExtraContextLine[] {
+/** Each cart line's context for pricing its attached extras — per-room extras
+ *  price for that room's occupancy. */
+function extraContext(lines: ResolvedLine[]): ExtraContextLine[] {
   return lines.map((l) => ({
     roomId: l.roomId,
     rateId: l.rateId,
     roomTitle: l.roomTitle,
-    guests,
+    guests: l.occupancy.adults + l.occupancy.children,
   }));
 }
 
-/** Derive the automatic offer baked into the resolved lines (by getCatalogRooms)
- *  plus each line's pre-discount price, so checkout can itemise the saving. */
-function deriveOffer(lines: ResolvedLine[], rooms: RoomWithRates[]) {
+/** Derive the automatic offer baked into the resolved lines (per-line offer data
+ *  set by resolveCartByOccupancy) plus each line's pre-discount price, so
+ *  checkout can itemise the saving. */
+function deriveOffer(lines: ResolvedLine[]) {
   let name = "";
   let percent = 0;
   let hasOffer = false;
   const view = lines.map((l) => {
-    const rp = rooms.find((r) => r.id === l.roomId)?.ratePlans.find((p) => p.id === l.rateId);
-    if (rp?.offer) {
+    const originalTotal = l.originalTotal ?? l.total;
+    if (l.offerName != null && l.offerPercent != null && originalTotal > l.total) {
       hasOffer = true;
-      name = rp.offer.name;
-      percent = rp.offer.percent;
+      name = l.offerName;
+      percent = l.offerPercent;
     }
-    return { ...l, originalTotal: rp?.offer ? Number(rp.offer.originalTotalPrice) : l.total };
+    return { ...l, originalTotal };
   });
   const originalSubtotal = Math.round(view.reduce((s, l) => s + l.originalTotal, 0) * 100) / 100;
   const saleSubtotal = Math.round(lines.reduce((s, l) => s + l.total, 0) * 100) / 100;
@@ -126,7 +132,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const settings = await getSettings(params.channelId);
   // The automatic offer (if any) is already baked into the line totals; derive
   // it for the itemised breakdown and each line's pre-discount price.
-  const { offer, originalSubtotal, lines: linesView } = deriveOffer(lines, rooms);
+  const { offer, originalSubtotal, lines: linesView } = deriveOffer(lines);
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
   const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
@@ -136,7 +142,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const extraLines = resolveAllExtras(
     await getActiveExtras(params.channelId),
     parseExtrasState(url.searchParams),
-    extraContext(lines, party),
+    extraContext(lines),
     nights,
     party,
   );
@@ -179,7 +185,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
   const totals = cartCoverage(lines);
   // The automatic offer is baked into the line totals; snapshot it on the booking.
-  const { offer } = deriveOffer(lines, rooms);
+  const { offer } = deriveOffer(lines);
 
   // "Apply" — preview the discount without booking, so typed guest details stay.
   if (intent === "applyPromo") {
@@ -225,7 +231,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const extraLines = resolveAllExtras(
     await getActiveExtras(stay.channelId),
     parseExtrasState(url.searchParams),
-    extraContext(lines, party),
+    extraContext(lines),
     nights,
     party,
   );

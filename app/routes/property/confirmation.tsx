@@ -3,7 +3,7 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/confirmation";
 import { useProperty } from "~/lib/booking-context";
-import { cartCoverage, parseCart, resolveCart } from "~/lib/cart";
+import { cartCoverage, parseCart } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -11,7 +11,7 @@ import { readOccupancy } from "~/lib/occupancy";
 import { getPageText, getSettings } from "~/lib/overrides.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
-import { getCatalogRooms } from "~/lib/catalog.server";
+import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import { extrasTotal, groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
 
@@ -33,33 +33,30 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-    const catalogRooms = await getCatalogRooms(params.channelId, {
-      checkinDate: checkin,
-      checkoutDate: checkout,
-      currency,
-      adults: occ.adults,
-      childrenAge: occ.childrenAge,
-    });
-    const lines = resolveCart(parseCart(url.searchParams), catalogRooms);
+    const lines = await resolveCartByOccupancy(
+      params.channelId,
+      { checkin, checkout, currency },
+      parseCart(url.searchParams),
+      { adults: occ.adults, childrenAge: occ.childrenAge },
+    );
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     if (lines.length) total = cartCoverage(lines).total;
     cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
-    // The automatic offer baked into the prices, for the breakdown line.
+    // The automatic offer baked into the prices (per-line data), for the breakdown line.
     let orig = 0;
     let oName = "";
     let oPct = 0;
     for (const l of lines) {
-      const rp = catalogRooms.find((r) => r.id === l.roomId)?.ratePlans.find((p) => p.id === l.rateId);
-      orig += rp?.offer ? Number(rp.offer.originalTotalPrice) : l.total;
-      if (rp?.offer) {
-        oName = rp.offer.name;
-        oPct = rp.offer.percent;
+      orig += l.originalTotal ?? l.total;
+      if (l.offerName != null && l.offerPercent != null && (l.originalTotal ?? l.total) > l.total) {
+        oName = l.offerName;
+        oPct = l.offerPercent;
       }
     }
     if (oName) {
       offer = { name: oName, percent: oPct, discount: Math.round((Math.round(orig * 100) / 100 - total) * 100) / 100 };
     }
-    // Extras carried in the URL, re-priced per room / per booking.
+    // Extras carried in the URL, re-priced per room (its occupancy) / per booking.
     extraLines = resolveAllExtras(
       await getActiveExtras(params.channelId),
       parseExtrasState(url.searchParams),
@@ -67,7 +64,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         roomId: l.roomId,
         rateId: l.rateId,
         roomTitle: l.roomTitle,
-        guests: occ.adults + (occ.childrenAge?.length ?? 0),
+        guests: l.occupancy.adults + l.occupancy.children,
       })),
       nights,
       occ.adults + (occ.childrenAge?.length ?? 0),

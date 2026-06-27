@@ -1,6 +1,7 @@
 // Channex Shopping API response/request types (camelCased to match the client,
 // which converts wire snake_case -> camelCase). Derived from docs.channex.io
 // and the legacy instant_booking_page consumers.
+import type { OccupancyPricing } from "../rate-pricing";
 
 export interface Photo {
   url: string;
@@ -131,6 +132,9 @@ export interface RatePlan {
   /** Automatic offer baked into totalPrice (set by getCatalogRooms). The
    *  original (pre-discount) price is kept so the UI can show the saving. */
   offer?: { name: string; percent: number; originalTotalPrice: string };
+  /** Per-person pricing rules (set by getCatalogRooms from the rate), so the
+   *  detail page can re-price live for a chosen room occupancy. */
+  occupancyPricing?: OccupancyPricing;
 }
 
 export interface BedOption {

@@ -10,13 +10,12 @@ import {
   cartCovers,
   parseCart,
   removeIndex,
-  resolveCart,
   roomCounts,
   serializeCart,
   type ResolvedLine,
 } from "~/lib/cart";
 import { parseExtrasState, removeExtrasLine, serializeExtrasState } from "~/lib/extras";
-import { getCatalogRooms } from "~/lib/catalog.server";
+import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getPageText } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -67,7 +66,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(params.channelId, "results", lang);
 
-  const cartLines = resolveCart(parseCart(url.searchParams), rooms);
+  const cartLines = await resolveCartByOccupancy(
+    params.channelId,
+    { checkin, checkout, currency },
+    parseCart(url.searchParams),
+    { adults: occ.adults, childrenAge: occ.childrenAge },
+  );
   const coverage = cartCoverage(cartLines);
   const covered = cartCovers(cartLines, occ);
 
