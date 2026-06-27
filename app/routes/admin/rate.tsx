@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/rate";
@@ -172,6 +173,14 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   // Effective policy (from rate.policy or legacy fields) for prefilling the form.
   const pol = ratePolicyOf(rate ?? {});
   const tier0 = pol.cancellation.tiers[0];
+  // Track the selects that gate dependent fields, so we can disable the inputs
+  // we don't need (deposit fields unless timing = Deposit; charge value only for
+  // percentage / fixed penalties).
+  const [payTiming, setPayTiming] = useState<string>(pol.payment.timing);
+  const [latePenalty, setLatePenalty] = useState<string>(tier0?.penalty ?? "full_stay");
+  const [noShowPenalty, setNoShowPenalty] = useState<string>(pol.noShow.penalty);
+  const needsValue = (p: string) => p === "percent" || p === "fixed";
+  const disabledInput = `${FIELD_INPUT} disabled:cursor-not-allowed disabled:opacity-50`;
 
   return (
     <div>
@@ -241,7 +250,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
               Payment timing
-              <select name="payTiming" defaultValue={pol.payment.timing} className={FIELD_INPUT}>
+              <select name="payTiming" value={payTiming} onChange={(e) => setPayTiming(e.target.value)} className={FIELD_INPUT}>
                 {PAYMENT_TIMINGS.map((t) => (
                   <option key={t} value={t}>{PAYMENT_TIMING_LABEL[t]}</option>
                 ))}
@@ -257,7 +266,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               Deposit type <span className="font-normal text-faint">(when timing = Deposit)</span>
-              <select name="depositType" defaultValue={pol.payment.deposit?.type ?? "percent"} className={FIELD_INPUT}>
+              <select name="depositType" defaultValue={pol.payment.deposit?.type ?? "percent"} disabled={payTiming !== "deposit"} className={disabledInput}>
                 {DEPOSIT_TYPES.map((d) => (
                   <option key={d} value={d}>{DEPOSIT_TYPE_LABEL[d]}</option>
                 ))}
@@ -265,7 +274,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               Deposit value <span className="font-normal text-faint">(% , amount, or no. of nights)</span>
-              <input name="depositValue" type="number" min={0} step="0.01" defaultValue={pol.payment.deposit?.value ?? ""} placeholder="e.g. 30" className={FIELD_INPUT} />
+              <input name="depositValue" type="number" min={0} step="0.01" defaultValue={pol.payment.deposit?.value ?? ""} placeholder="e.g. 30" disabled={payTiming !== "deposit"} className={disabledInput} />
             </label>
           </div>
         </div>
@@ -373,7 +382,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
               Late-cancellation charge <span className="font-normal text-faint">(after the deadline)</span>
-              <select name="latePenalty" defaultValue={tier0?.penalty ?? "full_stay"} className={FIELD_INPUT}>
+              <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
                 {PENALTY_TYPES.map((p) => (
                   <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
                 ))}
@@ -381,7 +390,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
-              <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" className={FIELD_INPUT} />
+              <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" disabled={!needsValue(latePenalty)} className={disabledInput} />
             </label>
           </div>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
@@ -396,7 +405,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
               No-show charge
-              <select name="noShowPenalty" defaultValue={pol.noShow.penalty} className={FIELD_INPUT}>
+              <select name="noShowPenalty" value={noShowPenalty} onChange={(e) => setNoShowPenalty(e.target.value)} className={FIELD_INPUT}>
                 {PENALTY_TYPES.map((p) => (
                   <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
                 ))}
@@ -404,7 +413,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
-              <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder="e.g. 100" className={FIELD_INPUT} />
+              <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder="e.g. 100" disabled={!needsValue(noShowPenalty)} className={disabledInput} />
             </label>
           </div>
         </div>
