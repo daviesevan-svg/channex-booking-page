@@ -1,6 +1,7 @@
 import { getRates } from "./catalog.server";
 import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
+import { DEFAULT_RATE_POLICY, ratePolicyOf, type PenaltyType, type RatePolicy } from "./rate-policy";
 
 export interface CancellationSnapshot {
   refundable: boolean;
@@ -54,4 +55,37 @@ export async function resolveBookingCancellation(
         ? null
         : new Date(earliestCancelBy).toISOString(),
   };
+}
+
+const TIMING_ORD = { pay_at_hotel: 0, deposit: 1, full_prepay: 2 } as const;
+const PENALTY_ORD: Record<PenaltyType, number> = { none: 0, first_night: 1, fixed: 2, percent: 2, full_stay: 3 };
+
+/** The effective rate policy for a booking. Single rate → that rate's policy.
+ *  Multiple → a best-effort most-restrictive combine (strictest payment timing/
+ *  card/no-show, refundable only if all are, harshest first cancel tier). */
+export async function resolveBookingPolicy(pid: string, rateIds: string[]): Promise<RatePolicy> {
+  const rates = await getRates(pid);
+  const byId = new Map(rates.map((r) => [r.id, r]));
+  const pols = rateIds.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => !!r).map((r) => ratePolicyOf(r));
+  if (pols.length === 0) return DEFAULT_RATE_POLICY;
+  if (pols.length === 1) return pols[0];
+
+  return pols.reduce((acc, p) => {
+    const stricterTiming = TIMING_ORD[p.payment.timing] > TIMING_ORD[acc.payment.timing] ? p.payment : acc.payment;
+    const accTier = acc.cancellation.tiers[0];
+    const pTier = p.cancellation.tiers[0];
+    const tierMs = (t?: { deadlineValue: number; deadlineUnit: DeadlineUnit }) =>
+      t ? (t.deadlineUnit === "days" ? t.deadlineValue * 24 : t.deadlineValue) : -1;
+    const tiers = tierMs(pTier) > tierMs(accTier) ? p.cancellation.tiers : acc.cancellation.tiers;
+    return {
+      payment: {
+        timing: stricterTiming.timing,
+        card: p.payment.card === "charge_at_booking" || acc.payment.card === "charge_at_booking" ? "charge_at_booking" : "guarantee",
+        deposit: stricterTiming.deposit,
+      },
+      cancellation: { refundable: acc.cancellation.refundable && p.cancellation.refundable, tiers },
+      noShow: PENALTY_ORD[p.noShow.penalty] > PENALTY_ORD[acc.noShow.penalty] ? p.noShow : acc.noShow,
+      overrideNote: acc.overrideNote ?? p.overrideNote,
+    };
+  });
 }

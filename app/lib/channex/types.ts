@@ -129,6 +129,10 @@ export interface RatePlan {
   images?: string[];
   /** Custom cancellation text shown verbatim to guests (overrides the policy title). */
   cancellationNote?: string;
+  /** Whether the rate is refundable, and the free-cancel deadline (ISO), derived
+   *  from the rate policy so the rate card can show it. */
+  refundable?: boolean;
+  freeCancelUntilISO?: string | null;
   /** Automatic offer baked into totalPrice (set by getCatalogRooms). The
    *  original (pre-discount) price is kept so the UI can show the saving. */
   offer?: { name: string; percent: number; originalTotalPrice: string };
