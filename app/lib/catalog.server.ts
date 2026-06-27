@@ -11,6 +11,7 @@ import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
 import { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
+import type { RatePolicy } from "./rate-policy";
 import type { CartLine, ResolvedLine } from "./cart";
 
 // Re-export so existing importers (admin rate editor) keep their import path.
@@ -43,7 +44,10 @@ export interface CatalogRate {
   prices: Record<string, number>;
   /** Optional per-person pricing rules (absent = flat price for any party). */
   occupancyPricing?: OccupancyPricing;
-  // Cancellation policy (mirrors the structured rate-plan override fields).
+  /** Structured payment + cancellation + no-show policy. When absent, the legacy
+   *  flat fields below are used (see ratePolicyOf in rate-policy.ts). */
+  policy?: RatePolicy;
+  // Legacy cancellation fields (kept in sync by the editor for back-compat).
   refundable: boolean;
   cancelDeadlineValue?: number;
   cancelDeadlineUnit?: DeadlineUnit;
