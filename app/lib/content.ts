@@ -184,6 +184,16 @@ export interface SiteSettings {
   // ----- Connectivity -----
   /** The channel-manager / PMS system this property is connected to (e.g. "channex"). */
   connectedSystem?: string;
+  // ----- Transactional email -----
+  /** Sender display name for guest/host emails (the from-domain is global). */
+  emailFromName?: string;
+  /** Reply-to address guests' replies go to (defaults to the contact email). */
+  emailReplyTo?: string;
+  /** Where host notifications are sent (defaults to the property contact email). */
+  hostNotifyEmail?: string;
+  /** Notify the host when a booking is made / cancelled. Default on. */
+  notifyHostOnBooking?: boolean;
+  notifyHostOnCancel?: boolean;
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */
@@ -402,4 +412,132 @@ export function pageDefaults(pageId: string, lang: string): Record<string, strin
   if (def) for (const f of def.fields) en[f.key] = f.default;
   if (lang === DEFAULT_LANG) return en;
   return { ...en, ...(PAGE_TRANSLATIONS[pageId]?.[lang] ?? {}) };
+}
+
+// ---- Editable transactional email templates ----
+// Operators edit only plain prose (subject + heading + intro/outro) with
+// {tokens}. The booking details block (rooms, dates, totals, due-now, manage
+// link) is rendered by the system between intro and outro, so the copy can't
+// break the layout or the numbers. Mirrors the page-text system above.
+export interface TokenDef {
+  /** The literal token, e.g. "{guest_first_name}". */
+  token: string;
+  desc: string;
+}
+export interface EmailDef {
+  id: string;
+  label: string;
+  /** Who receives it — drives whether a manage link or guest-contact block shows. */
+  recipient: "guest" | "host";
+  fields: PageField[];
+  tokens: TokenDef[];
+}
+
+const GUEST_TOKENS: TokenDef[] = [
+  { token: "{hotel_name}", desc: "Your property's name" },
+  { token: "{guest_first_name}", desc: "Guest's first name" },
+  { token: "{guest_last_name}", desc: "Guest's last name" },
+  { token: "{reference}", desc: "Booking reference code" },
+  { token: "{checkin}", desc: "Check-in date" },
+  { token: "{checkout}", desc: "Check-out date" },
+  { token: "{nights}", desc: "Number of nights" },
+  { token: "{total}", desc: "Grand total, with currency" },
+  { token: "{due_now}", desc: "Amount due today" },
+  { token: "{due_at_hotel}", desc: "Amount due at the hotel" },
+  { token: "{manage_url}", desc: "Link the guest uses to manage the booking" },
+];
+const HOST_TOKENS: TokenDef[] = [
+  ...GUEST_TOKENS.filter((t) => t.token !== "{manage_url}"),
+  { token: "{guest_email}", desc: "Guest's email address" },
+  { token: "{guest_phone}", desc: "Guest's phone number" },
+];
+
+const emailFields = (o: { subject: string; heading: string; intro: string; outro: string }): PageField[] => [
+  { key: "subject", label: "Subject line", default: o.subject },
+  { key: "heading", label: "Heading", default: o.heading },
+  { key: "intro", label: "Intro — shown above the booking details", textarea: true, default: o.intro },
+  { key: "outro", label: "Outro — shown below the booking details", textarea: true, default: o.outro },
+];
+
+export const EMAIL_TEMPLATES: EmailDef[] = [
+  {
+    id: "booking_confirmation",
+    label: "Booking confirmation",
+    recipient: "guest",
+    tokens: GUEST_TOKENS,
+    fields: emailFields({
+      subject: "Your booking at {hotel_name} is confirmed ({reference})",
+      heading: "You're booked, {guest_first_name}!",
+      intro:
+        "Thanks for booking direct with {hotel_name}. Here are the details of your stay — we can't wait to welcome you.",
+      outro: "Need to make a change? Use the “Manage booking” button above any time. See you soon!",
+    }),
+  },
+  {
+    id: "host_notification",
+    label: "New booking (to you)",
+    recipient: "host",
+    tokens: HOST_TOKENS,
+    fields: emailFields({
+      subject: "New booking: {guest_first_name} {guest_last_name} — {reference}",
+      heading: "New booking received",
+      intro:
+        "A new booking just came in through your booking page. The guest's contact details and the full breakdown are below.",
+      outro: "",
+    }),
+  },
+  {
+    id: "booking_cancellation",
+    label: "Cancellation (to guest)",
+    recipient: "guest",
+    tokens: GUEST_TOKENS,
+    fields: emailFields({
+      subject: "Your booking at {hotel_name} has been cancelled ({reference})",
+      heading: "Your booking is cancelled",
+      intro:
+        "We've cancelled your booking at {hotel_name}, {guest_first_name}. The details of the cancelled reservation are below.",
+      outro: "If you didn't request this, please contact us right away.",
+    }),
+  },
+  {
+    id: "cancellation_notification",
+    label: "Cancellation (to you)",
+    recipient: "host",
+    tokens: HOST_TOKENS,
+    fields: emailFields({
+      subject: "Cancelled: {guest_first_name} {guest_last_name} — {reference}",
+      heading: "Booking cancelled",
+      intro: "A guest has cancelled their booking. The cancelled reservation details are below.",
+      outro: "",
+    }),
+  },
+];
+
+export function emailDef(id: string): EmailDef | undefined {
+  return EMAIL_TEMPLATES.find((e) => e.id === id);
+}
+
+// English lives in the defaults above. Non-English templates fall back to
+// English until an operator translates them via the ?lang editor (seed here).
+const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> = {};
+
+/** Built-in email defaults for a language (English fields fill any gaps). */
+export function emailDefaults(id: string, lang: string): Record<string, string> {
+  const def = emailDef(id);
+  const en: Record<string, string> = {};
+  if (def) for (const f of def.fields) en[f.key] = f.default;
+  if (lang === DEFAULT_LANG) return en;
+  return { ...en, ...(EMAIL_TRANSLATIONS[id]?.[lang] ?? {}) };
+}
+
+/** Merge stored overrides over an email template's language-aware defaults. */
+export function withEmailDefaults(
+  id: string,
+  overrides: Record<string, string | undefined> = {},
+  lang: string = DEFAULT_LANG,
+): Record<string, string> {
+  const defaults = emailDefaults(id, lang);
+  const out: Record<string, string> = {};
+  for (const key of Object.keys(defaults)) out[key] = overrides[key]?.trim() || defaults[key];
+  return out;
 }

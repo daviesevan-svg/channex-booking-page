@@ -164,6 +164,20 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               {item.label}
             </NavLink>
           ))}
+          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
+            Emails
+          </div>
+          {[
+            { to: "/admin/emails", label: "Settings", end: true },
+            { to: "/admin/emails/booking_confirmation", label: "Booking confirmation" },
+            { to: "/admin/emails/host_notification", label: "New booking (to you)" },
+            { to: "/admin/emails/booking_cancellation", label: "Cancellation (guest)" },
+            { to: "/admin/emails/cancellation_notification", label: "Cancellation (to you)" },
+          ].map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+              {item.label}
+            </NavLink>
+          ))}
         </nav>
         <main className="min-w-0 flex-1">
           <Outlet context={context} />

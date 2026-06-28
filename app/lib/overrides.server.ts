@@ -4,12 +4,14 @@ import {
   bookingCutoffOf,
   DEFAULT_LANG,
   DEFAULT_PROMO_PLACEHOLDER,
+  emailDef,
   isDeadlineUnit,
   isThemeId,
   normalizeHex,
   pageDef,
   searchDefaults,
   withDefaults,
+  withEmailDefaults,
   type BookingCutoff,
   type SearchContent,
   type SiteSettings,
@@ -165,6 +167,74 @@ export async function savePageContent(
   entry.pages = { ...(entry.pages ?? {}), [pageId]: data };
   m[lang] = entry;
   await writeJson(contentKey(pid), m);
+}
+
+// ===== editable email templates (localized) =====
+interface EmailContent {
+  templates?: Record<string, Record<string, string>>;
+}
+const emailContentKey = (pid: string) => `email_content:${pid}`;
+const emailContentMap = (pid: string) =>
+  readJson<LangMap<EmailContent>>(emailContentKey(pid)).then((m) => m ?? {});
+
+/** Merged template fields (defaults + base[en] + lang overrides). */
+export async function getEmailTemplate(
+  pid: string,
+  id: string,
+  lang = DEFAULT_LANG,
+): Promise<Record<string, string>> {
+  const m = await emailContentMap(pid);
+  const base = m[DEFAULT_LANG]?.templates?.[id] ?? {};
+  const loc = m[lang]?.templates?.[id] ?? {};
+  return withEmailDefaults(id, { ...base, ...loc }, lang);
+}
+export async function getEmailOverridesRaw(
+  pid: string,
+  id: string,
+  lang: string,
+): Promise<Record<string, string>> {
+  const m = await emailContentMap(pid);
+  return m[lang]?.templates?.[id] ?? {};
+}
+export async function saveEmailContent(
+  pid: string,
+  id: string,
+  lang: string,
+  input: Record<string, FormDataEntryValue>,
+): Promise<void> {
+  const def = emailDef(id);
+  if (!def) return;
+  const data: Record<string, string> = {};
+  for (const f of def.fields) {
+    const v = String(input[f.key] ?? "").trim();
+    if (v) data[f.key] = v;
+  }
+  const m = await emailContentMap(pid);
+  const entry = m[lang] ?? {};
+  entry.templates = { ...(entry.templates ?? {}), [id]: data };
+  m[lang] = entry;
+  await writeJson(emailContentKey(pid), m);
+}
+
+const cleanEmail = (v: FormDataEntryValue | null): string | undefined => {
+  const s = String(v ?? "").trim().toLowerCase();
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(s) ? s : undefined;
+};
+
+/** Email sender identity + host-notification settings. Merges into existing
+ *  settings (doesn't reuse saveSettings, which would clobber other fields). */
+export async function saveEmailSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next: SiteSettings = {
+    ...existing,
+    emailFromName: String(form.get("emailFromName") ?? "").trim() || undefined,
+    emailReplyTo: cleanEmail(form.get("emailReplyTo")),
+    hostNotifyEmail: cleanEmail(form.get("hostNotifyEmail")),
+    notifyHostOnBooking: form.get("notifyHostOnBooking") === "on",
+    notifyHostOnCancel: form.get("notifyHostOnCancel") === "on",
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
 }
 
 // ===== general site settings (global, not localized) =====
