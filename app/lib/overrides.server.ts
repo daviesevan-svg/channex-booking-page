@@ -332,6 +332,22 @@ export async function saveConnectivity(pid: string, system: string | undefined):
   return next;
 }
 
+/** Set/clear the property's connected Stripe account (merge-style). Passing
+ *  undefined for `accountId` disconnects. */
+export async function savePaymentSettings(
+  pid: string,
+  patch: { stripeAccountId?: string; stripeChargesEnabled?: boolean },
+): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next: SiteSettings = {
+    ...existing,
+    stripeAccountId: patch.stripeAccountId || undefined,
+    stripeChargesEnabled: patch.stripeAccountId ? patch.stripeChargesEnabled ?? false : undefined,
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
 const posInt = (v: FormDataEntryValue | null): number | undefined => {
   const n = parseInt(String(v ?? ""), 10);
   return Number.isFinite(n) && n > 0 ? n : undefined;

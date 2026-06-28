@@ -194,6 +194,11 @@ export interface SiteSettings {
   /** Notify the host when a booking is made / cancelled. Default on. */
   notifyHostOnBooking?: boolean;
   notifyHostOnCancel?: boolean;
+  // ----- Payments (Stripe Connect, per-property) -----
+  /** Connected Stripe account id (acct_…) charges run on. Unset = not connected. */
+  stripeAccountId?: string;
+  /** Cached from the connected account: whether it can accept charges. */
+  stripeChargesEnabled?: boolean;
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */

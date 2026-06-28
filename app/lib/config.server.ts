@@ -27,6 +27,15 @@ export interface AppConfig extends ChannexConfig {
   /** Sender for transactional email, e.g. "Your Hotel <noreply@domain>".
    *  Must be on a SparkPost-verified sending domain; without it, email is skipped. */
   emailFrom?: string;
+  /** Stripe platform secret key (sk_…). Charges run on each property's connected
+   *  account via Stripe Connect; this is roompanda's platform account. */
+  stripeSecretKey?: string;
+  /** Stripe Connect client id (ca_…) for the Standard-account OAuth flow. */
+  stripeConnectClientId?: string;
+  /** Stripe webhook signing secret (whsec_…) for /api/stripe-webhook. */
+  stripeWebhookSecret?: string;
+  /** Optional platform fee in basis points taken from each charge (default 0). */
+  stripePlatformFeeBps: number;
   /** Open Channel inbound key: the one Channex sends to our /api endpoints. */
   openChannelApiKey: string;
   /** Open Channel outbound key: Channex-provided, used when WE call Channex's
@@ -63,6 +72,10 @@ export function getConfig(): AppConfig {
     // Never empty: an empty HMAC key throws in the Workers runtime.
     sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
     appUrl: read("APP_URL", "http://localhost:5173"),
+    stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
+    stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
+    stripeWebhookSecret: read("STRIPE_WEBHOOK_SECRET") || undefined,
+    stripePlatformFeeBps: Number(read("STRIPE_PLATFORM_FEE_BPS")) || 0,
     sparkpostApiKey: read("SPARKPOST_API_KEY") || undefined,
     sparkpostApiUrl: read("SPARKPOST_API_URL", "https://api.sparkpost.com").replace(/\/+$/, ""),
     emailFrom: read("EMAIL_FROM") || read("RESEND_FROM") || undefined,

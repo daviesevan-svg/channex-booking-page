@@ -23,6 +23,8 @@ export default [
     route("select-property", "routes/admin/select-property.tsx"),
     route("general", "routes/admin/general.tsx"),
     route("connectivity", "routes/admin/connectivity.tsx"),
+    route("payments", "routes/admin/payments.tsx"),
+    route("payments/callback", "routes/admin/payments.callback.tsx"),
     route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),
