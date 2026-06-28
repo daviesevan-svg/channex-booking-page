@@ -400,15 +400,34 @@ export async function action({ params, request }: Route.ActionArgs) {
       success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
       cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
     };
+    // A human-readable summary of the stay for Stripe's hosted page.
+    const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
+    const money = (n: number) => formatMoney(n, stay.currency);
+    const ci = parseISO(stay.checkin);
+    const co = parseISO(stay.checkout);
+    const dateLabel = `${format(ci, "EEE d MMM")} – ${format(co, "EEE d MMM yyyy")}`;
+    const guestLabel =
+      `${adults} adult${adults !== 1 ? "s" : ""}` + (children ? `, ${children} child${children !== 1 ? "ren" : ""}` : "");
+    const roomName =
+      lines.length === 1
+        ? `${lines[0].roomTitle} · ${lines[0].rateTitle}`
+        : `${lines[0].roomTitle} + ${lines.length - 1} more room${lines.length - 1 !== 1 ? "s" : ""}`;
+    const balance = Math.round((grandTotal - due) * 100) / 100;
+    const stayLine = `${dateLabel} · ${nights} night${nights !== 1 ? "s" : ""} · ${guestLabel}`;
+
     let sessionParams: Record<string, unknown>;
     if (stripeMode === "payment") {
-      const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
       const amountMinor = Math.round(due * 100);
       const feeBps = config.stripePlatformFeeBps;
+      const balanceNote =
+        balance > 0
+          ? `Deposit due now — ${money(balance)} balance payable at the hotel.`
+          : "Your stay is paid in full.";
       sessionParams = {
         ...common,
         mode: "payment",
         payment_intent_data: {
+          description: `${hotelName} · ${roomName} · ${dateLabel} (ref ${reference})`,
           metadata: { reference, pid: stay.channelId },
           ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
         },
@@ -418,10 +437,18 @@ export async function action({ params, request }: Route.ActionArgs) {
             price_data: {
               currency: stay.currency.toLowerCase(),
               unit_amount: amountMinor,
-              product_data: { name: `${hotelName} — booking ${reference}` },
+              product_data: { name: `${hotelName} — ${roomName}`, description: `${stayLine}. ${balanceNote}` },
             },
           },
         ],
+        custom_text: {
+          submit: {
+            message:
+              balance > 0
+                ? `Paying ${money(due)} now to secure your stay at ${hotelName}; ${money(balance)} is due at the hotel.`
+                : `Paying ${money(due)} for your stay at ${hotelName}.`,
+          },
+        },
       };
     } else {
       // Guarantee card: collect a card without charging.
@@ -429,6 +456,11 @@ export async function action({ params, request }: Route.ActionArgs) {
         ...common,
         mode: "setup",
         setup_intent_data: { metadata: { reference, pid: stay.channelId } },
+        custom_text: {
+          submit: {
+            message: `Saving your card to guarantee your stay at ${hotelName} (${roomName}, ${dateLabel}). You won't be charged now — payment is taken at the hotel.`,
+          },
+        },
       };
     }
     let sessionUrl: string | undefined;
