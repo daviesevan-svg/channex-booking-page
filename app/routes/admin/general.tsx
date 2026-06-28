@@ -208,6 +208,35 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           </div>
         </section>
 
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Legal links</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            Linked from the consent line at checkout. Leave blank to show the wording without a link.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:max-w-md">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Terms &amp; Conditions URL
+              <input
+                name="termsUrl"
+                type="url"
+                defaultValue={settings.termsUrl}
+                placeholder="https://yourhotel.com/terms"
+                className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+              />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Privacy Policy URL
+              <input
+                name="privacyUrl"
+                type="url"
+                defaultValue={settings.privacyUrl}
+                placeholder="https://yourhotel.com/privacy"
+                className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+              />
+            </label>
+          </div>
+        </section>
+
         {/* Languages */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Languages</div>

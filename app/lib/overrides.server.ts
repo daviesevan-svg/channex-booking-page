@@ -171,6 +171,18 @@ const settingsKey = (pid: string) => `settings:${pid}`;
 export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
+/** Accept only http(s) URLs; otherwise drop (so a bad value never becomes a link). */
+function safeUrl(v: FormDataEntryValue | null): string | undefined {
+  const s = String(v ?? "").trim();
+  if (!s) return undefined;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
   const existing = await getSettings(pid);
   const themeRaw = String(form.get("theme") ?? "").trim();
@@ -185,6 +197,8 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
         .replace(/^https?:\/\//, "")
         .replace(/\/.*$/, "") || undefined,
     currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
+    termsUrl: safeUrl(form.get("termsUrl")),
+    privacyUrl: safeUrl(form.get("privacyUrl")),
     languages: form.getAll("languages").map(String),
     liveBooking: form.get("liveBooking") === "on",
   };
