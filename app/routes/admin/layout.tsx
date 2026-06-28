@@ -156,6 +156,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/home", label: "Home" },
             { to: "/admin/pages/results", label: "Results" },
             { to: "/admin/pages/detail", label: "Room detail" },
+            { to: "/admin/pages/extras", label: "Extras" },
             { to: "/admin/pages/checkout", label: "Checkout" },
             { to: "/admin/pages/confirmation", label: "Confirmation" },
           ].map((item) => (
