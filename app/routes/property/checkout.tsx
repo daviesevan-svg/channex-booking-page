@@ -33,6 +33,7 @@ import { getConfig } from "~/lib/config.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { pushOpenChannelBooking } from "~/lib/open-channel.server";
+import { sendBookingEmails } from "~/lib/email.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
@@ -350,15 +351,16 @@ export async function action({ params, request }: Route.ActionArgs) {
     lines.map((l) => l.rateId),
     stay.checkin,
   );
-  await recordBooking(stay.channelId, {
+  const record = {
     id: crypto.randomUUID(),
     reference,
     channexId,
     status,
     error,
-    lifecycle: "active",
+    lifecycle: "active" as const,
     cancellation,
     createdAt: new Date().toISOString(),
+    lang: langFromRequest(request),
     currency: stay.currency,
     checkin: stay.checkin,
     checkout: stay.checkout,
@@ -386,7 +388,8 @@ export async function action({ params, request }: Route.ActionArgs) {
       children: l.occupancy.children,
       total: l.total,
     })),
-  });
+  };
+  await recordBooking(stay.channelId, record);
 
   if (status === "failed") {
     return { bookingError: error };
@@ -396,6 +399,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   // can only reach checkout if it had a positive availability row for every
   // night (the booking gate enforces this), so each decrement hits a real row.
   await decrementAvailability(stay.channelId, stayAvailabilityItems(lines, stay.checkin, nights));
+
+  // Confirmation to the guest + (opt-in) notification to the host. Fire-and-
+  // forget: a mail failure must not fail the booking (the helper never throws).
+  await sendBookingEmails(stay.channelId, record, url.origin);
 
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", live ? "0" : "1");
