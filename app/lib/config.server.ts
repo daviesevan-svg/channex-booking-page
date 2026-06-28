@@ -20,6 +20,9 @@ export interface AppConfig extends ChannexConfig {
   sessionSecret: string;
   appUrl: string;
   resendApiKey?: string;
+  /** Sender for transactional email, e.g. "Your Hotel <noreply@domain>".
+   *  Needs a Resend-verified domain in prod; falls back to onboarding@resend.dev. */
+  resendFrom?: string;
   /** Open Channel inbound key: the one Channex sends to our /api endpoints. */
   openChannelApiKey: string;
   /** Open Channel outbound key: Channex-provided, used when WE call Channex's
@@ -57,6 +60,7 @@ export function getConfig(): AppConfig {
     sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
     appUrl: read("APP_URL", "http://localhost:5173"),
     resendApiKey: read("RESEND_API_KEY") || undefined,
+    resendFrom: read("RESEND_FROM") || undefined,
     openChannelApiKey: read("OPEN_CHANNEL_API_KEY"),
     openChannelBookingKey: read("OPEN_CHANNEL_BOOKING_KEY") || read("OPEN_CHANNEL_API_KEY"),
     providerCode: read("PROVIDER_CODE") || undefined,

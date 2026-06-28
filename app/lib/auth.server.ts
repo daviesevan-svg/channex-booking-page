@@ -1,6 +1,7 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
 import { getConfig } from "./config.server";
+import { sendEmail } from "./email.server";
 import { getUser, isSuperadmin, upsertUser } from "./users.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
@@ -148,27 +149,15 @@ export async function sendMagicLink(
   link: string,
 ): Promise<{ sent: boolean; link?: string }> {
   const { resendApiKey } = getConfig();
+  // No provider configured: surface the link so dev sign-in still works.
   if (!resendApiKey) {
     console.log(`[admin] magic link for ${email}: ${link}`);
     return { sent: false, link };
   }
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "Booking Admin <onboarding@resend.dev>",
-        to: [email],
-        subject: "Your admin sign-in link",
-        html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
-      }),
-    });
-    if (!res.ok) return { sent: false, link };
-    return { sent: true };
-  } catch {
-    return { sent: false, link };
-  }
+  const { sent } = await sendEmail({
+    to: email,
+    subject: "Your admin sign-in link",
+    html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
+  });
+  return sent ? { sent: true } : { sent: false, link };
 }
