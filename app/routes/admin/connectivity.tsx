@@ -16,8 +16,8 @@ const SYSTEMS = [
     blurb: "Sync availability, rates and bookings through your Channex account.",
     available: true,
   },
-  { id: "siteminder", name: "SiteMinder", tagline: "Channel manager", blurb: "", available: false },
-  { id: "cloudbeds", name: "Cloudbeds", tagline: "PMS & channel manager", blurb: "", available: false },
+  { id: "apaleo", name: "Apaleo", tagline: "Property management system", blurb: "", available: false },
+  { id: "mews", name: "Mews", tagline: "Property management system", blurb: "", available: false },
 ] as const;
 
 const AVAILABLE = new Set(SYSTEMS.filter((s) => s.available).map((s) => s.id));
