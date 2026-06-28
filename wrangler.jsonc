@@ -21,7 +21,10 @@
 		"ADMIN_EMAILS": "",
 		"SESSION_SECRET": "",
 		"APP_URL": "",
+		// Email (Resend). RESEND_FROM needs a Resend-verified domain in prod,
+		// e.g. "Your Hotel <noreply@your-domain>"; blank falls back to onboarding@resend.dev.
 		"RESEND_API_KEY": "",
+		"RESEND_FROM": "",
 		// Open Channel API (Channex pushes ARI to us, we push bookings back).
 		// PROVIDER_CODE: your Channex Open Channel provider code.
 		"PROVIDER_CODE": "OpenChannel",
