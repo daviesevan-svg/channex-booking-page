@@ -90,6 +90,18 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
           <Row label="Check-out" value={fmtDate(b.checkout, "EEE d MMM yyyy")} />
           <Row label="Nights" value={String(b.nights)} />
           <Row label="Booked" value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm")} />
+          {b.payment?.mode === "payment" && (
+            <Row
+              label="Payment"
+              value={`Paid ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} via Stripe`}
+            />
+          )}
+          {b.payment?.mode === "setup" && (
+            <Row
+              label="Guarantee card"
+              value={b.payment.cardLast4 ? `On file ····${b.payment.cardLast4}` : "On file"}
+            />
+          )}
         </section>
 
         <section className="rounded-[14px] border border-line bg-surface p-5">

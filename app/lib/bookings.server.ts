@@ -23,6 +23,25 @@ export function stayAvailabilityItems(
 export type BookingStatus = "confirmed" | "simulated" | "failed";
 export type BookingLifecycle = "active" | "cancelled";
 
+/** Stripe payment outcome stored on a booking. `mode:"payment"` = a charge was
+ *  taken (deposit/prepay); `mode:"setup"` = a guarantee card saved on file. */
+export interface PaymentInfo {
+  provider: "stripe";
+  mode: "payment" | "setup";
+  /** Connected Stripe account the charge/setup ran on. */
+  accountId: string;
+  sessionId: string;
+  /** Amount captured in major units (mode: payment). */
+  amount?: number;
+  currency?: string;
+  paymentIntentId?: string;
+  /** Guarantee card on file (mode: setup) — for charging a no-show later. */
+  customerId?: string;
+  paymentMethodId?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+}
+
 export interface BookingRoom {
   roomId: string;
   roomTitle: string;
@@ -72,6 +91,8 @@ export interface BookingRecord {
     requests?: string;
   };
   rooms: BookingRoom[];
+  /** Stripe payment captured at checkout, or a guarantee card saved on file. */
+  payment?: PaymentInfo;
   /** Extras ("Enhance your stay") purchased, priced at booking time. */
   extras?: ResolvedExtra[];
   /** Consent captured at checkout — the defence for disputes/chargebacks. */

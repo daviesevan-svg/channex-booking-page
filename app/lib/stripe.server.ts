@@ -125,3 +125,69 @@ export interface StripeAccount {
 export function retrieveAccount(account: string): Promise<StripeAccount> {
   return stripeRequest<StripeAccount>(`/v1/accounts/${account}`, { method: "GET" });
 }
+
+// ---------- Checkout Sessions (direct charges on the connected account) ----------
+export interface CheckoutSession {
+  id: string;
+  url?: string;
+  payment_status?: string; // "paid" | "unpaid" | "no_payment_required"
+  status?: string; // "open" | "complete" | "expired"
+  mode?: string;
+  amount_total?: number;
+  currency?: string;
+  payment_intent?: string | { id: string };
+  setup_intent?: string | { id: string };
+  customer?: string | { id: string };
+}
+
+/** Create a Checkout Session on a connected account. `params` is passed through
+ *  to Stripe form-encoded, so nested objects/arrays use the documented shape. */
+export function createCheckoutSession(
+  account: string,
+  params: Record<string, unknown>,
+  idempotencyKey?: string,
+): Promise<CheckoutSession> {
+  return stripeRequest<CheckoutSession>("/v1/checkout/sessions", { account, body: params, idempotencyKey });
+}
+
+export function retrieveCheckoutSession(account: string, id: string): Promise<CheckoutSession> {
+  return stripeRequest<CheckoutSession>(
+    `/v1/checkout/sessions/${id}?expand[]=payment_intent&expand[]=setup_intent`,
+    { method: "GET", account },
+  );
+}
+
+// ---------- Webhook signature verification (Web Crypto, no SDK) ----------
+const TOLERANCE_SECONDS = 300;
+
+async function hmacSha256Hex(secret: string, payload: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Verify a Stripe-Signature header and return the parsed event, or throw. */
+export async function verifyWebhook(rawBody: string, sigHeader: string | null, secret: string, nowSec: number): Promise<unknown> {
+  if (!sigHeader || !secret) throw new StripeError(400, "signature", "Missing signature or secret.");
+  const parts = Object.fromEntries(sigHeader.split(",").map((kv) => kv.split("=") as [string, string]));
+  const t = Number(parts.t);
+  const v1 = parts.v1;
+  if (!t || !v1) throw new StripeError(400, "signature", "Malformed signature header.");
+  if (Math.abs(nowSec - t) > TOLERANCE_SECONDS) throw new StripeError(400, "signature", "Timestamp outside tolerance.");
+  const expected = await hmacSha256Hex(secret, `${t}.${rawBody}`);
+  if (!timingSafeEqual(expected, v1)) throw new StripeError(400, "signature", "Signature mismatch.");
+  return JSON.parse(rawBody);
+}
