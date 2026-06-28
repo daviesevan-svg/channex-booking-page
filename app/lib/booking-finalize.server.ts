@@ -13,7 +13,56 @@ import {
 import { decrementAvailability } from "./ari.server";
 import { pushOpenChannelBooking } from "./open-channel.server";
 import { sendBookingEmails } from "./email.server";
-import type { PendingBooking } from "./pending-bookings.server";
+import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
+import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
+
+const idOf = (v: unknown): string | undefined =>
+  typeof v === "string" ? v : v && typeof v === "object" ? (v as { id?: string }).id : undefined;
+
+/** Turn a completed Checkout Session into the PaymentInfo we store, for either a
+ *  charge (mode: payment) or a saved guarantee card (mode: setup). Returns null
+ *  if the session isn't actually complete. */
+export function paymentFromSession(account: string, sessionId: string, session: CheckoutSession): PaymentInfo | null {
+  if (session.payment_status === "paid") {
+    return {
+      provider: "stripe",
+      mode: "payment",
+      accountId: account,
+      sessionId,
+      amount: (session.amount_total ?? 0) / 100,
+      currency: (session.currency ?? "").toUpperCase() || undefined,
+      paymentIntentId: idOf(session.payment_intent),
+    };
+  }
+  if (session.mode === "setup" && session.status === "complete") {
+    const si = typeof session.setup_intent === "object" ? session.setup_intent : undefined;
+    const pm = si && typeof si.payment_method === "object" ? si.payment_method : undefined;
+    return {
+      provider: "stripe",
+      mode: "setup",
+      accountId: account,
+      sessionId,
+      customerId: idOf(session.customer),
+      paymentMethodId: pm?.id ?? (typeof si?.payment_method === "string" ? si.payment_method : undefined),
+      cardLast4: pm?.card?.last4,
+      cardBrand: pm?.card?.brand,
+    };
+  }
+  return null;
+}
+
+/** Look up the pending booking, retrieve its Stripe session, and finalize if it
+ *  completed. Used by the webhook backstop. No-op if nothing pending or unpaid. */
+export async function finalizeFromStripeSession(ref: string, sessionId: string): Promise<BookingRecord | null> {
+  const pending = await getPending(ref);
+  if (!pending) return null;
+  const session = await retrieveCheckoutSession(pending.account, sessionId);
+  const payment = paymentFromSession(pending.account, sessionId, session);
+  if (!payment) return null;
+  const record = await finalizeBooking(pending, payment, pending.origin);
+  await deletePending(ref);
+  return record;
+}
 
 /** Create the booking from a prepared draft. Returns the stored record. If a
  *  booking with the same reference already exists, returns it untouched. */
