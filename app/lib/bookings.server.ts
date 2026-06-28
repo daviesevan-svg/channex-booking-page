@@ -55,6 +55,9 @@ export interface BookingRecord {
   /** True once the booking has decremented inventory (so cancel restores it once). */
   inventoryHeld?: boolean;
   createdAt: string;
+  /** Guest's language at booking time — drives confirmation/cancellation email
+   *  language. Absent on legacy bookings (falls back to the default). */
+  lang?: string;
   currency: string;
   checkin: string;
   checkout: string;

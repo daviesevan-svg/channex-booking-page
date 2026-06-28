@@ -5,6 +5,7 @@ import { useProperty } from "~/lib/booking-context";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari.server";
+import { sendCancellationEmails } from "~/lib/email.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -62,7 +63,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     // Re-check server-side so a stale page can't cancel past the deadline.
     const active = (booking.lifecycle ?? "active") === "active";
     if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
-      await updateBooking(params.channelId, booking.id, {
+      const updated = await updateBooking(params.channelId, booking.id, {
         lifecycle: "cancelled",
         cancelledAt: new Date().toISOString(),
         inventoryHeld: false,
@@ -74,6 +75,8 @@ export async function action({ params, request }: Route.ActionArgs) {
           stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights),
         );
       }
+      // Cancellation confirmation to the guest + (opt-in) host notification.
+      await sendCancellationEmails(params.channelId, updated ?? booking, new URL(request.url).origin);
     }
   }
   return redirect(`/${params.channelId}/manage/${params.id}`);
