@@ -56,8 +56,9 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
       }),
     });
     if (!res.ok) {
+      const detail = await res.text().catch(() => "");
       const error = `SparkPost responded ${res.status}`;
-      console.log(`[email] send failed: ${error} (to ${to.join(", ")})`);
+      console.log(`[email] send failed: ${error} (to ${to.join(", ")})${detail ? ` — ${detail.slice(0, 500)}` : ""}`);
       return { sent: false, error };
     }
     return { sent: true };
