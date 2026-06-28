@@ -181,6 +181,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [payTiming, setPayTiming] = useState<string>(pol.payment.timing);
   const [latePenalty, setLatePenalty] = useState<string>(tier0?.penalty ?? "full_stay");
   const [noShowPenalty, setNoShowPenalty] = useState<string>(pol.noShow.penalty);
+  const [refundable, setRefundable] = useState<boolean>(pol.cancellation.refundable);
   const needsValue = (p: string) => p === "percent" || p === "fixed";
   const disabledInput = `${FIELD_INPUT} disabled:cursor-not-allowed disabled:opacity-50`;
 
@@ -366,43 +367,55 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         <div className="border-t border-divider pt-5">
           <div className="mb-3 font-serif text-[17px] font-semibold">Cancellation policy</div>
           <label className="mb-3 flex items-center gap-2.5 text-[14px] font-semibold">
-            <input type="checkbox" name="refundable" defaultChecked={rate ? rate.refundable : true} className={checkbox} />
+            <input
+              type="checkbox"
+              name="refundable"
+              checked={refundable}
+              onChange={(e) => setRefundable(e.target.checked)}
+              className={checkbox}
+            />
             Refundable (free cancellation)
           </label>
-          <div className="text-[13px] font-semibold text-secondary">Free cancellation up to</div>
-          <div className="mt-1.5 flex items-center gap-2">
-            <input
-              name="cancelDeadlineValue"
-              type="number"
-              min={0}
-              defaultValue={rate?.cancelDeadlineValue ?? ""}
-              placeholder="24"
-              className="w-24 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
-            />
-            <select
-              name="cancelDeadlineUnit"
-              defaultValue={rate?.cancelDeadlineUnit ?? "hours"}
-              className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
-            >
-              <option value="hours">hours</option>
-              <option value="days">days</option>
-            </select>
-            <span className="text-[13px] text-muted-2">before arrival</span>
-          </div>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <label className="block text-[13px] font-semibold text-secondary">
-              Late-cancellation charge <span className="font-normal text-faint">(after the deadline)</span>
-              <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
-                {PENALTY_TYPES.map((p) => (
-                  <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
-                ))}
-              </select>
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
-              <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" disabled={!needsValue(latePenalty)} className={disabledInput} />
-            </label>
-          </div>
+          {refundable ? (
+            <>
+              <div className="text-[13px] font-semibold text-secondary">Free cancellation up to</div>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  name="cancelDeadlineValue"
+                  type="number"
+                  min={0}
+                  defaultValue={rate?.cancelDeadlineValue ?? ""}
+                  placeholder="24"
+                  className="w-24 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
+                />
+                <select
+                  name="cancelDeadlineUnit"
+                  defaultValue={rate?.cancelDeadlineUnit ?? "hours"}
+                  className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+                >
+                  <option value="hours">hours</option>
+                  <option value="days">days</option>
+                </select>
+                <span className="text-[13px] text-muted-2">before arrival</span>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="block text-[13px] font-semibold text-secondary">
+                  Late-cancellation charge <span className="font-normal text-faint">(after the deadline)</span>
+                  <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
+                    {PENALTY_TYPES.map((p) => (
+                      <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-[13px] font-semibold text-secondary">
+                  Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
+                  <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" disabled={!needsValue(latePenalty)} className={disabledInput} />
+                </label>
+              </div>
+            </>
+          ) : (
+            <p className="text-[13px] text-muted">All bookings are non-refundable — no free cancellation.</p>
+          )}
         </div>
 
         <div className="border-t border-divider pt-5">
