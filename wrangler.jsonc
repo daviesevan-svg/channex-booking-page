@@ -27,6 +27,11 @@
 		// to https://api.eu.sparkpost.com (blank = US).
 		"SPARKPOST_API_URL": "",
 		"EMAIL_FROM": "",
+		// Stripe (Connect, per-property). STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET
+		// are secrets — set them in .dev.vars (local) / the dashboard (prod), not here.
+		// STRIPE_CONNECT_CLIENT_ID (ca_…) is the platform Connect client id.
+		"STRIPE_CONNECT_CLIENT_ID": "",
+		"STRIPE_PLATFORM_FEE_BPS": "",
 		// Open Channel API (Channex pushes ARI to us, we push bookings back).
 		// PROVIDER_CODE: your Channex Open Channel provider code.
 		"PROVIDER_CODE": "OpenChannel",
