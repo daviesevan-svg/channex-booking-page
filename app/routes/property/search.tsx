@@ -10,8 +10,9 @@ import { useT } from "~/lib/i18n";
 import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
-import { getSearchContent } from "~/lib/overrides.server";
+import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
+import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -19,13 +20,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates] = await Promise.all([
+  const [content, closedDates, cutoff] = await Promise.all([
     getSearchContent(params.channelId, lang),
     getCalendarAvailability(params.channelId, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
     ),
+    getBookingCutoff(params.channelId),
   ]);
-  return { closedDates, content };
+  // Earliest arrival the property currently accepts (lead-time cutoff), so the
+  // calendar can grey out dates that are too last-minute to book.
+  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now) };
 }
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
@@ -38,7 +42,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates, content } = loaderData;
+  const { closedDates, content, earliestCheckin } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -46,6 +50,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
 
   const dates = useDateRange({
     closedDates,
+    minCheckin: earliestCheckin,
     initialCheckin: searchParams.get("checkin") ?? undefined,
     initialCheckout: searchParams.get("checkout") ?? undefined,
     tr,

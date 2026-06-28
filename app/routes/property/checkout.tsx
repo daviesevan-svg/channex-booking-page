@@ -1,6 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { isStayBookable } from "~/lib/dates";
+import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
@@ -30,7 +30,7 @@ import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
-import { getSettings } from "~/lib/overrides.server";
+import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { pushOpenChannelBooking } from "~/lib/open-channel.server";
 import { formatMoney } from "~/lib/money";
@@ -125,6 +125,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const stay = readStay(url, params.channelId);
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
   const { rooms, lines } = await resolveStayCart(stay, url);
@@ -187,6 +188,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const url = new URL(request.url);
   const stay = readStay(url, params.channelId);
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
 
   const form = await request.formData();
   const intent = String(form.get("intent") || "book");

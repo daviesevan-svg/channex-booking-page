@@ -46,6 +46,9 @@ const MAX_OFFSET = 11;
 
 export interface UseDateRangeArgs {
   closedDates: ClosedDates | null;
+  /** Earliest selectable check-in (YYYY-MM-DD); dates before it are greyed out.
+   *  Used for the booking lead-time cutoff. Defaults to today. */
+  minCheckin?: string;
   initialCheckin?: string;
   initialCheckout?: string;
   tr: Translator;
@@ -53,6 +56,7 @@ export interface UseDateRangeArgs {
 
 export function useDateRange({
   closedDates,
+  minCheckin,
   initialCheckin,
   initialCheckout,
   tr,
@@ -81,6 +85,10 @@ export function useDateRange({
   const minStayFor = (d: Date) => minStayMap[iso(d)] ?? 1;
   const isSold = (d: Date) => soldSet.has(iso(d));
   const today = startOfToday();
+  // Arrival floor = the later of today and the lead-time cutoff. Dates before it
+  // can't be selected as a check-in (greyed like past dates).
+  const minArrival = minCheckin ? parseISO(minCheckin) : today;
+  const floor = isBefore(minArrival, today) ? today : minArrival;
 
   // A sold-out night can still be a valid CHECK-OUT (you don't sleep there):
   // true when picking a check-out, `date` is after check-in, meets min-stay,
@@ -162,16 +170,18 @@ export function useDateRange({
       }
       for (let d = 1; d <= dim; d++) {
         const date = new Date(monthDate.getFullYear(), monthDate.getMonth(), d);
-        const past = isBefore(date, today);
+        // Past dates and those inside the lead-time gap are both un-bookable as
+        // arrivals; render them greyed.
+        const tooEarly = isBefore(date, floor);
         const sold = isSold(date);
         // Sold nights stay un-pickable for arrival, but open up as a check-out.
         const asCheckout = checkoutAllowed(date);
         // First sold night after an available run — you can still check out here.
         const prev = addDays(date, -1);
         const checkoutBoundary = sold && !isSold(prev) && !isBefore(prev, today);
-        const disabled = past ? true : asCheckout ? false : sold;
+        const disabled = tooEarly ? true : asCheckout ? false : sold;
         let title: string | undefined;
-        if (!past) {
+        if (!tooEarly) {
           if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
         }
@@ -191,7 +201,7 @@ export function useDateRange({
           date,
           disabled,
           sold,
-          past,
+          past: tooEarly,
           checkoutBoundary,
           title,
           isCheckin,
@@ -203,7 +213,7 @@ export function useDateRange({
       return { title, cells };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkin, checkout, monthOffset, soldSet, minStayMap, ctaSet, ctdSet]);
+  }, [checkin, checkout, monthOffset, soldSet, minStayMap, ctaSet, ctdSet, minCheckin]);
 
   let rangeSummary: string;
   if (checkin && checkout) {

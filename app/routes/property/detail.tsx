@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { isStayBookable } from "~/lib/dates";
+import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 
@@ -8,7 +8,7 @@ import type { Route } from "./+types/detail";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
-import { getPageText } from "~/lib/overrides.server";
+import { getBookingCutoff, getPageText } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
@@ -26,6 +26,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { adults, childrenAge } = readOccupancy(url.searchParams);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
   const rooms = await getCatalogRooms(

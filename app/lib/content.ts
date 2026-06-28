@@ -161,6 +161,25 @@ export interface SiteSettings {
   modifyDeadlineUnit?: DeadlineUnit;
   /** Shown to guests once the cancel/modify deadline has passed. */
   afterDeadlineMessage?: string;
+  // ----- Booking lead time (last-minute cutoff) -----
+  /** IANA timezone used to evaluate the same-day cutoff. Defaults to UTC. */
+  timezone?: string;
+  /** Minimum lead time before check-in. undefined = no limit; 0 = same-day
+   *  bookings allowed until `bookingCutoffTime`; 1-7 = require N days ahead. */
+  bookingCutoffDays?: number;
+  /** "HH:MM" local time after which same-day check-ins stop (when days === 0). */
+  bookingCutoffTime?: string;
+}
+
+/** Lead-time cutoff in the shape the client-safe date helpers consume. */
+export interface BookingCutoff {
+  days?: number;
+  time?: string;
+  timezone?: string;
+}
+
+export function bookingCutoffOf(s: SiteSettings): BookingCutoff {
+  return { days: s.bookingCutoffDays, time: s.bookingCutoffTime, timezone: s.timezone };
 }
 
 export const isDeadlineUnit = (v: string): v is DeadlineUnit => v === "hours" || v === "days";

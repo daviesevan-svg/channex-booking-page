@@ -1,6 +1,7 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { isStayBookable } from "~/lib/dates";
+import { isStayBookable, isTooLastMinute } from "~/lib/dates";
+import { getBookingCutoff } from "~/lib/overrides.server";
 import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 
@@ -42,6 +43,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
+    throw redirect(`/${params.channelId}`);
+  }
+  if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) {
     throw redirect(`/${params.channelId}`);
   }
 
