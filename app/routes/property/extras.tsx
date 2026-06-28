@@ -1,7 +1,8 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { getBookingCutoff } from "~/lib/overrides.server";
+import { getBookingCutoff, getPageText } from "~/lib/overrides.server";
+import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
@@ -62,10 +63,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const state = parseExtrasState(url.searchParams);
+  const text = await getPageText(params.channelId, "extras", langFromRequest(request));
   return {
     lineIndex,
     nights,
     currency,
+    text,
     // Per-room extras price for this room's occupancy; booking extras for the party.
     roomGuests: line.occupancy.adults + line.occupancy.children,
     party: partySize(occ),
@@ -183,7 +186,7 @@ function ExtraSection({
 }
 
 export default function Extras({ loaderData, params }: Route.ComponentProps) {
-  const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras } =
+  const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
     loaderData;
   const { currency: ctxCurrency } = useProperty();
   const cur = ctxCurrency || currency;
@@ -221,8 +224,8 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
       <div className="flex flex-wrap items-start gap-9">
         <div className="min-w-[340px] flex-[1.6]">
           <ExtraSection
-            title={tr.t("enhanceRoom", { room: roomTitle })}
-            subtitle={tr.t("enhanceIntro")}
+            title={text.heading.replaceAll("{room}", roomTitle)}
+            subtitle={text.intro}
             extras={roomExtras}
             sel={roomSel}
             setSel={setRoomSel}
@@ -232,7 +235,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
             tr={tr}
           />
           <ExtraSection
-            title={tr.t("forYourStay")}
+            title={text.stayTitle}
             extras={bookingExtras}
             sel={bookingSel}
             setSel={setBookingSel}
@@ -258,7 +261,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
           {allLines.length > 0 && (
             <div className="flex flex-col gap-2.5 border-b border-divider py-4">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{text.summaryLabel}</div>
               {allLines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -275,7 +278,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           )}
 
           <div className="flex items-baseline justify-between py-4">
-            <span className="text-[15px] font-semibold">{tr.t("extrasLabel")}</span>
+            <span className="text-[15px] font-semibold">{text.summaryLabel}</span>
             <span className="font-serif text-[24px] font-semibold">{formatMoney(extrasSum, cur)}</span>
           </div>
 
@@ -284,14 +287,14 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
             onClick={() => go(false)}
             className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep"
           >
-            {tr.t("extrasContinue")}
+            {text.continueButton}
           </button>
           <button
             type="button"
             onClick={() => go(true)}
             className="mt-2.5 w-full rounded-[10px] py-2.5 text-center text-[14px] font-semibold text-muted hover:text-accent"
           >
-            {tr.t("skipForNow")}
+            {text.skipButton}
           </button>
         </aside>
       </div>

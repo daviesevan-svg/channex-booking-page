@@ -82,6 +82,18 @@ export const EDITABLE_PAGES: PageDef[] = [
     ],
   },
   {
+    id: "extras",
+    label: "Extras",
+    fields: [
+      { key: "heading", label: "Room section heading ({room} = room name)", default: "Enhance your {room}" },
+      { key: "intro", label: "Intro line", textarea: true, default: "Optional add-ons to make your stay special." },
+      { key: "stayTitle", label: "Stay-wide section title", default: "For your whole stay" },
+      { key: "summaryLabel", label: "Summary “Extras” label", default: "Extras" },
+      { key: "continueButton", label: "Continue button", default: "Continue" },
+      { key: "skipButton", label: "Skip button", default: "Skip for now" },
+    ],
+  },
+  {
     id: "confirmation",
     label: "Confirmation",
     fields: [
@@ -364,6 +376,14 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { heading: "I tuoi dati", guestSection: "Informazioni dell'ospite", arrivalSection: "Arrivo e richieste", paymentSection: "Pagamento", paymentNote: "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.", completeButton: "Completa la prenotazione", cancellationNote: "Cancellazione gratuita fino a 24 ore prima dell'arrivo." },
     pt: { heading: "Os seus dados", guestSection: "Informações do hóspede", arrivalSection: "Chegada e pedidos", paymentSection: "Pagamento", paymentNote: "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.", completeButton: "Concluir reserva", cancellationNote: "Cancelamento gratuito até 24h antes da chegada." },
     nl: { heading: "Uw gegevens", guestSection: "Gastinformatie", arrivalSection: "Aankomst & verzoeken", paymentSection: "Betaling", paymentNote: "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.", completeButton: "Boeking voltooien", cancellationNote: "Gratis annulering tot 24 uur voor aankomst." },
+  },
+  extras: {
+    fr: { heading: "Améliorez votre {room}", intro: "Des extras facultatifs pour rendre votre séjour spécial.", stayTitle: "Pour tout votre séjour", summaryLabel: "Extras", continueButton: "Continuer", skipButton: "Passer pour l’instant" },
+    de: { heading: "Verschönern Sie Ihr {room}", intro: "Optionale Extras für einen besonderen Aufenthalt.", stayTitle: "Für Ihren gesamten Aufenthalt", summaryLabel: "Extras", continueButton: "Weiter", skipButton: "Vorerst überspringen" },
+    es: { heading: "Mejora tu {room}", intro: "Extras opcionales para hacer tu estancia especial.", stayTitle: "Para toda tu estancia", summaryLabel: "Extras", continueButton: "Continuar", skipButton: "Omitir por ahora" },
+    it: { heading: "Arricchisci la tua {room}", intro: "Extra facoltativi per rendere speciale il tuo soggiorno.", stayTitle: "Per tutto il tuo soggiorno", summaryLabel: "Extra", continueButton: "Continua", skipButton: "Salta per ora" },
+    pt: { heading: "Melhore o seu {room}", intro: "Extras opcionais para tornar a sua estadia especial.", stayTitle: "Para toda a sua estadia", summaryLabel: "Extras", continueButton: "Continuar", skipButton: "Ignorar por agora" },
+    nl: { heading: "Maak je {room} compleet", intro: "Optionele extra’s om je verblijf bijzonder te maken.", stayTitle: "Voor je hele verblijf", summaryLabel: "Extra’s", continueButton: "Doorgaan", skipButton: "Nu overslaan" },
   },
   confirmation: {
     fr: { heading: "Tout est confirmé", subtitle: "Votre séjour à {hotel} est confirmé. Un e-mail de confirmation est en route.", newBooking: "Faire une autre réservation" },
