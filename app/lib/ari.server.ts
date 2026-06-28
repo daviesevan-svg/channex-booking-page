@@ -346,6 +346,69 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits): P
   for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
 }
 
+export interface BulkScope {
+  currency: string;
+  /** target dates (already filtered to the chosen days of week) */
+  dates: string[];
+  /** rooms in scope — availability is set per room */
+  rooms: { id: string }[];
+  /** rates in scope — price + restrictions are set per (room, rate) it's priced on */
+  rates: { id: string; prices: Record<string, number> }[];
+  /** each field is applied only when defined; undefined = leave untouched */
+  avail?: number;
+  price?: number;
+  minStay?: number;
+  stopSell?: boolean;
+  cta?: boolean;
+  ctd?: boolean;
+}
+
+/** Apply one set of values across a range of cells. Restriction fields that
+ *  aren't being changed are read back and preserved, so e.g. a bulk stop-sell
+ *  doesn't clear existing min-stay/CTA/CTD on the same cells. */
+export async function applyBulkUpdate(hotelCode: string, s: BulkScope): Promise<{ cells: number }> {
+  if (!s.dates.length) return { cells: 0 };
+  const edits: InventoryEdits = { currency: s.currency, availability: [], prices: [], restrictions: [] };
+
+  if (s.avail !== undefined) {
+    const avail = Math.max(0, Math.round(s.avail));
+    for (const room of s.rooms) for (const date of s.dates) edits.availability.push({ roomId: room.id, date, avail });
+  }
+
+  const touchRestr = s.minStay !== undefined || s.stopSell !== undefined || s.cta !== undefined || s.ctd !== undefined;
+  const touchPrice = s.price !== undefined && s.price > 0;
+  if (touchPrice || touchRestr) {
+    // Read the current window once so we can preserve restriction fields the
+    // operator left blank.
+    const existing = touchRestr
+      ? await getInventory(hotelCode, s.dates[0], s.dates[s.dates.length - 1])
+      : { availability: {}, prices: {}, restrictions: {} as Record<string, RestrictionCell> };
+    for (const rate of s.rates) {
+      for (const room of s.rooms) {
+        if (rate.prices[room.id] === undefined) continue; // rate not offered on this room
+        for (const date of s.dates) {
+          if (touchPrice) edits.prices.push({ roomId: room.id, rateId: rate.id, date, price: s.price! });
+          if (touchRestr) {
+            const cur = existing.restrictions[`${room.id}|${rate.id}|${date}`];
+            edits.restrictions.push({
+              roomId: room.id,
+              rateId: rate.id,
+              date,
+              stopSell: s.stopSell ?? cur?.stopSell ?? false,
+              minStay: s.minStay ?? cur?.minStay ?? 0,
+              cta: s.cta ?? cur?.cta ?? false,
+              ctd: s.ctd ?? cur?.ctd ?? false,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  await saveInventory(hotelCode, edits);
+  return { cells: edits.availability.length + edits.prices.length + edits.restrictions.length };
+}
+
 /** Adjust availability by `delta` per (room, date), clamped at 0. Only affects
  *  rooms/dates that already have an availability row (a room with no row is not
  *  bookable, so it never reaches this path). */
