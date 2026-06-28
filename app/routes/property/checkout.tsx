@@ -15,12 +15,7 @@ import {
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
-import {
-  generateReference,
-  recordBooking,
-  stayAvailabilityItems,
-  type BookingStatus,
-} from "~/lib/bookings.server";
+import { generateReference } from "~/lib/bookings.server";
 import { resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow, policyToCancellation } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
@@ -32,15 +27,15 @@ import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTot
 import { getConfig } from "~/lib/config.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
-import { pushOpenChannelBooking } from "~/lib/open-channel.server";
-import { sendBookingEmails } from "~/lib/email.server";
+import { createCheckoutSession } from "~/lib/stripe.server";
+import { stashPending, type PendingBooking } from "~/lib/pending-bookings.server";
+import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
-import { getPageText } from "~/lib/overrides.server";
+import { getOverrides, getPageText } from "~/lib/overrides.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
-import { decrementAvailability } from "~/lib/ari.server";
 
 interface Stay {
   channelId: string;
@@ -329,34 +324,17 @@ export async function action({ params, request }: Route.ActionArgs) {
     }),
   };
 
-  let status: BookingStatus;
-  let channexId: string | undefined;
-  let error: string | undefined;
-
-  if (live) {
-    try {
-      const result = await pushOpenChannelBooking(booking);
-      channexId = result?.reservation_id || result?.id || undefined;
-      status = "confirmed";
-    } catch (e) {
-      status = "failed";
-      error = e instanceof Error ? e.message : "Channex rejected the booking.";
-    }
-  } else {
-    status = "simulated";
-  }
-
   const cancellation = await resolveBookingCancellation(
     stay.channelId,
     lines.map((l) => l.rateId),
     stay.checkin,
   );
-  const record = {
+
+  // The booking, built but not yet created. Status/channexId/payment are decided
+  // at finalize (after payment, for paid rates).
+  const draft = {
     id: crypto.randomUUID(),
     reference,
-    channexId,
-    status,
-    error,
     lifecycle: "active" as const,
     cancellation,
     createdAt: new Date().toISOString(),
@@ -370,7 +348,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     offer: offer ?? undefined,
     extras: extraLines.length ? extraLines : undefined,
     consent,
-    inventoryHeld: status !== "failed",
     guest: {
       firstName: g.firstName,
       lastName: g.lastName,
@@ -389,24 +366,67 @@ export async function action({ params, request }: Route.ActionArgs) {
       total: l.total,
     })),
   };
-  await recordBooking(stay.channelId, record);
-
-  if (status === "failed") {
-    return { bookingError: error };
-  }
-
-  // Decrement availability for the booked rooms across the stay nights. A room
-  // can only reach checkout if it had a positive availability row for every
-  // night (the booking gate enforces this), so each decrement hits a real row.
-  await decrementAvailability(stay.channelId, stayAvailabilityItems(lines, stay.checkin, nights));
-
-  // Confirmation to the guest + (opt-in) notification to the host. Fire-and-
-  // forget: a mail failure must not fail the booking (the helper never throws).
-  await sendBookingEmails(stay.channelId, record, url.origin);
 
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", live ? "0" : "1");
   if (applied) next.set("promo", applied.code);
+  const pending: PendingBooking = {
+    pid: stay.channelId,
+    account: settings.stripeAccountId ?? "",
+    record: draft,
+    channexPayload: booking,
+    live,
+    returnParams: next.toString(),
+    origin: url.origin,
+  };
+
+  // Paid rate (deposit/prepay) → hand off to Stripe's hosted Checkout. The
+  // booking is created only once payment succeeds (return URL + webhook finalize).
+  if (due > 0) {
+    if (!settings.stripeAccountId || !config.stripeSecretKey) return { paymentError: true };
+    await stashPending(reference, pending);
+    const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
+    const amountMinor = Math.round(due * 100);
+    const feeBps = config.stripePlatformFeeBps;
+    let sessionUrl: string | undefined;
+    try {
+      const session = await createCheckoutSession(
+        settings.stripeAccountId,
+        {
+          mode: "payment",
+          client_reference_id: reference,
+          customer_email: g.email,
+          metadata: { reference, pid: stay.channelId },
+          payment_intent_data: {
+            metadata: { reference, pid: stay.channelId },
+            ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
+          },
+          line_items: [
+            {
+              quantity: 1,
+              price_data: {
+                currency: stay.currency.toLowerCase(),
+                unit_amount: amountMinor,
+                product_data: { name: `${hotelName} — booking ${reference}` },
+              },
+            },
+          ],
+          success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
+          cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
+        },
+        reference,
+      );
+      sessionUrl = session.url;
+    } catch {
+      return { paymentError: true };
+    }
+    if (!sessionUrl) return { paymentError: true };
+    throw redirect(sessionUrl);
+  }
+
+  // No payment due (pay at hotel): create the booking now.
+  const record = await finalizeBooking(pending, undefined, url.origin);
+  if (record.status === "failed") return { bookingError: record.error };
   return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
 }
 
@@ -546,6 +566,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       {bookingError && (
         <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
           {bookingError}
+        </div>
+      )}
+
+      {actionData?.paymentError && (
+        <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
+          This rate needs an online payment, but card payments aren&rsquo;t set up for this property
+          yet. Please contact us to complete your booking.
         </div>
       )}
 

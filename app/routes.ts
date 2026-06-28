@@ -10,6 +10,7 @@ export default [
   route("api/test_connection", "routes/api.test_connection.tsx"),
   route("api/mapping_details", "routes/api.mapping_details.tsx"),
   route("api/changes", "routes/api.changes.tsx"),
+  route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
 
   // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
@@ -49,6 +50,7 @@ export default [
     route("rooms/:roomId", "routes/property/detail.tsx"),
     route("extras", "routes/property/extras.tsx"),
     route("checkout", "routes/property/checkout.tsx"),
+    route("checkout/complete", "routes/property/checkout.complete.tsx"),
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
     route("manage", "routes/property/manage.tsx"),
     route("manage/:id", "routes/property/manage-booking.tsx"),
