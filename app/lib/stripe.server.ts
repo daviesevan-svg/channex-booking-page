@@ -127,6 +127,10 @@ export function retrieveAccount(account: string): Promise<StripeAccount> {
 }
 
 // ---------- Checkout Sessions (direct charges on the connected account) ----------
+export interface StripePaymentMethod {
+  id: string;
+  card?: { brand?: string; last4?: string };
+}
 export interface CheckoutSession {
   id: string;
   url?: string;
@@ -136,7 +140,7 @@ export interface CheckoutSession {
   amount_total?: number;
   currency?: string;
   payment_intent?: string | { id: string };
-  setup_intent?: string | { id: string };
+  setup_intent?: string | { id: string; payment_method?: string | StripePaymentMethod };
   customer?: string | { id: string };
 }
 
@@ -152,7 +156,7 @@ export function createCheckoutSession(
 
 export function retrieveCheckoutSession(account: string, id: string): Promise<CheckoutSession> {
   return stripeRequest<CheckoutSession>(
-    `/v1/checkout/sessions/${id}?expand[]=payment_intent&expand[]=setup_intent`,
+    `/v1/checkout/sessions/${id}?expand[]=payment_intent&expand[]=setup_intent&expand[]=setup_intent.payment_method`,
     { method: "GET", account },
   );
 }

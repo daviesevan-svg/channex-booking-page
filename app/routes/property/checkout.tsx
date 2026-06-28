@@ -380,42 +380,60 @@ export async function action({ params, request }: Route.ActionArgs) {
     origin: url.origin,
   };
 
-  // Paid rate (deposit/prepay) → hand off to Stripe's hosted Checkout. The
-  // booking is created only once payment succeeds (return URL + webhook finalize).
-  if (due > 0) {
-    if (!settings.stripeAccountId || !config.stripeSecretKey) return { paymentError: true };
+  // Stripe is needed to charge a deposit/prepay (mode=payment) or to save a
+  // guarantee card for a pay-at-hotel rate that asks for one (mode=setup).
+  const needsGuarantee = due === 0 && policy.payment.card === "guarantee";
+  const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
+  const stripeMode: "payment" | "setup" | null = due > 0 ? "payment" : needsGuarantee ? "setup" : null;
+
+  // A paid rate with no way to charge must not book unpaid. A guarantee-only
+  // rate without Stripe just books without a card (no-show cover is optional).
+  if (due > 0 && !stripeConnected) return { paymentError: true };
+
+  if (stripeMode && stripeConnected) {
+    const account = settings.stripeAccountId as string;
     await stashPending(reference, pending);
-    const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
-    const amountMinor = Math.round(due * 100);
-    const feeBps = config.stripePlatformFeeBps;
+    const common = {
+      client_reference_id: reference,
+      customer_email: g.email,
+      metadata: { reference, pid: stay.channelId },
+      success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
+      cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
+    };
+    let sessionParams: Record<string, unknown>;
+    if (stripeMode === "payment") {
+      const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
+      const amountMinor = Math.round(due * 100);
+      const feeBps = config.stripePlatformFeeBps;
+      sessionParams = {
+        ...common,
+        mode: "payment",
+        payment_intent_data: {
+          metadata: { reference, pid: stay.channelId },
+          ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
+        },
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: stay.currency.toLowerCase(),
+              unit_amount: amountMinor,
+              product_data: { name: `${hotelName} — booking ${reference}` },
+            },
+          },
+        ],
+      };
+    } else {
+      // Guarantee card: collect a card without charging.
+      sessionParams = {
+        ...common,
+        mode: "setup",
+        setup_intent_data: { metadata: { reference, pid: stay.channelId } },
+      };
+    }
     let sessionUrl: string | undefined;
     try {
-      const session = await createCheckoutSession(
-        settings.stripeAccountId,
-        {
-          mode: "payment",
-          client_reference_id: reference,
-          customer_email: g.email,
-          metadata: { reference, pid: stay.channelId },
-          payment_intent_data: {
-            metadata: { reference, pid: stay.channelId },
-            ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
-          },
-          line_items: [
-            {
-              quantity: 1,
-              price_data: {
-                currency: stay.currency.toLowerCase(),
-                unit_amount: amountMinor,
-                product_data: { name: `${hotelName} — booking ${reference}` },
-              },
-            },
-          ],
-          success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
-          cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
-        },
-        reference,
-      );
+      const session = await createCheckoutSession(account, sessionParams, reference);
       sessionUrl = session.url;
     } catch {
       return { paymentError: true };
@@ -424,7 +442,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     throw redirect(sessionUrl);
   }
 
-  // No payment due (pay at hotel): create the booking now.
+  // No card needed (or a guarantee rate with Stripe not connected): book now.
   const record = await finalizeBooking(pending, undefined, url.origin);
   if (record.status === "failed") return { bookingError: record.error };
   return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
