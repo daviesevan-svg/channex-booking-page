@@ -228,7 +228,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   // Live vs test booking is controlled from admin General settings; an unsaved
   // setting falls back to the ALLOW_LIVE_BOOKING env var.
   const settings = await getSettings(stay.channelId);
-  const live = settings.liveBooking ?? config.allowLiveBooking;
+  // Push to Channex only when the property has selected it as its connectivity;
+  // otherwise simulate, even in live mode (there's nothing to push to).
+  const live =
+    (settings.liveBooking ?? config.allowLiveBooking) && settings.connectedSystem === "channex";
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   // Random, unguessable reference — also the guest's manage-booking credential.
   const reference = generateReference();

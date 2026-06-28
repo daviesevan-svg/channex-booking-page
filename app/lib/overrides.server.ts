@@ -246,6 +246,13 @@ export async function getBookingCutoff(pid: string): Promise<BookingCutoff> {
   return bookingCutoffOf(await getSettings(pid));
 }
 
+/** True only when this property has explicitly selected Channex on the
+ *  Connectivity page. Gates all inbound Channex sync + outbound booking push. */
+export async function isChannexConnected(pid: string): Promise<boolean> {
+  if (!pid) return false;
+  return (await getSettings(pid)).connectedSystem === "channex";
+}
+
 /** Set (or clear, with undefined) the connected channel-manager/PMS system.
  *  Merges into existing settings rather than rewriting the whole form. */
 export async function saveConnectivity(pid: string, system: string | undefined): Promise<SiteSettings> {
