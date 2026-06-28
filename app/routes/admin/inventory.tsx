@@ -6,7 +6,7 @@ import type { Route } from "./+types/inventory";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
-import { getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
+import { applyBulkUpdate, getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 
 // Generous server window; the client renders only as many columns as fit the
@@ -14,9 +14,37 @@ import { getSettings } from "~/lib/overrides.server";
 const FETCH_DAYS = 31;
 const DEFAULT_COLS = 14;
 
+// Day-of-week chips for bulk update. Values are getUTCDay() codes (0 = Sunday).
+const DOW = [
+  { v: 1, label: "Mon" },
+  { v: 2, label: "Tue" },
+  { v: 3, label: "Wed" },
+  { v: 4, label: "Thu" },
+  { v: 5, label: "Fri" },
+  { v: 6, label: "Sat" },
+  { v: 0, label: "Sun" },
+];
+
+const MAX_BULK_DAYS = 366;
+
 function windowDates(start: string, n: number): string[] {
   const base = parseISO(start);
   return Array.from({ length: n }, (_, i) => format(addDays(base, i), "yyyy-MM-dd"));
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Inclusive YYYY-MM-DD dates from `from` to `to`, optionally limited to the
+ *  given days of week (0 = Sunday … 6 = Saturday; empty set = all days). */
+function rangeDates(from: string, to: string, dows: Set<number>): string[] {
+  const out: string[] = [];
+  const end = parseISO(to);
+  let d = parseISO(from);
+  while (d <= end && out.length < MAX_BULK_DAYS) {
+    if (dows.size === 0 || dows.has(d.getUTCDay())) out.push(format(d, "yyyy-MM-dd"));
+    d = addDays(d, 1);
+  }
+  return out;
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -51,6 +79,75 @@ export async function action({ request }: Route.ActionArgs) {
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
   const form = await request.formData();
+
+  if (String(form.get("intent")) === "bulk") {
+    const [rooms, rates, settings] = await Promise.all([
+      getRooms(propertyId),
+      getRates(propertyId),
+      getSettings(propertyId),
+    ]);
+
+    const from = String(form.get("from") || "");
+    const to = String(form.get("to") || "");
+    if (!ISO_DATE.test(from) || !ISO_DATE.test(to)) return { error: "Pick a valid date range." };
+    if (to < from) return { error: "End date must be on or after the start date." };
+
+    const dows = new Set(form.getAll("dow").map((d) => Number(d)).filter((n) => n >= 0 && n <= 6));
+    const dates = rangeDates(from, to, dows);
+    if (!dates.length) return { error: "No dates match the selected days of the week." };
+
+    const room = String(form.get("room") || "all");
+    const rate = String(form.get("rate") || "all");
+    const scopedRooms = room === "all" ? rooms : rooms.filter((r) => r.id === room);
+    const scopedRates = rate === "all" ? rates : rates.filter((r) => r.id === rate);
+
+    // Blank input = leave untouched. A value (including 0 for numbers / "off"
+    // for toggles) means set it.
+    const num = (key: string) => {
+      const v = String(form.get(key) ?? "").trim();
+      if (v === "") return undefined;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    const tri = (key: string) => {
+      const v = String(form.get(key) ?? "");
+      return v === "on" ? true : v === "off" ? false : undefined;
+    };
+
+    const avail = num("avail");
+    const price = num("price");
+    const minStay = num("minStay");
+    const stopSell = tri("stopSell");
+    const cta = tri("cta");
+    const ctd = tri("ctd");
+
+    if (
+      avail === undefined &&
+      !(price !== undefined && price > 0) &&
+      minStay === undefined &&
+      stopSell === undefined &&
+      cta === undefined &&
+      ctd === undefined
+    ) {
+      return { error: "Enter at least one value to apply." };
+    }
+
+    const { cells } = await applyBulkUpdate(propertyId, {
+      currency: settings.currency || "GBP",
+      dates,
+      rooms: scopedRooms.map((r) => ({ id: r.id })),
+      rates: scopedRates.map((r) => ({ id: r.id, prices: r.prices })),
+      avail: avail !== undefined ? Math.max(0, Math.round(avail)) : undefined,
+      price: price !== undefined && price > 0 ? Math.round(price * 100) / 100 : undefined,
+      minStay: minStay !== undefined ? Math.max(0, Math.round(minStay)) : undefined,
+      stopSell,
+      cta,
+      ctd,
+    });
+
+    return { ok: true as const, message: `Updated ${cells} cell${cells === 1 ? "" : "s"} across ${dates.length} date${dates.length === 1 ? "" : "s"}.` };
+  }
+
   const start = String(form.get("start") || format(new Date(), "yyyy-MM-dd"));
   // Only the columns the client actually rendered are saved, so paging by a
   // smaller visible window never clears restrictions on off-screen dates.
@@ -111,6 +208,9 @@ export function meta() {
 const cellInput =
   "w-full rounded-[6px] border border-line-alt bg-surface px-1.5 py-1 text-center text-[13px] text-ink outline-none focus:border-accent";
 
+const bulkField = "rounded-[8px] border border-line-alt bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent";
+const bulkLabel = "mb-1 block text-[11px] font-semibold uppercase tracking-wider text-faint";
+
 function Toggle({
   name,
   label,
@@ -148,6 +248,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   // Which room's card to show ("all" = every room). Purely a view filter —
   // hidden cards stay in the DOM so Save still submits their values.
   const [roomFilter, setRoomFilter] = useState<string>("all");
+  const [bulkOpen, setBulkOpen] = useState(false);
   const datesLen = loaderData.configured ? loaderData.dates.length : 0;
   useEffect(() => {
     const el = gridRef.current;
@@ -230,7 +331,129 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         <span className="font-semibold text-accent">D</span> no departure.
       </p>
 
+      <div className="mb-5 rounded-[14px] border border-line bg-surface">
+        <button
+          type="button"
+          onClick={() => setBulkOpen((v) => !v)}
+          aria-expanded={bulkOpen}
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <span className="font-serif text-[16px] font-semibold">Bulk update</span>
+          <span className="text-[13px] font-semibold text-muted-2">
+            {bulkOpen ? "Hide ▲" : "Set a range of dates ▼"}
+          </span>
+        </button>
+        {bulkOpen && (
+          <Form method="post" className="space-y-4 border-t border-divider px-4 py-4">
+            <input type="hidden" name="intent" value="bulk" />
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <label className="block">
+                <span className={bulkLabel}>From</span>
+                <input type="date" name="from" defaultValue={start} required className={`${bulkField} w-full`} />
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>To</span>
+                <input
+                  type="date"
+                  name="to"
+                  defaultValue={format(addDays(parseISO(start), 13), "yyyy-MM-dd")}
+                  required
+                  className={`${bulkField} w-full`}
+                />
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>Room</span>
+                <select name="room" defaultValue="all" className={`${bulkField} w-full cursor-pointer`}>
+                  <option value="all">All rooms</option>
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>{r.title}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>Rate</span>
+                <select name="rate" defaultValue="all" className={`${bulkField} w-full cursor-pointer`}>
+                  <option value="all">All rates</option>
+                  {rates.map((r) => (
+                    <option key={r.id} value={r.id}>{r.title}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <span className={bulkLabel}>Days of week</span>
+              <div className="flex flex-wrap gap-1.5">
+                {DOW.map((d) => (
+                  <label key={d.v} className="cursor-pointer">
+                    <input type="checkbox" name="dow" value={d.v} defaultChecked className="peer sr-only" />
+                    <span className="inline-block rounded-[8px] border border-line-alt px-3 py-1.5 text-[12px] font-semibold text-muted-2 peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">
+                      {d.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <label className="block">
+                <span className={bulkLabel}>Availability</span>
+                <input type="number" name="avail" min={0} placeholder="Leave blank" className={`${bulkField} w-full`} />
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>Price ({currency})</span>
+                <input type="number" name="price" min={0} step="0.01" placeholder="Leave blank" className={`${bulkField} w-full`} />
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>Min stay</span>
+                <input type="number" name="minStay" min={0} placeholder="Leave blank" className={`${bulkField} w-full`} />
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>Closed / stop sell</span>
+                <select name="stopSell" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
+                  <option value="">Leave unchanged</option>
+                  <option value="on">Close (stop sell)</option>
+                  <option value="off">Open</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>No arrival (CTA)</span>
+                <select name="cta" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
+                  <option value="">Leave unchanged</option>
+                  <option value="on">No check-in</option>
+                  <option value="off">Allow check-in</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className={bulkLabel}>No departure (CTD)</span>
+                <select name="ctd" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
+                  <option value="">Leave unchanged</option>
+                  <option value="on">No check-out</option>
+                  <option value="off">Allow check-out</option>
+                </select>
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+              >
+                {saving ? "Applying…" : "Apply to range"}
+              </button>
+              <p className="text-[12px] text-muted-2">
+                Blank fields are left untouched. Availability applies per room; price and restrictions
+                apply per selected rate.
+              </p>
+            </div>
+          </Form>
+        )}
+      </div>
+
       <Form method="post">
+        <input type="hidden" name="intent" value="save" />
         <input type="hidden" name="start" value={start} />
         <input type="hidden" name="cols" value={visible} />
         <div className="mb-4 flex items-center gap-3">
@@ -242,7 +465,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             {saving ? "Saving…" : "Save changes"}
           </button>
           {actionData?.ok && (
-            <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
+            <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
+              ✓ {actionData.message ?? "Saved"}
+            </span>
           )}
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
           <div className="ml-auto flex items-center gap-2 text-[13px] font-semibold">
