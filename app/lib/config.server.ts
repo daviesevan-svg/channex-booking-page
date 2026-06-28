@@ -19,10 +19,14 @@ export interface AppConfig extends ChannexConfig {
   superadminEmails: string[];
   sessionSecret: string;
   appUrl: string;
-  resendApiKey?: string;
+  /** SparkPost API key for transactional email (Transmissions API). */
+  sparkpostApiKey?: string;
+  /** SparkPost API base, defaults to the US host. Set to
+   *  https://api.eu.sparkpost.com for an EU account. */
+  sparkpostApiUrl: string;
   /** Sender for transactional email, e.g. "Your Hotel <noreply@domain>".
-   *  Needs a Resend-verified domain in prod; falls back to onboarding@resend.dev. */
-  resendFrom?: string;
+   *  Must be on a SparkPost-verified sending domain; without it, email is skipped. */
+  emailFrom?: string;
   /** Open Channel inbound key: the one Channex sends to our /api endpoints. */
   openChannelApiKey: string;
   /** Open Channel outbound key: Channex-provided, used when WE call Channex's
@@ -59,8 +63,9 @@ export function getConfig(): AppConfig {
     // Never empty: an empty HMAC key throws in the Workers runtime.
     sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
     appUrl: read("APP_URL", "http://localhost:5173"),
-    resendApiKey: read("RESEND_API_KEY") || undefined,
-    resendFrom: read("RESEND_FROM") || undefined,
+    sparkpostApiKey: read("SPARKPOST_API_KEY") || undefined,
+    sparkpostApiUrl: read("SPARKPOST_API_URL", "https://api.sparkpost.com").replace(/\/+$/, ""),
+    emailFrom: read("EMAIL_FROM") || read("RESEND_FROM") || undefined,
     openChannelApiKey: read("OPEN_CHANNEL_API_KEY"),
     openChannelBookingKey: read("OPEN_CHANNEL_BOOKING_KEY") || read("OPEN_CHANNEL_API_KEY"),
     providerCode: read("PROVIDER_CODE") || undefined,

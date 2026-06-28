@@ -148,9 +148,9 @@ export async function sendMagicLink(
   email: string,
   link: string,
 ): Promise<{ sent: boolean; link?: string }> {
-  const { resendApiKey } = getConfig();
+  const { sparkpostApiKey } = getConfig();
   // No provider configured: surface the link so dev sign-in still works.
-  if (!resendApiKey) {
+  if (!sparkpostApiKey) {
     console.log(`[admin] magic link for ${email}: ${link}`);
     return { sent: false, link };
   }
