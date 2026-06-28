@@ -1,6 +1,7 @@
 import { getConfigKV } from "./config.server";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
+  bookingCutoffOf,
   DEFAULT_LANG,
   DEFAULT_PROMO_PLACEHOLDER,
   isDeadlineUnit,
@@ -9,6 +10,7 @@ import {
   pageDef,
   searchDefaults,
   withDefaults,
+  type BookingCutoff,
   type SearchContent,
   type SiteSettings,
 } from "./content";
@@ -201,9 +203,47 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     privacyUrl: safeUrl(form.get("privacyUrl")),
     languages: form.getAll("languages").map(String),
     liveBooking: form.get("liveBooking") === "on",
+    timezone: cleanTimezone(form.get("timezone")),
+    bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
+    bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
   };
   await writeJson(settingsKey(pid), next);
   return next;
+}
+
+/** A valid IANA timezone string, or undefined. */
+function cleanTimezone(v: FormDataEntryValue | null): string | undefined {
+  const s = String(v ?? "").trim();
+  if (!s) return undefined;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: s });
+    return s;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Lead-time days: "" / "off" = no limit; 0-7 = required lead (0 = same-day). */
+function cutoffDays(v: FormDataEntryValue | null): number | undefined {
+  const s = String(v ?? "").trim();
+  if (s === "" || s === "off") return undefined;
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) && n >= 0 && n <= 7 ? n : undefined;
+}
+
+/** Normalize an "HH:MM" time, or undefined if malformed. */
+function cleanTime(v: FormDataEntryValue | null): string | undefined {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v ?? "").trim());
+  if (!m) return undefined;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return undefined;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/** The property's booking lead-time cutoff, for the guest-flow date guards. */
+export async function getBookingCutoff(pid: string): Promise<BookingCutoff> {
+  return bookingCutoffOf(await getSettings(pid));
 }
 
 const posInt = (v: FormDataEntryValue | null): number | undefined => {

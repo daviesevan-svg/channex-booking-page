@@ -8,6 +8,36 @@ import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 
+// A common-zone fallback for runtimes without Intl.supportedValuesOf.
+const FALLBACK_TIMEZONES = [
+  "UTC",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Madrid",
+  "Europe/Rome",
+  "Europe/Athens",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+];
+
+function supportedTimezones(): string[] {
+  const sv = (Intl as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+  if (typeof sv !== "function") return FALLBACK_TIMEZONES;
+  try {
+    const zones = sv("timeZone");
+    return zones.includes("UTC") ? zones : ["UTC", ...zones];
+  } catch {
+    return FALLBACK_TIMEZONES;
+  }
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
@@ -18,6 +48,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     settings,
     host: new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
+    timezones: supportedTimezones(),
   };
 }
 
@@ -49,9 +80,14 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, host, envLive } = loaderData;
+  const { settings, host, envLive, timezones } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
+  // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
+  // "1".."7" = require that many days before arrival.
+  const [cutoff, setCutoff] = useState<string>(
+    settings.bookingCutoffDays == null ? "off" : String(settings.bookingCutoffDays),
+  );
   const [hex, setHex] = useState(settings.customColor || "#b5651d");
   const validHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
   const [bgHex, setBgHex] = useState(settings.customBg || "");
@@ -60,6 +96,14 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
   const pickerCls = "h-10 w-12 cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt p-1";
   const hexCls =
     "w-36 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[9px] font-mono text-[14px] text-ink outline-none focus:border-accent";
+  const fieldCls =
+    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
+  const cutoffSummary =
+    cutoff === "off"
+      ? "Guests can book any available future date."
+      : cutoff === "0"
+        ? "Same-day arrivals are accepted until the cut-off time; after that, today's date closes."
+        : `Guests must book at least ${cutoff} day${cutoff === "1" ? "" : "s"} before the check-in date.`;
 
   return (
     <div>
@@ -183,6 +227,61 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+        </section>
+
+        {/* Booking lead time */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Booking lead time</div>
+          <p className="mb-4 text-[13.5px] text-muted">
+            Stop taking last-minute bookings. Choose how much notice you need before a guest's
+            check-in date. Same-day bookings can stay open until a cut-off time; one or more days'
+            notice closes at midnight in your timezone.
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:max-w-md">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Property timezone
+              <select name="timezone" defaultValue={settings.timezone || "UTC"} className={fieldCls}>
+                {timezones.map((z) => (
+                  <option key={z} value={z}>{z}</option>
+                ))}
+              </select>
+              <span className="mt-1 block text-[12px] font-normal text-muted">
+                Used to evaluate the same-day cut-off time and the daily midnight boundary.
+              </span>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Stop bookings
+              <select
+                name="bookingCutoffDays"
+                value={cutoff}
+                onChange={(e) => setCutoff(e.target.value)}
+                className={fieldCls}
+              >
+                <option value="off">No limit — accept any future date</option>
+                <option value="0">Same day — stop at a set time</option>
+                {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <option key={n} value={String(n)}>
+                    {n} day{n === 1 ? "" : "s"} before arrival
+                  </option>
+                ))}
+              </select>
+            </label>
+            {cutoff === "0" && (
+              <label className="block text-[13px] font-semibold text-secondary">
+                Stop same-day bookings at
+                <input
+                  type="time"
+                  name="bookingCutoffTime"
+                  defaultValue={settings.bookingCutoffTime || "18:00"}
+                  className={fieldCls}
+                />
+                <span className="mt-1 block text-[12px] font-normal text-muted">
+                  After this local time, today's date can no longer be booked.
+                </span>
+              </label>
+            )}
+          </div>
+          <p className="mt-3 rounded-[10px] bg-chip px-4 py-2.5 text-[12.5px] text-secondary">{cutoffSummary}</p>
         </section>
 
         {/* Custom domain */}
