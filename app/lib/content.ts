@@ -136,6 +136,9 @@ export interface SiteSettings {
   customColor?: string;
   customBg?: string;
   customDomain?: string;
+  /** Links shown in the checkout consent line (rendered as links only when set). */
+  termsUrl?: string;
+  privacyUrl?: string;
   /** ISO currency code for all prices (e.g. GBP). Defaults to GBP when unset. */
   currency?: string;
   languages?: string[]; // enabled languages (always includes the default)

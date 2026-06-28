@@ -71,6 +71,19 @@ export interface BookingRecord {
   rooms: BookingRoom[];
   /** Extras ("Enhance your stay") purchased, priced at booking time. */
   extras?: ResolvedExtra[];
+  /** Consent captured at checkout — the defence for disputes/chargebacks. */
+  consent?: {
+    acceptedAt: string;
+    ip?: string;
+    userAgent?: string;
+    /** The exact policy text shown to the guest when they agreed. */
+    policyText: string[];
+    /** Amount the guest acknowledged as due today. */
+    dueNow?: number;
+    /** Distinct acknowledgment ticked for non-refundable / charged-today rates. */
+    nonRefundableAck?: boolean;
+    marketingOptIn: boolean;
+  };
 }
 
 const bookingsKey = (pid: string) => `bookings:${pid}`;

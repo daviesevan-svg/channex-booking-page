@@ -109,6 +109,29 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
         </section>
       </div>
 
+      {b.consent && (
+        <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">Consent</h2>
+          <Row label="Accepted at" value={fmtDate(b.consent.acceptedAt, "d MMM yyyy, HH:mm")} />
+          {b.consent.nonRefundableAck != null && (
+            <Row label="Non-refundable acknowledged" value={b.consent.nonRefundableAck ? "Yes" : "No"} />
+          )}
+          <Row label="Marketing opt-in" value={b.consent.marketingOptIn ? "Yes" : "No"} />
+          {b.consent.ip && <Row label="IP address" value={b.consent.ip} />}
+          {b.consent.userAgent && <Row label="Device" value={b.consent.userAgent} />}
+          {b.consent.policyText.length > 0 && (
+            <div className="mt-3 border-t border-divider pt-3">
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">Policy shown to guest</div>
+              <ul className="flex flex-col gap-0.5 text-[13px] text-secondary">
+                {b.consent.policyText.map((t, i) => (
+                  <li key={i}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
         <h2 className="mb-3 font-serif text-[18px] font-semibold">Rooms</h2>
         <div className="flex flex-col divide-y divide-divider">

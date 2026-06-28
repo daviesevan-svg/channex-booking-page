@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
 
@@ -20,7 +21,7 @@ import {
 } from "~/lib/bookings.server";
 import { resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow, policyToCancellation } from "~/lib/policy-copy";
-import { CARD_HANDLING_LABEL, PAYMENT_TIMING_LABEL } from "~/lib/rate-policy";
+import { describePolicy } from "~/lib/rate-policy";
 import { cancellationMessage } from "~/lib/cancellation";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
@@ -165,6 +166,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     extraLines,
     policy,
     cancellation,
+    termsUrl: settings.termsUrl,
+    privacyUrl: settings.privacyUrl,
     taxConfig: taxConfigFrom(settings),
   };
 }
@@ -254,6 +257,30 @@ export async function action({ params, request }: Route.ActionArgs) {
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
+  // Consent is required before we create the booking. A non-refundable or
+  // charged-today rate needs the distinct acknowledgment too.
+  const policy = await resolveBookingPolicy(stay.channelId, lines.map((l) => l.rateId));
+  const due = dueNow(policy, grandTotal, nights);
+  const needAck = !policy.cancellation.refundable || due > 0;
+  const agreed = form.get("consent") === "on";
+  const nonRefundableAck = form.get("ackNonRefundable") === "on";
+  if (!agreed || (needAck && !nonRefundableAck)) {
+    return { consentError: true };
+  }
+  const desc = describePolicy(policy);
+  const consent = {
+    acceptedAt: new Date().toISOString(),
+    ip:
+      request.headers.get("cf-connecting-ip") ||
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      undefined,
+    userAgent: request.headers.get("user-agent") || undefined,
+    policyText: [desc.payment, desc.cancellation, desc.noShow].filter(Boolean),
+    dueNow: due,
+    nonRefundableAck: needAck ? nonRefundableAck : undefined,
+    marketingOptIn: form.get("marketing") === "on",
+  };
+
   // Open Channel booking payload. Each room's (promo-adjusted) total is spread
   // across the stay nights as days[], so the price we send is exactly what we
   // charge — no separate "amount" override needed.
@@ -333,6 +360,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     promo: applied ?? undefined,
     offer: offer ?? undefined,
     extras: extraLines.length ? extraLines : undefined,
+    consent,
     inventoryHeld: status !== "failed",
     guest: {
       firstName: g.firstName,
@@ -407,8 +435,8 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation } = loaderData;
-  const { currency } = useProperty();
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl } = loaderData;
+  const { currency, hotelName } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [searchParams] = useSearchParams();
@@ -475,6 +503,21 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
       : "";
   const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
+
+  // ---- consent ----
+  const nonRefundable = !policy.cancellation.refundable;
+  const needAck = nonRefundable || due > 0;
+  const ackText = nonRefundable
+    ? due > 0
+      ? `I understand this booking is non-refundable and my card will be charged ${formatMoney(due, currency)} today.`
+      : "I understand this booking is non-refundable."
+    : `I understand my card will be charged ${formatMoney(due, currency)} today.`;
+  const [agree, setAgree] = useState(false);
+  const [ack, setAck] = useState(false);
+  const [marketing, setMarketing] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+  const showConsentError = consentError || (!!actionData && "consentError" in actionData && actionData.consentError === true);
+  const checkboxCls = "mt-0.5 h-4 w-4 flex-none rounded border-line-alt text-accent focus:ring-accent";
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
@@ -677,11 +720,75 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
             </p>
           )}
+
+          {/* consent — required ticks sit directly above the booking button */}
+          <div className="mb-3 flex flex-col gap-2.5 border-t border-divider pt-4">
+            <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-secondary">
+              <input
+                type="checkbox"
+                name="consent"
+                checked={agree}
+                onChange={(e) => { setAgree(e.target.checked); setConsentError(false); }}
+                className={checkboxCls}
+              />
+              <span>
+                I agree to the booking conditions, the cancellation policy shown above, and the{" "}
+                {termsUrl ? (
+                  <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline">Terms &amp; Conditions</a>
+                ) : (
+                  <span className="font-semibold">Terms &amp; Conditions</span>
+                )}{" "}
+                and{" "}
+                {privacyUrl ? (
+                  <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline">Privacy Policy</a>
+                ) : (
+                  <span className="font-semibold">Privacy Policy</span>
+                )}.
+              </span>
+            </label>
+
+            {needAck && (
+              <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-secondary">
+                <input
+                  type="checkbox"
+                  name="ackNonRefundable"
+                  checked={ack}
+                  onChange={(e) => { setAck(e.target.checked); setConsentError(false); }}
+                  className={checkboxCls}
+                />
+                <span className="font-medium">{ackText}</span>
+              </label>
+            )}
+
+            <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-muted">
+              <input
+                type="checkbox"
+                name="marketing"
+                checked={marketing}
+                onChange={(e) => setMarketing(e.target.checked)}
+                className={checkboxCls}
+              />
+              <span>Send me offers and news{hotelName ? ` from ${hotelName}` : ""}.</span>
+            </label>
+
+            {showConsentError && (
+              <p className="text-[12.5px] font-medium text-red-600">
+                Please tick the required boxes to continue.
+              </p>
+            )}
+          </div>
+
           <button
             type="submit"
             name="intent"
             value="book"
             disabled={submitting}
+            onClick={(e) => {
+              if (!agree || (needAck && !ack)) {
+                e.preventDefault();
+                setConsentError(true);
+              }
+            }}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
           >
             {submitting ? tr.t("confirming") : text.completeButton}
