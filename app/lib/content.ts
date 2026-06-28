@@ -169,6 +169,9 @@ export interface SiteSettings {
   bookingCutoffDays?: number;
   /** "HH:MM" local time after which same-day check-ins stop (when days === 0). */
   bookingCutoffTime?: string;
+  // ----- Connectivity -----
+  /** The channel-manager / PMS system this property is connected to (e.g. "channex"). */
+  connectedSystem?: string;
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */

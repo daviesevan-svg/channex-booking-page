@@ -246,6 +246,15 @@ export async function getBookingCutoff(pid: string): Promise<BookingCutoff> {
   return bookingCutoffOf(await getSettings(pid));
 }
 
+/** Set (or clear, with undefined) the connected channel-manager/PMS system.
+ *  Merges into existing settings rather than rewriting the whole form. */
+export async function saveConnectivity(pid: string, system: string | undefined): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next: SiteSettings = { ...existing, connectedSystem: system || undefined };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
 const posInt = (v: FormDataEntryValue | null): number | undefined => {
   const n = parseInt(String(v ?? ""), 10);
   return Number.isFinite(n) && n > 0 ? n : undefined;

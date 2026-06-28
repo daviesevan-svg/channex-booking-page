@@ -135,6 +135,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin", label: "Property details", end: true },
             ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
             { to: "/admin/general", label: "General", end: false },
+            { to: "/admin/connectivity", label: "Connectivity", end: false },
             { to: "/admin/portal", label: "Customer Portal", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
             { to: "/admin/rates", label: "Rates", end: false },
