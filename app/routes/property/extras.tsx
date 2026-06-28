@@ -1,4 +1,6 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+
+import { isStayBookable } from "~/lib/dates";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
@@ -30,7 +32,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const checkout = url.searchParams.get("checkout");
   const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
-  if (!checkin || !checkout) throw redirect(`/${params.channelId}`);
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
 
   const sp = url.searchParams.toString();
   const lineIndex = Number(url.searchParams.get("line"));

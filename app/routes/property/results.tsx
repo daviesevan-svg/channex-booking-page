@@ -1,4 +1,6 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
+
+import { isStayBookable } from "~/lib/dates";
 import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 
@@ -39,7 +41,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const occ = readOccupancy(url.searchParams);
   const lang = langFromRequest(request);
 
-  if (!checkin || !checkout) {
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
     throw redirect(`/${params.channelId}`);
   }
 

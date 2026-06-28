@@ -1,4 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+
+import { isStayBookable } from "~/lib/dates";
 import { useState } from "react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { z } from "zod";
@@ -122,7 +124,7 @@ function deriveOffer(lines: ResolvedLine[]) {
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const stay = readStay(url, params.channelId);
-  if (!stay) throw redirect(`/${params.channelId}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
 
   const lang = langFromRequest(request);
   const { rooms, lines } = await resolveStayCart(stay, url);
@@ -184,7 +186,7 @@ const GuestSchema = z.object({
 export async function action({ params, request }: Route.ActionArgs) {
   const url = new URL(request.url);
   const stay = readStay(url, params.channelId);
-  if (!stay) throw redirect(`/${params.channelId}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
 
   const form = await request.formData();
   const intent = String(form.get("intent") || "book");
