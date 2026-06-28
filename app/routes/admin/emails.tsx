@@ -74,7 +74,7 @@ export default function AdminEmails({ loaderData, actionData }: Route.ComponentP
           From name
           <input name="emailFromName" defaultValue={settings.emailFromName} placeholder="Your hotel" className={FIELD_INPUT} />
           <span className="mt-1 block text-[12px] font-normal text-faint">
-            Shown as the sender name. The sending domain is configured globally (RESEND_FROM).
+            Shown as the sender name. The sending domain is configured globally (EMAIL_FROM).
           </span>
         </label>
         <label className="block text-[13px] font-semibold text-secondary">

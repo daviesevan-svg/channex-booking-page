@@ -1,59 +1,62 @@
-// Transactional email delivery via Resend (https://resend.com).
+// Transactional email delivery via SparkPost (https://sparkpost.com).
 //
 // `sendEmail` is the single low-level send used by everything: the admin
-// magic-link (auth.server) and the guest/host booking emails. When no
-// RESEND_API_KEY is configured (local dev), it logs a one-line summary and
-// reports `{ sent: false }` so flows still work without real mail. It never
-// throws — a mail failure must never break a booking or sign-in.
+// magic-link (auth.server) and the guest/host booking emails. When the
+// SparkPost API key or EMAIL_FROM is missing (local dev), it logs a one-line
+// summary and reports `{ sent: false }` so flows still work without real mail.
+// It never throws — a mail failure must never break a booking or sign-in.
 //
-// PROD: real delivery needs a Resend-verified sending domain. The default
-// `onboarding@resend.dev` only delivers to the Resend account owner; set
-// RESEND_FROM to "Your Hotel <noreply@your-verified-domain>" for production.
+// PROD: SparkPost has no shared sandbox sender, so EMAIL_FROM must be on a
+// SparkPost-verified sending domain. EU accounts must set SPARKPOST_API_URL to
+// https://api.eu.sparkpost.com.
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
 import { accentHex, composeEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
-const FALLBACK_FROM = "Bookings <onboarding@resend.dev>";
-
 export interface SendEmailOptions {
   to: string | string[];
   subject: string;
   html: string;
-  /** Overrides the global RESEND_FROM / fallback sender. */
+  /** Overrides the global EMAIL_FROM sender. */
   from?: string;
   replyTo?: string;
 }
 
 export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean; error?: string }> {
-  const { resendApiKey, resendFrom } = getConfig();
+  const { sparkpostApiKey, sparkpostApiUrl, emailFrom } = getConfig();
   const to = Array.isArray(opts.to) ? opts.to : [opts.to];
-  const from = opts.from || resendFrom || FALLBACK_FROM;
+  const from = opts.from || emailFrom;
 
-  if (!resendApiKey) {
-    console.log(`[email] (no RESEND_API_KEY) would send "${opts.subject}" to ${to.join(", ")}`);
+  // SparkPost needs both a key and a verified-domain sender; without either we
+  // can't send, so log and no-op (lets dev + sign-in flows work mail-free).
+  if (!sparkpostApiKey || !from) {
+    const why = !sparkpostApiKey ? "no SPARKPOST_API_KEY" : "no EMAIL_FROM";
+    console.log(`[email] (${why}) would send "${opts.subject}" to ${to.join(", ")}`);
     return { sent: false };
   }
 
   try {
-    const res = await fetch(RESEND_ENDPOINT, {
+    const res = await fetch(`${sparkpostApiUrl}/api/v1/transmissions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
+        Authorization: sparkpostApiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from,
-        to,
-        subject: opts.subject,
-        html: opts.html,
-        ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
+        options: { transactional: true },
+        content: {
+          from,
+          subject: opts.subject,
+          html: opts.html,
+          ...(opts.replyTo ? { reply_to: opts.replyTo } : {}),
+        },
+        recipients: to.map((address) => ({ address })),
       }),
     });
     if (!res.ok) {
-      const error = `Resend responded ${res.status}`;
+      const error = `SparkPost responded ${res.status}`;
       console.log(`[email] send failed: ${error} (to ${to.join(", ")})`);
       return { sent: false, error };
     }
@@ -66,10 +69,10 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
 }
 
 // ---------- high-level booking emails ----------
-// The sending domain is global (RESEND_FROM); the property only overrides the
-// display name. Falls back to RESEND_FROM / the dev sender.
+// The sending domain is global (EMAIL_FROM); the property only overrides the
+// display name.
 function senderFrom(settings: SiteSettings, config: AppConfig): string | undefined {
-  const base = config.resendFrom;
+  const base = config.emailFrom;
   if (!base || !settings.emailFromName) return base;
   const addr = base.match(/<([^>]+)>/)?.[1] ?? base;
   return `${settings.emailFromName} <${addr}>`;
