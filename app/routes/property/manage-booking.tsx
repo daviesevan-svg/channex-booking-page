@@ -7,6 +7,8 @@ import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari.server";
 import { sendCancellationEmails } from "~/lib/email.server";
 import { refundBookingCharge } from "~/lib/refunds.server";
+import { dispatchWebhook } from "~/lib/webhooks.server";
+import { serializeBooking } from "~/lib/api-serialize";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -86,6 +88,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       }
       // Cancellation confirmation to the guest + (opt-in) host notification.
       await sendCancellationEmails(params.channelId, finalBooking, new URL(request.url).origin);
+      await dispatchWebhook(params.channelId, "booking.cancelled", serializeBooking(finalBooking), Date.now());
     }
   }
   return redirect(`/${params.channelId}/manage/${params.id}`);
