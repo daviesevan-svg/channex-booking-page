@@ -120,6 +120,8 @@ export interface StripeAccount {
   details_submitted?: boolean;
   business_profile?: { name?: string | null } | null;
   email?: string | null;
+  country?: string | null;
+  default_currency?: string | null;
 }
 
 export function retrieveAccount(account: string): Promise<StripeAccount> {
