@@ -1,4 +1,4 @@
-import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
@@ -28,8 +28,9 @@ import { getConfig } from "~/lib/config.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { createCheckoutSession } from "~/lib/stripe.server";
-import { stashPending, type PendingBooking } from "~/lib/pending-bookings.server";
+import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
+import { preparePendingBooking } from "~/lib/booking-create.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
@@ -289,70 +290,20 @@ export async function action({ params, request }: Route.ActionArgs) {
     marketingOptIn: form.get("marketing") === "on",
   };
 
-  // Open Channel booking payload. Each room's (promo-adjusted) total is spread
-  // across the stay nights as days[], so the price we send is exactly what we
-  // charge — no separate "amount" override needed.
-  const stayDates = Array.from({ length: nights }, (_, i) =>
-    format(addDays(parseISO(stay.checkin), i), "yyyy-MM-dd"),
-  );
-  const ratio = totals.total > 0 ? discountedTotal / totals.total : 1;
-  const booking = {
-    status: "new",
-    provider_code: config.providerCode,
-    hotel_code: stay.channelId,
-    ota_name: config.providerCode || "Direct",
-    reservation_id: reference,
-    currency: stay.currency,
-    arrival_date: stay.checkin,
-    departure_date: stay.checkout,
-    arrival_hour: g.arrival || undefined,
-    customer: { name: g.firstName, surname: g.lastName, mail: g.email, phone: g.phone },
-    rooms: lines.map((l, index) => {
-      const lineTotal = Math.round(l.total * ratio * 100) / 100;
-      const per = Math.round((lineTotal / nights) * 100) / 100;
-      return {
-        index,
-        room_type_code: l.roomId,
-        occupancy: {
-          adults: l.occupancy.adults,
-          children: l.occupancy.children,
-          infants: l.occupancy.infants ?? 0,
-        },
-        guests: [{ name: g.firstName, surname: g.lastName }],
-        days: stayDates.map((date, i) => ({
-          date,
-          // last night absorbs the rounding remainder so days sum to lineTotal
-          price: (i === nights - 1 ? Math.round((lineTotal - per * (nights - 1)) * 100) / 100 : per).toFixed(2),
-          rate_plan_code: l.rateId,
-        })),
-      };
-    }),
-  };
+  // Carry the cart params onto the post-payment confirmation page.
+  const next = new URLSearchParams(url.searchParams);
+  next.set("sim", live ? "0" : "1");
+  if (applied) next.set("promo", applied.code);
 
-  const cancellation = await resolveBookingCancellation(
-    stay.channelId,
-    lines.map((l) => l.rateId),
-    stay.checkin,
-  );
-
-  // The booking, built but not yet created. Status/channexId/payment are decided
-  // at finalize (after payment, for paid rates).
-  const draft = {
-    id: crypto.randomUUID(),
+  // Build the booking (Open Channel payload + draft record), shared with the API.
+  const pending = await preparePendingBooking({
+    pid: stay.channelId,
     reference,
-    lifecycle: "active" as const,
-    cancellation,
-    createdAt: new Date().toISOString(),
-    lang: langFromRequest(request),
-    currency: stay.currency,
     checkin: stay.checkin,
     checkout: stay.checkout,
+    currency: stay.currency,
     nights,
-    total: grandTotal,
-    promo: applied ?? undefined,
-    offer: offer ?? undefined,
-    extras: extraLines.length ? extraLines : undefined,
-    consent,
+    lines,
     guest: {
       firstName: g.firstName,
       lastName: g.lastName,
@@ -361,29 +312,20 @@ export async function action({ params, request }: Route.ActionArgs) {
       arrival: g.arrival || undefined,
       requests: g.requests || undefined,
     },
-    rooms: lines.map((l) => ({
-      roomId: l.roomId,
-      roomTitle: l.roomTitle,
-      rateId: l.rateId,
-      rateTitle: l.rateTitle,
-      adults: l.occupancy.adults,
-      children: l.occupancy.children,
-      total: l.total,
-    })),
-  };
-
-  const next = new URLSearchParams(url.searchParams);
-  next.set("sim", live ? "0" : "1");
-  if (applied) next.set("promo", applied.code);
-  const pending: PendingBooking = {
-    pid: stay.channelId,
-    account: settings.stripeAccountId ?? "",
-    record: draft,
-    channexPayload: booking,
+    grandTotal,
+    baseTotal: totals.total,
+    discountedTotal,
+    applied: applied ?? undefined,
+    offer: offer ?? undefined,
+    extraLines,
+    consent,
+    lang: langFromRequest(request),
     live,
-    returnParams: next.toString(),
+    account: settings.stripeAccountId ?? "",
     origin: url.origin,
-  };
+    returnParams: next.toString(),
+    providerCode: config.providerCode,
+  });
 
   // Stripe is needed to charge a deposit/prepay (mode=payment) or to save a
   // guarantee card for a pay-at-hotel rate that asks for one (mode=setup).
