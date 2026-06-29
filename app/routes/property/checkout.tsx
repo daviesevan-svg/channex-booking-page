@@ -703,10 +703,6 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
               </div>
             )}
-
-            <div className="rounded-[10px] border border-dashed border-[#d8cdb9] bg-[#fbf7f0] p-[18px] text-[13px] text-muted-2">
-              {tr.t("cardPlaceholder")}
-            </div>
           </section>
         </div>
 
