@@ -6,6 +6,7 @@ import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari.server";
 import { sendCancellationEmails } from "~/lib/email.server";
+import { refundBookingCharge } from "~/lib/refunds.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -75,8 +76,16 @@ export async function action({ params, request }: Route.ActionArgs) {
           stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights),
         );
       }
+      // Auto-refund (if the property opted in): a guest cancel only succeeds inside
+      // the free window, so the full charge is owed back. Otherwise the hotel
+      // refunds manually. No-op for guarantee-card bookings (no charge taken).
+      let finalBooking = updated ?? booking;
+      if (settings.autoRefund) {
+        const r = await refundBookingCharge(params.channelId, finalBooking);
+        if (r.ok) finalBooking = r.booking;
+      }
       // Cancellation confirmation to the guest + (opt-in) host notification.
-      await sendCancellationEmails(params.channelId, updated ?? booking, new URL(request.url).origin);
+      await sendCancellationEmails(params.channelId, finalBooking, new URL(request.url).origin);
     }
   }
   return redirect(`/${params.channelId}/manage/${params.id}`);

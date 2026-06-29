@@ -218,9 +218,19 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
             {b.payment.mode === "payment" ? (
               <>
                 <dt className="text-muted">Status</dt>
-                <dd className="font-semibold text-[#3f7a52]">
+                <dd className={b.payment.refund ? "font-semibold text-ink" : "font-semibold text-[#3f7a52]"}>
                   Paid {formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} via Stripe
                 </dd>
+                {b.payment.refund && (
+                  <>
+                    <dt className="text-muted">Refunded</dt>
+                    <dd className="font-semibold text-[#9a6a1e]">
+                      {formatMoney(b.payment.refund.amount, b.payment.refund.currency || b.payment.currency || b.currency)}
+                      {" on "}
+                      {fmtDate(b.payment.refund.at, "d MMM yyyy")}
+                    </dd>
+                  </>
+                )}
                 {b.payment.paymentIntentId && (
                   <>
                     <dt className="text-muted">Payment intent</dt>

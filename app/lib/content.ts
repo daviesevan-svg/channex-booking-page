@@ -166,6 +166,9 @@ export interface SiteSettings {
   // ----- Customer Portal (manage-my-booking) -----
   allowCancel?: boolean;
   allowModify?: boolean;
+  /** Auto-refund the Stripe charge when a guest cancels within the free window.
+   *  Off (default) = the hotel issues any refund manually. */
+  autoRefund?: boolean;
   /** Default windows used when a rate plan doesn't set its own. */
   cancelDeadlineValue?: number;
   cancelDeadlineUnit?: DeadlineUnit;

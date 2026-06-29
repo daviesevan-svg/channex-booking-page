@@ -117,6 +117,17 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
           value={s.cancelDeadlineValue}
           unit={s.cancelDeadlineUnit}
         />
+        <label className="flex items-start gap-2.5 text-[14px] font-semibold">
+          <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
+          <span>
+            Automatically refund on cancellation
+            <span className="mt-0.5 block text-[12.5px] font-normal text-muted">
+              When a guest cancels within the free-cancellation window, refund their Stripe payment in
+              full automatically. Leave off to issue refunds yourself. Guarantee-card bookings have no
+              charge, so nothing is refunded.
+            </span>
+          </span>
+        </label>
 
         <div className="border-t border-divider" />
 
