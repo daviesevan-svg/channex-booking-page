@@ -213,7 +213,47 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
 
       <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
         <h2 className="mb-3 font-serif text-[18px] font-semibold">Payment</h2>
-        <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
+        {b.payment ? (
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[14px]">
+            {b.payment.mode === "payment" ? (
+              <>
+                <dt className="text-muted">Status</dt>
+                <dd className="font-semibold text-[#3f7a52]">
+                  Paid {formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} via Stripe
+                </dd>
+                {b.payment.paymentIntentId && (
+                  <>
+                    <dt className="text-muted">Payment intent</dt>
+                    <dd className="font-mono text-[12px] text-ink">{b.payment.paymentIntentId}</dd>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <dt className="text-muted">Status</dt>
+                <dd className="font-semibold text-ink">
+                  Guarantee card on file{" "}
+                  {b.payment.cardBrand || b.payment.cardLast4 ? (
+                    <span className="font-normal text-secondary">
+                      ({[b.payment.cardBrand, b.payment.cardLast4 && `····${b.payment.cardLast4}`]
+                        .filter(Boolean)
+                        .join(" ")}
+                      )
+                    </span>
+                  ) : null}
+                </dd>
+                <dt className="text-muted">No charge taken</dt>
+                <dd className="text-secondary">Payment is collected at the hotel.</dd>
+              </>
+            )}
+            <dt className="text-muted">Stripe account</dt>
+            <dd className="font-mono text-[12px] text-ink">{b.payment.accountId}</dd>
+            <dt className="text-muted">Checkout session</dt>
+            <dd className="font-mono text-[12px] text-ink">{b.payment.sessionId}</dd>
+          </dl>
+        ) : (
+          <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
+        )}
       </section>
     </div>
   );
