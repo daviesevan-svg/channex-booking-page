@@ -16,8 +16,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     configured: true as const,
     platformReady: Boolean(getConfig().stripeConnectClientId),
+    secretReady: Boolean(getConfig().stripeSecretKey),
     accountId: settings.stripeAccountId,
     chargesEnabled: settings.stripeChargesEnabled ?? false,
+    notice: new URL(request.url).searchParams.get("stripe") || undefined,
   };
 }
 
@@ -62,8 +64,22 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { platformReady, accountId, chargesEnabled } = loaderData;
+  const { platformReady, secretReady, accountId, chargesEnabled, notice } = loaderData;
   const connected = Boolean(accountId);
+
+  const NOTICES: Record<string, { ok: boolean; text: string }> = {
+    connected: { ok: true, text: "Stripe connected." },
+    denied: { ok: false, text: "Stripe connection was cancelled." },
+    mismatch: {
+      ok: false,
+      text: "Couldn't match this to the selected property — make sure the right property is selected, then try again.",
+    },
+    error: {
+      ok: false,
+      text: "Couldn't complete the Stripe connection. Check that the Stripe secret key is set on the server, then try again (details in the server logs).",
+    },
+  };
+  const banner = notice ? NOTICES[notice] : undefined;
 
   return (
     <div>
@@ -78,6 +94,25 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         Connect this property's Stripe account to take deposits and prepayments at checkout. Payments
         go directly to your Stripe account — guests pay on Stripe's secure hosted page.
       </p>
+
+      {banner && (
+        <p
+          className={`mb-4 max-w-2xl rounded-[10px] border px-4 py-2.5 text-[13px] ${
+            banner.ok ? "border-[#cfe3d0] bg-[#eef5ec] text-[#3f7a52]" : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {banner.ok ? "✓ " : ""}
+          {banner.text}
+        </p>
+      )}
+
+      {platformReady && !secretReady && (
+        <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-800">
+          The Stripe secret key isn't set on this environment, so connecting can't complete. Set
+          <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>in the Worker's
+          variables, then try again.
+        </p>
+      )}
 
       {actionData?.error && (
         <p className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
