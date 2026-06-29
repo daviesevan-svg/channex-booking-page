@@ -17,10 +17,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  if (!code) return redirect("/admin/payments?stripe=error");
   // `state` is the property the connect flow started for — it must match the
   // admin's currently-selected property (both come from their session/flow).
-  if (!code || !propertyId || state !== propertyId) {
-    return redirect("/admin/payments?stripe=error");
+  if (!propertyId || state !== propertyId) {
+    console.log(`[stripe] oauth state mismatch: state=${state} current=${propertyId}`);
+    return redirect("/admin/payments?stripe=mismatch");
   }
 
   try {
@@ -30,8 +32,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       stripeAccountId: stripe_user_id,
       stripeChargesEnabled: account?.charges_enabled ?? false,
     });
-  } catch {
+  } catch (e) {
+    console.log(`[stripe] oauth callback failed: ${e instanceof Error ? e.message : e}`);
     return redirect("/admin/payments?stripe=error");
   }
-  return redirect("/admin/payments");
+  return redirect("/admin/payments?stripe=connected");
 }
