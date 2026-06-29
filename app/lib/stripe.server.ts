@@ -163,6 +163,29 @@ export function retrieveCheckoutSession(account: string, id: string): Promise<Ch
   );
 }
 
+// ---------- Refunds (on the connected account) ----------
+export interface StripeRefund {
+  id: string;
+  amount?: number; // minor units
+  currency?: string;
+  status?: string; // "succeeded" | "pending" | "failed" | "canceled"
+}
+
+/** Refund a payment intent on a connected account. Omit `amountMinor` for a full
+ *  refund. The idempotency key guards against a double-refund on retry. */
+export function createRefund(
+  account: string,
+  paymentIntentId: string,
+  amountMinor?: number,
+  idempotencyKey?: string,
+): Promise<StripeRefund> {
+  return stripeRequest<StripeRefund>("/v1/refunds", {
+    account,
+    idempotencyKey,
+    body: { payment_intent: paymentIntentId, ...(amountMinor != null ? { amount: amountMinor } : {}) },
+  });
+}
+
 // ---------- Webhook signature verification (Web Crypto, no SDK) ----------
 const TOLERANCE_SECONDS = 300;
 

@@ -428,6 +428,7 @@ export async function savePortalSettings(pid: string, form: FormData): Promise<S
     ...existing,
     allowCancel: form.get("allowCancel") === "on",
     allowModify: form.get("allowModify") === "on",
+    autoRefund: form.get("autoRefund") === "on",
     cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
     cancelDeadlineUnit: unit("cancelDeadlineUnit"),
     modifyDeadlineValue: posInt(form.get("modifyDeadlineValue")),
