@@ -137,6 +137,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/general", label: "General", end: false },
             { to: "/admin/connectivity", label: "Connectivity", end: false },
             { to: "/admin/payments", label: "Payments", end: false },
+            ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys", end: false }] : []),
             { to: "/admin/portal", label: "Customer Portal", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
             { to: "/admin/rates", label: "Rates", end: false },
