@@ -12,6 +12,17 @@ export default [
   route("api/changes", "routes/api.changes.tsx"),
   route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
 
+  // Public REST API (v1), authenticated by per-property API keys.
+  route("v1/properties", "routes/api.v1.properties.tsx"),
+  route("v1/properties/:id", "routes/api.v1.properties.$id.tsx"),
+  route("v1/calendar", "routes/api.v1.calendar.tsx"),
+  route("v1/rooms", "routes/api.v1.rooms.tsx"),
+  route("v1/availability", "routes/api.v1.availability.tsx"),
+  route("v1/rates", "routes/api.v1.rates.tsx"),
+  route("v1/extras", "routes/api.v1.extras.tsx"),
+  route("v1/bookings", "routes/api.v1.bookings.tsx"),
+  route("v1/bookings/:id", "routes/api.v1.bookings.$id.tsx"),
+
   // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/verify", "routes/admin/verify.tsx"),
@@ -26,6 +37,7 @@ export default [
     route("connectivity", "routes/admin/connectivity.tsx"),
     route("payments", "routes/admin/payments.tsx"),
     route("payments/callback", "routes/admin/payments.callback.tsx"),
+    route("api-keys", "routes/admin/api-keys.tsx"),
     route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),
