@@ -15,7 +15,7 @@ export type RefundOutcome =
 export async function refundBookingCharge(
   pid: string,
   booking: BookingRecord,
-  amountMinor?: number,
+  opts: { amountMinor?: number; by?: string } = {},
 ): Promise<RefundOutcome> {
   const p = booking.payment;
   if (!p || p.mode !== "payment" || !p.paymentIntentId || !p.accountId) {
@@ -24,12 +24,18 @@ export async function refundBookingCharge(
   if (p.refund) return { ok: false, reason: "already_refunded" };
 
   try {
-    const refund = await createRefund(p.accountId, p.paymentIntentId, amountMinor, `refund_${booking.reference}`);
+    const refund = await createRefund(p.accountId, p.paymentIntentId, opts.amountMinor, `refund_${booking.reference}`);
     const amount = (refund.amount ?? Math.round((p.amount ?? 0) * 100)) / 100;
     const updated = await updateBooking(pid, booking.id, {
       payment: {
         ...p,
-        refund: { id: refund.id, amount, currency: refund.currency?.toUpperCase() ?? p.currency, at: new Date().toISOString() },
+        refund: {
+          id: refund.id,
+          amount,
+          currency: refund.currency?.toUpperCase() ?? p.currency,
+          at: new Date().toISOString(),
+          by: opts.by,
+        },
       },
     });
     return { ok: true, booking: updated ?? booking, amount };
