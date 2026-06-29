@@ -388,7 +388,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   // A paid rate with no way to charge must not book unpaid. A guarantee-only
   // rate without Stripe just books without a card (no-show cover is optional).
-  if (due > 0 && !stripeConnected) return { paymentError: true };
+  if (due > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
 
   if (stripeMode && stripeConnected) {
     const account = settings.stripeAccountId as string;
@@ -467,10 +467,15 @@ export async function action({ params, request }: Route.ActionArgs) {
     try {
       const session = await createCheckoutSession(account, sessionParams, reference);
       sessionUrl = session.url;
-    } catch {
-      return { paymentError: true };
+    } catch (e) {
+      // Stripe is connected but rejected the session — log the real reason
+      // (acct/capability/amount/currency) so this isn't mistaken for "not set up".
+      console.log(
+        `[checkout] stripe session failed for pid=${stay.channelId} acct=${account}: ${e instanceof Error ? e.message : e}`,
+      );
+      return { paymentError: "failed" as const };
     }
-    if (!sessionUrl) return { paymentError: true };
+    if (!sessionUrl) return { paymentError: "failed" as const };
     throw redirect(sessionUrl);
   }
 
@@ -621,8 +626,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
       {actionData?.paymentError && (
         <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
-          This rate needs an online payment, but card payments aren&rsquo;t set up for this property
-          yet. Please contact us to complete your booking.
+          {actionData.paymentError === "failed"
+            ? "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking."
+            : "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking."}
         </div>
       )}
 
