@@ -38,6 +38,7 @@ export default [
     route("payments", "routes/admin/payments.tsx"),
     route("payments/callback", "routes/admin/payments.callback.tsx"),
     route("api-keys", "routes/admin/api-keys.tsx"),
+    route("webhooks", "routes/admin/webhooks.tsx"),
     route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),

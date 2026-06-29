@@ -138,6 +138,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/connectivity", label: "Connectivity", end: false },
             { to: "/admin/payments", label: "Payments", end: false },
             ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys", end: false }] : []),
+            ...(canManageCurrent ? [{ to: "/admin/webhooks", label: "Webhooks", end: false }] : []),
             { to: "/admin/portal", label: "Customer Portal", end: false },
             { to: "/admin/rooms", label: "Rooms", end: false },
             { to: "/admin/rates", label: "Rates", end: false },

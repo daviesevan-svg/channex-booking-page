@@ -15,6 +15,8 @@ import { pushOpenChannelBooking } from "./open-channel.server";
 import { sendBookingEmails } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
+import { dispatchWebhook } from "./webhooks.server";
+import { serializeBooking } from "./api-serialize";
 
 const idOf = (v: unknown): string | undefined =>
   typeof v === "string" ? v : v && typeof v === "object" ? (v as { id?: string }).id : undefined;
@@ -103,6 +105,7 @@ export async function finalizeBooking(
   if (status !== "failed") {
     await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));
     await sendBookingEmails(pid, record, origin);
+    await dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now());
   }
   return record;
 }
