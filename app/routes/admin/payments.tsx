@@ -5,6 +5,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, savePaymentSettings } from "~/lib/overrides.server";
+import { getProperty } from "~/lib/properties.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { redirect } from "react-router";
 
@@ -30,6 +31,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   return {
     configured: true as const,
+    propertyName: (await getProperty(propertyId))?.name,
     platformReady: Boolean(getConfig().stripeConnectClientId),
     secretReady: Boolean(getConfig().stripeSecretKey),
     accountId: settings.stripeAccountId,
@@ -80,7 +82,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { platformReady, secretReady, accountId, chargesEnabled, account, notice } = loaderData;
+  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice } = loaderData;
   const connected = Boolean(accountId);
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
@@ -100,7 +102,14 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Payments</h1>
+        <div>
+          <h1 className="font-serif text-[26px] font-semibold">Payments</h1>
+          {propertyName && (
+            <p className="mt-0.5 text-[13px] text-muted">
+              Connecting for <span className="font-semibold text-secondary">{propertyName}</span>
+            </p>
+          )}
+        </div>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
         )}
