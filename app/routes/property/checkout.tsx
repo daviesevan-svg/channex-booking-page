@@ -264,7 +264,12 @@ export async function action({ params, request }: Route.ActionArgs) {
   // charged-today rate needs the distinct acknowledgment too.
   const policy = await resolveBookingPolicy(stay.channelId, lines.map((l) => l.rateId));
   const due = dueNow(policy, grandTotal, nights);
-  const needAck = !policy.cancellation.refundable || due > 0;
+  // A refundable rate whose free-cancellation window has already closed is, for
+  // this booking, non-refundable — so it needs the same acknowledgment.
+  const cancelAtBooking = policyToCancellation(policy, stay.checkin);
+  const freeWindowClosed =
+    cancelAtBooking.refundable && cancelAtBooking.cancelByISO != null && Date.now() > parseISO(cancelAtBooking.cancelByISO).getTime();
+  const needAck = !policy.cancellation.refundable || freeWindowClosed || due > 0;
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
   if (!agreed || (needAck && !nonRefundableAck)) {
@@ -584,19 +589,29 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     }
   };
   // Cancellation: the override note wins; else the translated free-until / non-refundable line.
-  const cancelMsg = cancellationMessage(policyToCancellation(policy, stay.checkin), Date.now());
+  // atBooking → a free window that's already closed reads as non-refundable, not a past date.
+  const cancelInfo = policyToCancellation(policy, stay.checkin);
+  // A refundable rate whose free-cancellation window has already closed is, for
+  // this booking, non-refundable (the guest can't go back and cancel for free).
+  const freeWindowClosed =
+    cancelInfo.refundable && cancelInfo.cancelByISO != null && Date.now() > parseISO(cancelInfo.cancelByISO).getTime();
+  const cancelMsg = cancellationMessage(cancelInfo, Date.now(), { atBooking: true });
   const cancellationText =
     policy.overrideNote ||
     (cancelMsg ? tr.t(cancelMsg.key, "iso" in cancelMsg ? { date: fmt(parseISO(cancelMsg.iso), "EEE d MMM yyyy") } : undefined) : "");
   const tier0 = policy.cancellation.tiers[0];
+  // The "after the deadline …" line only makes sense while the deadline is still
+  // ahead — once it's passed the lead line already reads "non-refundable".
   const latePhrase =
-    policy.cancellation.refundable && tier0 && tier0.penalty !== "none" && !policy.overrideNote
+    policy.cancellation.refundable && !freeWindowClosed && tier0 && tier0.penalty !== "none" && !policy.overrideNote
       ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
       : "";
   const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
 
   // ---- consent ----
-  const nonRefundable = !policy.cancellation.refundable;
+  // Either the rate is non-refundable, or its free-cancellation window already
+  // closed before this booking is being made — both mean "can't cancel free".
+  const nonRefundable = !policy.cancellation.refundable || freeWindowClosed;
   const needAck = nonRefundable || due > 0;
   const ackText = nonRefundable
     ? due > 0
