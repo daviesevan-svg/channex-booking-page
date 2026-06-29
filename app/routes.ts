@@ -13,6 +13,7 @@ export default [
   route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
 
   // Public REST API (v1), authenticated by per-property API keys.
+  route("v1/openapi.json", "routes/api.v1.openapi.tsx"),
   route("v1/properties", "routes/api.v1.properties.tsx"),
   route("v1/properties/:id", "routes/api.v1.properties.$id.tsx"),
   route("v1/calendar", "routes/api.v1.calendar.tsx"),
