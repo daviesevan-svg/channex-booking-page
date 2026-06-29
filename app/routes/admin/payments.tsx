@@ -5,7 +5,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, savePaymentSettings } from "~/lib/overrides.server";
-import { deauthorize, oauthAuthorizeUrl } from "~/lib/stripe.server";
+import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { redirect } from "react-router";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -13,12 +13,28 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
+  // Pull live account details so the operator can see exactly which Stripe
+  // account is connected (and a stale charges flag self-heals on view).
+  let account: { name?: string; email?: string; country?: string; currency?: string; chargesEnabled: boolean } | null = null;
+  if (settings.stripeAccountId) {
+    const a = await retrieveAccount(settings.stripeAccountId).catch(() => null);
+    if (a) {
+      account = {
+        name: a.business_profile?.name ?? undefined,
+        email: a.email ?? undefined,
+        country: a.country ?? undefined,
+        currency: a.default_currency ? a.default_currency.toUpperCase() : undefined,
+        chargesEnabled: a.charges_enabled ?? false,
+      };
+    }
+  }
   return {
     configured: true as const,
     platformReady: Boolean(getConfig().stripeConnectClientId),
     secretReady: Boolean(getConfig().stripeSecretKey),
     accountId: settings.stripeAccountId,
-    chargesEnabled: settings.stripeChargesEnabled ?? false,
+    chargesEnabled: account?.chargesEnabled ?? settings.stripeChargesEnabled ?? false,
+    account,
     notice: new URL(request.url).searchParams.get("stripe") || undefined,
   };
 }
@@ -64,7 +80,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { platformReady, secretReady, accountId, chargesEnabled, notice } = loaderData;
+  const { platformReady, secretReady, accountId, chargesEnabled, account, notice } = loaderData;
   const connected = Boolean(accountId);
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
@@ -136,6 +152,35 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
             </span>
           )}
         </div>
+
+        {connected && (
+          <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
+            {account?.name && (
+              <>
+                <dt className="text-muted">Account</dt>
+                <dd className="font-semibold text-ink">{account.name}</dd>
+              </>
+            )}
+            <dt className="text-muted">Account ID</dt>
+            <dd className="font-mono text-[12px] text-ink">{accountId}</dd>
+            {account?.email && (
+              <>
+                <dt className="text-muted">Email</dt>
+                <dd className="text-ink">{account.email}</dd>
+              </>
+            )}
+            {(account?.country || account?.currency) && (
+              <>
+                <dt className="text-muted">Country / currency</dt>
+                <dd className="text-ink">{[account?.country, account?.currency].filter(Boolean).join(" · ")}</dd>
+              </>
+            )}
+            <dt className="text-muted">Charges</dt>
+            <dd className={chargesEnabled ? "font-semibold text-[#3f7a52]" : "font-semibold text-[#9a6a1e]"}>
+              {chargesEnabled ? "Enabled" : "Not enabled yet"}
+            </dd>
+          </dl>
+        )}
 
         {connected && !chargesEnabled && (
           <p className="mt-3 text-[13px] text-secondary">
