@@ -32,6 +32,7 @@ export type CancelMessage =
 export function cancellationMessage(
   c: CancellationLike | undefined,
   nowMs: number,
+  opts?: { atBooking?: boolean },
 ): CancelMessage | null {
   const v = cancellationView(c, nowMs);
   switch (v.kind) {
@@ -42,6 +43,11 @@ export function cancellationMessage(
     case "freeAnytime":
       return { key: "freeCancellationAnytime" };
     case "freeUntil":
-      return { key: v.passed ? "freeCancellationEnded" : "freeCancellationUntil", iso: v.iso };
+      // At checkout, a free-cancellation window that has already closed means the
+      // booking is non-refundable from the outset — the guest can't cancel free.
+      // ("Free cancellation was available until <past date>" only makes sense when
+      //  looking back at an existing booking, not while making one.)
+      if (v.passed) return opts?.atBooking ? { key: "nonRefundableBooking" } : { key: "freeCancellationEnded", iso: v.iso };
+      return { key: "freeCancellationUntil", iso: v.iso };
   }
 }
