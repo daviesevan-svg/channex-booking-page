@@ -81,7 +81,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       // refunds manually. No-op for guarantee-card bookings (no charge taken).
       let finalBooking = updated ?? booking;
       if (settings.autoRefund) {
-        const r = await refundBookingCharge(params.channelId, finalBooking);
+        const r = await refundBookingCharge(params.channelId, finalBooking, { by: "auto (guest cancellation)" });
         if (r.ok) finalBooking = r.booking;
       }
       // Cancellation confirmation to the guest + (opt-in) host notification.

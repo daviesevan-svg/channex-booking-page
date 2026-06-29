@@ -5,8 +5,8 @@ import { BookingStatusBadge } from "~/components/booking-status";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
-import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking } from "~/lib/bookings.server";
 import { refundBookingCharge } from "~/lib/refunds.server";
 import { groupExtrasByRoom } from "~/lib/extras";
@@ -18,7 +18,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!propertyId) throw redirect("/admin/bookings");
   const booking = await getBooking(propertyId, params.id);
   if (!booking) throw redirect("/admin/bookings");
-  return { booking };
+  // Only owners/superadmins may issue refunds; controls whether the button shows.
+  const canRefund = await isOwnerOrSuper(request, propertyId);
+  return { booking, canRefund };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -30,7 +32,12 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const form = await request.formData();
   if (form.get("intent") === "refund") {
-    const r = await refundBookingCharge(propertyId, booking);
+    // Server-side gate — never trust the hidden button being absent.
+    if (!(await isOwnerOrSuper(request, propertyId))) {
+      return { error: "Only an owner or manager can issue refunds." };
+    }
+    const by = (await getAdminEmail(request)) ?? undefined;
+    const r = await refundBookingCharge(propertyId, booking, { by });
     if (r.ok) return { refunded: true as const };
     return {
       error:
@@ -58,7 +65,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
-  const { booking: b } = loaderData;
+  const { booking: b, canRefund } = loaderData;
   const nav = useNavigation();
   const refunding = nav.state !== "idle" && nav.formData?.get("intent") === "refund";
   const en = makeTranslator("en"); // admin UI is English
@@ -254,6 +261,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                       {formatMoney(b.payment.refund.amount, b.payment.refund.currency || b.payment.currency || b.currency)}
                       {" on "}
                       {fmtDate(b.payment.refund.at, "d MMM yyyy")}
+                      {b.payment.refund.by && <span className="font-normal text-muted"> · by {b.payment.refund.by}</span>}
                     </dd>
                   </>
                 )}
@@ -291,7 +299,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
         )}
 
-        {b.payment?.mode === "payment" && !b.payment.refund && (
+        {b.payment?.mode === "payment" && !b.payment.refund && canRefund && (
           <Form
             method="post"
             className="mt-4 border-t border-divider pt-4"

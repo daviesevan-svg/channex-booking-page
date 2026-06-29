@@ -40,8 +40,9 @@ export interface PaymentInfo {
   paymentMethodId?: string;
   cardLast4?: string;
   cardBrand?: string;
-  /** Set once the charge has been refunded (full or partial). */
-  refund?: { id: string; amount: number; currency?: string; at: string };
+  /** Set once the charge has been refunded (full or partial). `by` is the admin
+   *  who issued it, or an "auto …" marker for automatic refunds. */
+  refund?: { id: string; amount: number; currency?: string; at: string; by?: string };
 }
 
 export interface BookingRoom {
