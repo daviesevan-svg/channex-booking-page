@@ -455,6 +455,8 @@ export async function action({ params, request }: Route.ActionArgs) {
       sessionParams = {
         ...common,
         mode: "setup",
+        // Setup sessions have no line_items, so Stripe requires currency explicitly.
+        currency: stay.currency.toLowerCase(),
         setup_intent_data: { metadata: { reference, pid: stay.channelId } },
         custom_text: {
           submit: {
