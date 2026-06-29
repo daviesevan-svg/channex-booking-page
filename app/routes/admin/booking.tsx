@@ -1,4 +1,4 @@
-import { Link, redirect } from "react-router";
+import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/booking";
 import { BookingStatusBadge } from "~/components/booking-status";
@@ -8,6 +8,7 @@ import { makeTranslator } from "~/lib/i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getBooking } from "~/lib/bookings.server";
+import { refundBookingCharge } from "~/lib/refunds.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { formatMoney } from "~/lib/money";
 
@@ -18,6 +19,29 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const booking = await getBooking(propertyId, params.id);
   if (!booking) throw redirect("/admin/bookings");
   return { booking };
+}
+
+export async function action({ params, request }: Route.ActionArgs) {
+  await requireAdmin(request);
+  const propertyId = await currentPropertyId(request);
+  if (!propertyId) return { error: "No property selected." };
+  const booking = await getBooking(propertyId, params.id);
+  if (!booking) return { error: "Booking not found." };
+
+  const form = await request.formData();
+  if (form.get("intent") === "refund") {
+    const r = await refundBookingCharge(propertyId, booking);
+    if (r.ok) return { refunded: true as const };
+    return {
+      error:
+        r.reason === "already_refunded"
+          ? "This booking has already been refunded."
+          : r.reason === "no_charge"
+            ? "There's no Stripe charge on this booking to refund."
+            : "The refund couldn't be processed — check Stripe and try again.",
+    };
+  }
+  return { error: "Unknown action." };
 }
 
 export function meta() {
@@ -33,8 +57,10 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export default function AdminBooking({ loaderData }: Route.ComponentProps) {
+export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
   const { booking: b } = loaderData;
+  const nav = useNavigation();
+  const refunding = nav.state !== "idle" && nav.formData?.get("intent") === "refund";
   const en = makeTranslator("en"); // admin UI is English
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
@@ -263,6 +289,37 @@ export default function AdminBooking({ loaderData }: Route.ComponentProps) {
           </dl>
         ) : (
           <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
+        )}
+
+        {b.payment?.mode === "payment" && !b.payment.refund && (
+          <Form
+            method="post"
+            className="mt-4 border-t border-divider pt-4"
+            onSubmit={(e) => {
+              if (!confirm(`Refund ${formatMoney(b.payment!.amount ?? 0, b.payment!.currency || b.currency)} to the guest? This can't be undone.`))
+                e.preventDefault();
+            }}
+          >
+            <input type="hidden" name="intent" value="refund" />
+            <button
+              type="submit"
+              disabled={refunding}
+              className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+            >
+              {refunding ? "Refunding…" : `Refund ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)}`}
+            </button>
+            <p className="mt-2 text-[12.5px] text-muted">Issues a full refund via Stripe to the original card.</p>
+          </Form>
+        )}
+        {actionData?.error && (
+          <p className="mt-3 rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">
+            {actionData.error}
+          </p>
+        )}
+        {actionData?.refunded && (
+          <p className="mt-3 rounded-[10px] border border-[#cfe3d0] bg-[#eef5ec] px-3.5 py-2.5 text-[13px] text-[#3f7a52]">
+            ✓ Refund issued.
+          </p>
         )}
       </section>
     </div>
