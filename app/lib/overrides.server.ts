@@ -276,6 +276,18 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     timezone: cleanTimezone(form.get("timezone")),
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
+/** Merge the property-level Google/location/check-in fields into settings without
+ *  touching the rest (these are edited on the Property details page, not General,
+ *  so we must not clobber theme/currency/etc.). */
+export async function savePropertyMeta(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next: SiteSettings = {
+    ...existing,
     checkinTime: cleanTime(form.get("checkinTime")),
     checkoutTime: cleanTime(form.get("checkoutTime")),
     addressCity: String(form.get("addressCity") ?? "").trim() || undefined,

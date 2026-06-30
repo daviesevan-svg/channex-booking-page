@@ -7,7 +7,6 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
-import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
 const FALLBACK_TIMEZONES = [
@@ -43,14 +42,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const [settings, googleReadiness] = await Promise.all([
-    getSettings(propertyId),
-    checkGoogleReadiness(propertyId),
-  ]);
+  const settings = await getSettings(propertyId);
   return {
     configured: true as const,
     settings,
-    googleReadiness,
     host: new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
     timezones: supportedTimezones(),
@@ -85,7 +80,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, googleReadiness, host, envLive, timezones } = loaderData;
+  const { settings, host, envLive, timezones } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
@@ -373,123 +368,6 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         </section>
 
         {/* Booking mode */}
-        <section className="border-t border-divider pt-6">
-          <div className="mb-1 font-serif text-[18px] font-semibold">Check-in & check-out</div>
-          <p className="mb-3 text-[13.5px] text-muted">
-            Shown to guests and used in Google structured data. Defaults to 3:00 PM / 11:00 AM.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <label className="block text-[13px] font-semibold text-secondary">
-              Check-in from
-              <input type="time" name="checkinTime" defaultValue={settings.checkinTime || "15:00"} className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Check-out by
-              <input type="time" name="checkoutTime" defaultValue={settings.checkoutTime || "11:00"} className={fieldCls} />
-            </label>
-          </div>
-        </section>
-
-        <section className="border-t border-divider pt-6">
-          <div className="mb-1 font-serif text-[18px] font-semibold">Location</div>
-          <p className="mb-3 text-[13.5px] text-muted">
-            The structured address and map coordinates used to match this property in the Google
-            Hotel List Feed. The street line comes from the Property details address.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-[13px] font-semibold text-secondary">
-              City
-              <input name="addressCity" defaultValue={settings.addressCity} className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Region / state
-              <input name="addressRegion" defaultValue={settings.addressRegion} className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Postal code
-              <input name="addressPostalCode" defaultValue={settings.addressPostalCode} className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Country (2-letter)
-              <input name="addressCountry" defaultValue={settings.addressCountry} placeholder="GB" maxLength={2} className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Latitude
-              <input name="latitude" defaultValue={settings.latitude} placeholder="51.8576" className={fieldCls} />
-            </label>
-            <label className="block text-[13px] font-semibold text-secondary">
-              Longitude
-              <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={fieldCls} />
-            </label>
-          </div>
-        </section>
-
-        <section className="border-t border-divider pt-6">
-          <div className="mb-1 font-serif text-[18px] font-semibold">Google Hotels</div>
-          <p className="mb-3 text-[13.5px] text-muted">
-            Emit Google Hotel price structured data on your room, results and checkout pages so your
-            direct rates can appear in Google's Free Booking Links. The Hotel ID must match your
-            property in Google Hotel Center / your price feed; leave it blank to use the property ID.
-          </p>
-          <p className="mb-3 text-[12.5px] text-muted">
-            Hotel List Feed (give this URL to Google Hotel Center):{" "}
-            <code className="rounded bg-chip px-1.5 py-0.5">
-              {host ? `https://${host}` : ""}/feeds/google-hotels.xml
-            </code>
-          </p>
-
-          {/* Feed readiness — Google rejects/drops listings with missing content. */}
-          {googleReadiness.missingRequired.length > 0 ? (
-            <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#9a3b27]">
-              <strong>Not in the Google feed yet</strong> — add the required content below
-              (Google won't process a listing that's missing these):
-              <ul className="mt-1.5 list-disc pl-5">
-                {googleReadiness.missingRequired.map((m) => (
-                  <li key={m.field}>{m.label}</li>
-                ))}
-              </ul>
-            </div>
-          ) : (
-            <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12.5px] font-medium text-[#3f7a52]">
-              ✓ Required content complete — this property is included in the Google feed.
-            </div>
-          )}
-          {googleReadiness.missingRecommended.length > 0 && (
-            <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a6a23]">
-              <strong>Recommended</strong> — improves matching &amp; quality, but won't block the feed:
-              <ul className="mt-1.5 list-disc pl-5">
-                {googleReadiness.missingRecommended.map((m) => (
-                  <li key={m.field}>{m.label}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
-            <input
-              type="checkbox"
-              name="googleStructuredData"
-              defaultChecked={settings.googleStructuredData !== false}
-              className="mt-1"
-            />
-            <span>
-              <span className="block text-[14px] font-semibold text-ink">Emit structured data</span>
-              <span className="block text-[12.5px] text-muted">
-                Adds schema.org <code>Hotel</code> price JSON-LD to guest pages.
-              </span>
-            </span>
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Google Hotel ID
-            <input
-              name="googleHotelId"
-              defaultValue={settings.googleHotelId}
-              placeholder="Defaults to the property ID"
-              className={fieldCls}
-            />
-          </label>
-        </section>
-
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Booking mode</div>
           <p className="mb-3 text-[13.5px] text-muted">

@@ -1,11 +1,12 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
-import { Field } from "~/components/admin-form";
+import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pickLang } from "~/lib/content";
-import { getOverridesRaw, saveOverrides } from "~/lib/overrides.server";
+import { getOverridesRaw, getSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
+import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -13,8 +14,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const overrides = await getOverridesRaw(propertyId, lang);
-  return { configured: true as const, propertyId, lang, overrides };
+  const [overrides, settings, googleReadiness] = await Promise.all([
+    getOverridesRaw(propertyId, lang),
+    getSettings(propertyId),
+    checkGoogleReadiness(propertyId),
+  ]);
+  return {
+    configured: true as const,
+    propertyId,
+    lang,
+    overrides,
+    settings,
+    googleReadiness,
+    host: new URL(request.url).host,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -22,7 +35,10 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
+  // Guest-facing copy is localized (per language); the location / check-in /
+  // Google fields are global property settings (merged so the rest is untouched).
   await saveOverrides(propertyId, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));
+  await savePropertyMeta(propertyId, form);
   return { ok: true };
 }
 
@@ -49,7 +65,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, lang } = loaderData;
+  const { overrides, settings, googleReadiness, host, lang } = loaderData;
 
   return (
     <div>
@@ -78,6 +94,127 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
           <Field name="email" label="Email" value={overrides.email} placeholder="stay@hotel.com" />
         </div>
+
+        {/* Check-in / check-out times (global; shown to guests + Google). */}
+        <section className="border-t border-divider pt-5">
+          <div className="mb-1 text-[15px] font-semibold">Check-in &amp; check-out</div>
+          <p className="mb-3 text-[13px] text-muted">
+            Shown to guests and used in Google structured data. Defaults to 3:00 PM / 11:00 AM.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Check-in from
+              <input type="time" name="checkinTime" defaultValue={settings.checkinTime || "15:00"} className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Check-out by
+              <input type="time" name="checkoutTime" defaultValue={settings.checkoutTime || "11:00"} className={FIELD_INPUT} />
+            </label>
+          </div>
+        </section>
+
+        {/* Structured location (global; powers Google matching). */}
+        <section className="border-t border-divider pt-5">
+          <div className="mb-1 text-[15px] font-semibold">Location</div>
+          <p className="mb-3 text-[13px] text-muted">
+            Structured address and map coordinates used to match this property in the Google Hotel
+            List Feed. The street line comes from the Address above.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              City
+              <input name="addressCity" defaultValue={settings.addressCity} className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Region / state
+              <input name="addressRegion" defaultValue={settings.addressRegion} className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Postal code
+              <input name="addressPostalCode" defaultValue={settings.addressPostalCode} className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Country (2-letter)
+              <input name="addressCountry" defaultValue={settings.addressCountry} placeholder="GB" maxLength={2} className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Latitude
+              <input name="latitude" defaultValue={settings.latitude} placeholder="51.8576" className={FIELD_INPUT} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Longitude
+              <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={FIELD_INPUT} />
+            </label>
+          </div>
+        </section>
+
+        {/* Google Hotels (global). */}
+        <section className="border-t border-divider pt-5">
+          <div className="mb-1 text-[15px] font-semibold">Google Hotels</div>
+          <p className="mb-3 text-[13px] text-muted">
+            Emit Google Hotel price structured data on your room, results and checkout pages so your
+            direct rates can appear in Google's Free Booking Links. The Hotel ID must match your
+            property in Google Hotel Center / your price feed; leave it blank to use the property ID.
+          </p>
+          <p className="mb-3 text-[12.5px] text-muted">
+            Hotel List Feed (give this URL to Google Hotel Center):{" "}
+            <code className="rounded bg-chip px-1.5 py-0.5">
+              {host ? `https://${host}` : ""}/feeds/google-hotels.xml
+            </code>
+          </p>
+
+          {/* Feed readiness — Google rejects/drops listings with missing content. */}
+          {googleReadiness.missingRequired.length > 0 ? (
+            <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#9a3b27]">
+              <strong>Not in the Google feed yet</strong> — add the required content above (Google
+              won't process a listing that's missing these):
+              <ul className="mt-1.5 list-disc pl-5">
+                {googleReadiness.missingRequired.map((m) => (
+                  <li key={m.field}>{m.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12.5px] font-medium text-[#3f7a52]">
+              ✓ Required content complete — this property is included in the Google feed.
+            </div>
+          )}
+          {googleReadiness.missingRecommended.length > 0 && (
+            <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a6a23]">
+              <strong>Recommended</strong> — improves matching &amp; quality, but won't block the feed:
+              <ul className="mt-1.5 list-disc pl-5">
+                {googleReadiness.missingRecommended.map((m) => (
+                  <li key={m.field}>{m.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input
+              type="checkbox"
+              name="googleStructuredData"
+              defaultChecked={settings.googleStructuredData !== false}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">Emit structured data</span>
+              <span className="block text-[12.5px] text-muted">
+                Adds schema.org <code>Hotel</code> price JSON-LD to guest pages.
+              </span>
+            </span>
+          </label>
+          <label className="block text-[13px] font-semibold text-secondary">
+            Google Hotel ID
+            <input
+              name="googleHotelId"
+              defaultValue={settings.googleHotelId}
+              placeholder="Defaults to the property ID"
+              className={FIELD_INPUT}
+            />
+          </label>
+        </section>
+
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
         <div>
           <button
