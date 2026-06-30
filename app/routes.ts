@@ -27,8 +27,9 @@ export default [
   route("v1/bookings", "routes/api.v1.bookings.tsx"),
   route("v1/bookings/:id", "routes/api.v1.bookings.$id.tsx"),
 
-  // Admin (emailed sign-in code)
+  // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
+  route("admin/verify", "routes/admin/verify.tsx"),
   route("admin/logout", "routes/admin/logout.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
