@@ -386,11 +386,51 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         </section>
 
         <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Location</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            The structured address and map coordinates used to match this property in the Google
+            Hotel List Feed. The street line comes from the Property details address.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              City
+              <input name="addressCity" defaultValue={settings.addressCity} className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Region / state
+              <input name="addressRegion" defaultValue={settings.addressRegion} className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Postal code
+              <input name="addressPostalCode" defaultValue={settings.addressPostalCode} className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Country (2-letter)
+              <input name="addressCountry" defaultValue={settings.addressCountry} placeholder="GB" maxLength={2} className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Latitude
+              <input name="latitude" defaultValue={settings.latitude} placeholder="51.8576" className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Longitude
+              <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={fieldCls} />
+            </label>
+          </div>
+        </section>
+
+        <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Google Hotels</div>
           <p className="mb-3 text-[13.5px] text-muted">
             Emit Google Hotel price structured data on your room, results and checkout pages so your
             direct rates can appear in Google's Free Booking Links. The Hotel ID must match your
             property in Google Hotel Center / your price feed; leave it blank to use the property ID.
+          </p>
+          <p className="mb-3 text-[12.5px] text-muted">
+            Hotel List Feed (give this URL to Google Hotel Center):{" "}
+            <code className="rounded bg-chip px-1.5 py-0.5">
+              {host ? `https://${host}` : ""}/feeds/google-hotels.xml
+            </code>
           </p>
           <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
             <input

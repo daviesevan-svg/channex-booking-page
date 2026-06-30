@@ -189,6 +189,17 @@ export interface SiteSettings {
    *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
   checkinTime?: string;
   checkoutTime?: string;
+  // ----- Structured location (Google Hotel List Feed + structured data) -----
+  /** Street line falls back to the localized PropertyOverrides.address. These
+   *  structured parts + geo power the Google Hotel List Feed matching. */
+  addressCity?: string;
+  addressRegion?: string;
+  addressPostalCode?: string;
+  /** ISO 3166-1 alpha-2 country code, e.g. "GB". */
+  addressCountry?: string;
+  /** Decimal degrees, stored as strings. */
+  latitude?: string;
+  longitude?: string;
   // ----- Connectivity -----
   /** The channel-manager / PMS system this property is connected to (e.g. "channex"). */
   connectedSystem?: string;
