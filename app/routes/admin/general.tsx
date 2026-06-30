@@ -7,6 +7,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
+import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
 const FALLBACK_TIMEZONES = [
@@ -42,10 +43,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const settings = await getSettings(propertyId);
+  const [settings, googleReadiness] = await Promise.all([
+    getSettings(propertyId),
+    checkGoogleReadiness(propertyId),
+  ]);
   return {
     configured: true as const,
     settings,
+    googleReadiness,
     host: new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
     timezones: supportedTimezones(),
@@ -80,7 +85,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, host, envLive, timezones } = loaderData;
+  const { settings, googleReadiness, host, envLive, timezones } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
@@ -432,6 +437,34 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               {host ? `https://${host}` : ""}/feeds/google-hotels.xml
             </code>
           </p>
+
+          {/* Feed readiness — Google rejects/drops listings with missing content. */}
+          {googleReadiness.missingRequired.length > 0 ? (
+            <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#9a3b27]">
+              <strong>Not in the Google feed yet</strong> — add the required content below
+              (Google won't process a listing that's missing these):
+              <ul className="mt-1.5 list-disc pl-5">
+                {googleReadiness.missingRequired.map((m) => (
+                  <li key={m.field}>{m.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12.5px] font-medium text-[#3f7a52]">
+              ✓ Required content complete — this property is included in the Google feed.
+            </div>
+          )}
+          {googleReadiness.missingRecommended.length > 0 && (
+            <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a6a23]">
+              <strong>Recommended</strong> — improves matching &amp; quality, but won't block the feed:
+              <ul className="mt-1.5 list-disc pl-5">
+                {googleReadiness.missingRecommended.map((m) => (
+                  <li key={m.field}>{m.label}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
             <input
               type="checkbox"
