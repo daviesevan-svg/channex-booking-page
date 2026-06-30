@@ -276,6 +276,8 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     timezone: cleanTimezone(form.get("timezone")),
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
+    checkinTime: cleanTime(form.get("checkinTime")),
+    checkoutTime: cleanTime(form.get("checkoutTime")),
     googleStructuredData: form.get("googleStructuredData") === "on",
     googleHotelId: String(form.get("googleHotelId") ?? "").trim() || undefined,
   };

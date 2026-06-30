@@ -184,6 +184,11 @@ export interface SiteSettings {
   bookingCutoffDays?: number;
   /** "HH:MM" local time after which same-day check-ins stop (when days === 0). */
   bookingCutoffTime?: string;
+  // ----- Check-in / check-out times -----
+  /** "HH:MM" local check-in-from and check-out-by times. Shown to guests and
+   *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
+  checkinTime?: string;
+  checkoutTime?: string;
   // ----- Connectivity -----
   /** The channel-manager / PMS system this property is connected to (e.g. "channex"). */
   connectedSystem?: string;

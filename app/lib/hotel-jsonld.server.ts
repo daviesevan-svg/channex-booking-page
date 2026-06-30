@@ -10,12 +10,16 @@
 // the returned plain object inside a <script type="application/ld+json">.
 import { getOverrides, getSettings } from "./overrides.server";
 
-// We don't store per-property check-in/out times yet; use industry-standard
-// defaults. The Offer requires both as date-times.
+// Industry-standard fallbacks when a property hasn't set its own times. The
+// Offer requires both as date-times.
 const CHECKIN_TIME = "15:00:00";
 const CHECKOUT_TIME = "11:00:00";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Settings store "HH:MM"; structured data wants "HH:MM:SS".
+const toSeconds = (t: string | undefined, fallback: string) =>
+  t && /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t || fallback;
 
 export interface JsonLdOffer {
   /** Rate-plan identifier (optional; helps Google match feed rate plans). */
@@ -41,6 +45,8 @@ interface HotelInfo {
   name: string;
   address?: string;
   currency: string;
+  checkinTime: string;
+  checkoutTime: string;
 }
 
 async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
@@ -51,6 +57,8 @@ async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
     currency: settings.currency || "GBP",
+    checkinTime: toSeconds(settings.checkinTime, CHECKIN_TIME),
+    checkoutTime: toSeconds(settings.checkoutTime, CHECKOUT_TIME),
   };
 }
 
@@ -66,16 +74,16 @@ function baseHotel(info: HotelInfo): Record<string, unknown> {
   return hotel;
 }
 
-function offer(stay: Stay, currency: string, o: JsonLdOffer): Record<string, unknown> {
+function offer(stay: Stay, info: HotelInfo, o: JsonLdOffer): Record<string, unknown> {
   return {
     "@type": ["Offer", "LodgingReservation"],
     ...(o.rateId ? { identifier: o.rateId } : {}),
-    checkinTime: `${stay.checkin} ${CHECKIN_TIME}`,
-    checkoutTime: `${stay.checkout} ${CHECKOUT_TIME}`,
+    checkinTime: `${stay.checkin} ${info.checkinTime}`,
+    checkoutTime: `${stay.checkout} ${info.checkoutTime}`,
     priceSpecification: {
       "@type": "CompoundPriceSpecification",
       price: round2(o.total),
-      priceCurrency: currency,
+      priceCurrency: info.currency,
     },
   };
 }
@@ -101,7 +109,7 @@ export async function catalogHotelJsonLd(
       if (r.occupancy && r.occupancy > 0) {
         room.occupancy = { "@type": "QuantitativeValue", value: r.occupancy };
       }
-      const offers = r.offers.map((o) => offer(stay, info.currency, o));
+      const offers = r.offers.map((o) => offer(stay, info, o));
       room.offers = offers.length === 1 ? offers[0] : offers;
       return room;
     });
@@ -119,5 +127,5 @@ export async function reservationHotelJsonLd(
 ): Promise<Record<string, unknown> | null> {
   const info = await hotelInfo(pid, lang);
   if (!info.enabled || !(total > 0)) return null;
-  return { ...baseHotel(info), makesOffer: offer(stay, info.currency, { total }) };
+  return { ...baseHotel(info), makesOffer: offer(stay, info, { total }) };
 }
