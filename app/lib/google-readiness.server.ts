@@ -46,7 +46,6 @@ export function recommendedMissing(settings: SiteSettings, overrides: PropertyOv
   want(settings.addressRegion, "addressRegion", "Region / state (Location)");
   want(settings.addressPostalCode, "addressPostalCode", "Postal code (Location)");
   want(overrides.phone, "phone", "Phone (Property details)");
-  want(settings.googleHotelId, "googleHotelId", "Google Hotel ID (set once matched in Hotel Center)");
   return out;
 }
 

@@ -297,7 +297,6 @@ export async function savePropertyMeta(pid: string, form: FormData): Promise<Sit
     latitude: cleanCoord(form.get("latitude")),
     longitude: cleanCoord(form.get("longitude")),
     googleStructuredData: form.get("googleStructuredData") === "on",
-    googleHotelId: String(form.get("googleHotelId") ?? "").trim() || undefined,
   };
   await writeJson(settingsKey(pid), next);
   return next;

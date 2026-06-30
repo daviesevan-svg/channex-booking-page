@@ -44,7 +44,7 @@ export async function buildHotelListFeed(): Promise<string> {
     // get the whole feed rejected. The admin readiness panel flags these.
     if (requiredMissing(settings, overrides).length > 0) continue;
 
-    const id = settings.googleHotelId?.trim() || p.id;
+    const id = p.id;
     const name = overrides.hotelName || p.name;
     const address =
       component("addr1", overrides.address) +
