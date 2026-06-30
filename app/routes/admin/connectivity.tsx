@@ -20,7 +20,7 @@ const SYSTEMS = [
   { id: "mews", name: "Mews", tagline: "Property management system", blurb: "", available: false },
 ] as const;
 
-const AVAILABLE = new Set(SYSTEMS.filter((s) => s.available).map((s) => s.id));
+const AVAILABLE = new Set<string>(SYSTEMS.filter((s) => s.available).map((s) => s.id));
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);

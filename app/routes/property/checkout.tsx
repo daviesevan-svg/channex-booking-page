@@ -293,7 +293,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   // Carry the cart params onto the post-payment confirmation page.
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", live ? "0" : "1");
-  if (applied) next.set("promo", applied.code);
+  if (applied?.code) next.set("promo", applied.code);
 
   // Build the booking (Open Channel payload + draft record), shared with the API.
   const pending = await preparePendingBooking({
