@@ -117,7 +117,7 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
             className={FIELD_INPUT}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            They sign in with a magic link to this address and get full access to this property.
+            They sign in with an emailed code to this address and get full access to this property.
           </span>
         </label>
         <div>
