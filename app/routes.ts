@@ -6,6 +6,9 @@ export default [
   // Public image server (R2-backed)
   route("images/*", "routes/image.tsx"),
 
+  // Google Hotel List Feed (XML, Google pulls on a schedule).
+  route("feeds/google-hotels.xml", "routes/feeds.hotel-list.tsx"),
+
   // Open Channel API (Channex → us): ARI push + handshake endpoints.
   route("api/test_connection", "routes/api.test_connection.tsx"),
   route("api/mapping_details", "routes/api.mapping_details.tsx"),

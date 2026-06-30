@@ -278,6 +278,12 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
     checkinTime: cleanTime(form.get("checkinTime")),
     checkoutTime: cleanTime(form.get("checkoutTime")),
+    addressCity: String(form.get("addressCity") ?? "").trim() || undefined,
+    addressRegion: String(form.get("addressRegion") ?? "").trim() || undefined,
+    addressPostalCode: String(form.get("addressPostalCode") ?? "").trim() || undefined,
+    addressCountry: String(form.get("addressCountry") ?? "").trim().toUpperCase().slice(0, 2) || undefined,
+    latitude: cleanCoord(form.get("latitude")),
+    longitude: cleanCoord(form.get("longitude")),
     googleStructuredData: form.get("googleStructuredData") === "on",
     googleHotelId: String(form.get("googleHotelId") ?? "").trim() || undefined,
   };
@@ -313,6 +319,14 @@ function cleanTime(v: FormDataEntryValue | null): string | undefined {
   const min = Number(m[2]);
   if (h < 0 || h > 23 || min < 0 || min > 59) return undefined;
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/** A decimal-degrees coordinate, kept as a normalized string (or undefined). */
+function cleanCoord(v: FormDataEntryValue | null): string | undefined {
+  const s = String(v ?? "").trim();
+  if (!s) return undefined;
+  const n = Number(s);
+  return Number.isFinite(n) ? String(n) : undefined;
 }
 
 /** The property's booking lead-time cutoff, for the guest-flow date guards. */
