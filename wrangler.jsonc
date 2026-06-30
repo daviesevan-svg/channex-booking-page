@@ -7,33 +7,25 @@
 	"name": "channex-booking-page",
 	"compatibility_date": "2026-06-22",
 	"main": "./workers/app.ts",
-	// Runtime config — override per-deployment in the Cloudflare dashboard.
-	// Real values for local dev go in .dev.vars (gitignored).
+	// Runtime config. Real values for local dev go in .dev.vars (gitignored).
+	//
+	// IMPORTANT: every key listed here is RE-APPLIED on each `wrangler deploy`,
+	// overwriting whatever is set in the Cloudflare dashboard — and since plaintext
+	// vars and secrets share one namespace, a key here also clobbers a same-named
+	// secret. So only true, environment-agnostic defaults live here. Everything
+	// per-deployment or secret is set ONLY in the dashboard (Settings → Variables &
+	// Secrets) and is intentionally NOT listed here, so deploys never wipe it:
+	//   SESSION_SECRET, ADMIN_EMAILS, SUPERADMIN_EMAILS, APP_URL, GROUP_ID,
+	//   GOOGLE_MAP_KEY, EMAIL_FROM, SPARKPOST_API_KEY, SPARKPOST_API_URL,
+	//   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_CONNECT_CLIENT_ID,
+	//   STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY, OPEN_CHANNEL_BOOKING_KEY
 	"vars": {
 		"CHANNEX_API_URL": "https://app.channex.io",
 		"CHANNEL_CODE": "OpenShopping",
 		"DEFAULT_PROPERTY_ID": "439ec597-8caf-47be-b07d-663a9602c79c",
-		"GROUP_ID": "",
 		"PCI_URL": "https://pci.vaultera.co",
-		"GOOGLE_MAP_KEY": "",
 		"ALLOW_LIVE_BOOKING": "false",
-		// Admin (magic-link). Set ADMIN_EMAILS + a strong SESSION_SECRET in prod.
-		"ADMIN_EMAILS": "",
-		"SESSION_SECRET": "",
-		"APP_URL": "",
-		// Email (SparkPost). Set SPARKPOST_API_KEY as a secret (dashboard/.dev.vars),
-		// not here. EMAIL_FROM must be on a SparkPost-verified sending domain,
-		// e.g. "Your Hotel <noreply@your-domain>". EU accounts: set SPARKPOST_API_URL
-		// to https://api.eu.sparkpost.com (blank = US).
-		"SPARKPOST_API_URL": "",
-		"EMAIL_FROM": "",
-		// Stripe (Connect, per-property). STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET
-		// are secrets — set them in .dev.vars (local) / the dashboard (prod), not here.
-		// STRIPE_CONNECT_CLIENT_ID (ca_…) is the platform Connect client id.
-		"STRIPE_CONNECT_CLIENT_ID": "",
-		"STRIPE_PLATFORM_FEE_BPS": "",
-		// Open Channel API (Channex pushes ARI to us, we push bookings back).
-		// PROVIDER_CODE: your Channex Open Channel provider code.
+		// Channex Open Channel: our provider code + outbound new_booking webhook.
 		"PROVIDER_CODE": "RoomPanda",
 		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking"
 	},
