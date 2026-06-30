@@ -139,6 +139,11 @@ export interface RatePlan {
   /** Per-person pricing rules (set by getCatalogRooms from the rate), so the
    *  detail page can re-price live for a chosen room occupancy. */
   occupancyPricing?: OccupancyPricing;
+  /** Tax-/fee-inclusive stay total (set by the results loader via computePricing)
+   *  — the all-in price shown to guests and emitted in Google structured data so
+   *  it matches the checkout total. `allInOriginal` is the pre-discount equivalent. */
+  allInTotal?: number;
+  allInOriginal?: number;
 }
 
 export interface BedOption {

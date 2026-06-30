@@ -369,6 +369,38 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
 
         {/* Booking mode */}
         <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Google Hotels</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            Emit Google Hotel price structured data on your room, results and checkout pages so your
+            direct rates can appear in Google's Free Booking Links. The Hotel ID must match your
+            property in Google Hotel Center / your price feed; leave it blank to use the property ID.
+          </p>
+          <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input
+              type="checkbox"
+              name="googleStructuredData"
+              defaultChecked={settings.googleStructuredData !== false}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">Emit structured data</span>
+              <span className="block text-[12.5px] text-muted">
+                Adds schema.org <code>Hotel</code> price JSON-LD to guest pages.
+              </span>
+            </span>
+          </label>
+          <label className="block text-[13px] font-semibold text-secondary">
+            Google Hotel ID
+            <input
+              name="googleHotelId"
+              defaultValue={settings.googleHotelId}
+              placeholder="Defaults to the property ID"
+              className={fieldCls}
+            />
+          </label>
+        </section>
+
+        <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Booking mode</div>
           <p className="mb-3 text-[13.5px] text-muted">
             In <strong>Test mode</strong> checkout simulates the booking and nothing is sent to

@@ -31,6 +31,7 @@ import { createCheckoutSession } from "~/lib/stripe.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
+import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { formatMoney } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
@@ -154,6 +155,32 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // cancellation snapshot (for the translated free-until line).
   const policy = await resolveBookingPolicy(params.channelId, lines.map((l) => l.rateId));
   const cancellation = await resolveBookingCancellation(params.channelId, lines.map((l) => l.rateId), stay.checkin);
+
+  // Google Hotel price structured data — the final all-in total the guest sees,
+  // so Google's price matches right through the last step (no surprise charges).
+  // Mirrors the grand-total computation in the component below.
+  const discount = urlPromo?.discount ?? 0;
+  const discountedRoom = Math.round((totals.total - discount) * 100) / 100;
+  const pricing = computePricing(
+    {
+      base: discountedRoom,
+      nights,
+      adults: lines.reduce((s, l) => s + l.occupancy.adults, 0),
+      children: lines.reduce((s, l) => s + l.occupancy.children, 0),
+      rooms: lines.length,
+      cleaningFee: lines.reduce((s, l) => s + l.cleaningFee, 0),
+      taxableExtras: taxableExtrasTotal(extraLines),
+    },
+    taxConfigFrom(settings),
+  );
+  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
+  const jsonLd = await reservationHotelJsonLd(
+    params.channelId,
+    lang,
+    { checkin: stay.checkin, checkout: stay.checkout },
+    grandTotal,
+  );
+
   return {
     stay,
     lines: linesView,
@@ -169,6 +196,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
     taxConfig: taxConfigFrom(settings),
+    jsonLd,
   };
 }
 
@@ -473,7 +501,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl, jsonLd } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -569,6 +597,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      )}
       <Link
         to={`/${params.channelId}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
