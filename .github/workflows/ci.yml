@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR branch).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall runs `wrangler types && react-router build`; CI=true keeps it non-interactive.
+      - name: Install dependencies
+        run: npm ci
+
+      # wrangler types + react-router typegen + tsc -b. Catches undefined names,
+      # bad types, and route errors that a plain `tsc` or a successful build miss.
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Full production build — also surfaces client/server bundle breaks
+      # (e.g. a server-only import leaking into the client bundle).
+      - name: Build
+        run: npm run build
