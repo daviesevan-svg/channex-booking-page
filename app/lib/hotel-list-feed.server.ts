@@ -8,6 +8,7 @@
 // Google's pull) from a public resource route.
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
+import { requiredMissing } from "./google-readiness.server";
 
 function esc(s: string): string {
   return s
@@ -39,6 +40,9 @@ export async function buildHotelListFeed(): Promise<string> {
     if (!p.public) continue;
     const [settings, overrides] = await Promise.all([getSettings(p.id), getOverrides(p.id)]);
     if (settings.googleStructuredData === false) continue;
+    // Skip properties missing data Google requires — an incomplete listing can
+    // get the whole feed rejected. The admin readiness panel flags these.
+    if (requiredMissing(settings, overrides).length > 0) continue;
 
     const id = settings.googleHotelId?.trim() || p.id;
     const name = overrides.hotelName || p.name;
