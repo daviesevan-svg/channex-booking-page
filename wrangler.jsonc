@@ -34,8 +34,8 @@
 		"STRIPE_PLATFORM_FEE_BPS": "",
 		// Open Channel API (Channex pushes ARI to us, we push bookings back).
 		// PROVIDER_CODE: your Channex Open Channel provider code.
-		"PROVIDER_CODE": "OpenChannel",
-		"OPEN_CHANNEL_BOOKING_URL": "https://secure-staging.channex.io/api/v1/channel_webhooks/open_channel/new_booking"
+		"PROVIDER_CODE": "RoomPanda",
+		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking"
 	},
 	// Per-property content overrides edited in the admin. Create the namespace for
 	// production with `wrangler kv namespace create CONFIG` and paste the id here.
