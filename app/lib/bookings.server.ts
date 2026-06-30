@@ -65,9 +65,14 @@ export interface BookingRecord {
   status: BookingStatus;
   /** Failure reason from Channex, when status is "failed". */
   error?: string;
+  /** The Open Channel payload, stored only while status is "failed" so an admin
+   *  can retry the exact push. Cleared once the booking succeeds. */
+  channexPayload?: unknown;
   /** Where the booking is in its life: active or cancelled. Defaults to active. */
   lifecycle?: BookingLifecycle;
   cancelledAt?: string;
+  /** Who cancelled: an admin email for a manual cancel; unset = guest self-cancel. */
+  cancelledBy?: string;
   /** Cancellation policy resolved at booking time (drives the guest cancel button). */
   cancellation?: CancellationSnapshot;
   /** Promo code applied at checkout, if any. `total` is the post-discount total. */
