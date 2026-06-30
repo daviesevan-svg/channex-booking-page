@@ -32,9 +32,9 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
   // SparkPost needs both a key and a verified-domain sender; without either we
   // can't send, so log and no-op (lets dev + sign-in flows work mail-free).
   if (!sparkpostApiKey || !from) {
-    const why = !sparkpostApiKey ? "no SPARKPOST_API_KEY" : "no EMAIL_FROM";
+    const why = !sparkpostApiKey ? "no SPARKPOST_API_KEY set" : "no EMAIL_FROM set";
     console.log(`[email] (${why}) would send "${opts.subject}" to ${to.join(", ")}`);
-    return { sent: false };
+    return { sent: false, error: why };
   }
 
   try {
@@ -57,7 +57,13 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      const error = `SparkPost responded ${res.status}`;
+      let reason = "";
+      try {
+        reason = (JSON.parse(detail) as { errors?: { message?: string }[] })?.errors?.[0]?.message ?? "";
+      } catch {
+        /* non-JSON body */
+      }
+      const error = `SparkPost responded ${res.status}${reason ? ` — ${reason}` : ""}`;
       console.log(`[email] send failed: ${error} (to ${to.join(", ")})${detail ? ` — ${detail.slice(0, 500)}` : ""}`);
       return { sent: false, error };
     }
