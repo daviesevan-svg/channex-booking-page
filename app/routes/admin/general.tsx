@@ -369,6 +369,23 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
 
         {/* Booking mode */}
         <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Check-in & check-out</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            Shown to guests and used in Google structured data. Defaults to 3:00 PM / 11:00 AM.
+          </p>
+          <div className="flex flex-wrap gap-4">
+            <label className="block text-[13px] font-semibold text-secondary">
+              Check-in from
+              <input type="time" name="checkinTime" defaultValue={settings.checkinTime || "15:00"} className={fieldCls} />
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              Check-out by
+              <input type="time" name="checkoutTime" defaultValue={settings.checkoutTime || "11:00"} className={fieldCls} />
+            </label>
+          </div>
+        </section>
+
+        <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Google Hotels</div>
           <p className="mb-3 text-[13.5px] text-muted">
             Emit Google Hotel price structured data on your room, results and checkout pages so your
