@@ -164,7 +164,7 @@ export async function action({ request }: Route.ActionArgs) {
   rp.set("adults", String(adults));
   rp.set("sel", serializeCart(cartLines));
   rp.set("sim", live ? "0" : "1");
-  if (applied) rp.set("promo", applied.code);
+  if (applied?.code) rp.set("promo", applied.code);
 
   const pending = await preparePendingBooking({
     pid,
