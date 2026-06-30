@@ -28,10 +28,12 @@ export function requiredMissing(settings: SiteSettings, overrides: PropertyOverr
     if (!ok) out.push({ field, label });
   };
   need(overrides.hotelName, "hotelName", "Hotel name (Property details)");
-  need(overrides.address, "address", "Street address (Property details)");
+  need(overrides.address, "address", "Street (Location)");
   need(settings.addressCity, "addressCity", "City (Location)");
   need(settings.addressCountry, "addressCountry", "Country (Location)");
   need(settings.latitude && settings.longitude, "geo", "Map coordinates — latitude & longitude (Location)");
+  // Google must not advertise a property that can't take a booking/payment.
+  need(settings.stripeAccountId && settings.stripeChargesEnabled, "stripe", "Active Stripe connection (Payments)");
   return out;
 }
 
