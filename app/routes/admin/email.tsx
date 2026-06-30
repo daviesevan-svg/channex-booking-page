@@ -78,10 +78,10 @@ export async function action({ params, request }: Route.ActionArgs) {
       accent: accentHex(settings),
       manageUrl,
     });
-    const { sent } = await sendEmail({ to: adminEmail, subject, html, replyTo: settings.emailReplyTo });
+    const { sent, error } = await sendEmail({ to: adminEmail, subject, html, replyTo: settings.emailReplyTo });
     return sent
       ? { ok: true as const, message: `Test sent to ${adminEmail}.` }
-      : { ok: true as const, message: "No email provider configured — see server logs for the composed test." };
+      : { error: `Test not sent — ${error ?? "email provider not configured"}.` };
   }
 
   await saveEmailContent(pid, params.template, lang, Object.fromEntries(form));
