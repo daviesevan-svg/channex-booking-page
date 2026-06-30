@@ -6,6 +6,7 @@ import {
   getBookings,
   recordBooking,
   stayAvailabilityItems,
+  updateBooking,
   type BookingRecord,
   type BookingStatus,
   type PaymentInfo,
@@ -97,6 +98,8 @@ export async function finalizeBooking(
     status,
     channexId,
     error,
+    // Keep the payload only on failure, so an admin can retry the exact push.
+    channexPayload: status === "failed" ? channexPayload : undefined,
     inventoryHeld: status !== "failed",
     payment,
   };
@@ -108,4 +111,37 @@ export async function finalizeBooking(
     await dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now());
   }
   return record;
+}
+
+/** Re-attempt the Channex push for a booking that failed. On success, flips it to
+ *  confirmed and runs the same post-booking steps finalizeBooking does (inventory,
+ *  email, webhook). Mirrors the success path so a retry is indistinguishable from a
+ *  first-try success. */
+export async function retryChannexPush(
+  pid: string,
+  booking: BookingRecord,
+  origin: string,
+): Promise<{ ok: true; booking: BookingRecord } | { ok: false; reason: "not_failed" | "no_payload" | "push_failed"; error?: string }> {
+  if (booking.status !== "failed") return { ok: false, reason: "not_failed" };
+  if (!booking.channexPayload) return { ok: false, reason: "no_payload" };
+  try {
+    const result = (await pushOpenChannelBooking(booking.channexPayload)) as { reservation_id?: string; id?: string } | undefined;
+    const channexId = result?.reservation_id || result?.id || undefined;
+    const updated = await updateBooking(pid, booking.id, {
+      status: "confirmed",
+      channexId,
+      error: undefined,
+      channexPayload: undefined,
+      inventoryHeld: true,
+    });
+    const finalBooking = updated ?? booking;
+    await decrementAvailability(pid, stayAvailabilityItems(finalBooking.rooms, finalBooking.checkin, finalBooking.nights));
+    await sendBookingEmails(pid, finalBooking, origin);
+    await dispatchWebhook(pid, "booking.created", serializeBooking(finalBooking), Date.now());
+    return { ok: true, booking: finalBooking };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : "Channex rejected the booking.";
+    await updateBooking(pid, booking.id, { error });
+    return { ok: false, reason: "push_failed", error };
+  }
 }

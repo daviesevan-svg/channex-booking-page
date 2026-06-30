@@ -7,7 +7,12 @@ import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
-import { getBooking } from "~/lib/bookings.server";
+import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { retryChannexPush } from "~/lib/booking-finalize.server";
+import { incrementAvailability } from "~/lib/ari.server";
+import { sendCancellationEmails } from "~/lib/email.server";
+import { dispatchWebhook } from "~/lib/webhooks.server";
+import { serializeBooking } from "~/lib/api-serialize";
 import { refundBookingCharge } from "~/lib/refunds.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { formatMoney } from "~/lib/money";
@@ -31,7 +36,43 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!booking) return { error: "Booking not found." };
 
   const form = await request.formData();
-  if (form.get("intent") === "refund") {
+  const intent = form.get("intent");
+
+  if (intent === "retry") {
+    const r = await retryChannexPush(propertyId, booking, new URL(request.url).origin);
+    if (r.ok) return { retried: true as const };
+    return {
+      error:
+        r.reason === "not_failed"
+          ? "Only a failed booking can be retried."
+          : r.reason === "no_payload"
+            ? "No stored Channex payload to retry (legacy failed booking)."
+            : `Channex rejected it again: ${r.error}`,
+    };
+  }
+
+  if (intent === "cancel") {
+    if ((booking.lifecycle ?? "active") !== "active") {
+      return { error: "This booking is already cancelled." };
+    }
+    const by = (await getAdminEmail(request)) ?? undefined;
+    const updated = await updateBooking(propertyId, booking.id, {
+      lifecycle: "cancelled",
+      cancelledAt: new Date().toISOString(),
+      cancelledBy: by,
+      inventoryHeld: false,
+    });
+    // Give the nights back to inventory (only if this booking held them).
+    if (booking.inventoryHeld) {
+      await incrementAvailability(propertyId, stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights));
+    }
+    const finalBooking = updated ?? booking;
+    await sendCancellationEmails(propertyId, finalBooking, new URL(request.url).origin);
+    await dispatchWebhook(propertyId, "booking.cancelled", serializeBooking(finalBooking), Date.now());
+    return { cancelled: true as const };
+  }
+
+  if (intent === "refund") {
     // Server-side gate — never trust the hidden button being absent.
     if (!(await isOwnerOrSuper(request, propertyId))) {
       return { error: "Only an owner or manager can issue refunds." };
@@ -67,7 +108,11 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
   const { booking: b, canRefund } = loaderData;
   const nav = useNavigation();
-  const refunding = nav.state !== "idle" && nav.formData?.get("intent") === "refund";
+  const intent = nav.formData?.get("intent");
+  const refunding = nav.state !== "idle" && intent === "refund";
+  const retrying = nav.state !== "idle" && intent === "retry";
+  const cancelling = nav.state !== "idle" && intent === "cancel";
+  const active = (b.lifecycle ?? "active") === "active";
   const en = makeTranslator("en"); // admin UI is English
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
@@ -99,13 +144,39 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
 
       {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
-          Cancelled by the guest on {fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm")}.
+          Cancelled {b.cancelledBy ? `by ${b.cancelledBy}` : "by the guest"} on{" "}
+          {fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm")}.
         </div>
       )}
 
-      {b.status === "failed" && b.error && (
+      {actionData?.retried && (
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+          ✓ Sent to Channex — the booking is now confirmed.
+        </div>
+      )}
+      {actionData?.cancelled && (
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
+          Booking cancelled. A cancellation email has been sent to the guest.
+        </div>
+      )}
+
+      {b.status === "failed" && (
         <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
-          <span className="font-semibold">Channex error:</span> {b.error}
+          {b.error && (
+            <p>
+              <span className="font-semibold">Channex error:</span> {b.error}
+            </p>
+          )}
+          <Form method="post" className="mt-2.5">
+            <input type="hidden" name="intent" value="retry" />
+            <button
+              type="submit"
+              disabled={retrying}
+              className="rounded-[10px] border border-red-300 bg-white px-4 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+            >
+              {retrying ? "Retrying…" : "Retry sending to Channex"}
+            </button>
+          </Form>
         </div>
       )}
 
@@ -330,6 +401,33 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           </p>
         )}
       </section>
+
+      {active && (
+        <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">Manage booking</h2>
+          <Form
+            method="post"
+            onSubmit={(e) => {
+              if (!confirm("Cancel this booking? The guest will be emailed and the nights returned to inventory. This can't be undone.")) {
+                e.preventDefault();
+              }
+            }}
+          >
+            <input type="hidden" name="intent" value="cancel" />
+            <button
+              type="submit"
+              disabled={cancelling}
+              className="rounded-[10px] border border-[#e0b4ab] bg-surface px-4 py-2.5 text-[14px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
+            >
+              {cancelling ? "Cancelling…" : "Cancel booking"}
+            </button>
+            <p className="mt-2 text-[12.5px] text-muted">
+              Marks the booking cancelled, emails the guest, and frees the inventory. Issue a refund
+              separately (Payment section above) if one is due.
+            </p>
+          </Form>
+        </section>
+      )}
     </div>
   );
 }
