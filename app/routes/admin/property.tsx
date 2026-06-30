@@ -164,8 +164,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           <div className="mb-1 text-[15px] font-semibold">Google Hotels</div>
           <p className="mb-3 text-[13px] text-muted">
             Emit Google Hotel price structured data on your room, results and checkout pages so your
-            direct rates can appear in Google's Free Booking Links. The Hotel ID must match your
-            property in Google Hotel Center / your price feed; leave it blank to use the property ID.
+            direct rates can appear in Google's Free Booking Links.
           </p>
           <p className="mb-3 text-[12.5px] text-muted">
             Hotel List Feed (give this URL to Google Hotel Center):{" "}
@@ -214,15 +213,6 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
                 Adds schema.org <code>Hotel</code> price JSON-LD to guest pages.
               </span>
             </span>
-          </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Google Hotel ID
-            <input
-              name="googleHotelId"
-              defaultValue={settings.googleHotelId}
-              placeholder="Defaults to the property ID"
-              className={FIELD_INPUT}
-            />
           </label>
         </section>
 

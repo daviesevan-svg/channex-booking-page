@@ -53,7 +53,7 @@ async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
   const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid, lang)]);
   return {
     enabled: settings.googleStructuredData !== false, // undefined = on
-    identifier: settings.googleHotelId?.trim() || pid,
+    identifier: pid,
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
     currency: settings.currency || "GBP",

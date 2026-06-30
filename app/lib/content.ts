@@ -220,11 +220,9 @@ export interface SiteSettings {
   stripeChargesEnabled?: boolean;
   // ----- Google Hotels structured data -----
   /** Emit Google Hotel price structured data (JSON-LD) on results/detail/checkout.
-   *  undefined = on; set false to suppress. */
+   *  undefined = on; set false to suppress. The hotel identifier sent to Google
+   *  (HLF + structured data) is always the property id. */
   googleStructuredData?: boolean;
-  /** Hotel identifier that must match the property's ID in your Google price feed
-   *  / Hotel Center. Falls back to the property id when unset. */
-  googleHotelId?: string;
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */
