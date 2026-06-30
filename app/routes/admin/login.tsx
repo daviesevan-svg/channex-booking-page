@@ -24,8 +24,8 @@ export async function action({ request }: Route.ActionArgs) {
   // Build the link from this request's own origin so it works on any host.
   const origin = new URL(request.url).origin;
   const link = `${origin}/admin/verify?token=${encodeURIComponent(token)}`;
-  const result = await sendMagicLink(email, link);
-  return { ok: true, sent: result.sent, devLink: result.link };
+  await sendMagicLink(email, link);
+  return { ok: true };
 }
 
 export function meta() {
@@ -50,18 +50,8 @@ export default function Login({ actionData }: Route.ComponentProps) {
         <div className="rounded-[14px] border border-line bg-surface p-6">
           <h1 className="mb-2 font-serif text-[22px] font-semibold">Check your email</h1>
           <p className="text-[15px] text-secondary">
-            {actionData.sent
-              ? "We've emailed you a sign-in link. It expires in 15 minutes."
-              : "Email isn't configured in this environment, so use the link below:"}
+            We've emailed you a sign-in link. It expires in 15 minutes.
           </p>
-          {actionData.devLink && (
-            <a
-              href={actionData.devLink}
-              className="mt-4 block break-all rounded-[10px] bg-accent-soft px-4 py-3 text-[13px] font-semibold text-accent-deep"
-            >
-              {actionData.devLink}
-            </a>
-          )}
         </div>
       ) : (
         <Form method="post" className="rounded-[14px] border border-line bg-surface p-6">

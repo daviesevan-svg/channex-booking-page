@@ -142,22 +142,15 @@ export async function logout(request: Request) {
 }
 
 // ---------- email delivery ----------
-/** Sends the magic link. Returns the link for on-screen display when no email
- *  provider is configured (dev), so you can click through without real email. */
-export async function sendMagicLink(
-  email: string,
-  link: string,
-): Promise<{ sent: boolean; link?: string }> {
-  const { sparkpostApiKey } = getConfig();
-  // No provider configured: surface the link so dev sign-in still works.
-  if (!sparkpostApiKey) {
-    console.log(`[admin] magic link for ${email}: ${link}`);
-    return { sent: false, link };
-  }
+/** Emails the magic link. Never returns it for on-screen display; when email
+ *  isn't configured (dev) the link is logged to the server console so you can
+ *  still sign in locally. */
+export async function sendMagicLink(email: string, link: string): Promise<{ sent: boolean }> {
   const { sent } = await sendEmail({
     to: email,
     subject: "Your admin sign-in link",
     html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
   });
-  return sent ? { sent: true } : { sent: false, link };
+  if (!sent) console.log(`[admin] magic link for ${email}: ${link}`);
+  return { sent };
 }
