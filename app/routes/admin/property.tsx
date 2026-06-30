@@ -7,6 +7,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, getSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
+import { COUNTRIES } from "~/lib/countries";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -88,7 +89,6 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       >
         <input type="hidden" name="lang" value={lang} />
         <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
-        <Field name="address" label="Address" value={overrides.address} placeholder="123 High Street, Carmarthen" />
         <Field name="description" label="Description" value={overrides.description} textarea rows={4} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
@@ -117,9 +117,13 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         <section className="border-t border-divider pt-5">
           <div className="mb-1 text-[15px] font-semibold">Location</div>
           <p className="mb-3 text-[13px] text-muted">
-            Structured address and map coordinates used to match this property in the Google Hotel
-            List Feed. The street line comes from the Address above.
+            The address guests see and the map coordinates used to match this property in the Google
+            Hotel List Feed.
           </p>
+          <label className="mb-3 block text-[13px] font-semibold text-secondary">
+            Street
+            <input name="address" defaultValue={overrides.address} placeholder="123 High Street" className={FIELD_INPUT} />
+          </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
               City
@@ -134,8 +138,15 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               <input name="addressPostalCode" defaultValue={settings.addressPostalCode} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Country (2-letter)
-              <input name="addressCountry" defaultValue={settings.addressCountry} placeholder="GB" maxLength={2} className={FIELD_INPUT} />
+              Country
+              <select name="addressCountry" defaultValue={settings.addressCountry ?? ""} className={`${FIELD_INPUT} cursor-pointer`}>
+                <option value="">Select a country…</option>
+                {COUNTRIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               Latitude
