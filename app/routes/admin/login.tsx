@@ -3,9 +3,10 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
 import {
   canSignIn,
-  createMagicToken,
+  createAdminSession,
   getAdminEmail,
-  sendMagicLink,
+  requestLoginCode,
+  verifyLoginCode,
 } from "~/lib/auth.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -20,21 +21,41 @@ export async function action({ request }: Route.ActionArgs) {
   if (!(await canSignIn(email))) {
     return { error: "That email isn't on the admin allowlist." };
   }
-  const token = await createMagicToken(email);
-  // Build the link from this request's own origin so it works on any host.
-  const origin = new URL(request.url).origin;
-  const link = `${origin}/admin/verify?token=${encodeURIComponent(token)}`;
-  const result = await sendMagicLink(email, link);
-  return { ok: true, sent: result.sent, devLink: result.link };
+
+  // Step 2: a code was entered — verify it and sign in (unless resending).
+  const code = String(form.get("code") ?? "").trim();
+  const resend = form.get("resend") != null;
+  if (code && !resend) {
+    const r = await verifyLoginCode(email, code);
+    if (r.ok) return createAdminSession(email, "/admin");
+    return {
+      step: "code" as const,
+      email,
+      error:
+        r.reason === "locked"
+          ? "Too many attempts. Request a new code."
+          : r.reason === "expired"
+            ? "That code has expired. Request a new one."
+            : "That code isn't right. Try again.",
+    };
+  }
+
+  // Step 1 (or resend): generate + send a code.
+  const { sent } = await requestLoginCode(email);
+  return { step: "code" as const, email, sent };
 }
 
 export function meta() {
   return [{ title: "Admin · Sign in" }];
 }
 
+const INPUT =
+  "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent";
+
 export default function Login({ actionData }: Route.ComponentProps) {
   const nav = useNavigation();
-  const sending = nav.state === "submitting";
+  const busy = nav.state === "submitting";
+  const onCodeStep = actionData?.step === "code";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
@@ -46,27 +67,47 @@ export default function Login({ actionData }: Route.ComponentProps) {
         <span className="font-serif text-[22px] font-semibold">Booking Admin</span>
       </div>
 
-      {actionData?.ok ? (
-        <div className="rounded-[14px] border border-line bg-surface p-6">
-          <h1 className="mb-2 font-serif text-[22px] font-semibold">Check your email</h1>
-          <p className="text-[15px] text-secondary">
-            {actionData.sent
-              ? "We've emailed you a sign-in link. It expires in 15 minutes."
-              : "Email isn't configured in this environment, so use the link below:"}
+      {onCodeStep ? (
+        <Form method="post" className="rounded-[14px] border border-line bg-surface p-6">
+          <h1 className="mb-1 font-serif text-[24px] font-semibold">Enter your code</h1>
+          <p className="mb-5 text-[14px] text-muted">
+            We emailed a 6-digit sign-in code to <strong>{actionData.email}</strong>. It expires in
+            10 minutes.
           </p>
-          {actionData.devLink && (
-            <a
-              href={actionData.devLink}
-              className="mt-4 block break-all rounded-[10px] bg-accent-soft px-4 py-3 text-[13px] font-semibold text-accent-deep"
-            >
-              {actionData.devLink}
-            </a>
-          )}
-        </div>
+          <input type="hidden" name="email" value={actionData.email} />
+          <label className="block text-[13px] font-semibold text-secondary">
+            Sign-in code
+            <input
+              name="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              required
+              autoFocus
+              placeholder="123456"
+              className={`${INPUT} tracking-[6px]`}
+            />
+          </label>
+          {actionData?.error && <p className="mt-2 text-[13px] text-red-600">{actionData.error}</p>}
+          <button
+            type="submit"
+            disabled={busy}
+            className="mt-5 w-full rounded-[10px] bg-accent py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+          >
+            {busy ? "Verifying…" : "Sign in"}
+          </button>
+          <p className="mt-3 text-center text-[12.5px] text-muted">
+            Didn't get it?{" "}
+            <button type="submit" name="resend" value="1" className="font-semibold text-accent hover:underline">
+              Resend code
+            </button>
+          </p>
+        </Form>
       ) : (
         <Form method="post" className="rounded-[14px] border border-line bg-surface p-6">
           <h1 className="mb-1 font-serif text-[24px] font-semibold">Sign in</h1>
-          <p className="mb-5 text-[14px] text-muted">We'll email you a magic link — no password.</p>
+          <p className="mb-5 text-[14px] text-muted">We'll email you a sign-in code — no password.</p>
           <label className="block text-[13px] font-semibold text-secondary">
             Email
             <input
@@ -75,18 +116,16 @@ export default function Login({ actionData }: Route.ComponentProps) {
               required
               autoFocus
               placeholder="you@example.com"
-              className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
+              className={INPUT}
             />
           </label>
-          {actionData?.error && (
-            <p className="mt-2 text-[13px] text-red-600">{actionData.error}</p>
-          )}
+          {actionData?.error && <p className="mt-2 text-[13px] text-red-600">{actionData.error}</p>}
           <button
             type="submit"
-            disabled={sending}
+            disabled={busy}
             className="mt-5 w-full rounded-[10px] bg-accent py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {sending ? "Sending…" : "Send magic link"}
+            {busy ? "Sending…" : "Email me a code"}
           </button>
         </Form>
       )}

@@ -1,10 +1,8 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
-import { getConfig } from "./config.server";
+import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
 import { getUser, isSuperadmin, upsertUser } from "./users.server";
-
-const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
 // ---------- base64url helpers ----------
 function toBase64Url(bytes: Uint8Array): string {
@@ -12,14 +10,9 @@ function toBase64Url(bytes: Uint8Array): string {
   for (const b of bytes) bin += String.fromCharCode(b);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
-function fromBase64Url(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
-  const bin = atob(b64);
-  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
-}
 const enc = (s: string) => new TextEncoder().encode(s);
 
-// ---------- HMAC-signed magic-link tokens ----------
+// ---------- HMAC signing (used to hash sign-in codes) ----------
 async function sign(payload: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
@@ -32,25 +25,78 @@ async function sign(payload: string, secret: string): Promise<string> {
   return toBase64Url(new Uint8Array(sig));
 }
 
-export async function createMagicToken(email: string): Promise<string> {
-  const { sessionSecret } = getConfig();
-  const payload = toBase64Url(enc(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS })));
-  const sig = await sign(payload, sessionSecret);
-  return `${payload}.${sig}`;
+// ---------- emailed sign-in codes ----------
+const CODE_TTL_MS = 10 * 60 * 1000; // codes valid for 10 minutes
+const CODE_MAX_ATTEMPTS = 5;
+const codeKey = (email: string) => `login_code:${email.toLowerCase()}`;
+
+interface CodeRecord {
+  codeHash: string;
+  exp: number;
+  attempts: number;
 }
 
-export async function verifyMagicToken(token: string): Promise<string | null> {
-  const { sessionSecret } = getConfig();
-  const [payload, sig] = token.split(".");
-  if (!payload || !sig) return null;
-  if ((await sign(payload, sessionSecret)) !== sig) return null;
-  try {
-    const { email, exp } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
-    if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
-    return email.toLowerCase();
-  } catch {
-    return null;
+async function hashCode(code: string): Promise<string> {
+  return sign(code.trim(), getConfig().sessionSecret);
+}
+
+/** Generate a 6-digit sign-in code, store its hash (10-min TTL) and email it. In
+ *  local dev (localhost APP_URL) the code is also logged to the server console so
+ *  you can sign in without real email — never logged in production. */
+export async function requestLoginCode(email: string): Promise<{ sent: boolean }> {
+  const lc = email.toLowerCase();
+  const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+  const kv = getConfigKV();
+  if (kv) {
+    const rec: CodeRecord = { codeHash: await hashCode(code), exp: Date.now() + CODE_TTL_MS, attempts: 0 };
+    await kv.put(codeKey(lc), JSON.stringify(rec), { expirationTtl: 600 });
   }
+  if (getConfig().appUrl.startsWith("http://localhost")) {
+    console.log(`[admin] sign-in code for ${lc}: ${code}`);
+  }
+  const { sent } = await sendEmail({
+    to: lc,
+    subject: "Your admin sign-in code",
+    html:
+      `<p>Your sign-in code for the booking admin is:</p>` +
+      `<p style="font-size:26px;font-weight:700;letter-spacing:4px">${code}</p>` +
+      `<p>It expires in 10 minutes. If you didn't request this, you can ignore this email.</p>`,
+  });
+  return { sent };
+}
+
+/** Verify an emailed code. Consumes it on success; counts attempts and locks the
+ *  code after CODE_MAX_ATTEMPTS so a 6-digit code can't be brute-forced. */
+export async function verifyLoginCode(
+  email: string,
+  code: string,
+): Promise<{ ok: boolean; reason?: "expired" | "locked" | "wrong" }> {
+  const kv = getConfigKV();
+  if (!kv) return { ok: false, reason: "expired" };
+  const key = codeKey(email);
+  const raw = await kv.get(key);
+  if (!raw) return { ok: false, reason: "expired" };
+  let rec: CodeRecord;
+  try {
+    rec = JSON.parse(raw) as CodeRecord;
+  } catch {
+    await kv.delete(key);
+    return { ok: false, reason: "expired" };
+  }
+  if (Date.now() > rec.exp) {
+    await kv.delete(key);
+    return { ok: false, reason: "expired" };
+  }
+  if (rec.attempts >= CODE_MAX_ATTEMPTS) {
+    await kv.delete(key);
+    return { ok: false, reason: "locked" };
+  }
+  if ((await hashCode(code)) === rec.codeHash) {
+    await kv.delete(key);
+    return { ok: true };
+  }
+  await kv.put(key, JSON.stringify({ ...rec, attempts: rec.attempts + 1 }), { expirationTtl: 600 });
+  return { ok: false, reason: "wrong" };
 }
 
 export function isAllowedEmail(email: string): boolean {
@@ -141,23 +187,3 @@ export async function logout(request: Request) {
   });
 }
 
-// ---------- email delivery ----------
-/** Sends the magic link. Returns the link for on-screen display when no email
- *  provider is configured (dev), so you can click through without real email. */
-export async function sendMagicLink(
-  email: string,
-  link: string,
-): Promise<{ sent: boolean; link?: string }> {
-  const { sparkpostApiKey } = getConfig();
-  // No provider configured: surface the link so dev sign-in still works.
-  if (!sparkpostApiKey) {
-    console.log(`[admin] magic link for ${email}: ${link}`);
-    return { sent: false, link };
-  }
-  const { sent } = await sendEmail({
-    to: email,
-    subject: "Your admin sign-in link",
-    html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
-  });
-  return sent ? { sent: true } : { sent: false, link };
-}
