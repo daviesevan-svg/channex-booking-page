@@ -129,24 +129,38 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
       <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
+          {/* Operations — the day-to-day pages, kept at the top. */}
           {[
-            { to: "/admin/properties", label: "Properties", end: false },
-            ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
+            { to: "/admin/inventory", label: "Inventory", end: false },
+            { to: "/admin/bookings", label: "Bookings", end: false },
+          ].map((item) => (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+              {item.label}
+            </NavLink>
+          ))}
+          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
+            Settings
+          </div>
+          {[
+            // Property basics
             { to: "/admin", label: "Property details", end: true },
-            ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
             { to: "/admin/general", label: "General", end: false },
+            { to: "/admin/portal", label: "Customer Portal", end: false },
+            // Catalogue & pricing
+            { to: "/admin/rooms", label: "Rooms", end: false },
+            { to: "/admin/rates", label: "Rates", end: false },
+            { to: "/admin/taxes", label: "Taxes & Fees", end: false },
+            { to: "/admin/promotions", label: "Promotions", end: false },
+            { to: "/admin/extras", label: "Extras", end: false },
+            // Integrations
             { to: "/admin/connectivity", label: "Connectivity", end: false },
             { to: "/admin/payments", label: "Payments", end: false },
             ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys", end: false }] : []),
             ...(canManageCurrent ? [{ to: "/admin/webhooks", label: "Webhooks", end: false }] : []),
-            { to: "/admin/portal", label: "Customer Portal", end: false },
-            { to: "/admin/rooms", label: "Rooms", end: false },
-            { to: "/admin/rates", label: "Rates", end: false },
-            { to: "/admin/inventory", label: "Inventory", end: false },
-            { to: "/admin/taxes", label: "Taxes & Fees", end: false },
-            { to: "/admin/promotions", label: "Promotions", end: false },
-            { to: "/admin/extras", label: "Extras", end: false },
-            { to: "/admin/bookings", label: "Bookings", end: false },
+            // Access & management
+            ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
+            { to: "/admin/properties", label: "Properties", end: false },
+            ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
           ].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
               {item.label}
