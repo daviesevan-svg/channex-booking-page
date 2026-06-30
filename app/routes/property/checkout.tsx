@@ -348,7 +348,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
     };
     // A human-readable summary of the stay for Stripe's hosted page.
-    const hotelName = (await getOverrides(stay.channelId, draft.lang)).hotelName || "Your booking";
+    const hotelName = (await getOverrides(stay.channelId, pending.record.lang)).hotelName || "Your booking";
     const money = (n: number) => formatMoney(n, stay.currency);
     const ci = parseISO(stay.checkin);
     const co = parseISO(stay.checkout);
