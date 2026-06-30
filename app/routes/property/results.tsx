@@ -20,7 +20,9 @@ import {
 import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, serializeExtrasState } from "~/lib/extras";
 import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
-import { getPageText } from "~/lib/overrides.server";
+import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
+import { getPageText, getSettings } from "~/lib/overrides.server";
+import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -73,6 +75,27 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(params.channelId, "results", lang);
 
+  // Tax-/fee-inclusive (all-in) total per rate, so the headline price matches the
+  // checkout total and the Google structured data. Computed once here and shown
+  // both on the card and in the JSON-LD below.
+  const taxConfig = taxConfigFrom(await getSettings(params.channelId));
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const allIn = (base: number, cleaningFee: number) =>
+    r2(
+      computePricing(
+        { base, nights, adults: occ.adults, children: occ.childrenAge?.length ?? 0, rooms: 1, cleaningFee, taxableExtras: 0 },
+        taxConfig,
+      ).total,
+    );
+  const priced = enriched.map((room) => ({
+    ...room,
+    ratePlans: room.ratePlans.map((rp) => ({
+      ...rp,
+      allInTotal: allIn(Number(rp.totalPrice), room.cleaningFee ?? 0),
+      allInOriginal: rp.offer ? allIn(Number(rp.offer.originalTotalPrice), room.cleaningFee ?? 0) : undefined,
+    })),
+  }));
+
   const cartLines = await resolveCartByOccupancy(
     params.channelId,
     { checkin, checkout, currency },
@@ -97,8 +120,25 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   const extrasSum = extrasTotal(extraLines);
 
+  // Google Hotel price structured data — every bookable room + its rates, at the
+  // all-in price (so Google shows the same total the guest pays at checkout).
+  const jsonLd = await catalogHotelJsonLd(
+    params.channelId,
+    lang,
+    { checkin, checkout },
+    priced.map((room) => ({
+      roomId: room.id,
+      name: room.title,
+      occupancy: party,
+      offers: ratePlansForParty(room, party).map((rp) => ({
+        rateId: rp.parentRatePlanId ?? rp.id,
+        total: rp.allInTotal ?? Number(rp.totalPrice),
+      })),
+    })),
+  );
+
   return {
-    rooms: enriched,
+    rooms: priced,
     nights,
     bestMatchId,
     party: partySize(occ),
@@ -107,6 +147,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     covered,
     extrasSum,
     text,
+    jsonLd,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
 }
@@ -141,7 +182,8 @@ function RoomCard({
   );
   // The card is a summary; the guest picks a rate on the room detail page.
   const cheapest = sorted[0];
-  const perNight = cheapest ? Number(cheapest.totalPrice) / nights : 0;
+  const cheapestTotal = cheapest ? (cheapest.allInTotal ?? Number(cheapest.totalPrice)) : 0;
+  const perNight = cheapestTotal / nights;
   const photo = room.photos?.[0]?.url;
   const amenities = (room.facilities ?? []).slice(0, 4);
   const { capacity } = roomCapacity(room);
@@ -204,7 +246,7 @@ function RoomCard({
           <span className="text-[13px] text-muted-2">{tr.t("from")} </span>
           {cheapest?.offer && (
             <span className="mr-1.5 text-[15px] text-muted-2 line-through">
-              {formatMoney(Number(cheapest.offer.originalTotalPrice) / nights, currency)}
+              {formatMoney((cheapest.allInOriginal ?? Number(cheapest.offer.originalTotalPrice)) / nights, currency)}
             </span>
           )}
           <span className="font-serif text-[28px] font-semibold">
@@ -355,7 +397,7 @@ function CartPanel({
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, jsonLd, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -401,6 +443,9 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      )}
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">

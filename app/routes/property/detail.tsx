@@ -8,7 +8,9 @@ import type { Route } from "./+types/detail";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
-import { getBookingCutoff, getPageText } from "~/lib/overrides.server";
+import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
+import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
+import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
@@ -64,10 +66,38 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const defaultAdults = Math.min(maxAdults, Math.max(1, adults - assignedAdults));
   const defaultChildrenCount = Math.min(childrenPool.length, Math.max(0, capacity - defaultAdults));
 
+  const party = partySize({ adults, childrenAge });
+  // All-in (tax-/fee-inclusive) price for the searched party — matches the headline
+  // shown to the guest and the checkout total. Also passed to the client so the
+  // live occupancy re-price stays all-in.
+  const taxConfig = taxConfigFrom(await getSettings(params.channelId));
+  const allIn = (base: number) =>
+    Math.round(
+      computePricing(
+        { base, nights, adults, children: childrenAge.length, rooms: 1, cleaningFee: room.cleaningFee ?? 0, taxableExtras: 0 },
+        taxConfig,
+      ).total * 100,
+    ) / 100;
+  // Google Hotel price structured data — this room and its rate plans, all-in.
+  const jsonLd = await catalogHotelJsonLd(params.channelId, lang, { checkin, checkout }, [
+    {
+      roomId: room.id,
+      name: room.title,
+      occupancy: capacity,
+      offers: ratePlansForParty(room, party).map((rp) => ({
+        rateId: rp.parentRatePlanId ?? rp.id,
+        total: allIn(Number(rp.totalPrice)),
+      })),
+    },
+  ]);
+
   return {
     room,
     nights,
-    party: partySize({ adults, childrenAge }),
+    party,
+    jsonLd,
+    taxConfig,
+    cleaningFee: room.cleaningFee ?? 0,
     searched: { adults, childrenAge },
     maxAdults,
     capacity,
@@ -123,7 +153,7 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
 type DetailRate = RoomWithRates["ratePlans"][number];
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
-  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, text, query } = loaderData;
+  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, text, jsonLd, taxConfig, cleaningFee, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -148,6 +178,16 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   // Live price for a rate plan at the selected occupancy. The occupancy delta is
   // flat per night, so reverse out the searched-party delta to get the zero-delta
   // base, then re-apply for this room's party. The server re-prices identically.
+  // Tax-/fee-inclusive (all-in) total for a room base at the live occupancy, so
+  // the displayed price matches the checkout total. Uses the same computePricing
+  // the checkout and results loader use.
+  const allInOf = (base: number) =>
+    Math.round(
+      computePricing(
+        { base, nights, adults, children: childrenAges.length, rooms: 1, cleaningFee, taxableExtras: 0 },
+        taxConfig,
+      ).total * 100,
+    ) / 100;
   const priceFor = (plan: DetailRate) => {
     const op = plan.occupancyPricing;
     const grossSearched = plan.offer ? Number(plan.offer.originalTotalPrice) : Number(plan.totalPrice);
@@ -155,8 +195,8 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
     const gross = Math.max(0, baseGross + occupancyNightlyDelta(op, adults, childrenAges) * nights);
     const offerPct = plan.offer?.percent ?? 0;
     return {
-      gross: Math.round(gross * 100) / 100,
-      sale: Math.round(gross * (1 - offerPct / 100) * 100) / 100,
+      gross: allInOf(gross),
+      sale: allInOf(gross * (1 - offerPct / 100)),
       hasOffer: offerPct > 0,
     };
   };
@@ -198,6 +238,9 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-7">
+      {jsonLd && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      )}
       <Link
         to={`/${params.channelId}/rooms?${qs}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
@@ -330,7 +373,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                             {formatMoney(pr.gross / nights, currency)}
                           </span>
                         )}
-                        {formatMoney(perNight, currency)} {tr.t("perNight")}
+                        {formatMoney(perNight, currency)} {tr.t("perNightInclTaxes")}
                       </span>
                     </span>
                     <span className="mt-1 block text-[13px] leading-[1.45] text-muted">
