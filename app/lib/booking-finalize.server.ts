@@ -11,8 +11,9 @@ import {
   type BookingStatus,
   type PaymentInfo,
 } from "./bookings.server";
-import { decrementAvailability } from "./ari.server";
+import { availabilityShortfall, decrementAvailability } from "./ari.server";
 import { pushOpenChannelBooking } from "./open-channel.server";
+import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
@@ -82,24 +83,39 @@ export async function finalizeBooking(
   let status: BookingStatus = "simulated";
   let channexId: string | undefined;
   let error: string | undefined;
+  // `unavailable` = the room sold out before payment completed (definitive; no
+  // retry can recover it). A plain push failure may be transient (retryable).
+  let unavailable = false;
   if (live) {
-    try {
-      const result = (await pushOpenChannelBooking(channexPayload)) as { reservation_id?: string; id?: string } | undefined;
-      channexId = result?.reservation_id || result?.id || undefined;
-      status = "confirmed";
-    } catch (e) {
+    // Re-check availability right before committing — between checkout and
+    // payment completion the room may have sold via another channel. Our ARI is
+    // a cache (Channex is the source of truth), so this is best-effort; Channex
+    // still rejects a genuinely oversold push below.
+    const items = stayAvailabilityItems(draft.rooms, draft.checkin, draft.nights);
+    if (await availabilityShortfall(pid, items)) {
       status = "failed";
-      error = e instanceof Error ? e.message : "Channex rejected the booking.";
+      error = "Rooms are no longer available for these dates.";
+      unavailable = true;
+    } else {
+      try {
+        const result = (await pushOpenChannelBooking(channexPayload)) as { reservation_id?: string; id?: string } | undefined;
+        channexId = result?.reservation_id || result?.id || undefined;
+        status = "confirmed";
+      } catch (e) {
+        status = "failed";
+        error = e instanceof Error ? e.message : "Channex rejected the booking.";
+      }
     }
   }
 
-  const record: BookingRecord = {
+  let record: BookingRecord = {
     ...draft,
     status,
     channexId,
     error,
-    // Keep the payload only on failure, so an admin can retry the exact push.
-    channexPayload: status === "failed" ? channexPayload : undefined,
+    // Keep the payload for a retry only on a (possibly transient) push failure —
+    // never when the rooms are gone, since a retry can't recover sold inventory.
+    channexPayload: status === "failed" && !unavailable ? channexPayload : undefined,
     inventoryHeld: status !== "failed",
     payment,
   };
@@ -109,6 +125,11 @@ export async function finalizeBooking(
     await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));
     await sendBookingEmails(pid, record, origin);
     await dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now());
+  } else if (unavailable && payment?.mode === "payment") {
+    // Charged, but we can't fulfil the stay — always refund (this is our failure,
+    // not a discretionary cancellation). refundBookingCharge is idempotent + safe.
+    const r = await refundBookingCharge(pid, record, { by: "auto (unavailable at booking)" });
+    if (r.ok) record = r.booking;
   }
   return record;
 }
