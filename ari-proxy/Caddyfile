@@ -1,0 +1,35 @@
+# Static-egress-IP forward proxy for Google Hotels ARI.
+#
+# Cloudflare Workers have no stable egress IP, but Google Hotel Center whitelists
+# the source IP of ARI pushes. This tiny proxy runs on a Fly.io machine with a
+# static *egress* IP (see README) and relays our POSTs to google.com from that
+# one whitelisted address. It only forwards the ARI upload paths, and only when
+# the shared secret header matches, so it can't be used as an open relay.
+{
+	admin off
+	auto_https off
+}
+
+:8080 {
+	# Fly health check — no secret required.
+	handle /healthz {
+		respond "ok" 200
+	}
+
+	# Only the Google ARI upload paths, and only with the correct shared secret.
+	@ari {
+		path /travel/hotels/uploads/*
+		header X-Ari-Proxy-Key {$ARI_PROXY_KEY}
+	}
+	handle @ari {
+		reverse_proxy https://www.google.com {
+			header_up Host www.google.com
+			header_up -X-Ari-Proxy-Key
+		}
+	}
+
+	# Everything else (wrong path, missing/wrong secret) is refused.
+	handle {
+		respond "Forbidden" 403
+	}
+}

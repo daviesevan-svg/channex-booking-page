@@ -57,11 +57,15 @@ function nowTimestamp(): string {
  *  Google returns HTTP 200 with an OTA body; we treat a non-2xx, a fetch error,
  *  or an error/failure marker in the body as a failure. */
 export async function postToGoogleAri(kind: string, path: string, xml: string): Promise<AriPushResult> {
-  const { googleAriBaseUrl } = getConfig();
+  const { googleAriBaseUrl, googleAriProxyKey } = getConfig();
   try {
     const res = await fetch(`${googleAriBaseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/xml" },
+      headers: {
+        "Content-Type": "application/xml",
+        // Authenticates us to the egress proxy (ignored on a direct-to-Google push).
+        ...(googleAriProxyKey ? { "X-Ari-Proxy-Key": googleAriProxyKey } : {}),
+      },
       body: xml,
     });
     const body = (await res.text().catch(() => "")).trim();
