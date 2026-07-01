@@ -7,24 +7,34 @@
 	"name": "channex-booking-page",
 	"compatibility_date": "2026-06-22",
 	"main": "./workers/app.ts",
-	// Runtime config. Real values for local dev go in .dev.vars (gitignored).
+	// Runtime config. Two kinds of value, kept deliberately apart:
 	//
-	// IMPORTANT: every key listed here is RE-APPLIED on each `wrangler deploy`,
-	// overwriting whatever is set in the Cloudflare dashboard — and since plaintext
-	// vars and secrets share one namespace, a key here also clobbers a same-named
-	// secret. So only true, environment-agnostic defaults live here. Everything
-	// per-deployment or secret is set ONLY in the dashboard (Settings → Variables &
-	// Secrets) and is intentionally NOT listed here, so deploys never wipe it:
-	//   SESSION_SECRET, ADMIN_EMAILS, SUPERADMIN_EMAILS, APP_URL, GROUP_ID,
-	//   GOOGLE_MAP_KEY, EMAIL_FROM, SPARKPOST_API_KEY, SPARKPOST_API_URL,
-	//   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_CONNECT_CLIENT_ID,
-	//   STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY, OPEN_CHANNEL_BOOKING_KEY
+	//  • NON-SECRET config lives HERE (version-controlled). Every deploy re-applies
+	//    it, so it can never be "lost" from the dashboard — this is why the email
+	//    sender, API hosts and app URL are pinned below. (.dev.vars overrides these
+	//    for local dev.)
+	//  • SECRETS + PII live in the Cloudflare dashboard ONLY (Settings → Variables &
+	//    Secrets), never here. Anything listed here is re-applied on deploy and —
+	//    since plaintext vars and secrets share one namespace — would overwrite a
+	//    same-named secret. Keep these OUT of this file:
+	//      SESSION_SECRET, SPARKPOST_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
+	//      STRIPE_CONNECT_CLIENT_ID, STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY,
+	//      GOOGLE_MAP_KEY, GROUP_ID, and ADMIN_EMAILS / SUPERADMIN_EMAILS (this repo
+	//      is public, so admin email addresses stay in the dashboard).
+	//
+	//  NOTE: deploy with `npm run deploy` (it builds first). A bare `wrangler deploy`
+	//  ships a stale build snapshot and won't pick up changes here.
 	"vars": {
 		"CHANNEX_API_URL": "https://app.channex.io",
 		"CHANNEL_CODE": "OpenShopping",
 		"DEFAULT_PROPERTY_ID": "439ec597-8caf-47be-b07d-663a9602c79c",
 		"PCI_URL": "https://pci.vaultera.co",
 		"ALLOW_LIVE_BOOKING": "false",
+		"APP_URL": "https://book.roompanda.com",
+		// Transactional email (SparkPost). Sender + region host are not secret; the
+		// API key stays a dashboard secret. EU account → the .eu host.
+		"EMAIL_FROM": "Bookings <noreply@roompanda.com>",
+		"SPARKPOST_API_URL": "https://api.eu.sparkpost.com",
 		// Channex Open Channel: our provider code + outbound new_booking webhook.
 		"PROVIDER_CODE": "RoomPanda",
 		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking"
