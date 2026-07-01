@@ -72,7 +72,8 @@ export function buildPropertyDataXml(
         (r.description ? textEl("Description", r.description) : "") +
         `    <Capacity>${r.maxGuests}</Capacity>\n` +
         `    <AdultCapacity>${r.maxAdults}</AdultCapacity>\n` +
-        `    <ChildCapacity>${childCap}</ChildCapacity>\n` +
+        // Only when the room actually sleeps children — Google warns on a 0 value.
+        (childCap > 0 ? `    <ChildCapacity>${childCap}</ChildCapacity>\n` : "") +
         (pkgs ? `    <AllowablePackageIDs>\n${pkgs}    </AllowablePackageIDs>\n` : "") +
         `  </RoomData>\n`
       );
