@@ -223,6 +223,19 @@ export interface SiteSettings {
    *  undefined = on; set false to suppress. The hotel identifier sent to Google
    *  (HLF + structured data) is always the property id. */
   googleStructuredData?: boolean;
+  // ----- Google Hotels ARI push (direct rooms/rates/discounts/availability) -----
+  /** Master switch: push this property's ARI (property data, rates, availability,
+   *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */
+  googleAriPush?: boolean;
+  /** How many days ahead of today to push availability/rates for. Default 365. */
+  googleAriWindowDays?: number;
+  /** Outcome of the last push, surfaced in the admin so operators see failures. */
+  googleAriLastSync?: {
+    /** ISO timestamp of the push. */
+    at: string;
+    /** Per-message result (property_data / rates / avail / inventory / taxes / promotions). */
+    results: { kind: string; ok: boolean; detail: string }[];
+  };
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */
