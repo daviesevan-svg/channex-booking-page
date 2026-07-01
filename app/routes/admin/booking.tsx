@@ -162,21 +162,27 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
 
       {b.status === "failed" && (
         <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
-          {b.error && (
-            <p>
-              <span className="font-semibold">Channex error:</span> {b.error}
-            </p>
+          <p>
+            <span className="font-semibold">Not confirmed:</span>{" "}
+            {b.error ?? "This booking wasn't sent to Channex."}
+          </p>
+          {b.payment?.refund && (
+            <p className="mt-1 font-medium">The payment was automatically refunded to the guest.</p>
           )}
-          <Form method="post" className="mt-2.5">
-            <input type="hidden" name="intent" value="retry" />
-            <button
-              type="submit"
-              disabled={retrying}
-              className="rounded-[10px] border border-red-300 bg-white px-4 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
-            >
-              {retrying ? "Retrying…" : "Retry sending to Channex"}
-            </button>
-          </Form>
+          {/* Retry only makes sense for a (possibly transient) push failure that
+              still has its payload — not when the rooms sold out. */}
+          {b.channexPayload != null && (
+            <Form method="post" className="mt-2.5">
+              <input type="hidden" name="intent" value="retry" />
+              <button
+                type="submit"
+                disabled={retrying}
+                className="rounded-[10px] border border-red-300 bg-white px-4 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+              >
+                {retrying ? "Retrying…" : "Retry sending to Channex"}
+              </button>
+            </Form>
+          )}
         </div>
       )}
 
