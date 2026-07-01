@@ -56,6 +56,11 @@
 	"d1_databases": [
 		{ "binding": "DB", "database_name": "channex-ari", "database_id": "36c91859-bf71-43af-a8f0-9b6fcadeb132" }
 	],
+	// Google Hotels ARI re-sync: every 6h, re-push all ARI-enabled properties
+	// (backstop to the change-driven + admin-edit pushes). See workers/app.ts.
+	"triggers": {
+		"crons": ["0 */6 * * *"]
+	},
 	"observability": {
 		"enabled": true
 	},

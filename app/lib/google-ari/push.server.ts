@@ -21,6 +21,8 @@ import {
   type PropertyRate,
   type PropertyRoom,
 } from "./xml";
+import { getProperties } from "../properties.server";
+import { waitUntil } from "cloudflare:workers";
 import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
 import { googlePromotions } from "./promotions.server";
 
@@ -180,4 +182,34 @@ export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriP
   }
   await recordGoogleAriSync(pid, { at: nowTimestamp(), results });
   return results;
+}
+
+/** Fire-and-forget push after a data change: no-op unless the property has ARI
+ *  push enabled, and never blocks the caller — the work is kept alive past the
+ *  response via waitUntil (falling back to a floating promise if unavailable, e.g.
+ *  dev). Used by the Channex change webhook and admin edits. */
+export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promise<void> {
+  if (!(await getSettings(pid)).googleAriPush) return;
+  const work = runAndRecord(pid, kinds).catch((e) =>
+    console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
+  );
+  try {
+    waitUntil(work);
+  } catch {
+    void work; // outside a request context (or dev): let it run detached
+  }
+}
+
+/** Cron entry: push everything for every property that has ARI push enabled.
+ *  Each property is isolated so one failure doesn't stop the sweep. */
+export async function scheduledGoogleAriSync(): Promise<void> {
+  const properties = await getProperties();
+  for (const p of properties) {
+    if (!(await getSettings(p.id)).googleAriPush) continue;
+    try {
+      await runAndRecord(p.id, ALL_SYNC_KINDS);
+    } catch (e) {
+      console.log(`[google-ari] scheduled sync failed for ${p.id}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
 }

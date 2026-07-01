@@ -6,6 +6,7 @@ import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveTaxSettings } from "~/lib/overrides.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { formatMoney } from "~/lib/money";
 import {
   computePricing,
@@ -35,6 +36,7 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   await saveTaxSettings(propertyId, await request.formData());
+  await queueGoogleAriPush(propertyId, ["taxes"]);
   return { ok: true };
 }
 

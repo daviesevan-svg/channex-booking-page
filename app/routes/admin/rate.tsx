@@ -6,6 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { isDeadlineUnit } from "~/lib/content";
 import { deleteRate, getRate, getRooms, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import {
   CARD_HANDLINGS,
   CARD_HANDLING_LABEL,
@@ -94,6 +95,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   if (form.get("intent") === "delete" && !isNew) {
     await deleteRate(propertyId, params.rateId);
+    await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
     return redirect("/admin/rates");
   }
 
@@ -160,6 +162,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
   await saveRate(propertyId, rate);
+  await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
   return isNew ? redirect(`/admin/rates/${rate.id}`) : { ok: true };
 }
 

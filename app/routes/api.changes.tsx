@@ -1,6 +1,7 @@
 import type { Route } from "./+types/api.changes";
 import { applyChanges, checkApiKey } from "~/lib/ari.server";
 import { isChannexConnected } from "~/lib/overrides.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 
 // POST /api/changes — Channex pushes availability/rate/restriction changes.
 export async function action({ request }: Route.ActionArgs) {
@@ -33,6 +34,10 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     const counts = await applyChanges(body);
+    // Forward the fresh ARI on to Google (rates/availability/inventory) for any
+    // ARI-enabled property in this batch. Fire-and-forget so Channex's webhook
+    // response isn't held up; a no-op when the property isn't pushing to Google.
+    for (const code of hotelCodes) await queueGoogleAriPush(code, ["ari"]);
     return Response.json({ success: true, ...counts });
   } catch (e) {
     return Response.json(
