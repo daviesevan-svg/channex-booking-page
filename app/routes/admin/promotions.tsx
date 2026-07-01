@@ -20,6 +20,7 @@ import {
   savePromotion,
   togglePromotion,
 } from "~/lib/promotions.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -53,10 +54,12 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "delete") {
     await deletePromotion(propertyId, String(form.get("id")));
+    await queueGoogleAriPush(propertyId, ["promotions"]);
     return redirect("/admin/promotions");
   }
   if (intent === "toggle") {
     await togglePromotion(propertyId, String(form.get("id")));
+    await queueGoogleAriPush(propertyId, ["promotions"]);
     return redirect("/admin/promotions");
   }
 
@@ -130,6 +133,7 @@ export async function action({ request }: Route.ActionArgs) {
     createdAt: prev?.createdAt ?? new Date().toISOString(),
   };
   await savePromotion(propertyId, promo);
+  await queueGoogleAriPush(propertyId, ["promotions"]);
   return redirect("/admin/promotions");
 }
 

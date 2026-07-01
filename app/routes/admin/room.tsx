@@ -4,6 +4,7 @@ import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 
@@ -28,6 +29,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   if (form.get("intent") === "delete" && !isNew) {
     await deleteRoom(propertyId, params.roomId);
+    await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
     return redirect("/admin/rooms");
   }
 
@@ -68,6 +70,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
   await saveRoom(propertyId, room);
+  await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
   return isNew ? redirect(`/admin/rooms/${id}`) : { ok: true };
 }
 

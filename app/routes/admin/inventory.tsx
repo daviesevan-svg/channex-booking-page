@@ -8,6 +8,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 import { applyBulkUpdate, getInventory, saveInventory, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 
 // Generous server window; the client renders only as many columns as fit the
 // screen and pages by that visible count.
@@ -145,6 +146,7 @@ export async function action({ request }: Route.ActionArgs) {
       ctd,
     });
 
+    await queueGoogleAriPush(propertyId, ["ari"]);
     return { ok: true as const, message: `Updated ${cells} cell${cells === 1 ? "" : "s"} across ${dates.length} date${dates.length === 1 ? "" : "s"}.` };
   }
 
@@ -198,6 +200,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   await saveInventory(propertyId, edits);
+  await queueGoogleAriPush(propertyId, ["ari"]);
   return { ok: true };
 }
 
