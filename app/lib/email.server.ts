@@ -110,6 +110,22 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
   }
 }
 
+/** Guest "couldn't confirm — you've been refunded" email, sent when a paid
+ *  booking can't be fulfilled (room sold out before payment completed). No manage
+ *  link (there's no booking to manage). Never throws. */
+export async function sendBookingFailedEmail(pid: string, booking: BookingRecord, _origin: string): Promise<void> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
+    const hotelName = ov.hotelName || "Your hotel";
+    const from = senderFrom(settings, getConfig());
+    const text = await getEmailTemplate(pid, "booking_failed", booking.lang);
+    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, accent: accentHex(settings), manageUrl: "" });
+    await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
+  } catch (e) {
+    console.log(`[email] sendBookingFailedEmail failed: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 /** Guest cancellation confirmation + (opt-in) host cancellation notification. */
 export async function sendCancellationEmails(pid: string, booking: BookingRecord, origin: string): Promise<void> {
   try {

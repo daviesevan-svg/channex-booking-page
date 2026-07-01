@@ -80,6 +80,7 @@ export function bookingVars(
     total: money(booking.total),
     due_now: money(dueNow),
     due_at_hotel: money(Math.max(0, booking.total - dueNow)),
+    refund_amount: money(booking.payment?.refund?.amount ?? booking.payment?.amount ?? 0),
     manage_url: manageUrl,
     guest_email: booking.guest.email,
     guest_phone: booking.guest.phone,
@@ -129,7 +130,7 @@ function detailsHtml(
       : "Non-refundable";
 
   const manageBtn =
-    opts.recipient === "guest"
+    opts.recipient === "guest" && opts.manageUrl
       ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:10px;background:${opts.accent};">
            <a href="${esc(opts.manageUrl)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Manage booking</a>
          </td></tr></table>`
@@ -248,5 +249,15 @@ export function sampleBooking(currency = "GBP"): BookingRecord {
     ],
     extras: [{ id: "x1", name: "Airport transfer", unit: "trip", unitPrice: 60, qty: 1, amount: 60 }],
     consent: { acceptedAt: "2025-01-01T10:00:00.000Z", policyText: [], dueNow: 180, marketingOptIn: false },
+    // Sample deposit + refund so the "couldn't confirm" preview shows a real amount.
+    payment: {
+      provider: "stripe",
+      mode: "payment",
+      accountId: "acct_sample",
+      sessionId: "cs_sample",
+      amount: 180,
+      currency,
+      refund: { id: "re_sample", amount: 180, currency, at: "2025-01-01T10:05:00.000Z", by: "auto (unavailable at booking)" },
+    },
   };
 }
