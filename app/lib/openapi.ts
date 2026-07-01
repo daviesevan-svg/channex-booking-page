@@ -1,28 +1,52 @@
 // OpenAPI 3.1 description of the public /v1 API — the single source of truth,
 // served at GET /v1/openapi.json. Keep in sync with the routes in
-// app/routes/api.v1.*.tsx and the shapes in app/lib/api-serialize.ts.
+// app/routes/api.v1.*.tsx and the shapes in app/lib/api-serialize.ts. Constraints
+// (uuid formats, integer bounds, currency pattern) mirror the server validation
+// in api.v1.bookings.tsx so the schema is precise, not merely structural.
+
+// ---- reusable field fragments ----
+/** All resource ids (property, room, rate, extra, booking) are v4 UUIDs. */
+const uuid = { type: "string", format: "uuid" } as const;
+const uuidNullable = { type: ["string", "null"], format: "uuid" } as const;
+/** ISO 4217 three-letter currency code, e.g. "GBP". */
+const currency = { type: "string", pattern: "^[A-Z]{3}$", description: "ISO 4217 currency code, e.g. GBP." } as const;
+const currencyNullable = { type: ["string", "null"], pattern: "^[A-Z]{3}$", description: "ISO 4217 currency code, e.g. GBP." } as const;
+/** A monetary amount in the property currency; never negative. */
+const money = { type: "number", minimum: 0 } as const;
+const moneyNullable = { type: ["number", "null"], minimum: 0 } as const;
+const date = { type: "string", format: "date", description: "Calendar date, YYYY-MM-DD." } as const;
+/** A gross price for the whole stay, serialised as a decimal string, e.g. "240.00". */
+const priceString = { type: "string", pattern: "^\\d+(\\.\\d{1,2})?$", description: "Decimal amount as a string, e.g. \"240.00\"." } as const;
 
 const ratePlan = {
   type: "object",
   properties: {
-    id: { type: "string" },
-    parent_rate_id: { type: "string" },
+    id: uuid,
+    parent_rate_id: uuidNullable,
     title: { type: "string" },
     meal_plan: { type: ["string", "null"] },
-    currency: { type: ["string", "null"] },
-    total_price: { type: "string", description: "Gross price for the whole stay." },
-    available: { type: ["integer", "null"] },
+    currency: currencyNullable,
+    total_price: { ...priceString, description: "Gross price for the whole stay." },
+    available: { type: ["integer", "null"], minimum: 0, description: "Rooms left to sell at this rate." },
     occupancy: {
       type: "object",
-      properties: { adults: { type: "integer" }, children: { type: "integer" }, infants: { type: "integer" } },
+      properties: {
+        adults: { type: "integer", minimum: 1 },
+        children: { type: "integer", minimum: 0 },
+        infants: { type: "integer", minimum: 0 },
+      },
     },
     refundable: { type: ["boolean", "null"] },
-    free_cancel_until: { type: ["string", "null"], description: "ISO 8601 deadline for free cancellation." },
+    free_cancel_until: { type: ["string", "null"], format: "date-time", description: "ISO 8601 deadline for free cancellation." },
     description: { type: ["string", "null"] },
     inclusions: { type: "array", items: { type: "string" } },
     offer: {
       type: ["object", "null"],
-      properties: { name: { type: "string" }, percent: { type: "number" }, original_total_price: { type: "string" } },
+      properties: {
+        name: { type: "string" },
+        percent: { type: "number", minimum: 0, maximum: 100 },
+        original_total_price: priceString,
+      },
     },
   },
 } as const;
@@ -30,24 +54,24 @@ const ratePlan = {
 const booking = {
   type: "object",
   properties: {
-    id: { type: "string" },
-    reference: { type: "string", description: "The guest-facing booking reference (also the manage-booking credential)." },
+    id: uuid,
+    reference: { type: "string", minLength: 8, maxLength: 8, pattern: "^[0-9A-HJKMNP-TV-Z]{8}$", description: "The guest-facing booking reference (also the manage-booking credential): 8 Crockford-base32 chars, not a UUID." },
     status: { type: "string", enum: ["confirmed", "simulated", "failed"] },
     lifecycle: { type: "string", enum: ["active", "cancelled"] },
-    confirmation_id: { type: ["string", "null"], description: "Channel-manager reservation id, when pushed live." },
+    confirmation_id: { type: ["string", "null"], description: "Channel-manager reservation id, when pushed live. Format is the channel manager's, not a UUID." },
     created_at: { type: "string", format: "date-time" },
-    currency: { type: "string" },
-    checkin: { type: "string", format: "date" },
-    checkout: { type: "string", format: "date" },
-    nights: { type: "integer" },
-    total: { type: "number" },
+    currency,
+    checkin: date,
+    checkout: date,
+    nights: { type: "integer", minimum: 1 },
+    total: money,
     guest: {
       type: "object",
       properties: {
-        first_name: { type: "string" },
-        last_name: { type: "string" },
+        first_name: { type: "string", minLength: 1 },
+        last_name: { type: "string", minLength: 1 },
         email: { type: "string", format: "email" },
-        phone: { type: "string" },
+        phone: { type: "string", minLength: 3 },
       },
     },
     rooms: {
@@ -55,13 +79,13 @@ const booking = {
       items: {
         type: "object",
         properties: {
-          room_id: { type: "string" },
+          room_id: uuid,
           room_title: { type: "string" },
-          rate_id: { type: "string" },
+          rate_id: uuid,
           rate_title: { type: "string" },
-          adults: { type: "integer" },
-          children: { type: "integer" },
-          total: { type: "number" },
+          adults: { type: "integer", minimum: 1 },
+          children: { type: "integer", minimum: 0 },
+          total: money,
         },
       },
     },
@@ -69,23 +93,23 @@ const booking = {
       type: "array",
       items: {
         type: "object",
-        properties: { id: { type: "string" }, name: { type: "string" }, qty: { type: "integer" }, amount: { type: "number" } },
+        properties: { id: uuid, name: { type: "string" }, qty: { type: "integer", minimum: 1 }, amount: money },
       },
     },
     cancellation: {
       type: ["object", "null"],
-      properties: { refundable: { type: "boolean" }, cancel_by: { type: ["string", "null"] } },
+      properties: { refundable: { type: "boolean" }, cancel_by: { type: ["string", "null"], format: "date-time" } },
     },
     payment: {
       type: ["object", "null"],
       properties: {
         mode: { type: "string", enum: ["payment", "setup"] },
-        amount: { type: ["number", "null"] },
-        currency: { type: ["string", "null"] },
-        card_last4: { type: ["string", "null"] },
+        amount: moneyNullable,
+        currency: currencyNullable,
+        card_last4: { type: ["string", "null"], pattern: "^\\d{4}$" },
         refunded: {
           type: ["object", "null"],
-          properties: { amount: { type: "number" }, at: { type: "string", format: "date-time" } },
+          properties: { amount: money, at: { type: "string", format: "date-time" } },
         },
       },
     },
@@ -143,7 +167,7 @@ export const openApiSpec = {
       get: {
         tags: ["Catalog"],
         summary: "Retrieve a property by id (must match the key's property)",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        parameters: [{ name: "id", in: "path", required: true, schema: uuid }],
         responses: {
           "200": {
             description: "The property",
@@ -159,8 +183,8 @@ export const openApiSpec = {
         tags: ["Catalog"],
         summary: "Per-date availability for a date picker",
         parameters: [
-          { name: "from", in: "query", required: true, schema: { type: "string", format: "date" } },
-          { name: "to", in: "query", required: true, schema: { type: "string", format: "date" } },
+          { name: "from", in: "query", required: true, schema: date },
+          { name: "to", in: "query", required: true, schema: date },
         ],
         responses: {
           "200": {
@@ -188,12 +212,12 @@ export const openApiSpec = {
         tags: ["Catalog"],
         summary: "Priced, bookable rooms and rates for a stay",
         parameters: [
-          { name: "checkin", in: "query", required: true, schema: { type: "string", format: "date" } },
-          { name: "checkout", in: "query", required: true, schema: { type: "string", format: "date" } },
-          { name: "adults", in: "query", schema: { type: "integer", default: 2 } },
-          { name: "children", in: "query", schema: { type: "integer" }, description: "Child count (use children_ages for exact ages)." },
-          { name: "children_ages", in: "query", schema: { type: "string" }, description: "Comma-separated child ages, e.g. 4,9." },
-          { name: "currency", in: "query", schema: { type: "string" } },
+          { name: "checkin", in: "query", required: true, schema: date },
+          { name: "checkout", in: "query", required: true, schema: date },
+          { name: "adults", in: "query", schema: { type: "integer", minimum: 1, default: 2 } },
+          { name: "children", in: "query", schema: { type: "integer", minimum: 0 }, description: "Child count (use children_ages for exact ages)." },
+          { name: "children_ages", in: "query", schema: { type: "string", pattern: "^\\d{1,2}(,\\d{1,2})*$" }, description: "Comma-separated child ages, e.g. 4,9." },
+          { name: "currency", in: "query", schema: currency },
         ],
         responses: {
           "200": {
@@ -202,7 +226,7 @@ export const openApiSpec = {
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: { checkin: { type: "string" }, checkout: { type: "string" }, data: { type: "array", items: { $ref: "#/components/schemas/AvailabilityRoom" } } },
+                  properties: { checkin: date, checkout: date, data: { type: "array", items: { $ref: "#/components/schemas/AvailabilityRoom" } } },
                 },
               },
             },
@@ -240,8 +264,8 @@ export const openApiSpec = {
         tags: ["Bookings"],
         summary: "List bookings (newest first)",
         parameters: [
-          { name: "limit", in: "query", schema: { type: "integer", default: 50, maximum: 100 } },
-          { name: "offset", in: "query", schema: { type: "integer", default: 0 } },
+          { name: "limit", in: "query", schema: { type: "integer", minimum: 1, maximum: 100, default: 50 } },
+          { name: "offset", in: "query", schema: { type: "integer", minimum: 0, default: 0 } },
         ],
         responses: {
           "200": {
@@ -250,7 +274,12 @@ export const openApiSpec = {
               "application/json": {
                 schema: {
                   type: "object",
-                  properties: { data: { type: "array", items: { $ref: "#/components/schemas/Booking" } }, total: { type: "integer" }, limit: { type: "integer" }, offset: { type: "integer" } },
+                  properties: {
+                    data: { type: "array", items: { $ref: "#/components/schemas/Booking" } },
+                    total: { type: "integer", minimum: 0 },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                    offset: { type: "integer", minimum: 0 },
+                  },
                 },
               },
             },
@@ -282,7 +311,12 @@ export const openApiSpec = {
                       properties: {
                         data: {
                           type: "object",
-                          properties: { reference: { type: "string" }, status: { type: "string", enum: ["pending_payment"] }, amount_due: { type: "number" }, currency: { type: "string" } },
+                          properties: {
+                            reference: { type: "string", minLength: 1 },
+                            status: { type: "string", enum: ["pending_payment"] },
+                            amount_due: money,
+                            currency,
+                          },
                         },
                         payment_url: { type: "string", format: "uri" },
                       },
@@ -301,7 +335,7 @@ export const openApiSpec = {
       get: {
         tags: ["Bookings"],
         summary: "Retrieve a booking by id",
-        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+        parameters: [{ name: "id", in: "path", required: true, schema: uuid }],
         responses: {
           "200": {
             description: "The booking",
@@ -334,41 +368,41 @@ export const openApiSpec = {
     },
     responses: { Error: errorResponse },
     schemas: {
-      Property: { type: "object", properties: { id: { type: "string" }, name: { type: "string" } } },
+      Property: { type: "object", properties: { id: uuid, name: { type: "string" } } },
       Calendar: {
         type: "object",
         properties: {
-          from: { type: "string", format: "date" },
-          to: { type: "string", format: "date" },
-          closed: { type: "array", items: { type: "string", format: "date" } },
-          closed_to_arrival: { type: "array", items: { type: "string", format: "date" } },
-          closed_to_departure: { type: "array", items: { type: "string", format: "date" } },
-          min_stay_arrival: { type: "object", additionalProperties: { type: "integer" } },
-          min_stay_through: { type: "object", additionalProperties: { type: "integer" } },
+          from: date,
+          to: date,
+          closed: { type: "array", items: date },
+          closed_to_arrival: { type: "array", items: date },
+          closed_to_departure: { type: "array", items: date },
+          min_stay_arrival: { type: "object", additionalProperties: { type: "integer", minimum: 1 }, description: "Minimum nights keyed by arrival date." },
+          min_stay_through: { type: "object", additionalProperties: { type: "integer", minimum: 1 } },
         },
       },
       Room: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: uuid,
           title: { type: "string" },
           description: { type: ["string", "null"] },
-          images: { type: "array", items: { type: "string" } },
+          images: { type: "array", items: { type: "string", description: "Image URL." } },
           facilities: { type: "array", items: { type: "string" } },
-          max_adults: { type: "integer" },
-          max_guests: { type: "integer" },
-          cleaning_fee: { type: "number" },
+          max_adults: { type: "integer", minimum: 1 },
+          max_guests: { type: "integer", minimum: 1 },
+          cleaning_fee: money,
         },
       },
       AvailabilityRoom: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: uuid,
           title: { type: "string" },
           description: { type: ["string", "null"] },
-          images: { type: "array", items: { type: "string" } },
+          images: { type: "array", items: { type: "string", description: "Image URL." } },
           facilities: { type: "array", items: { type: "string" } },
-          cleaning_fee: { type: "number" },
+          cleaning_fee: money,
           rates: { type: "array", items: { $ref: "#/components/schemas/RatePlan" } },
         },
       },
@@ -376,26 +410,26 @@ export const openApiSpec = {
       Rate: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: uuid,
           title: { type: "string" },
           meal_plan: { type: ["string", "null"] },
-          prices: { type: "object", additionalProperties: { type: "number" }, description: "Base nightly price by room id, in the property currency." },
+          prices: { type: "object", additionalProperties: money, description: "Base nightly price by room id (UUID), in the property currency." },
           refundable: { type: "boolean" },
-          cancel_deadline_value: { type: ["integer", "null"] },
-          cancel_deadline_unit: { type: ["string", "null"] },
+          cancel_deadline_value: { type: ["integer", "null"], minimum: 0 },
+          cancel_deadline_unit: { type: ["string", "null"], enum: ["hours", "days", null] },
           cancellation_note: { type: ["string", "null"] },
           inclusions: { type: "array", items: { type: "string" } },
-          policy: { type: ["object", "null"] },
+          policy: { type: ["object", "null"], description: "Structured payment/cancellation/no-show policy." },
         },
       },
       Extra: {
         type: "object",
         properties: {
-          id: { type: "string" },
+          id: uuid,
           name: { type: "string" },
           description: { type: ["string", "null"] },
           unit: { type: "string" },
-          price: { type: ["number", "null"] },
+          price: moneyNullable,
           scope: { type: "string", enum: ["room", "booking"] },
           taxable: { type: "boolean" },
           options: { type: ["array", "null"] },
@@ -407,9 +441,9 @@ export const openApiSpec = {
         type: "object",
         required: ["checkin", "checkout", "rooms", "guest"],
         properties: {
-          checkin: { type: "string", format: "date" },
-          checkout: { type: "string", format: "date" },
-          currency: { type: "string", default: "GBP" },
+          checkin: date,
+          checkout: { ...date, description: "Calendar date, YYYY-MM-DD; must be after checkin." },
+          currency: { ...currency, default: "GBP" },
           rooms: {
             type: "array",
             minItems: 1,
@@ -417,10 +451,10 @@ export const openApiSpec = {
               type: "object",
               required: ["room_id", "rate_id"],
               properties: {
-                room_id: { type: "string" },
-                rate_id: { type: "string" },
-                adults: { type: "integer" },
-                children_ages: { type: "array", items: { type: "integer" } },
+                room_id: uuid,
+                rate_id: uuid,
+                adults: { type: "integer", minimum: 1, description: "Defaults to the rate's occupancy when omitted." },
+                children_ages: { type: "array", items: { type: "integer", minimum: 0, maximum: 17 }, description: "Exact age of each child (0–17)." },
               },
             },
           },
@@ -428,11 +462,11 @@ export const openApiSpec = {
             type: "object",
             required: ["first_name", "last_name", "email", "phone"],
             properties: {
-              first_name: { type: "string" },
-              last_name: { type: "string" },
+              first_name: { type: "string", minLength: 1 },
+              last_name: { type: "string", minLength: 1 },
               email: { type: "string", format: "email" },
-              phone: { type: "string" },
-              arrival: { type: "string" },
+              phone: { type: "string", minLength: 3 },
+              arrival: { type: "string", description: "Estimated arrival time, e.g. \"15:00\"." },
               requests: { type: "string" },
             },
           },
@@ -444,9 +478,9 @@ export const openApiSpec = {
         type: "object",
         description: "Signed with header `Roompanda-Signature: t=<unix>,v1=<hex>` where hex = HMAC-SHA256(endpoint_secret, `<t>.<rawBody>`).",
         properties: {
-          id: { type: "string" },
+          id: { type: "string", description: "Unique event id." },
           type: { type: "string", enum: ["booking.created", "booking.cancelled"] },
-          created: { type: "integer", description: "Unix timestamp (seconds)." },
+          created: { type: "integer", minimum: 0, description: "Unix timestamp (seconds)." },
           data: { $ref: "#/components/schemas/Booking" },
         },
       },
