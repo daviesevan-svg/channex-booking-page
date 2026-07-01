@@ -3,6 +3,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { jsonLdHtml } from "~/lib/jsonld";
 
 import type { Route } from "./+types/detail";
 import type { RoomWithRates } from "~/lib/channex/types";
@@ -266,7 +267,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-7">
       {jsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <Link
         to={`/${params.channelId}/rooms?${qs}`}
