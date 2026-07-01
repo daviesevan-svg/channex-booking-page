@@ -372,6 +372,11 @@ export async function action({ params, request }: Route.ActionArgs) {
       client_reference_id: reference,
       customer_email: g.email,
       metadata: { reference, pid: stay.channelId },
+      // Bound the payment window so the session can't outlive the pending-booking
+      // stash (see pending-bookings.server TTL): a payment completed after the
+      // stash expired would be charged with no booking created. 60 min hold,
+      // comfortably inside the stash TTL.
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
       success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
       cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
     };
