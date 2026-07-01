@@ -69,9 +69,16 @@ export async function postToGoogleAri(kind: string, path: string, xml: string): 
       body: xml,
     });
     const body = (await res.text().catch(() => "")).trim();
-    const errored = /<Error|<Issue|status="?fail|>\s*fail/i.test(body);
+    // Google replies with an OTA <Errors>/<Error> block or, on the proprietary
+    // endpoints, <Issue status="error">. An <Issue status="warning"> means the
+    // message was ACCEPTED with notes — that must not be reported as a failure.
+    const errored = /<Errors[\s>]|<Error[\s>]|status="error"/i.test(body);
+    const warned = /status="warning"/i.test(body);
     const ok = res.ok && !errored;
-    const detail = `HTTP ${res.status}${body ? ` — ${body.slice(0, 400)}` : ""}`;
+    const detail =
+      `HTTP ${res.status}` +
+      (ok && warned ? " (accepted with warnings)" : "") +
+      (body ? ` — ${body.slice(0, 400)}` : "");
     return { kind, ok, detail };
   } catch (e) {
     return { kind, ok: false, detail: e instanceof Error ? e.message : "request failed" };
@@ -113,7 +120,8 @@ export async function syncPropertyData(pid: string): Promise<AriPushResult> {
   const gate = await envelopeFor(pid, "property_data");
   if (!gate.ok) return gate.result;
 
-  const [rooms, rates, settings] = await Promise.all([getRooms(pid), getRates(pid), getSettings(pid)]);
+  const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  const settings = gate.settings; // envelopeFor already loaded them
   const active = rates.filter((r) => r.active);
   const propRooms: PropertyRoom[] = rooms.map((room) => ({
     id: room.id,

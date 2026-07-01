@@ -4,7 +4,7 @@ import type { Route } from "./+types/google-hotels";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
-import { getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
+import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
 
@@ -13,7 +13,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
-  const [settings, readiness] = await Promise.all([getSettings(propertyId), checkGoogleReadiness(propertyId)]);
+  const [settings, readiness, lastSync] = await Promise.all([
+    getSettings(propertyId),
+    checkGoogleReadiness(propertyId),
+    getGoogleAriSync(propertyId),
+  ]);
   return {
     configured: true as const,
     canManage,
@@ -21,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     partnerConfigured: Boolean(getConfig().googleAriPartnerKey),
     push: settings.googleAriPush ?? false,
     windowDays: settings.googleAriWindowDays ?? 365,
-    lastSync: settings.googleAriLastSync,
+    lastSync,
     readiness,
   };
 }
@@ -43,9 +47,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
   if (intent === "push") {
     const which = String(form.get("kinds") ?? "");
-    const one = ["property_data", "ari", "taxes", "promotions"] as const;
     const kinds: SyncKind[] =
-      which === "all" ? ALL_SYNC_KINDS : (one as readonly string[]).includes(which) ? [which as SyncKind] : [];
+      which === "all"
+        ? ALL_SYNC_KINDS
+        : (ALL_SYNC_KINDS as readonly string[]).includes(which)
+          ? [which as SyncKind]
+          : [];
     if (!kinds.length) return { error: "Nothing to push." };
     const results = await runAndRecord(propertyId, kinds);
     return { results };
