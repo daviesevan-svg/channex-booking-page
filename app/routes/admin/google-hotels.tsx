@@ -6,7 +6,7 @@ import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
-import { runAndRecord } from "~/lib/google-ari/push.server";
+import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -41,8 +41,13 @@ export async function action({ request }: Route.ActionArgs) {
     await saveGoogleAriSettings(propertyId, { push: form.get("push") === "on", windowDays });
     return { ok: true as const };
   }
-  if (intent === "push-property") {
-    const results = await runAndRecord(propertyId, ["property_data"]);
+  if (intent === "push") {
+    const which = String(form.get("kinds") ?? "");
+    const one = ["property_data", "ari", "taxes", "promotions"] as const;
+    const kinds: SyncKind[] =
+      which === "all" ? ALL_SYNC_KINDS : (one as readonly string[]).includes(which) ? [which as SyncKind] : [];
+    if (!kinds.length) return { error: "Nothing to push." };
+    const results = await runAndRecord(propertyId, kinds);
     return { results };
   }
   return { error: "Unknown action." };
@@ -157,20 +162,36 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">Push now</h2>
         <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
-          Send the property definition (rooms + rate plans) to Google. Rates, availability, taxes and
-          promotions are pushed in the next step.
+          Send data to Google. All four core messages (property data, rates, availability, inventory)
+          must be accepted before prices display; taxes compose the all-in price and promotions carry
+          the discounts. "Push everything" sends them all in order.
         </p>
-        <Form method="post">
-          <input type="hidden" name="intent" value="push-property" />
-          <button
-            type="submit"
-            disabled={busy || !canPush}
-            title={canPush ? undefined : "Enable the push, set the partner key and complete readiness first."}
-            className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-          >
-            Push property data
-          </button>
-        </Form>
+        <div className="flex flex-wrap gap-2.5">
+          {[
+            { kinds: "all", label: "Push everything", primary: true },
+            { kinds: "property_data", label: "Property data" },
+            { kinds: "ari", label: "Rates · availability · inventory" },
+            { kinds: "taxes", label: "Taxes & fees" },
+            { kinds: "promotions", label: "Promotions" },
+          ].map((b) => (
+            <Form method="post" key={b.kinds}>
+              <input type="hidden" name="intent" value="push" />
+              <input type="hidden" name="kinds" value={b.kinds} />
+              <button
+                type="submit"
+                disabled={busy || !canPush}
+                title={canPush ? undefined : "Enable the push, set the partner key and complete readiness first."}
+                className={
+                  b.primary
+                    ? "rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                    : "rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                }
+              >
+                {b.label}
+              </button>
+            </Form>
+          ))}
+        </div>
 
         {actionData && "results" in actionData && actionData.results && (
           <div className="mt-4 space-y-2">
