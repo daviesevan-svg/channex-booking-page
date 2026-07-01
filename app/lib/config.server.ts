@@ -45,6 +45,12 @@ export interface AppConfig extends ChannexConfig {
   providerCode?: string;
   /** Channex Open Channel new_booking webhook (staging vs production host). */
   openChannelBookingUrl: string;
+  /** Google Hotels ARI push host. Default https://www.google.com. */
+  googleAriBaseUrl: string;
+  /** Partner account key from the Google Hotel Center account, stamped on every
+   *  ARI message. Auth is IP-whitelist based; this only identifies the account.
+   *  Unset = ARI push can't run (surfaced in the admin). */
+  googleAriPartnerKey?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -86,6 +92,8 @@ export function getConfig(): AppConfig {
       "OPEN_CHANNEL_BOOKING_URL",
       "https://secure-staging.channex.io/api/v1/channel_webhooks/open_channel/new_booking",
     ),
+    googleAriBaseUrl: read("GOOGLE_ARI_BASE_URL", "https://www.google.com").replace(/\/+$/, ""),
+    googleAriPartnerKey: read("GOOGLE_ARI_PARTNER_KEY") || undefined,
   };
 }
 

@@ -361,6 +361,29 @@ export async function saveConnectivity(pid: string, system: string | undefined):
   return next;
 }
 
+/** Merge the Google Hotels ARI push settings (enable toggle + window). Leaves the
+ *  rest of settings untouched. */
+export async function saveGoogleAriSettings(
+  pid: string,
+  input: { push: boolean; windowDays?: number },
+): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const n = input.windowDays;
+  const windowDays = Number.isFinite(n) && (n as number) > 0 ? Math.min(500, Math.round(n as number)) : undefined;
+  const next: SiteSettings = { ...existing, googleAriPush: input.push, googleAriWindowDays: windowDays };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
+/** Record the outcome of a Google ARI push so the admin can show last-sync state. */
+export async function recordGoogleAriSync(
+  pid: string,
+  lastSync: NonNullable<SiteSettings["googleAriLastSync"]>,
+): Promise<void> {
+  const existing = await getSettings(pid);
+  await writeJson(settingsKey(pid), { ...existing, googleAriLastSync: lastSync });
+}
+
 /** Set/clear the property's connected Stripe account (merge-style). Passing
  *  undefined for `accountId` disconnects. */
 export async function savePaymentSettings(
