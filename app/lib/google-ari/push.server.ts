@@ -7,9 +7,22 @@
 // outcome is recorded on the property so the admin can show it.
 import { getConfig } from "../config.server";
 import { getRooms, getRates } from "../catalog.server";
+import type { SiteSettings } from "../content";
 import { checkGoogleReadiness } from "../google-readiness.server";
 import { getSettings, recordGoogleAriSync } from "../overrides.server";
-import { buildPropertyDataXml, type AriEnvelope, type PropertyRoom, type PropertyRate } from "./xml";
+import {
+  buildAvailXml,
+  buildInvCountXml,
+  buildPromotionsXml,
+  buildPropertyDataXml,
+  buildRateAmountXml,
+  buildTaxesXml,
+  type AriEnvelope,
+  type PropertyRate,
+  type PropertyRoom,
+} from "./xml";
+import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
+import { googlePromotions } from "./promotions.server";
 
 /** Google upload paths (joined onto `googleAriBaseUrl`). */
 export const ARI_PATHS = {
@@ -64,7 +77,10 @@ export async function postToGoogleAri(kind: string, path: string, xml: string): 
 async function envelopeFor(
   pid: string,
   kind: string,
-): Promise<{ ok: true; env: (k: string) => AriEnvelope } | { ok: false; result: AriPushResult }> {
+): Promise<
+  | { ok: true; env: (k: string) => AriEnvelope; settings: SiteSettings }
+  | { ok: false; result: AriPushResult }
+> {
   const { googleAriPartnerKey } = getConfig();
   const settings = await getSettings(pid);
   if (!settings.googleAriPush) {
@@ -81,6 +97,7 @@ async function envelopeFor(
   const partner = googleAriPartnerKey;
   return {
     ok: true,
+    settings,
     env: (k: string) => ({ partner, hotelId: pid, id: messageId(k), timestamp: nowTimestamp() }),
   };
 }
@@ -115,9 +132,41 @@ export async function syncPropertyData(pid: string): Promise<AriPushResult> {
   return postToGoogleAri("property_data", ARI_PATHS.propertyData, xml);
 }
 
-/** The push kinds available today. PR2 adds rate/avail/inventory/taxes/promotions. */
-export type SyncKind = "property_data";
-export const ALL_SYNC_KINDS: SyncKind[] = ["property_data"];
+/** Rates + availability/restrictions + inventory counts. These three are pushed
+ *  together (one inventory read) since they describe the same product grid. */
+export async function syncAri(pid: string): Promise<AriPushResult[]> {
+  const gate = await envelopeFor(pid, "ari");
+  if (!gate.ok) return [gate.result];
+  const window = ariWindow(gate.settings.googleAriWindowDays ?? 365);
+  const { rates, avail, inventory } = await collectAri(pid, window);
+  const out: AriPushResult[] = [];
+  out.push(await postToGoogleAri("rate", ARI_PATHS.rate, buildRateAmountXml(gate.env("rate"), rates)));
+  out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(gate.env("avail"), avail)));
+  out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), inventory)));
+  return out;
+}
+
+/** TaxFeeInfo: VAT + fees + city tax so Google composes the all-in price. */
+export async function syncTaxes(pid: string): Promise<AriPushResult> {
+  const gate = await envelopeFor(pid, "taxes");
+  if (!gate.ok) return gate.result;
+  const { taxes, fees } = googleTaxLines(gate.settings);
+  const xml = buildTaxesXml(gate.env("taxes"), taxes, fees);
+  return postToGoogleAri("taxes", ARI_PATHS.taxes, xml);
+}
+
+/** Promotions: every auto-offer as a non-combinable Google promotion. */
+export async function syncPromotions(pid: string): Promise<AriPushResult> {
+  const gate = await envelopeFor(pid, "promotions");
+  if (!gate.ok) return gate.result;
+  const promos = await googlePromotions(pid);
+  const xml = buildPromotionsXml(gate.env("promotions"), promos);
+  return postToGoogleAri("promotions", ARI_PATHS.promotions, xml);
+}
+
+/** The push groups the admin can trigger. "ari" fans out to rate/avail/inventory. */
+export type SyncKind = "property_data" | "ari" | "taxes" | "promotions";
+export const ALL_SYNC_KINDS: SyncKind[] = ["property_data", "ari", "taxes", "promotions"];
 
 /** Run the given syncs, record the combined outcome on the property, and return
  *  the per-message results. */
@@ -125,6 +174,9 @@ export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriP
   const results: AriPushResult[] = [];
   for (const kind of kinds) {
     if (kind === "property_data") results.push(await syncPropertyData(pid));
+    else if (kind === "ari") results.push(...(await syncAri(pid)));
+    else if (kind === "taxes") results.push(await syncTaxes(pid));
+    else if (kind === "promotions") results.push(await syncPromotions(pid));
   }
   await recordGoogleAriSync(pid, { at: nowTimestamp(), results });
   return results;
