@@ -438,3 +438,21 @@ export const incrementAvailability = (
   hotelCode: string,
   items: { roomId: string; date: string; by: number }[],
 ) => adjustAvailability(hotelCode, items, 1);
+
+/** True if any requested (room, date) has fewer rooms left than needed, per our
+ *  cached ARI. A best-effort guard against booking a room that sold between
+ *  checkout and payment completion — Channex remains the authoritative gate. */
+export async function availabilityShortfall(
+  hotelCode: string,
+  items: { roomId: string; date: string; by: number }[],
+): Promise<boolean> {
+  if (!items.length) return false;
+  await ensureSchema();
+  const D = db();
+  const stmt = D.prepare(`SELECT avail FROM availability WHERE hotel_code=? AND room_type_id=? AND date=?`);
+  for (const i of items) {
+    const row = await stmt.bind(hotelCode, i.roomId, i.date).first<{ avail: number }>();
+    if ((row?.avail ?? 0) < i.by) return true;
+  }
+  return false;
+}
