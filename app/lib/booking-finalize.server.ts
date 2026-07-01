@@ -14,7 +14,7 @@ import {
 import { availabilityShortfall, decrementAvailability } from "./ari.server";
 import { pushOpenChannelBooking } from "./open-channel.server";
 import { refundBookingCharge } from "./refunds.server";
-import { sendBookingEmails } from "./email.server";
+import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
 import { dispatchWebhook } from "./webhooks.server";
@@ -130,6 +130,8 @@ export async function finalizeBooking(
     // not a discretionary cancellation). refundBookingCharge is idempotent + safe.
     const r = await refundBookingCharge(pid, record, { by: "auto (unavailable at booking)" });
     if (r.ok) record = r.booking;
+    // Tell the guest we couldn't confirm and have refunded them.
+    await sendBookingFailedEmail(pid, record, origin);
   }
   return record;
 }

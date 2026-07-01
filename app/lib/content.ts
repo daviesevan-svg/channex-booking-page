@@ -480,6 +480,11 @@ const HOST_TOKENS: TokenDef[] = [
   { token: "{guest_email}", desc: "Guest's email address" },
   { token: "{guest_phone}", desc: "Guest's phone number" },
 ];
+// The couldn't-confirm email has no manage link, but adds the refunded amount.
+const FAILED_TOKENS: TokenDef[] = [
+  ...GUEST_TOKENS.filter((t) => t.token !== "{manage_url}"),
+  { token: "{refund_amount}", desc: "Amount refunded to the guest, with currency" },
+];
 
 const emailFields = (o: { subject: string; heading: string; intro: string; outro: string }): PageField[] => [
   { key: "subject", label: "Subject line", default: o.subject },
@@ -538,6 +543,19 @@ export const EMAIL_TEMPLATES: EmailDef[] = [
       heading: "Booking cancelled",
       intro: "A guest has cancelled their booking. The cancelled reservation details are below.",
       outro: "",
+    }),
+  },
+  {
+    id: "booking_failed",
+    label: "Couldn't confirm (to guest)",
+    recipient: "guest",
+    tokens: FAILED_TOKENS,
+    fields: emailFields({
+      subject: "We couldn't confirm your booking at {hotel_name} ({reference})",
+      heading: "Sorry, {guest_first_name} — we couldn't confirm your booking",
+      intro:
+        "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. We've refunded {refund_amount} in full to your card — it can take a few days to appear.",
+      outro: "We're sorry for the disappointment. Please try different dates, and do reach out if we can help.",
     }),
   },
 ];
