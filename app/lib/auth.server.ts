@@ -143,16 +143,17 @@ export async function logout(request: Request) {
 
 // ---------- email delivery ----------
 /** Emails the magic link. Never returns it for on-screen display. Logs it to the
- *  server console in local dev (localhost APP_URL) so you can sign in without
- *  real email, and in any env when the send failed so ops can recover via logs —
- *  but never in normal production operation. */
+ *  server console only in a dev BUILD (import.meta.env.DEV — baked in at build
+ *  time, so a misconfigured prod env can't turn this on), or in any build when
+ *  the send actually failed so ops can recover a lockout via logs. A production
+ *  build with working email never logs the link. */
 export async function sendMagicLink(email: string, link: string): Promise<{ sent: boolean }> {
   const { sent } = await sendEmail({
     to: email,
     subject: "Your admin sign-in link",
     html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
   });
-  if (!sent || getConfig().appUrl.startsWith("http://localhost")) {
+  if (!sent || import.meta.env.DEV) {
     console.log(`[admin] magic link for ${email}: ${link}`);
   }
   return { sent };
