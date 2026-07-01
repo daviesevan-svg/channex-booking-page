@@ -385,25 +385,28 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                     }}
                   />
                   <span className="flex-1">
-                    <span className="flex items-baseline justify-between gap-2.5">
-                      <span className="text-[15.5px] font-semibold">
-                        {plan.title}
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block text-[15.5px] font-semibold">{plan.title}</span>
                         {plan.offer && (
-                          <span className="ml-2 rounded-full bg-[#ece6f0] px-2 py-0.5 align-middle text-[11px] font-semibold text-[#6b4f8a]">
+                          <span className="mt-1 inline-block rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
                             {plan.offer.name} −{plan.offer.percent}%
                           </span>
                         )}
                       </span>
-                      <span className="whitespace-nowrap text-[15.5px] font-semibold">
-                        {pr.hasOffer && (
-                          <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
-                            {formatMoney(pr.gross / nights, currency)}
-                          </span>
-                        )}
-                        {formatMoney(perNight, currency)} {tr.t("perNightInclTaxes")}
+                      <span className="flex-none text-right">
+                        <span className="block whitespace-nowrap text-[15.5px] font-semibold">
+                          {pr.hasOffer && (
+                            <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
+                              {formatMoney(pr.gross / nights, currency)}
+                            </span>
+                          )}
+                          {formatMoney(perNight, currency)}
+                        </span>
+                        <span className="block text-[11.5px] text-muted-2">{tr.t("perNightInclTaxes")}</span>
                       </span>
                     </span>
-                    <span className="mt-1 block text-[13px] leading-[1.45] text-muted">
+                    <span className="mt-1.5 block text-[13px] leading-[1.45] text-muted">
                       {rateNote(plan, tr)}
                     </span>
                   </span>
