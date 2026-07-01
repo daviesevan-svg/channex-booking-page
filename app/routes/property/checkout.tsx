@@ -3,6 +3,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { jsonLdHtml } from "~/lib/jsonld";
 import { z } from "zod";
 
 import type { Route } from "./+types/checkout";
@@ -603,7 +604,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
       {jsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <Link
         to={`/${params.channelId}/rooms?${searchParams.toString()}`}

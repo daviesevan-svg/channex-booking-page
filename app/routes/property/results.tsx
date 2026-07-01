@@ -4,6 +4,7 @@ import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { getBookingCutoff } from "~/lib/overrides.server";
 import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
+import { jsonLdHtml } from "~/lib/jsonld";
 
 import type { Route } from "./+types/results";
 import type { RoomWithRates } from "~/lib/channex/types";
@@ -453,7 +454,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
       {jsonLd && (
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
