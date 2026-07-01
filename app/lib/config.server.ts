@@ -45,12 +45,17 @@ export interface AppConfig extends ChannexConfig {
   providerCode?: string;
   /** Channex Open Channel new_booking webhook (staging vs production host). */
   openChannelBookingUrl: string;
-  /** Google Hotels ARI push host. Default https://www.google.com. */
+  /** Google Hotels ARI push host. Default https://www.google.com. In production,
+   *  point this at the static-egress-IP proxy (Google whitelists that one IP,
+   *  since Workers have no stable egress IP). */
   googleAriBaseUrl: string;
   /** Partner account key from the Google Hotel Center account, stamped on every
    *  ARI message. Auth is IP-whitelist based; this only identifies the account.
    *  Unset = ARI push can't run (surfaced in the admin). */
   googleAriPartnerKey?: string;
+  /** Shared secret sent as X-Ari-Proxy-Key when pushing via the egress proxy, so
+   *  the proxy isn't an open relay to Google. Unset = header omitted (direct push). */
+  googleAriProxyKey?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -94,6 +99,7 @@ export function getConfig(): AppConfig {
     ),
     googleAriBaseUrl: read("GOOGLE_ARI_BASE_URL", "https://www.google.com").replace(/\/+$/, ""),
     googleAriPartnerKey: read("GOOGLE_ARI_PARTNER_KEY") || undefined,
+    googleAriProxyKey: read("GOOGLE_ARI_PROXY_KEY") || undefined,
   };
 }
 

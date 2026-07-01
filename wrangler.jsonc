@@ -19,8 +19,10 @@
 	//    same-named secret. Keep these OUT of this file:
 	//      SESSION_SECRET, SPARKPOST_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 	//      STRIPE_CONNECT_CLIENT_ID, STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY,
-	//      GOOGLE_MAP_KEY, GOOGLE_ARI_PARTNER_KEY, GROUP_ID, and ADMIN_EMAILS /
-	//      SUPERADMIN_EMAILS (this repo is public, so admin emails stay in the dashboard).
+	//      GOOGLE_MAP_KEY, GOOGLE_ARI_PARTNER_KEY, GOOGLE_ARI_PROXY_KEY, GROUP_ID, and
+	//      ADMIN_EMAILS / SUPERADMIN_EMAILS (this repo is public, so admin emails stay
+	//      in the dashboard). GOOGLE_ARI_BASE_URL is a dashboard var (points at the
+	//      egress proxy in prod) — see the `vars` note below.
 	//
 	//  NOTE: deploy with `npm run deploy` (it builds first). A bare `wrangler deploy`
 	//  ships a stale build snapshot and won't pick up changes here.
@@ -37,9 +39,11 @@
 		"SPARKPOST_API_URL": "https://api.eu.sparkpost.com",
 		// Channex Open Channel: our provider code + outbound new_booking webhook.
 		"PROVIDER_CODE": "RoomPanda",
-		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking",
-		// Google Hotels ARI push host (non-secret). The partner key is a dashboard secret.
-		"GOOGLE_ARI_BASE_URL": "https://www.google.com"
+		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking"
+		// GOOGLE_ARI_BASE_URL is intentionally NOT pinned here: in prod it points at
+		// the static-egress-IP proxy (see ari-proxy/README.md) and is set in the
+		// dashboard. Pinning it would clobber that override on every deploy. Unset
+		// falls back to https://www.google.com (see config.server.ts).
 	},
 	// Per-property content overrides edited in the admin. Create the namespace for
 	// production with `wrangler kv namespace create CONFIG` and paste the id here.
