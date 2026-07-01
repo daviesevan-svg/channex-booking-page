@@ -321,11 +321,20 @@ function CartPanel({
           {lines.map((l, i) => (
             <div key={`${l.roomId}-${l.rateId}-${i}`} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-[14.5px] font-semibold">{l.roomTitle}</div>
-                <div className="text-[12.5px] text-muted-2">
-                  {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
-                  {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
-                </div>
+                <Link
+                  to={`/${channelId}/rooms/${l.roomId}?edit=${i}&${qs}`}
+                  className="group block"
+                  title={tr.t("updateRoom")}
+                >
+                  <div className="truncate text-[14.5px] font-semibold group-hover:text-accent">
+                    {l.roomTitle}
+                  </div>
+                  <div className="text-[12.5px] text-muted-2">
+                    {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
+                    {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
+                    <span className="ml-1 text-[11px] text-accent">✎</span>
+                  </div>
+                </Link>
                 <Link
                   to={`/${channelId}/extras?line=${i}&${qs}`}
                   className="mt-1 inline-block text-[12.5px] font-semibold text-accent hover:underline"

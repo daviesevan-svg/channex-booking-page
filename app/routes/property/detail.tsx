@@ -12,7 +12,7 @@ import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
-import { addLine, parseCart, serializeCart } from "~/lib/cart";
+import { addLine, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { occupancyNightlyDelta } from "~/lib/rate-pricing";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -52,19 +52,36 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // searched party, so adding a 2nd room auto-fills the remainder. Capacity comes
   // from the room type.
   const { maxAdults, capacity } = roomCapacity(room);
+  const cart = parseCart(url.searchParams);
+  // Edit mode: the guest clicked an already-selected room to change it. Valid
+  // only when the index exists and points at THIS room.
+  const editRaw = url.searchParams.get("edit");
+  const editIndex =
+    editRaw != null && /^\d+$/.test(editRaw) && cart[Number(editRaw)]?.roomId === params.roomId
+      ? Number(editRaw)
+      : null;
+  const editLine = editIndex != null ? cart[editIndex] : null;
+
   let assignedAdults = 0;
   const assignedChildren: number[] = [];
-  for (const l of parseCart(url.searchParams)) {
+  cart.forEach((l, idx) => {
+    if (idx === editIndex) return; // re-choosing this line — don't count it as already assigned
     assignedAdults += l.adults ?? adults;
     for (const a of l.childrenAge ?? childrenAge) assignedChildren.push(a);
-  }
+  });
   const childrenPool = [...childrenAge];
   for (const a of assignedChildren) {
     const i = childrenPool.indexOf(a);
     if (i >= 0) childrenPool.splice(i, 1);
   }
-  const defaultAdults = Math.min(maxAdults, Math.max(1, adults - assignedAdults));
-  const defaultChildrenCount = Math.min(childrenPool.length, Math.max(0, capacity - defaultAdults));
+  // Editing: pre-fill from the line's current occupancy. Otherwise: the still-
+  // unassigned slice of the searched party.
+  const defaultAdults = editLine
+    ? Math.min(maxAdults, Math.max(1, editLine.adults ?? adults))
+    : Math.min(maxAdults, Math.max(1, adults - assignedAdults));
+  const defaultChildrenCount = editLine
+    ? Math.min(childrenPool.length, editLine.childrenAge?.length ?? 0)
+    : Math.min(childrenPool.length, Math.max(0, capacity - defaultAdults));
 
   const party = partySize({ adults, childrenAge });
   // All-in (tax-/fee-inclusive) price for the searched party — matches the headline
@@ -104,6 +121,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     defaultAdults,
     defaultChildrenCount,
     childrenPool,
+    editIndex,
+    editRateId: editLine?.rateId ?? null,
     text,
     query: { checkin, checkout, currency, adults },
   };
@@ -153,7 +172,7 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
 type DetailRate = RoomWithRates["ratePlans"][number];
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
-  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, text, jsonLd, taxConfig, cleaningFee, query } = loaderData;
+  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -164,7 +183,12 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const qs = searchParams.toString();
 
   const ratePlans = ratePlansForParty(room, party);
-  const [selectedRate, setSelectedRate] = useState(ratePlans[0]?.id);
+  // When editing an existing selection, pre-select its rate (match by id or the
+  // stable parent rate id); otherwise the first rate.
+  const initialRate =
+    (editRateId && ratePlans.find((r) => r.id === editRateId || r.parentRatePlanId === editRateId)?.id) ||
+    ratePlans[0]?.id;
+  const [selectedRate, setSelectedRate] = useState(initialRate);
   const chosen = ratePlans.find((r) => r.id === selectedRate) ?? ratePlans[0];
 
   // Per-room occupancy the guest is booking (defaults to the unassigned party).
@@ -215,23 +239,26 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
   function addToStay() {
     if (!chosen) return;
-    const lines = addLine(parseCart(searchParams), {
+    const cart = parseCart(searchParams);
+    const line = {
       roomId: room.id,
       rateId: chosen.id,
       adults,
       childrenAge: childrenAges.length ? childrenAges : undefined,
-    });
-    const newIndex = lines.length - 1;
-    // Keep the per-line extras buckets aligned with the cart, then send the guest
-    // to that room's "enhance" step (it redirects straight to results if there's
-    // nothing to offer for this room).
-    const state = addExtrasLine(parseExtrasState(searchParams));
+    };
+    // Editing replaces the line in place (keeping its extras bucket); a fresh
+    // selection appends and opens a new extras bucket.
+    const lines = editIndex != null ? replaceIndex(cart, editIndex, line) : addLine(cart, line);
+    const targetIndex = editIndex ?? lines.length - 1;
+    const state = editIndex != null ? parseExtrasState(searchParams) : addExtrasLine(parseExtrasState(searchParams));
     const next = new URLSearchParams(searchParams);
+    next.delete("edit");
     next.set("sel", serializeCart(lines));
     const xt = serializeExtrasState(state);
     if (xt) next.set("xt", xt);
     else next.delete("xt");
-    navigate(`/${params.channelId}/extras?line=${newIndex}&${next.toString()}`);
+    // The extras step redirects straight to results when the room has no add-ons.
+    navigate(`/${params.channelId}/extras?line=${targetIndex}&${next.toString()}`);
   }
 
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
@@ -441,7 +468,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             disabled={adding}
             className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
-            {adding ? "Adding…" : text.addButton}
+            {adding ? "…" : editIndex != null ? tr.t("updateRoom") : text.addButton}
           </button>
         </div>
       </div>

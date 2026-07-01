@@ -55,6 +55,12 @@ export function removeIndex(lines: CartLine[], index: number): CartLine[] {
   return lines.filter((_, i) => i !== index);
 }
 
+/** Replace a line in place (editing an already-selected room). */
+export function replaceIndex(lines: CartLine[], index: number, line: CartLine): CartLine[] {
+  if (index < 0 || index >= lines.length) return lines;
+  return lines.map((l, i) => (i === index ? line : l));
+}
+
 export interface ResolvedLine extends CartLine {
   roomTitle: string;
   rateTitle: string;
