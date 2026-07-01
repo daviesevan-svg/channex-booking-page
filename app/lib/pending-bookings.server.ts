@@ -22,6 +22,9 @@ export interface PendingBooking {
   origin: string;
 }
 
+// 3 hours. Must exceed the Checkout Session's expires_at (60 min, set in
+// checkout.tsx) plus webhook/return processing margin, so a completed payment
+// always finds its pending record. NOT 3 seconds — 3 * 3600 = 10,800s.
 const TTL_SECONDS = 3 * 3600;
 const key = (ref: string) => `pending_booking:${ref}`;
 
