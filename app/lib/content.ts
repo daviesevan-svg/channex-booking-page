@@ -227,15 +227,10 @@ export interface SiteSettings {
   /** Master switch: push this property's ARI (property data, rates, availability,
    *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */
   googleAriPush?: boolean;
-  /** How many days ahead of today to push availability/rates for. Default 365. */
+  /** How many days ahead of today to push availability/rates for. Default 365.
+   *  (The last-sync status lives in its own KV key — see GoogleAriSyncStatus in
+   *  overrides.server — so automated status writes can't clobber settings.) */
   googleAriWindowDays?: number;
-  /** Outcome of the last push, surfaced in the admin so operators see failures. */
-  googleAriLastSync?: {
-    /** ISO timestamp of the push. */
-    at: string;
-    /** Per-message result (property_data / rates / avail / inventory / taxes / promotions). */
-    results: { kind: string; ok: boolean; detail: string }[];
-  };
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */

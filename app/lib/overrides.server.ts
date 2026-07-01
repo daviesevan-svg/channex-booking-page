@@ -375,13 +375,27 @@ export async function saveGoogleAriSettings(
   return next;
 }
 
+/** Per-property Google ARI last-sync status. Kept in its OWN KV key — never
+ *  merged into settings: these writes fire from automated contexts (the cron
+ *  sweep and every Channex change webhook), and a read-modify-write of the
+ *  settings object there would race admin saves and silently drop fields (the
+ *  classic single-KV-key clobber). Racing against itself is harmless — it's
+ *  display-only status. */
+export interface GoogleAriSyncStatus {
+  /** ISO timestamp of the push. */
+  at: string;
+  /** Per-message result (property_data / rate / avail / inventory / taxes / promotions). */
+  results: { kind: string; ok: boolean; detail: string }[];
+}
+const googleAriSyncKey = (pid: string) => `google_ari_sync:${pid}`;
+
 /** Record the outcome of a Google ARI push so the admin can show last-sync state. */
-export async function recordGoogleAriSync(
-  pid: string,
-  lastSync: NonNullable<SiteSettings["googleAriLastSync"]>,
-): Promise<void> {
-  const existing = await getSettings(pid);
-  await writeJson(settingsKey(pid), { ...existing, googleAriLastSync: lastSync });
+export async function recordGoogleAriSync(pid: string, status: GoogleAriSyncStatus): Promise<void> {
+  await writeJson(googleAriSyncKey(pid), status);
+}
+
+export async function getGoogleAriSync(pid: string): Promise<GoogleAriSyncStatus | null> {
+  return readJson<GoogleAriSyncStatus>(googleAriSyncKey(pid));
 }
 
 /** Set/clear the property's connected Stripe account (merge-style). Passing
