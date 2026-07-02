@@ -11,7 +11,8 @@ import {
   type PaymentInfo,
 } from "./bookings.server";
 import { availabilityShortfall, decrementAvailability } from "./ari.server";
-import { pushOpenChannelBooking } from "./open-channel.server";
+import { pushOpenChannelBooking, pushOpenChannelCancellation } from "./open-channel.server";
+import { getConfig } from "./config.server";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
@@ -116,9 +117,10 @@ export async function finalizeBooking(
     status,
     channexId,
     error,
-    // Keep the payload for a retry only on a (possibly transient) push failure —
-    // never when the rooms are gone, since a retry can't recover sold inventory.
-    channexPayload: status === "failed" && !unavailable ? channexPayload : undefined,
+    // Keep the payload: on a (transient) push failure so an admin can retry, and
+    // on a confirmed live booking so we can re-send it as a cancellation revision.
+    // Only drop it when the rooms were gone (a retry can't recover sold inventory).
+    channexPayload: unavailable ? undefined : channexPayload,
     inventoryHeld: status !== "failed",
     payment,
   };
@@ -157,7 +159,7 @@ export async function retryChannexPush(
       status: "confirmed",
       channexId,
       error: undefined,
-      channexPayload: undefined,
+      // Keep the payload — a now-live booking may still need a cancellation push.
       inventoryHeld: true,
     });
     const finalBooking = updated ?? booking;
@@ -169,5 +171,36 @@ export async function retryChannexPush(
     const error = e instanceof Error ? e.message : "Channex rejected the booking.";
     await updateBooking(pid, booking.id, { error });
     return { ok: false, reason: "push_failed", error };
+  }
+}
+
+/** Push a cancellation to Channex for a booking that was pushed live (has a
+ *  channexId), so the hotel's PMS doesn't keep an active reservation after the
+ *  guest has been cancelled/refunded. Best-effort: re-sends the original payload
+ *  as a "cancelled" revision (falling back to a minimal one), never throws. */
+export async function cancelChannexBooking(pid: string, booking: BookingRecord): Promise<void> {
+  if (!booking.channexId) return; // never pushed live — nothing upstream to cancel
+  const cfg = getConfig();
+  const base =
+    booking.channexPayload && typeof booking.channexPayload === "object"
+      ? (booking.channexPayload as Record<string, unknown>)
+      : {
+          provider_code: cfg.providerCode,
+          hotel_code: pid,
+          ota_name: cfg.providerCode || "Direct",
+          reservation_id: booking.reference,
+          currency: booking.currency,
+          arrival_date: booking.checkin,
+          departure_date: booking.checkout,
+          customer: {
+            name: booking.guest.firstName,
+            surname: booking.guest.lastName,
+            mail: booking.guest.email,
+            phone: booking.guest.phone,
+          },
+        };
+  const res = await pushOpenChannelCancellation({ ...base, status: "cancelled" });
+  if (!res.ok) {
+    console.log(`[open-channel] cancellation push failed for ${booking.reference}: ${res.error}`);
   }
 }
