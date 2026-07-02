@@ -403,7 +403,10 @@ export async function getCalendarAvailability(
       const avail = inv.availability[`${room.id}|${date}`] ?? 0;
       if (avail <= 0) continue; // no inventory set = not bookable
       for (const rt of roomRates) {
-        const r = inv.restrictions[`${rt.id}|${date}`];
+        // getInventory keys restrictions by room|rate|date (see ari.server.ts) —
+        // the old rate|date key never matched, so the calendar showed stop-sell/
+        // CTA/CTD/min-stay dates as open. Match the booking gate's key exactly.
+        const r = inv.restrictions[`${room.id}|${rt.id}|${date}`];
         if (r?.stopSell) continue; // rate not bookable this day
         bookable = true;
         minStay = Math.min(minStay, r?.minStay || 1);
