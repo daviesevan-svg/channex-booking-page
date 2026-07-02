@@ -40,6 +40,7 @@ export default [
     route("general", "routes/admin/general.tsx"),
     route("connectivity", "routes/admin/connectivity.tsx"),
     route("google-hotels", "routes/admin/google-hotels.tsx"),
+    route("website-widget", "routes/admin/website-widget.tsx"),
     route("payments", "routes/admin/payments.tsx"),
     route("payments/callback", "routes/admin/payments.callback.tsx"),
     route("api-keys", "routes/admin/api-keys.tsx"),
@@ -59,6 +60,13 @@ export default [
     route("emails/:template", "routes/admin/email.tsx"),
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),
+  ]),
+
+  // Embeddable booking widget for hotels' own sites: a public loader script +
+  // a bare, theme-only date-picker page (no ARI — deep-links into the flow).
+  route("embed.js", "routes/embed.script.tsx"),
+  route("embed/:channelId", "routes/embed.$channelId.tsx", [
+    index("routes/embed.$channelId._index.tsx"),
   ]),
 
   // Guest booking flow
