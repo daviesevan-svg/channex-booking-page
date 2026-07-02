@@ -126,6 +126,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
   if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
 
+  const settings = await getSettings(params.channelId);
+  // Currency is the property's configured currency — NEVER the URL param. There
+  // is no conversion anywhere, so a spoofed ?currency= would just re-denominate
+  // the same number at checkout (pay ¥500 for a £500 room).
+  stay.currency = settings.currency || "GBP";
+
   const lang = langFromRequest(request);
   const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
@@ -135,7 +141,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   const text = await getPageText(params.channelId, "checkout", lang);
   const totals = cartCoverage(lines);
-  const settings = await getSettings(params.channelId);
   // The automatic offer (if any) is already baked into the line totals; derive
   // it for the itemised breakdown and each line's pre-discount price.
   const { offer, originalSubtotal, lines: linesView } = deriveOffer(lines);
@@ -216,6 +221,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
   if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
 
+  // Currency is the property's, never the URL (see loader) — this is the charge
+  // path, so the guard matters most here.
+  const settings = await getSettings(stay.channelId);
+  stay.currency = settings.currency || "GBP";
+
   const form = await request.formData();
   const intent = String(form.get("intent") || "book");
   const promoCode = String(form.get("promoCode") || "");
@@ -252,8 +262,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const g = parsed.data;
   const config = getConfig();
   // Live vs test booking is controlled from admin General settings; an unsaved
-  // setting falls back to the ALLOW_LIVE_BOOKING env var.
-  const settings = await getSettings(stay.channelId);
+  // setting falls back to the ALLOW_LIVE_BOOKING env var. (settings loaded above.)
   // Push to Channex only when the property has selected it as its connectivity;
   // otherwise simulate, even in live mode (there's nothing to push to).
   const live =

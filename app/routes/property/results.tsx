@@ -41,7 +41,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
-  const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
   const lang = langFromRequest(request);
 
@@ -51,6 +50,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) {
     throw redirect(`/${params.channelId}`);
   }
+
+  // Currency is the property's, not the URL param — there's no conversion, so a
+  // spoofed ?currency= would only mislabel prices (and the charge; see checkout).
+  const settings = await getSettings(params.channelId);
+  const currency = settings.currency || "GBP";
 
   const rooms = await getCatalogRooms(
     params.channelId,
@@ -79,7 +83,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Tax-/fee-inclusive (all-in) total per rate, so the headline price matches the
   // checkout total and the Google structured data. Computed once here and shown
   // both on the card and in the JSON-LD below.
-  const taxConfig = taxConfigFrom(await getSettings(params.channelId));
+  const taxConfig = taxConfigFrom(settings);
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const allIn = (base: number, cleaningFee: number) =>
     r2(

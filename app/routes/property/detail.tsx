@@ -25,11 +25,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
-  const currency = url.searchParams.get("currency") || "GBP";
   const { adults, childrenAge } = readOccupancy(url.searchParams);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
   if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+
+  // Currency is the property's, not the URL param (no conversion exists).
+  const settings = await getSettings(params.channelId);
+  const currency = settings.currency || "GBP";
 
   const lang = langFromRequest(request);
   const rooms = await getCatalogRooms(
@@ -88,7 +91,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // All-in (tax-/fee-inclusive) price for the searched party — matches the headline
   // shown to the guest and the checkout total. Also passed to the client so the
   // live occupancy re-price stays all-in.
-  const taxConfig = taxConfigFrom(await getSettings(params.channelId));
+  const taxConfig = taxConfigFrom(settings);
   const allIn = (base: number) =>
     Math.round(
       computePricing(

@@ -106,7 +106,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const { checkin, checkout } = body;
-  const currency = (body.currency || "GBP").toUpperCase();
+  // Currency is the property's configured currency — never client input. There's
+  // no conversion, so trusting body.currency would just re-denominate the charge.
+  const settings = await getSettings(pid);
+  const currency = (settings.currency || "GBP").toUpperCase();
   if (!isStayBookable(checkin, checkout)) return apiError(422, "invalid_request", "Check-out must be after check-in, in the future.");
   if (isTooLastMinute(checkin, await getBookingCutoff(pid))) return apiError(422, "invalid_request", "Check-in is within the booking cut-off window.");
 
@@ -124,7 +127,6 @@ export async function action({ request }: Route.ActionArgs) {
     return apiError(422, "unavailable", "One or more of the requested rooms/rates is not available for those dates or occupancy.");
   }
 
-  const settings = await getSettings(pid);
   const config = getConfig();
   const nights = Math.max(1, Math.round((Date.parse(checkout) - Date.parse(checkin)) / 86400000));
   const reference = generateReference();
