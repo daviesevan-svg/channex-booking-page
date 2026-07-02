@@ -63,8 +63,14 @@ function read(key: string, fallback = ""): string {
   return value ?? fallback;
 }
 
+// The placeholder used when SESSION_SECRET is unset. It's published in this
+// public repo, so it must NEVER sign real sessions/tokens/API-key hashes — a
+// production deploy that forgot the secret would be trivially forgeable. We fail
+// closed in a prod build (below); dev keeps working with the placeholder.
+const DEFAULT_SESSION_SECRET = "insecure-default-change-me-via-SESSION_SECRET";
+
 export function getConfig(): AppConfig {
-  return {
+  const config: AppConfig = {
     apiUrl: read("CHANNEX_API_URL", "https://app.channex.io"),
     channelCode: read("CHANNEL_CODE"),
     groupId: read("GROUP_ID") || undefined,
@@ -81,7 +87,7 @@ export function getConfig(): AppConfig {
       .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
     // Never empty: an empty HMAC key throws in the Workers runtime.
-    sessionSecret: read("SESSION_SECRET") || "insecure-default-change-me-via-SESSION_SECRET",
+    sessionSecret: read("SESSION_SECRET") || DEFAULT_SESSION_SECRET,
     appUrl: read("APP_URL", "http://localhost:5173"),
     stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
     stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
@@ -101,6 +107,14 @@ export function getConfig(): AppConfig {
     googleAriPartnerKey: read("GOOGLE_ARI_PARTNER_KEY") || undefined,
     googleAriProxyKey: read("GOOGLE_ARI_PROXY_KEY") || undefined,
   };
+  // Fail closed: a production build must never sign with the public default
+  // secret. (Dev builds keep the placeholder so local dev needs no setup.)
+  if (import.meta.env.PROD && config.sessionSecret === DEFAULT_SESSION_SECRET) {
+    throw new Error(
+      "SESSION_SECRET is not set. Refusing to run in production with the public default secret — set SESSION_SECRET as a Cloudflare secret.",
+    );
+  }
+  return config;
 }
 
 /** Convenience: a Channex client built from runtime config. */

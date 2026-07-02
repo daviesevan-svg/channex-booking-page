@@ -135,18 +135,27 @@ export async function hasAnySuperadmin(): Promise<boolean> {
   return hasStoredSuperadmin();
 }
 
-/** Effective superadmin check. No-lockout bootstrap: while NO superadmin exists
- *  anywhere, every signed-in user is treated as a superadmin (mirrors the
- *  "empty ADMIN_EMAILS = open" posture) so a fresh deploy is never locked out. */
 export async function isSuperadmin(email: string): Promise<boolean> {
   const { superadminEmails } = getConfig();
   if (superadminEmails.includes(norm(email))) return true;
   const u = await getUser(email);
-  if (u?.role === "superadmin") return true;
-  // Bootstrap only applies when no env superadmin is configured at all — this is
-  // the only path that scans all users, and it stops once a superadmin exists.
-  if (superadminEmails.length === 0 && !(await hasStoredSuperadmin())) return true;
-  return false;
+  return u?.role === "superadmin";
+}
+
+/** Lockout-safe bootstrap: if no superadmin exists yet (none in SUPERADMIN_EMAILS
+ *  and none stored), the FIRST person to sign in claims the role. Previously
+ *  isSuperadmin() returned true for *everyone* during that window — on an
+ *  open-signup deploy that made any visitor a superadmin. Now exactly one account
+ *  is bootstrapped and everyone after is a member. Called on sign-in. */
+export async function claimSuperadminIfUnclaimed(email: string): Promise<void> {
+  const { superadminEmails } = getConfig();
+  if (superadminEmails.length > 0) return; // an env superadmin owns bootstrap
+  if (await hasStoredSuperadmin()) return; // already claimed
+  const kv = getConfigKV();
+  if (!kv) return;
+  const existing = await getUser(email);
+  const user: User = { email: norm(email), role: "superadmin", createdAt: existing?.createdAt ?? Date.now() };
+  await kv.put(userKey(email), JSON.stringify(user));
 }
 
 /** True if this user's superadmin status comes from the env list (can't be
