@@ -3,8 +3,7 @@
 // Stripe return URL + webhook. Idempotent by reference so the return URL and the
 // webhook can't both create the booking.
 import {
-  getBookings,
-  recordBooking,
+  claimBooking,
   stayAvailabilityItems,
   updateBooking,
   type BookingRecord,
@@ -77,8 +76,12 @@ export async function finalizeBooking(
 ): Promise<BookingRecord> {
   const { pid, record: draft, channexPayload, live } = pending;
 
-  const existing = (await getBookings(pid)).find((b) => b.reference === draft.reference);
-  if (existing) return existing; // idempotent — already finalized by the other path
+  // Atomically claim the reference. Only the winner proceeds to the side effects
+  // below (Channex push, inventory, emails); a concurrent finalize (Stripe return
+  // URL vs webhook) loses the claim and returns the existing record untouched.
+  const provisional: BookingRecord = { ...draft, status: "simulated", inventoryHeld: false, payment };
+  const claim = await claimBooking(pid, provisional);
+  if (!claim.won) return claim.existing ?? provisional;
 
   let status: BookingStatus = "simulated";
   let channexId: string | undefined;
@@ -108,8 +111,8 @@ export async function finalizeBooking(
     }
   }
 
-  let record: BookingRecord = {
-    ...draft,
+  // Persist the final state onto the row we claimed above.
+  const patch: Partial<BookingRecord> = {
     status,
     channexId,
     error,
@@ -119,7 +122,7 @@ export async function finalizeBooking(
     inventoryHeld: status !== "failed",
     payment,
   };
-  await recordBooking(pid, record);
+  let record: BookingRecord = (await updateBooking(pid, draft.id, patch)) ?? { ...provisional, ...patch };
 
   if (status !== "failed") {
     await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));

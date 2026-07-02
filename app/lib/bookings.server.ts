@@ -3,7 +3,7 @@ import { addDays, format, parseISO } from "date-fns";
 import type { CancellationSnapshot } from "./policy.server";
 import type { AppliedPromo } from "./promotions";
 import type { ResolvedExtra } from "./extras";
-import { getConfigKV } from "./config.server";
+import { getConfigKV, getDB } from "./config.server";
 
 /** Per-(room, night) availability units a stay occupies — for decrement on
  *  booking and restore on cancel. */
@@ -118,8 +118,46 @@ export interface BookingRecord {
   };
 }
 
+// Bookings live in D1 (atomic writes + immediate consistency), NOT a single KV
+// key. The old KV list was read-modify-write, so concurrent finalizes (the
+// Stripe return URL and the webhook) could double-write or lose a paid record.
+// D1 lets us claim a reference atomically = finalize-once (see claimBooking).
 const bookingsKey = (pid: string) => `bookings:${pid}`;
-const MAX_RECORDS = 500;
+
+function db(): D1Database {
+  const d = getDB();
+  if (!d) throw new Error("D1 database (binding DB) is not configured.");
+  return d;
+}
+
+let schemaReady = false;
+async function ensureBookingSchema(): Promise<void> {
+  if (schemaReady) return;
+  await db()
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS booking (
+        pid TEXT NOT NULL, id TEXT NOT NULL, reference TEXT NOT NULL,
+        email TEXT NOT NULL, created_at TEXT NOT NULL,
+        lifecycle TEXT NOT NULL DEFAULT 'active', json TEXT NOT NULL,
+        PRIMARY KEY (pid, id)
+      )`,
+    )
+    .run();
+  await db()
+    .prepare(`CREATE UNIQUE INDEX IF NOT EXISTS booking_ref ON booking(pid, reference)`)
+    .run();
+  await db().prepare(`CREATE INDEX IF NOT EXISTS booking_email ON booking(pid, email)`).run();
+  schemaReady = true;
+}
+
+type Row = { json: string };
+const parseRows = (rows: Row[]): BookingRecord[] =>
+  rows.map((r) => JSON.parse(r.json) as BookingRecord);
+
+/** The indexed columns extracted from a record (the full record is stored as JSON). */
+function rowValues(pid: string, r: BookingRecord): [string, string, string, string, string, string, string] {
+  return [pid, r.id, r.reference, norm(r.guest.email), r.createdAt, r.lifecycle ?? "active", JSON.stringify(r)];
+}
 
 // Crockford base32 (no I/L/O/U) — unambiguous when read aloud or typed.
 const REF_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -135,29 +173,62 @@ export function generateReference(len = 8): string {
   return out;
 }
 
-export async function getBookings(pid: string): Promise<BookingRecord[]> {
+const norm = (s: string) => s.trim().toLowerCase();
+
+// One-time backfill of any legacy KV bookings into D1, per property per isolate.
+const migrated = new Set<string>();
+async function migrateFromKv(pid: string): Promise<void> {
+  if (migrated.has(pid)) return;
+  migrated.add(pid);
   const kv = getConfigKV();
-  if (!kv) return [];
+  if (!kv) return;
   const raw = await kv.get(bookingsKey(pid));
-  if (!raw) return [];
+  if (!raw) return;
   try {
     const arr = JSON.parse(raw) as BookingRecord[];
-    return Array.isArray(arr) ? arr : [];
+    if (Array.isArray(arr) && arr.length) {
+      const stmt = db().prepare(
+        `INSERT INTO booking (pid,id,reference,email,created_at,lifecycle,json)
+         VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+      );
+      const binds = arr.map((r) => stmt.bind(...rowValues(pid, r)));
+      for (let i = 0; i < binds.length; i += 100) await db().batch(binds.slice(i, i + 100));
+    }
+    await kv.delete(bookingsKey(pid)); // migrated — D1 is now authoritative
   } catch {
-    return [];
+    migrated.delete(pid); // let a later call retry
   }
 }
 
-export async function getBooking(pid: string, id: string): Promise<BookingRecord | undefined> {
-  return (await getBookings(pid)).find((b) => b.id === id);
+/** Schema + legacy migration guard run before every op. */
+async function ready(pid: string): Promise<void> {
+  await ensureBookingSchema();
+  await migrateFromKv(pid);
 }
 
-const norm = (s: string) => s.trim().toLowerCase();
+export async function getBookings(pid: string): Promise<BookingRecord[]> {
+  await ready(pid);
+  const { results } = await db()
+    .prepare(`SELECT json FROM booking WHERE pid=? ORDER BY created_at DESC, rowid DESC`)
+    .bind(pid)
+    .all<Row>();
+  return parseRows(results ?? []);
+}
+
+export async function getBooking(pid: string, id: string): Promise<BookingRecord | undefined> {
+  await ready(pid);
+  const row = await db().prepare(`SELECT json FROM booking WHERE pid=? AND id=?`).bind(pid, id).first<Row>();
+  return row ? (JSON.parse(row.json) as BookingRecord) : undefined;
+}
 
 /** All bookings made with a given email (newest first). */
 export async function getBookingsByEmail(pid: string, email: string): Promise<BookingRecord[]> {
-  const e = norm(email);
-  return (await getBookings(pid)).filter((b) => norm(b.guest.email) === e);
+  await ready(pid);
+  const { results } = await db()
+    .prepare(`SELECT json FROM booking WHERE pid=? AND email=? ORDER BY created_at DESC, rowid DESC`)
+    .bind(pid, norm(email))
+    .all<Row>();
+  return parseRows(results ?? []);
 }
 
 /** Airline-style lookup: a booking matching both reference and email. */
@@ -166,21 +237,52 @@ export async function findBookingByRefAndEmail(
   reference: string,
   email: string,
 ): Promise<BookingRecord | undefined> {
-  const ref = norm(reference);
-  const e = norm(email);
-  return (await getBookings(pid)).find(
-    (b) => norm(b.reference) === ref && norm(b.guest.email) === e,
-  );
+  await ready(pid);
+  // References are uppercase base32; match case-insensitively via the stored form.
+  const row = await db()
+    .prepare(`SELECT json FROM booking WHERE pid=? AND reference=? AND email=?`)
+    .bind(pid, reference.trim().toUpperCase(), norm(email))
+    .first<Row>();
+  return row ? (JSON.parse(row.json) as BookingRecord) : undefined;
 }
 
-/** Prepend a booking record (newest first), capped to the most recent MAX_RECORDS. */
+/** Insert a booking. Overwrites any existing row with the same id (upsert). */
 export async function recordBooking(pid: string, record: BookingRecord): Promise<void> {
-  const kv = getConfigKV();
-  if (!kv) return;
-  const arr = await getBookings(pid);
-  arr.unshift(record);
-  if (arr.length > MAX_RECORDS) arr.length = MAX_RECORDS;
-  await kv.put(bookingsKey(pid), JSON.stringify(arr));
+  await ready(pid);
+  await db()
+    .prepare(
+      `INSERT INTO booking (pid,id,reference,email,created_at,lifecycle,json)
+       VALUES (?,?,?,?,?,?,?)
+       ON CONFLICT(pid,id) DO UPDATE SET
+         reference=excluded.reference, email=excluded.email, created_at=excluded.created_at,
+         lifecycle=excluded.lifecycle, json=excluded.json`,
+    )
+    .bind(...rowValues(pid, record))
+    .run();
+}
+
+/** Atomically claim a booking's reference. INSERTs the record iff no booking with
+ *  that reference exists yet, returning whether we won. This is the finalize-once
+ *  latch: only the winner runs the side effects (Channex push, inventory, email),
+ *  so the Stripe return URL and webhook can both call finalize safely. */
+export async function claimBooking(
+  pid: string,
+  record: BookingRecord,
+): Promise<{ won: true } | { won: false; existing: BookingRecord | undefined }> {
+  await ready(pid);
+  const res = await db()
+    .prepare(
+      `INSERT INTO booking (pid,id,reference,email,created_at,lifecycle,json)
+       VALUES (?,?,?,?,?,?,?) ON CONFLICT DO NOTHING`,
+    )
+    .bind(...rowValues(pid, record))
+    .run();
+  if (res.meta.changes === 1) return { won: true };
+  const existing = await db()
+    .prepare(`SELECT json FROM booking WHERE pid=? AND reference=?`)
+    .bind(pid, record.reference)
+    .first<Row>();
+  return { won: false, existing: existing ? (JSON.parse(existing.json) as BookingRecord) : undefined };
 }
 
 /** Patch a stored booking by id. Returns the updated record, or undefined. */
@@ -189,12 +291,15 @@ export async function updateBooking(
   id: string,
   patch: Partial<BookingRecord>,
 ): Promise<BookingRecord | undefined> {
-  const kv = getConfigKV();
-  if (!kv) return undefined;
-  const arr = await getBookings(pid);
-  const i = arr.findIndex((b) => b.id === id);
-  if (i === -1) return undefined;
-  arr[i] = { ...arr[i], ...patch };
-  await kv.put(bookingsKey(pid), JSON.stringify(arr));
-  return arr[i];
+  await ready(pid);
+  const current = await getBooking(pid, id);
+  if (!current) return undefined;
+  const next = { ...current, ...patch };
+  await db()
+    .prepare(
+      `UPDATE booking SET reference=?, email=?, created_at=?, lifecycle=?, json=? WHERE pid=? AND id=?`,
+    )
+    .bind(next.reference, norm(next.guest.email), next.createdAt, next.lifecycle ?? "active", JSON.stringify(next), pid, id)
+    .run();
+  return next;
 }
