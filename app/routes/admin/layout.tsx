@@ -79,7 +79,12 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           </div>
           <div className="flex items-center gap-5 text-[13px] text-muted">
             {properties.length > 0 && (
-              <Form method="post" action="/admin/select-property" className="flex items-center gap-1.5">
+              // reloadDocument: switching property does a full-page reload, so the
+              // whole admin re-renders from fresh SSR under the new property. A
+              // client-side navigation could leave the page showing the old
+              // property (stale uncontrolled inputs, or the Set-Cookie racing
+              // revalidation); a document reload is deterministic across envs.
+              <Form method="post" action="/admin/select-property" reloadDocument className="flex items-center gap-1.5">
                 <input type="hidden" name="redirectTo" value={pathname} />
                 <select
                   name="propertyId"
