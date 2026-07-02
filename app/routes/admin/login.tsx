@@ -50,13 +50,17 @@ export default function Login({ actionData }: Route.ComponentProps) {
         <div className="rounded-[14px] border border-line bg-surface p-6">
           <h1 className="mb-2 font-serif text-[22px] font-semibold">Check your email</h1>
           <p className="text-[15px] text-secondary">
-            We've emailed you a sign-in link. It expires in 15 minutes.
+            We've emailed you a sign-in link. It expires in 15 minutes. If this is your first time,
+            the link sets up your account.
           </p>
         </div>
       ) : (
         <Form method="post" className="rounded-[14px] border border-line bg-surface p-6">
-          <h1 className="mb-1 font-serif text-[24px] font-semibold">Sign in</h1>
-          <p className="mb-5 text-[14px] text-muted">We'll email you a magic link — no password.</p>
+          <h1 className="mb-1 font-serif text-[24px] font-semibold">Sign in or sign up</h1>
+          <p className="mb-5 text-[14px] text-muted">
+            New here? Enter your email to create your account — no password, no sign-up form. We'll
+            email you a magic link.
+          </p>
           <label className="block text-[13px] font-semibold text-secondary">
             Email
             <input
