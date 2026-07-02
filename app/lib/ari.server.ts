@@ -2,6 +2,7 @@
 // POST /api/changes; we upsert them into D1 and read slices on demand at search
 // time. See https://docs.channex.io/for-ota/open-channel-api.
 import { getConfig, getDB } from "./config.server";
+import { timingSafeEqual } from "./hmac.server";
 
 function db(): D1Database {
   const d = getDB();
@@ -14,7 +15,9 @@ function db(): D1Database {
 export function checkApiKey(request: Request): Response | null {
   const expected = getConfig().openChannelApiKey;
   const got = request.headers.get("api-key");
-  if (!expected || got !== expected) {
+  // Constant-time compare (like the Stripe/webhook paths) so the shared key
+  // can't be probed byte-by-byte via response timing.
+  if (!expected || !got || !timingSafeEqual(got, expected)) {
     return Response.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
   return null;

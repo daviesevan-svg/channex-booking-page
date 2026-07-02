@@ -14,6 +14,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
     return apiError(400, "invalid_request", "`from` and `to` are required (YYYY-MM-DD).");
   }
+  // Cap the span: getCalendarAvailability loops day-by-day, so an unbounded range
+  // (e.g. to=9999-12-31) would spin the Worker. 400 days covers any real picker.
+  const span = Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
+  if (!(span >= 0) || span > 400) {
+    return apiError(400, "invalid_request", "`to` must be on/after `from` and within 400 days.");
+  }
 
   const c = await getCalendarAvailability(auth.pid, from, to);
   return Response.json({

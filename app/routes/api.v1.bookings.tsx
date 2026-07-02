@@ -228,6 +228,10 @@ export async function action({ request }: Route.ActionArgs) {
       client_reference_id: reference,
       customer_email: body.guest.email,
       metadata: { reference, pid },
+      // Must expire INSIDE the pending stash TTL (3h) — otherwise a guest paying
+      // after the stash lapses is charged with no pending record to finalize, so
+      // no booking and no refund. Mirrors the web checkout's 60-minute window.
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
       success_url: `${origin}/${pid}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${rp.toString()}`,
       cancel_url: `${origin}/${pid}`,
     };
