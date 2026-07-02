@@ -264,11 +264,6 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
     customColor: normalizeHex(String(form.get("customColor") ?? "")),
     customBg: normalizeHex(String(form.get("customBg") ?? "")),
-    customDomain:
-      String(form.get("customDomain") ?? "")
-        .trim()
-        .replace(/^https?:\/\//, "")
-        .replace(/\/.*$/, "") || undefined,
     currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),

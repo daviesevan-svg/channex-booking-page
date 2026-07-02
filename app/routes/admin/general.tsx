@@ -325,29 +325,6 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           <p className="mt-3 rounded-[10px] bg-chip px-4 py-2.5 text-[12.5px] text-secondary">{cutoffSummary}</p>
         </section>
 
-        {/* Custom domain */}
-        <section className="border-t border-divider pt-6">
-          <div className="mb-1 font-serif text-[18px] font-semibold">Custom domain</div>
-          <p className="mb-3 text-[13.5px] text-muted">
-            Use your own domain for the booking page (e.g. <code className="rounded bg-chip px-1 py-0.5">book.yourhotel.com</code>).
-          </p>
-          <label className="block text-[13px] font-semibold text-secondary">
-            Domain
-            <input
-              name="customDomain"
-              defaultValue={settings.customDomain}
-              placeholder="book.yourhotel.com"
-              className="mt-1.5 block w-full max-w-md rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <div className="mt-3 rounded-[10px] bg-chip px-4 py-3 text-[12.5px] leading-[1.6] text-secondary">
-            <strong>To activate it</strong> in Cloudflare → your Worker → <em>Domains &amp; Routes</em> →
-            add a custom domain. If your DNS is elsewhere, create a <strong>CNAME</strong> for your
-            domain pointing to <code className="rounded bg-surface px-1 py-0.5">{host}</code>. Saving
-            here records the domain; Cloudflare handles the certificate.
-          </div>
-        </section>
-
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Legal links</div>
           <p className="mb-3 text-[13.5px] text-muted">
