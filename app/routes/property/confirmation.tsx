@@ -22,6 +22,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
   const simulated = url.searchParams.get("sim") === "1";
+  // Set by checkout/complete when finalize failed — the guest paid but the
+  // booking couldn't be confirmed (Channex rejected / sold out + auto-refunded).
+  const failed = url.searchParams.get("status") === "failed";
+  const refunded = url.searchParams.get("refunded") === "1";
   const lang = langFromRequest(request);
 
   let rooms: { title: string; rate: string }[] = [];
@@ -94,6 +98,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     reference: params.ref,
     simulated,
+    failed,
+    refunded,
     rooms,
     currency,
     total,
@@ -113,10 +119,39 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
-  const { reference, simulated, rooms, currency, total, discount, promoCode, offer, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
+
+  // Finalize failed after payment — never show the success card. Tell the guest
+  // the truth (auto-refunded, or that we'll follow up) instead of "Confirmed".
+  if (failed) {
+    return (
+      <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
+        <h1 className="mb-3 font-serif text-[40px] font-medium tracking-[-0.02em]">
+          {tr.t("confirmProblemHeading")}
+        </h1>
+        <p className="mb-6 text-[17px] leading-[1.6] text-secondary">
+          {(refunded ? tr.t("confirmRefundedBody") : tr.t("confirmProblemBody")).replaceAll("{hotel}", hotelName)}
+        </p>
+        <div
+          className="mb-8 inline-block rounded-full px-[18px] py-2 text-sm font-semibold tracking-[0.04em] text-accent"
+          style={{ background: "var(--accent-soft)" }}
+        >
+          {tr.t("confirmationRef", { ref: reference })}
+        </div>
+        <div>
+          <Link
+            to={`/${params.channelId}`}
+            className="inline-block rounded-[12px] border border-line-alt bg-surface-alt px-7 py-3.5 text-[15px] font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+          >
+            {text.newBooking}
+          </Link>
+        </div>
+      </main>
+    );
+  }
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const datesStr =
     checkin && checkout

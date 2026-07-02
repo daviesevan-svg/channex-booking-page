@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/checkout.complete";
-import { getBookings } from "~/lib/bookings.server";
+import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromSession } from "~/lib/booking-finalize.server";
 import { retrieveCheckoutSession } from "~/lib/stripe.server";
@@ -19,15 +19,26 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const fwd = new URLSearchParams(url.searchParams);
   fwd.delete("session_id");
   fwd.delete("ref");
-  const confirmationUrl = `/${pid}/confirmation/${ref}?${fwd.toString()}`;
   const checkoutUrl = `/${pid}/checkout?${fwd.toString()}`;
   if (!ref || !sessionId) throw redirect(`/${pid}`);
 
-  // Webhook already finalized it → straight to confirmation.
+  // Confirmation URL that tells the truth: a booking that failed to finalize
+  // (Channex rejected it, or it sold out and was auto-refunded) must NOT land the
+  // paid guest on a success page. Carry the outcome so confirmation can show it.
+  const outcomeUrl = (rec: BookingRecord) => {
+    const p = new URLSearchParams(fwd);
+    if (rec.status === "failed") {
+      p.set("status", "failed");
+      if (rec.payment?.refund) p.set("refunded", "1");
+    }
+    return `/${pid}/confirmation/${ref}?${p.toString()}`;
+  };
+
+  // Webhook already finalized it → straight to the matching outcome.
   const already = (await getBookings(pid)).find((b) => b.reference === ref);
   if (already) {
     await deletePending(ref);
-    throw redirect(confirmationUrl);
+    throw redirect(outcomeUrl(already));
   }
 
   const pending = await getPending(ref);
@@ -42,9 +53,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   if (!payment) throw redirect(checkoutUrl); // not completed (guest backed out)
-  await finalizeBooking(pending, payment, pending.origin);
+  const record = await finalizeBooking(pending, payment, pending.origin);
   await deletePending(ref);
-  throw redirect(confirmationUrl);
+  throw redirect(outcomeUrl(record));
 }
 
 export default function CheckoutComplete() {

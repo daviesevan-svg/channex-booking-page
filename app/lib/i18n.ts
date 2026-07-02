@@ -171,6 +171,11 @@ const EN: Dict = {
   confirmationRef: "Confirmation {ref}",
   dates: "Dates",
   demoMode: "Demo mode — no live reservation was created.",
+  confirmProblemHeading: "We couldn't confirm your booking",
+  confirmProblemBody:
+    "Your payment went through, but we couldn't finalise your booking at {hotel}. Our team has been notified and will be in touch shortly. If we can't confirm it, you'll be refunded in full.",
+  confirmRefundedBody:
+    "Your payment went through, but the room was no longer available so we couldn't confirm your booking at {hotel}. We've refunded your payment in full — you'll receive a confirmation email shortly.",
 };
 
 const FR: Dict = {
