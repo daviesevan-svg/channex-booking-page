@@ -2,7 +2,7 @@ import { Outlet } from "react-router";
 
 import type { Route } from "./+types/embed.$channelId";
 import type { PropertyOutletContext } from "~/lib/booking-context";
-import { DEFAULT_THEME, langFromRequest } from "~/lib/content";
+import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 
 // Bare, chrome-less shell for the embeddable widget iframe (/embed/:channelId).
@@ -22,6 +22,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
+    themeFont: settings.themeFont,
     lang,
   };
 }
@@ -33,7 +34,8 @@ export function headers() {
 }
 
 export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
-  const { currency, hotelName, theme, customColor, customBg, lang } = loaderData;
+  const { currency, hotelName, theme, customColor, customBg, themeFont, lang } = loaderData;
+  const font = fontPair(themeFont);
 
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "transparent" } as React.CSSProperties;
@@ -46,6 +48,9 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
       "--page": customBg || `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
     });
   }
+  if (font.id !== "default") {
+    Object.assign(themeStyle, { "--font-serif": font.heading, "--font-sans": font.body });
+  }
 
   const context: PropertyOutletContext = {
     property: { photos: [] },
@@ -56,6 +61,7 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
+      {font.href && <link rel="stylesheet" href={font.href} />}
       <Outlet context={context} />
     </div>
   );
