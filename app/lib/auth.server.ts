@@ -1,6 +1,6 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 
-import { getConfig } from "./config.server";
+import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
 import { getUser, isSuperadmin, upsertUser } from "./users.server";
 
@@ -34,7 +34,9 @@ async function sign(payload: string, secret: string): Promise<string> {
 
 export async function createMagicToken(email: string): Promise<string> {
   const { sessionSecret } = getConfig();
-  const payload = toBase64Url(enc(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS })));
+  // jti makes the link single-use: it's marked consumed in KV on first verify.
+  const jti = crypto.randomUUID();
+  const payload = toBase64Url(enc(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS, jti })));
   const sig = await sign(payload, sessionSecret);
   return `${payload}.${sig}`;
 }
@@ -45,8 +47,20 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
   if (!payload || !sig) return null;
   if ((await sign(payload, sessionSecret)) !== sig) return null;
   try {
-    const { email, exp } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
+    const { email, exp, jti } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
     if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
+    // Single-use: reject a token already consumed, then mark it consumed. We track
+    // *consumption* (not issuance) so KV propagation lag never blocks a first, real
+    // login — only a later replay of a leaked link is refused. Legacy tokens with
+    // no jti skip this (they still expire in 15 min).
+    if (typeof jti === "string") {
+      const kv = getConfigKV();
+      if (kv) {
+        const usedKey = `magic_used:${jti}`;
+        if (await kv.get(usedKey)) return null; // already used
+        await kv.put(usedKey, "1", { expirationTtl: Math.ceil(TOKEN_TTL_MS / 1000) });
+      }
+    }
     return email.toLowerCase();
   } catch {
     return null;

@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/webhooks";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
-import { addWebhook, listWebhooks, removeWebhook } from "~/lib/webhooks.server";
+import { addWebhook, isSafeWebhookUrl, listWebhooks, removeWebhook } from "~/lib/webhooks.server";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "~/lib/webhook-events";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -24,7 +24,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "add") {
     const url = String(form.get("url") ?? "").trim();
-    if (!/^https?:\/\/.+/.test(url)) return { error: "Enter a valid https:// URL." };
+    if (!isSafeWebhookUrl(url)) {
+      return { error: "Enter a public https:// URL (private/internal hosts aren't allowed)." };
+    }
     const events = form.getAll("events").map(String).filter((e): e is WebhookEvent => (WEBHOOK_EVENTS as readonly string[]).includes(e));
     const ep = await addWebhook(propertyId, url, events);
     return { addedSecret: ep.secret, addedUrl: ep.url };

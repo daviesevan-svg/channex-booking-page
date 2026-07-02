@@ -20,6 +20,40 @@ export interface WebhookEndpoint {
 
 const key = (pid: string) => `webhooks:${pid}`;
 
+/** True for an IP literal in a private / loopback / link-local / CGNAT range. */
+function isPrivateIp(host: string): boolean {
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 169 && b === 254) return true; // link-local incl. 169.254.169.254 metadata
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT
+    return false;
+  }
+  const h = host.replace(/^\[|\]$/g, "").toLowerCase();
+  return h === "::1" || h === "::" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80");
+}
+
+/** Reject webhook URLs that could target the internal network (SSRF): non-HTTPS,
+ *  localhost, .internal/.local hostnames, or private/loopback/link-local IPs.
+ *  DNS-rebinding to a private IP isn't fully preventable from a Worker, but
+ *  dispatch also refuses to follow redirects (see dispatchWebhook). */
+export function isSafeWebhookUrl(raw: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(raw.trim());
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase();
+  if (host === "localhost" || /\.(local|internal|lan|home|corp)$/i.test(host)) return false;
+  return !isPrivateIp(host);
+}
+
 async function readJson<T>(k: string): Promise<T | null> {
   const kv = getConfigKV();
   if (!kv) return null;
@@ -47,6 +81,7 @@ export async function listWebhooks(pid: string): Promise<WebhookEndpoint[]> {
 }
 
 export async function addWebhook(pid: string, url: string, events: WebhookEvent[]): Promise<WebhookEndpoint> {
+  if (!isSafeWebhookUrl(url)) throw new Error("Unsafe webhook URL."); // backstop; route validates first
   const eps = await listWebhooks(pid);
   const ep: WebhookEndpoint = {
     id: rand(8),
@@ -79,6 +114,7 @@ export async function dispatchWebhook(pid: string, event: WebhookEvent, data: un
           method: "POST",
           headers: { "Content-Type": "application/json", "Roompanda-Signature": `t=${t},v1=${sig}` },
           body,
+          redirect: "manual", // never follow a 3xx to an internal host (SSRF)
         });
         if (!res.ok) console.log(`[webhook] ${event} → ${ep.url} responded ${res.status}`);
       } catch (e) {
