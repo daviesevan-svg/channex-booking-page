@@ -3,6 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/manage-booking";
 import { useProperty } from "~/lib/booking-context";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { cancelChannexBooking } from "~/lib/booking-finalize.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari.server";
 import { sendCancellationEmails } from "~/lib/email.server";
@@ -78,6 +79,9 @@ export async function action({ params, request }: Route.ActionArgs) {
           stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights),
         );
       }
+      // Cancel the reservation upstream in Channex too (best-effort), so the
+      // hotel's PMS doesn't keep a live booking after the guest cancelled.
+      await cancelChannexBooking(params.channelId, booking);
       // Auto-refund (if the property opted in): a guest cancel only succeeds inside
       // the free window, so the full charge is owed back. Otherwise the hotel
       // refunds manually. No-op for guarantee-card bookings (no charge taken).

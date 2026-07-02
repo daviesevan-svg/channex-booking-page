@@ -40,3 +40,16 @@ export async function pushOpenChannelBooking(booking: unknown): Promise<OpenChan
   const data = (obj.data as OpenChannelBookingResult) ?? (obj as OpenChannelBookingResult);
   return data ?? {};
 }
+
+/** Push a cancellation revision to Channex (same new_booking webhook, the payload
+ *  re-sent with status "cancelled" keyed by the original reservation_id). Best
+ *  effort — a cancellation must never fail the guest/admin cancel + refund flow,
+ *  so this returns the outcome instead of throwing. */
+export async function pushOpenChannelCancellation(booking: unknown): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await pushOpenChannelBooking(booking);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "cancellation push failed" };
+  }
+}

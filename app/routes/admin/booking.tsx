@@ -8,7 +8,7 @@ import { makeTranslator } from "~/lib/i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
-import { retryChannexPush } from "~/lib/booking-finalize.server";
+import { cancelChannexBooking, retryChannexPush } from "~/lib/booking-finalize.server";
 import { incrementAvailability } from "~/lib/ari.server";
 import { sendCancellationEmails } from "~/lib/email.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
@@ -66,6 +66,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     if (booking.inventoryHeld) {
       await incrementAvailability(propertyId, stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights));
     }
+    // Cancel upstream in Channex too (best-effort) for a live booking.
+    await cancelChannexBooking(propertyId, booking);
     const finalBooking = updated ?? booking;
     await sendCancellationEmails(propertyId, finalBooking, new URL(request.url).origin);
     await dispatchWebhook(propertyId, "booking.cancelled", serializeBooking(finalBooking), Date.now());
