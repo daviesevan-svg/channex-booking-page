@@ -23,6 +23,7 @@ import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getPageText, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -43,21 +44,24 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const checkout = url.searchParams.get("checkout");
   const occ = readOccupancy(url.searchParams);
   const lang = langFromRequest(request);
+  // :channelId may be a slug — resolve to the real id for data lookups; redirects
+  // and links keep params.channelId so the slug stays in the URL.
+  const pid = await resolvePropertyId(params.channelId);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
     throw redirect(`/${params.channelId}`);
   }
-  if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) {
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) {
     throw redirect(`/${params.channelId}`);
   }
 
   // Currency is the property's, not the URL param — there's no conversion, so a
   // spoofed ?currency= would only mislabel prices (and the charge; see checkout).
-  const settings = await getSettings(params.channelId);
+  const settings = await getSettings(pid);
   const currency = settings.currency || "GBP";
 
   const rooms = await getCatalogRooms(
-    params.channelId,
+    pid,
     {
       checkinDate: checkin,
       checkoutDate: checkout,
@@ -78,7 +82,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-  const text = await getPageText(params.channelId, "results", lang);
+  const text = await getPageText(pid, "results", lang);
 
   // Tax-/fee-inclusive (all-in) total per rate, so the headline price matches the
   // checkout total and the Google structured data. Computed once here and shown
@@ -102,7 +106,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }));
 
   const cartLines = await resolveCartByOccupancy(
-    params.channelId,
+    pid,
     { checkin, checkout, currency },
     parseCart(url.searchParams),
     { adults: occ.adults, childrenAge: occ.childrenAge },
@@ -112,7 +116,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   // Extras selected so far, so the cart total here matches checkout.
   const extraLines = resolveAllExtras(
-    await getActiveExtras(params.channelId),
+    await getActiveExtras(pid),
     parseExtrasState(url.searchParams),
     cartLines.map((l) => ({
       roomId: l.roomId,
@@ -128,7 +132,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Google Hotel price structured data — every bookable room + its rates, at the
   // all-in price (so Google shows the same total the guest pays at checkout).
   const jsonLd = await catalogHotelJsonLd(
-    params.channelId,
+    pid,
     lang,
     { checkin, checkout },
     priced.map((room) => ({

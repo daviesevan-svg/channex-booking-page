@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
@@ -43,9 +43,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
+  const ref = await getProperty(propertyId);
   return {
     configured: true as const,
     settings,
+    slug: ref?.slug ?? "",
+    propertyId,
     host: new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
     timezones: supportedTimezones(),
@@ -56,8 +59,13 @@ export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
-  await saveSettings(propertyId, await request.formData());
-  return { ok: true };
+  const form = await request.formData();
+  await saveSettings(propertyId, form);
+  // The shortcode lives on the property registry (globally unique), not the
+  // per-property settings blob — save it separately and surface any clash.
+  const slugRes = await setPropertySlug(propertyId, String(form.get("slug") ?? ""));
+  if ("error" in slugRes) return { ok: true as const, slugError: slugRes.error };
+  return { ok: true as const };
 }
 
 export function meta() {
@@ -80,7 +88,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, host, envLive, timezones } = loaderData;
+  const { settings, slug, host, envLive, timezones } = loaderData;
   const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
@@ -109,7 +117,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     <div>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="font-serif text-[26px] font-semibold">General</h1>
-        {actionData?.ok && (
+        {actionData?.ok && !actionData?.slugError && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
             ✓ Saved
           </span>
@@ -117,6 +125,39 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
       </div>
 
       <Form method="post" className="flex flex-col gap-7 rounded-[14px] border border-line bg-surface p-6">
+        {/* Booking link (shortcode) */}
+        <section>
+          <div className="mb-1 font-serif text-[18px] font-semibold">Booking link</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            A short, memorable web address for your booking page, instead of the long id. Use lowercase
+            letters, numbers and hyphens. Leave blank to use the id.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-[10px] bg-chip px-3 py-[11px] font-mono text-[13.5px] text-secondary">
+              {host}/
+            </span>
+            <input
+              name="slug"
+              defaultValue={slug}
+              placeholder="spilmanhotel"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              className="min-w-[200px] flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] font-mono text-[15px] text-ink outline-none focus:border-accent"
+            />
+          </div>
+          {actionData?.slugError ? (
+            <p className="mt-2 text-[13px] text-red-600">{actionData.slugError}</p>
+          ) : (
+            slug && (
+              <p className="mt-2 text-[12.5px] text-muted">
+                Live at <code className="rounded bg-chip px-1.5 py-0.5">{host}/{slug}</code> — the long
+                id keeps working too.
+              </p>
+            )
+          )}
+        </section>
+
         {/* Theme */}
         <section>
           <div className="mb-1 font-serif text-[18px] font-semibold">Brand colour</div>

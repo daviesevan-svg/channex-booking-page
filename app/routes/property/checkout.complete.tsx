@@ -4,6 +4,7 @@ import type { Route } from "./+types/checkout.complete";
 import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromSession } from "~/lib/booking-finalize.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { retrieveCheckoutSession } from "~/lib/stripe.server";
 
 // Stripe sends the guest here after paying. We retrieve the session to confirm
@@ -12,15 +13,18 @@ import { retrieveCheckoutSession } from "~/lib/stripe.server";
 // confirmation can render even if the webhook finalized first.
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const pid = params.channelId;
+  // `channel` is the URL segment (may be a slug) used for redirects so the pretty
+  // URL survives; `pid` is the resolved id used to look bookings up.
+  const channel = params.channelId;
+  const pid = await resolvePropertyId(channel);
   const ref = url.searchParams.get("ref") || "";
   const sessionId = url.searchParams.get("session_id") || "";
 
   const fwd = new URLSearchParams(url.searchParams);
   fwd.delete("session_id");
   fwd.delete("ref");
-  const checkoutUrl = `/${pid}/checkout?${fwd.toString()}`;
-  if (!ref || !sessionId) throw redirect(`/${pid}`);
+  const checkoutUrl = `/${channel}/checkout?${fwd.toString()}`;
+  if (!ref || !sessionId) throw redirect(`/${channel}`);
 
   // Confirmation URL that tells the truth: a booking that failed to finalize
   // (Channex rejected it, or it sold out and was auto-refunded) must NOT land the
@@ -31,7 +35,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       p.set("status", "failed");
       if (rec.payment?.refund) p.set("refunded", "1");
     }
-    return `/${pid}/confirmation/${ref}?${p.toString()}`;
+    return `/${channel}/confirmation/${ref}?${p.toString()}`;
   };
 
   // Webhook already finalized it → straight to the matching outcome.
@@ -42,7 +46,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const pending = await getPending(ref);
-  if (!pending) throw redirect(`/${pid}`); // expired / unknown
+  if (!pending) throw redirect(`/${channel}`); // expired / unknown
 
   let payment;
   try {

@@ -11,21 +11,24 @@ import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/li
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
+  // :channelId may be a slug — resolve to the real id for data lookups.
+  const pid = await resolvePropertyId(params.channelId);
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
   const [content, closedDates, cutoff] = await Promise.all([
-    getSearchContent(params.channelId, lang),
-    getCalendarAvailability(params.channelId, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
+    getSearchContent(pid, lang),
+    getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
     ),
-    getBookingCutoff(params.channelId),
+    getBookingCutoff(pid),
   ]);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.

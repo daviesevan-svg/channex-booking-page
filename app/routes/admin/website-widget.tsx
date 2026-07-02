@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website-widget";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, saveThemeTokens } from "~/lib/overrides.server";
 import { FONT_PAIRS, fontPair } from "~/lib/content";
@@ -15,10 +15,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const canManage = await isOwnerOrSuper(request, propertyId);
   const settings = await getSettings(propertyId);
   const appUrl = getConfig().appUrl.replace(/\/+$/, "");
+  // Prefer the shortcode in the snippet/links when one is set (it resolves to the
+  // same property); fall back to the id.
+  const linkId = (await getProperty(propertyId))?.slug || propertyId;
   return {
     configured: true as const,
     canManage,
     propertyId,
+    linkId,
     appUrl,
     accent: settings.theme === "custom" ? settings.customColor ?? null : null,
     themeName: settings.theme ?? "terracotta",
@@ -81,9 +85,9 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { propertyId, appUrl, accent, themeName, fontLabel, themeVersion } = loaderData;
-  const snippet = `<script async src="${appUrl}/embed.js" data-property="${propertyId}"></script>`;
-  const previewSrc = `${appUrl}/embed/${propertyId}?v=${encodeURIComponent(themeVersion)}`;
+  const { linkId, appUrl, accent, themeName, fontLabel, themeVersion } = loaderData;
+  const snippet = `<script async src="${appUrl}/embed.js" data-property="${linkId}"></script>`;
+  const previewSrc = `${appUrl}/embed/${linkId}?v=${encodeURIComponent(themeVersion)}`;
   const input = "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
 
   const copyBrief = async () => {
@@ -117,7 +121,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
     }
   };
 
-  const deepLink = `${appUrl}/${propertyId}/rooms?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adults=2&childrenAge=8,12`;
+  const deepLink = `${appUrl}/${linkId}/rooms?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adults=2&childrenAge=8,12`;
   const copyDevBrief = async () => {
     const brand = (briefRef.current?.value ?? "").trim();
     const tech = (techRef.current?.value ?? "").trim();

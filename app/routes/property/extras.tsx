@@ -2,6 +2,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
@@ -33,18 +34,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
   const occ = readOccupancy(url.searchParams);
+  // :channelId may be a slug — resolve to the real id for data lookups; redirects
+  // and links keep params.channelId so the slug stays in the URL.
+  const pid = await resolvePropertyId(params.channelId);
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
 
   // Currency is the property's, not the URL param (no conversion exists).
-  const currency = (await getSettings(params.channelId)).currency || "GBP";
+  const currency = (await getSettings(pid)).currency || "GBP";
 
   const sp = url.searchParams.toString();
   const lineIndex = Number(url.searchParams.get("line"));
   if (!Number.isInteger(lineIndex) || lineIndex < 0) throw redirect(`/${params.channelId}/rooms?${sp}`);
 
   const cartLines = await resolveCartByOccupancy(
-    params.channelId,
+    pid,
     { checkin, checkout, currency },
     parseCart(url.searchParams),
     { adults: occ.adults, childrenAge: occ.childrenAge },
@@ -54,7 +58,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   // Room-scoped extras eligible for this room+rate; booking-scoped extras are
   // offered once, on the first room's step.
-  const catalog = await getActiveExtras(params.channelId);
+  const catalog = await getActiveExtras(pid);
   const roomExtras = catalog.filter((e) => scopeOf(e) === "room" && extraEligible(e, line.roomId, line.rateId));
   const isFirst = lineIndex === 0;
   const bookingExtras = isFirst ? catalog.filter((e) => scopeOf(e) === "booking") : [];
@@ -65,7 +69,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const state = parseExtrasState(url.searchParams);
-  const text = await getPageText(params.channelId, "extras", langFromRequest(request));
+  const text = await getPageText(pid, "extras", langFromRequest(request));
   return {
     lineIndex,
     nights,

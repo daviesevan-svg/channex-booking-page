@@ -12,14 +12,18 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).
+  // :channelId may be a slug — resolve it to the real id for data lookups; links
+  // keep params.channelId so the slug stays in the URL through the flow.
   const lang = langFromRequest(request);
+  const pid = await resolvePropertyId(params.channelId);
   const [overrides, settings] = await Promise.all([
-    getOverrides(params.channelId, lang),
-    getSettings(params.channelId),
+    getOverrides(pid, lang),
+    getSettings(pid),
   ]);
 
   return {
