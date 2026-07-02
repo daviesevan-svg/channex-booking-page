@@ -2,7 +2,7 @@ import { createCookieSessionStorage, redirect } from "react-router";
 
 import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
-import { getUser, isSuperadmin, upsertUser } from "./users.server";
+import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -102,6 +102,9 @@ function sessionStorage() {
 export async function createAdminSession(email: string, redirectTo: string) {
   // First sign-in creates the user record (member by default).
   await upsertUser(email);
+  // Lockout-safe bootstrap: if no superadmin exists yet, this first sign-in
+  // claims it (instead of treating everyone as superadmin). No-op once claimed.
+  await claimSuperadminIfUnclaimed(email);
   const storage = sessionStorage();
   const session = await storage.getSession();
   session.set("email", email.toLowerCase());
