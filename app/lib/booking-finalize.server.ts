@@ -84,6 +84,23 @@ export async function finalizeBooking(
   const claim = await claimBooking(pid, provisional);
   if (!claim.won) return claim.existing ?? provisional;
 
+  // Defensive tripwire: the charge is server-authored (we created the Stripe
+  // session with our own amount/currency and re-fetch it by id), so what the
+  // guest paid must equal what we intended. If it ever doesn't, a bug or a
+  // session mix-up let a wrong amount through — record what they actually paid
+  // (below) but shout loudly so it's caught in logs/tests rather than silently.
+  if (payment?.mode === "payment") {
+    const expectedMinor = Math.round((draft.consent?.dueNow ?? 0) * 100);
+    const gotMinor = Math.round((payment.amount ?? 0) * 100);
+    const expCur = (draft.currency || "").toUpperCase();
+    const gotCur = (payment.currency || "").toUpperCase();
+    if (expectedMinor !== gotMinor || (expCur && gotCur && expCur !== gotCur)) {
+      console.error(
+        `[finalize] CHARGE MISMATCH for ${draft.reference}: expected ${expectedMinor} ${expCur}, Stripe reported ${gotMinor} ${gotCur}`,
+      );
+    }
+  }
+
   let status: BookingStatus = "simulated";
   let channexId: string | undefined;
   let error: string | undefined;
