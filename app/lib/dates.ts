@@ -12,11 +12,19 @@ export function todayISODate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Whether a search/stay is bookable: check-in is today or later and check-out
- *  is strictly after check-in. Guards against stale tabs with past dates (and
- *  inverted ranges). Lexical compare is valid for YYYY-MM-DD strings. */
+/** Longest bookable stay. Bounds per-night work (getCatalogRooms/preparePending
+ *  build one entry per night) so a hostile ?checkout=9999-12-31 can't spin the
+ *  Worker on millions of iterations — an unauthenticated request-kill otherwise. */
+export const MAX_STAY_NIGHTS = 60;
+
+/** Whether a search/stay is bookable: check-in is today or later, check-out is
+ *  strictly after check-in, and the stay is within MAX_STAY_NIGHTS. Guards stale
+ *  tabs with past dates, inverted ranges, and abusive far-future ranges. Lexical
+ *  compare is valid for YYYY-MM-DD strings. */
 export function isStayBookable(checkin: string, checkout: string): boolean {
-  return checkin >= todayISODate() && checkout > checkin;
+  if (!(checkin >= todayISODate() && checkout > checkin)) return false;
+  const nights = Math.round((Date.parse(checkout) - Date.parse(checkin)) / 86400000);
+  return nights >= 1 && nights <= MAX_STAY_NIGHTS;
 }
 
 /** Current calendar date (YYYY-MM-DD) and minutes-since-midnight in a timezone. */
