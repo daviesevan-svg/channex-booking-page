@@ -59,7 +59,9 @@ export function meta() {
 export default function WebsiteWidget({ loaderData, actionData }: Route.ComponentProps) {
   const [copied, setCopied] = useState(false);
   const [briefCopied, setBriefCopied] = useState(false);
+  const [devCopied, setDevCopied] = useState(false);
   const briefRef = useRef<HTMLTextAreaElement>(null);
+  const techRef = useRef<HTMLInputElement>(null);
   const nav = useNavigation();
 
   if (!loaderData.configured) {
@@ -110,6 +112,47 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
       await navigator.clipboard.writeText(brief);
       setBriefCopied(true);
       setTimeout(() => setBriefCopied(false), 1800);
+    } catch {
+      /* clipboard blocked */
+    }
+  };
+
+  const deepLink = `${appUrl}/${propertyId}/rooms?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adults=2&childrenAge=8,12`;
+  const copyDevBrief = async () => {
+    const brand = (briefRef.current?.value ?? "").trim();
+    const tech = (techRef.current?.value ?? "").trim();
+    const brief = [
+      `Build a booking date-picker widget for my hotel's website.`,
+      ``,
+      `Website tech: ${tech || "plain HTML/CSS/JS (no framework)"}`,
+      `Brand / style: ${brand || "match my existing website"}`,
+      ``,
+      `When the guest picks their dates + guests and clicks the button, send the browser to this URL`,
+      `(fill in the values):`,
+      ``,
+      `  ${deepLink}`,
+      ``,
+      `URL rules:`,
+      `- checkin, checkout: dates formatted YYYY-MM-DD. checkout must be after checkin, and checkin must be today or later.`,
+      `- adults: whole number, at least 1 (default 2).`,
+      `- childrenAge: OPTIONAL, comma-separated age of each child (0–17), e.g. 8,12. Omit entirely if none.`,
+      `- Do NOT add price or currency params — the booking page handles pricing and availability.`,
+      ``,
+      `Widget requirements:`,
+      `- A date-range picker: block past dates and any checkout on/before checkin.`,
+      `- A guests control: adults (min 1) plus optional children, each with an age.`,
+      `- A "Check availability" button that builds the URL above and does window.location.href = url`,
+      `  (if you place the widget in an iframe, navigate the TOP window instead).`,
+      `- Style it to match the brand above — you have full freedom over layout, fonts, colours, corner`,
+      `  radius, spacing and wording.`,
+      `- Fully self-contained: no API keys and no server calls — it only builds and opens a link.`,
+      ``,
+      `Return the complete, ready-to-paste widget code.`,
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(brief);
+      setDevCopied(true);
+      setTimeout(() => setDevCopied(false), 1800);
     } catch {
       /* clipboard blocked */
     }
@@ -205,6 +248,40 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
             Apply theme
           </button>
         </Form>
+      </section>
+
+      {/* Build a fully custom widget (advanced) */}
+      <section className="rounded-[14px] border border-line bg-surface p-6">
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">Build a fully custom widget</h2>
+        <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
+          Want total control over the design — corners, layout, wording, your own framework? Copy this
+          brief into ChatGPT or Claude and it'll build a bespoke widget from scratch. It just needs the
+          deep-link below; the booking page handles availability and pricing.
+        </p>
+
+        <label className="mb-1.5 block text-[13px] font-semibold text-secondary">Your website tech (optional)</label>
+        <input
+          ref={techRef}
+          placeholder="e.g. WordPress, Squarespace, React, plain HTML"
+          className={`${input} mb-3 w-full max-w-sm`}
+        />
+
+        <div className="mb-1.5 text-[13px] font-semibold text-secondary">Booking deep-link for this property</div>
+        <code className="mb-3 block whitespace-pre-wrap break-all rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 font-mono text-[12.5px] text-ink">
+          {deepLink}
+        </code>
+
+        <button
+          type="button"
+          onClick={copyDevBrief}
+          className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
+        >
+          {devCopied ? "Copied brief ✓" : "Copy developer brief"}
+        </button>
+        <p className="mt-2.5 text-[12.5px] text-muted">
+          The brief reuses the brand description above. Uses the same date/guest params as the standard
+          widget, so anything built this way drops straight into your booking flow.
+        </p>
       </section>
 
       {/* Live preview */}
