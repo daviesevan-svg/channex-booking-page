@@ -6,6 +6,7 @@ import {
   DEFAULT_PROMO_PLACEHOLDER,
   emailDef,
   isDeadlineUnit,
+  isFontPairId,
   isThemeId,
   normalizeHex,
   pageDef,
@@ -350,6 +351,29 @@ export async function getBookingCutoff(pid: string): Promise<BookingCutoff> {
 export async function isChannexConnected(pid: string): Promise<boolean> {
   if (!pid) return false;
   return (await getSettings(pid)).connectedSystem === "channex";
+}
+
+/** Apply AI-generated (or manually pasted) brand theme tokens: accent + optional
+ *  background hex and a curated font-pair id. Merge-safe. A valid accent switches
+ *  the theme to "custom" so it takes effect; invalid/missing values are ignored
+ *  (kept from existing) so a bad paste can't wipe the theme. */
+export async function saveThemeTokens(
+  pid: string,
+  input: { accent?: string; bg?: string; font?: string },
+): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const accent = normalizeHex(String(input.accent ?? ""));
+  const bg = normalizeHex(String(input.bg ?? ""));
+  const font = input.font && isFontPairId(input.font) ? input.font : undefined;
+  const next: SiteSettings = {
+    ...existing,
+    theme: accent ? "custom" : existing.theme,
+    customColor: accent ?? existing.customColor,
+    customBg: bg ?? existing.customBg,
+    themeFont: font ?? existing.themeFont,
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
 }
 
 /** Set (or clear, with undefined) the connected channel-manager/PMS system.

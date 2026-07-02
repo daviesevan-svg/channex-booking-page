@@ -141,12 +141,37 @@ export function isThemeId(value: string): value is ThemeId {
   return THEMES.some((t) => t.id === value);
 }
 
+// Curated Google-Font pairings the AI branding flow can choose from — a bounded
+// allowlist so we control exactly which stylesheets load (no arbitrary font
+// injection). `heading` maps to --font-serif, `body` to --font-sans. `href` is a
+// Google Fonts CSS URL; `default` reuses the fonts already loaded in root.tsx.
+export const FONT_PAIRS = [
+  { id: "default", label: "Newsreader + Hanken Grotesk (default)", heading: '"Newsreader", ui-serif, Georgia, serif', body: '"Hanken Grotesk", system-ui, sans-serif', href: "" },
+  { id: "playfair-inter", label: "Playfair Display + Inter", heading: '"Playfair Display", ui-serif, Georgia, serif', body: '"Inter", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" },
+  { id: "cormorant-montserrat", label: "Cormorant Garamond + Montserrat", heading: '"Cormorant Garamond", ui-serif, Georgia, serif', body: '"Montserrat", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" },
+  { id: "fraunces-nunito", label: "Fraunces + Nunito Sans", heading: '"Fraunces", ui-serif, Georgia, serif', body: '"Nunito Sans", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Nunito+Sans:wght@400;600;700&display=swap" },
+  { id: "lora-worksans", label: "Lora + Work Sans", heading: '"Lora", ui-serif, Georgia, serif', body: '"Work Sans", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&display=swap" },
+  { id: "dmserif-dmsans", label: "DM Serif Display + DM Sans", heading: '"DM Serif Display", ui-serif, Georgia, serif', body: '"DM Sans", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display&display=swap" },
+  { id: "poppins", label: "Poppins (modern sans)", heading: '"Poppins", system-ui, sans-serif', body: '"Poppins", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" },
+  { id: "spacegrotesk-inter", label: "Space Grotesk + Inter", heading: '"Space Grotesk", ui-sans-serif, system-ui', body: '"Inter", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" },
+] as const;
+
+export type FontPairId = (typeof FONT_PAIRS)[number]["id"];
+export function fontPair(id: string | undefined) {
+  return FONT_PAIRS.find((f) => f.id === id) ?? FONT_PAIRS[0];
+}
+export function isFontPairId(value: string): value is FontPairId {
+  return FONT_PAIRS.some((f) => f.id === value);
+}
+
 export type DeadlineUnit = "hours" | "days";
 
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
   customBg?: string;
+  /** Curated Google-Font pairing id (see FONT_PAIRS). Unset = default fonts. */
+  themeFont?: string;
   customDomain?: string;
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;

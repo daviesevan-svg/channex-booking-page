@@ -6,6 +6,7 @@ import {
   DEFAULT_LANG,
   DEFAULT_THEME,
   enabledLanguages,
+  fontPair,
   langFromRequest,
   langLabel,
   LANG_COOKIE,
@@ -28,6 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
+    themeFont: settings.themeFont,
     lang,
     languages: enabledLanguages(settings),
   };
@@ -94,8 +96,9 @@ function Stepper({ step, tr }: { step: Step; tr: Translator }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme, customColor, customBg, lang, languages } =
+  const { property, currency, hotelName, theme, customColor, customBg, themeFont, lang, languages } =
     loaderData;
+  const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) => {
     // Persist as a cookie so the choice survives navigations that drop ?lang.
@@ -134,6 +137,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       "--page": customBg || `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
     });
   }
+  // Chosen font pairing (default = the fonts already loaded in root.tsx).
+  if (font.id !== "default") {
+    Object.assign(themeStyle, { "--font-serif": font.heading, "--font-sans": font.body });
+  }
 
   return (
     <div
@@ -141,6 +148,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       data-theme={isCustom ? undefined : theme}
       style={themeStyle}
     >
+      {font.href && <link rel="stylesheet" href={font.href} />}
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"
