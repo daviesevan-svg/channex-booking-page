@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { getBookingCutoff, getPageText } from "~/lib/overrides.server";
+import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
@@ -32,10 +32,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
-  const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
   if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+
+  // Currency is the property's, not the URL param (no conversion exists).
+  const currency = (await getSettings(params.channelId)).currency || "GBP";
 
   const sp = url.searchParams.toString();
   const lineIndex = Number(url.searchParams.get("line"));
