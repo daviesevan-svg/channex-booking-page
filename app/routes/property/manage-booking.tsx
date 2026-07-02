@@ -11,6 +11,7 @@ import { refundBookingCharge } from "~/lib/refunds.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
 import { getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
@@ -44,10 +45,12 @@ function cancelState(
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const booking = await ownedBooking(params.channelId, params.id, request);
+  // :channelId may be a slug — resolve to the real id for data; redirects keep it.
+  const pid = await resolvePropertyId(params.channelId);
+  const booking = await ownedBooking(pid, params.id, request);
   if (!booking) throw redirect(`/${params.channelId}/manage`);
 
-  const settings = await getSettings(params.channelId);
+  const settings = await getSettings(pid);
   const { canCancel, reason } = cancelState(booking, Boolean(settings.allowCancel));
   return {
     booking,
@@ -58,16 +61,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
-  const booking = await ownedBooking(params.channelId, params.id, request);
+  const pid = await resolvePropertyId(params.channelId);
+  const booking = await ownedBooking(pid, params.id, request);
   if (!booking) throw redirect(`/${params.channelId}/manage`);
 
   const form = await request.formData();
   if (form.get("intent") === "cancel") {
-    const settings = await getSettings(params.channelId);
+    const settings = await getSettings(pid);
     // Re-check server-side so a stale page can't cancel past the deadline.
     const active = (booking.lifecycle ?? "active") === "active";
     if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
-      const updated = await updateBooking(params.channelId, booking.id, {
+      const updated = await updateBooking(pid, booking.id, {
         lifecycle: "cancelled",
         cancelledAt: new Date().toISOString(),
         inventoryHeld: false,
@@ -75,24 +79,24 @@ export async function action({ params, request }: Route.ActionArgs) {
       // Give the nights back to inventory (only if this booking held them).
       if (booking.inventoryHeld) {
         await incrementAvailability(
-          params.channelId,
+          pid,
           stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights),
         );
       }
       // Cancel the reservation upstream in Channex too (best-effort), so the
       // hotel's PMS doesn't keep a live booking after the guest cancelled.
-      await cancelChannexBooking(params.channelId, booking);
+      await cancelChannexBooking(pid, booking);
       // Auto-refund (if the property opted in): a guest cancel only succeeds inside
       // the free window, so the full charge is owed back. Otherwise the hotel
       // refunds manually. No-op for guarantee-card bookings (no charge taken).
       let finalBooking = updated ?? booking;
       if (settings.autoRefund) {
-        const r = await refundBookingCharge(params.channelId, finalBooking, { by: "auto (guest cancellation)" });
+        const r = await refundBookingCharge(pid, finalBooking, { by: "auto (guest cancellation)" });
         if (r.ok) finalBooking = r.booking;
       }
       // Cancellation confirmation to the guest + (opt-in) host notification.
-      await sendCancellationEmails(params.channelId, finalBooking, new URL(request.url).origin);
-      await dispatchWebhook(params.channelId, "booking.cancelled", serializeBooking(finalBooking), Date.now());
+      await sendCancellationEmails(pid, finalBooking, new URL(request.url).origin);
+      await dispatchWebhook(pid, "booking.cancelled", serializeBooking(finalBooking), Date.now());
     }
   }
   return redirect(`/${params.channelId}/manage/${params.id}`);

@@ -9,12 +9,16 @@ import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getSearchContent } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { useDateRange } from "~/lib/use-date-range";
 
 // Localized CTA label (honours the hotel's edited "Search" button + language).
 // No ARI read — just page content (cheap KV), keeping the widget cacheable.
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const content = await getSearchContent(params.channelId, langFromRequest(request));
+  // :channelId may be a slug — resolve for the content lookup, but keep the
+  // original segment as `channelId` so the deep-link stays on the slug.
+  const pid = await resolvePropertyId(params.channelId);
+  const content = await getSearchContent(pid, langFromRequest(request));
   return { channelId: params.channelId, searchButton: content.searchButton || DEFAULT_SEARCH.searchButton };
 }
 

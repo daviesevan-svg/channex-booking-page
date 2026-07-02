@@ -11,6 +11,7 @@ import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
 import { addLine, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
@@ -26,17 +27,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
   const { adults, childrenAge } = readOccupancy(url.searchParams);
+  // :channelId may be a slug — resolve to the real id for data lookups; redirects
+  // and links keep params.channelId so the slug stays in the URL.
+  const pid = await resolvePropertyId(params.channelId);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
 
   // Currency is the property's, not the URL param (no conversion exists).
-  const settings = await getSettings(params.channelId);
+  const settings = await getSettings(pid);
   const currency = settings.currency || "GBP";
 
   const lang = langFromRequest(request);
   const rooms = await getCatalogRooms(
-    params.channelId,
+    pid,
     {
       checkinDate: checkin,
       checkoutDate: checkout,
@@ -50,7 +54,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!room) throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-  const text = await getPageText(params.channelId, "detail", lang);
+  const text = await getPageText(pid, "detail", lang);
 
   // Per-room occupancy: default this room to the still-unassigned slice of the
   // searched party, so adding a 2nd room auto-fills the remainder. Capacity comes
@@ -100,7 +104,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       ).total * 100,
     ) / 100;
   // Google Hotel price structured data — this room and its rate plans, all-in.
-  const jsonLd = await catalogHotelJsonLd(params.channelId, lang, { checkin, checkout }, [
+  const jsonLd = await catalogHotelJsonLd(pid, lang, { checkin, checkout }, [
     {
       roomId: room.id,
       name: room.title,

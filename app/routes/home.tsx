@@ -9,11 +9,11 @@ export async function loader() {
 
   // One public property → skip the picker and go straight to it.
   if (properties.length === 1) {
-    throw redirect(`/${properties[0].id}`);
+    throw redirect(`/${properties[0].slug || properties[0].id}`);
   }
-  // Several → show the picker (rendered below).
+  // Several → show the picker (rendered below). Prefer the shortcode in the link.
   if (properties.length > 1) {
-    return { properties };
+    return { properties: properties.map((p) => ({ id: p.id, slug: p.slug, name: p.name })) };
   }
 
   // None marked public: fall back to the configured default property, or the
@@ -22,7 +22,7 @@ export async function loader() {
   if (defaultPropertyId) {
     throw redirect(`/${defaultPropertyId}`);
   }
-  return { properties: [] as { id: string; name: string }[] };
+  return { properties: [] as { id: string; slug?: string; name: string }[] };
 }
 
 export function meta() {
@@ -67,7 +67,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         {properties.map((p, i) => (
           <Link
             key={p.id}
-            to={`/${p.id}`}
+            to={`/${p.slug || p.id}`}
             className={`flex items-center justify-between gap-3 px-6 py-5 transition-colors hover:bg-chip ${
               i > 0 ? "border-t border-divider" : ""
             }`}

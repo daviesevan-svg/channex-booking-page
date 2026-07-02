@@ -9,6 +9,7 @@ import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
 import { getPageText, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
@@ -27,6 +28,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const failed = url.searchParams.get("status") === "failed";
   const refunded = url.searchParams.get("refunded") === "1";
   const lang = langFromRequest(request);
+  // :channelId may be a slug — resolve to the real id for data lookups; links
+  // keep params.channelId so the slug stays in the URL.
+  const pid = await resolvePropertyId(params.channelId);
 
   let rooms: { title: string; rate: string }[] = [];
   let total = 0;
@@ -38,7 +42,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
     const lines = await resolveCartByOccupancy(
-      params.channelId,
+      pid,
       { checkin, checkout, currency },
       parseCart(url.searchParams),
       { adults: occ.adults, childrenAge: occ.childrenAge },
@@ -62,7 +66,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     }
     // Extras carried in the URL, re-priced per room (its occupancy) / per booking.
     extraLines = resolveAllExtras(
-      await getActiveExtras(params.channelId),
+      await getActiveExtras(pid),
       parseExtrasState(url.searchParams),
       lines.map((l) => ({
         roomId: l.roomId,
@@ -76,10 +80,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const applied =
-    total > 0 ? await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", total) : null;
+    total > 0 ? await resolveAppliedPromo(pid, url.searchParams.get("promo") || "", total) : null;
 
   const discount = applied?.discount ?? 0;
-  const settings = await getSettings(params.channelId);
+  const settings = await getSettings(pid);
   const pricing = computePricing(
     {
       base: Math.round((total - discount) * 100) / 100,
@@ -114,7 +118,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     nights,
     adults: occ.adults,
     childrenAge: occ.childrenAge,
-    text: await getPageText(params.channelId, "confirmation", lang),
+    text: await getPageText(pid, "confirmation", lang),
   };
 }
 

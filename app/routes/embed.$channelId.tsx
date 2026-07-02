@@ -4,6 +4,7 @@ import type { Route } from "./+types/embed.$channelId";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 
 // Bare, chrome-less shell for the embeddable widget iframe (/embed/:channelId).
 // It provides the same Outlet context the property pages do (so shared bits like
@@ -12,9 +13,11 @@ import { getOverrides, getSettings } from "~/lib/overrides.server";
 // (rarely-changing) theme, so the response is cacheable and cheap per impression.
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
+  // :channelId may be a slug — resolve to the real id for the theme lookup.
+  const pid = await resolvePropertyId(params.channelId);
   const [overrides, settings] = await Promise.all([
-    getOverrides(params.channelId, lang),
-    getSettings(params.channelId),
+    getOverrides(pid, lang),
+    getSettings(pid),
   ]);
   return {
     currency: settings.currency || "GBP",

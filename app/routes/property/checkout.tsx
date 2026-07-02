@@ -38,6 +38,7 @@ import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getOverrides, getPageText } from "~/lib/overrides.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 
 interface Stay {
@@ -122,11 +123,15 @@ function deriveOffer(lines: ResolvedLine[]) {
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const stay = readStay(url, params.channelId);
+  // :channelId may be a slug — resolve to the real id and carry it on the stay,
+  // so every data lookup + the booking record use the UUID. Redirects/links keep
+  // params.channelId so the slug stays in the URL through the flow.
+  const pid = await resolvePropertyId(params.channelId);
+  const stay = readStay(url, pid);
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
 
-  const settings = await getSettings(params.channelId);
+  const settings = await getSettings(pid);
   // Currency is the property's configured currency — NEVER the URL param. There
   // is no conversion anywhere, so a spoofed ?currency= would just re-denominate
   // the same number at checkout (pay ¥500 for a £500 room).
@@ -139,19 +144,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
-  const text = await getPageText(params.channelId, "checkout", lang);
+  const text = await getPageText(pid, "checkout", lang);
   const totals = cartCoverage(lines);
   // The automatic offer (if any) is already baked into the line totals; derive
   // it for the itemised breakdown and each line's pre-discount price.
   const { offer, originalSubtotal, lines: linesView } = deriveOffer(lines);
   // A promo carried from the landing page (?promo=) is pre-applied here so the
   // guest sees the discount immediately.
-  const urlPromo = await resolveAppliedPromo(params.channelId, url.searchParams.get("promo") || "", totals.total);
+  const urlPromo = await resolveAppliedPromo(pid, url.searchParams.get("promo") || "", totals.total);
   // Extras carried in the URL, re-priced from the catalog: per-room extras
   // against each room's guests, booking-scoped extras against the whole party.
   const party = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
   const extraLines = resolveAllExtras(
-    await getActiveExtras(params.channelId),
+    await getActiveExtras(pid),
     parseExtrasState(url.searchParams),
     extraContext(lines),
     nights,
@@ -159,8 +164,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   // Effective payment + cancellation + no-show policy for the booking, plus the
   // cancellation snapshot (for the translated free-until line).
-  const policy = await resolveBookingPolicy(params.channelId, lines.map((l) => l.rateId));
-  const cancellation = await resolveBookingCancellation(params.channelId, lines.map((l) => l.rateId), stay.checkin);
+  const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
+  const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), stay.checkin);
 
   // Google Hotel price structured data — the final all-in total the guest sees,
   // so Google's price matches right through the last step (no surprise charges).
@@ -181,7 +186,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
   const jsonLd = await reservationHotelJsonLd(
-    params.channelId,
+    pid,
     lang,
     { checkin: stay.checkin, checkout: stay.checkout },
     grandTotal,
@@ -217,9 +222,12 @@ const GuestSchema = z.object({
 
 export async function action({ params, request }: Route.ActionArgs) {
   const url = new URL(request.url);
-  const stay = readStay(url, params.channelId);
+  // Resolve slug→id: stay.channelId (the booking's pid, Stripe metadata, etc.)
+  // must be the real UUID. Redirect/return URLs keep params.channelId (the slug).
+  const pid = await resolvePropertyId(params.channelId);
+  const stay = readStay(url, pid);
   if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(params.channelId))) throw redirect(`/${params.channelId}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
 
   // Currency is the property's, never the URL (see loader) — this is the charge
   // path, so the guard matters most here.

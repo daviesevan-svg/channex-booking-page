@@ -8,6 +8,7 @@ import {
   getBookingsByEmail,
 } from "~/lib/bookings.server";
 import { createGuestSession, getGuestEmail, guestLogout } from "~/lib/guest-auth.server";
+import { resolvePropertyId } from "~/lib/properties.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -15,7 +16,8 @@ import { formatMoney } from "~/lib/money";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const email = await getGuestEmail(request);
   if (!email) return { authed: false as const };
-  const bookings = await getBookingsByEmail(params.channelId, email);
+  // :channelId may be a slug — resolve to the real id for booking lookups.
+  const bookings = await getBookingsByEmail(await resolvePropertyId(params.channelId), email);
   return {
     authed: true as const,
     email,
@@ -36,8 +38,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (form.get("intent") === "logout") {
     return guestLogout(request, `/${params.channelId}/manage`);
   }
+  const pid = await resolvePropertyId(params.channelId);
   // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
-  if (!(await rateLimit(`manage:${params.channelId}:${clientKey(request)}`, 8, 600))) {
+  if (!(await rateLimit(`manage:${pid}:${clientKey(request)}`, 8, 600))) {
     return { tooMany: true };
   }
 
@@ -45,7 +48,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const email = String(form.get("email") ?? "").trim();
   if (!reference || !email) return { notFound: true };
 
-  const booking = await findBookingByRefAndEmail(params.channelId, reference, email);
+  const booking = await findBookingByRefAndEmail(pid, reference, email);
   if (!booking) return { notFound: true };
   return createGuestSession(email, `/${params.channelId}/manage`);
 }
