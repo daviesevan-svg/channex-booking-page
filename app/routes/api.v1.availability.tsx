@@ -1,10 +1,12 @@
 import type { Route } from "./+types/api.v1.availability";
 import { authenticateApiKey, apiError } from "~/lib/api-auth.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
+import { getSettings } from "~/lib/overrides.server";
 import { serializeAvailabilityRoom } from "~/lib/api-serialize";
 
-// GET /v1/availability?checkin=&checkout=&adults=&children_ages=&currency=
+// GET /v1/availability?checkin=&checkout=&adults=&children_ages=
 // Priced, bookable rooms + rates for a chosen stay (the results screen).
+// Prices are always in the property's own currency (there is no conversion).
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request);
   if (auth instanceof Response) return auth;
@@ -22,10 +24,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     ? agesParam.split(",").map((a) => parseInt(a.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0)
     : Array.from({ length: Math.max(0, parseInt(url.searchParams.get("children") ?? "0", 10) || 0) }, () => 8);
 
+  // Currency is the property's own (no conversion); never a client param.
+  const currency = (await getSettings(auth.pid)).currency || "GBP";
   const rooms = await getCatalogRooms(
     auth.pid,
-    { checkinDate: checkin, checkoutDate: checkout, currency: url.searchParams.get("currency") || undefined, adults, childrenAge },
+    { checkinDate: checkin, checkoutDate: checkout, currency, adults, childrenAge },
     { gate: true },
   );
-  return Response.json({ checkin, checkout, data: rooms.map(serializeAvailabilityRoom) });
+  return Response.json({ checkin, checkout, currency, data: rooms.map(serializeAvailabilityRoom) });
 }
