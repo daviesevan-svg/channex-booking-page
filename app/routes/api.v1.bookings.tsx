@@ -34,7 +34,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 const Body = z.object({
   checkin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkout: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  currency: z.string().optional(),
+  // currency is intentionally NOT accepted — prices are always the property's own
+  // currency (no conversion), so trusting a client value would mis-denominate.
   rooms: z
     .array(
       z.object({
