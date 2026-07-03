@@ -36,6 +36,7 @@ type PropView = {
   photo: string | null;
   chips: string[];
   fromPrice: string | null;
+  fromPriceNum: number | null; // numeric all-in nightly, for sorting
   soldOut: boolean;
   currency: string;
   left: number | null; // pin x %, null when no coordinates
@@ -75,6 +76,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       let photo: string | null = null;
       let chips: string[] = [];
       let fromPrice: string | null = null;
+      let fromPriceNum: number | null = null;
       let soldOut = false;
 
       if (hasDates) {
@@ -118,6 +120,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           photo = cheapestRoom.photos?.[0]?.url ?? null;
           chips = (cheapestRoom.facilities ?? []).slice(0, 3);
           fromPrice = formatMoney(cheapest, currency);
+          fromPriceNum = cheapest;
         }
       }
 
@@ -135,6 +138,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           photo,
           chips,
           fromPrice,
+          fromPriceNum,
           soldOut,
           currency,
         },
@@ -170,6 +174,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     name: collection.name,
     destination: collection.destination || "",
+    heading: collection.heading || "Choose where you'll stay",
     intro: collection.intro || "",
     phone: collection.phone || "",
     theme: collection.theme ?? DEFAULT_THEME,
@@ -211,6 +216,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   const {
     name,
     destination,
+    heading,
     intro,
     phone,
     theme,
@@ -233,6 +239,19 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingDates, setEditingDates] = useState(false);
+  const [sort, setSort] = useState<"recommended" | "asc" | "desc">("recommended");
+
+  // Sort a copy for the list; sold-out / unpriced always sink to the bottom.
+  // Pins keep the original set (order is irrelevant — they're positioned by geo).
+  const listProps =
+    sort === "recommended"
+      ? properties
+      : [...properties].sort((a, b) => {
+          if (a.fromPriceNum == null && b.fromPriceNum == null) return 0;
+          if (a.fromPriceNum == null) return 1;
+          if (b.fromPriceNum == null) return -1;
+          return sort === "asc" ? a.fromPriceNum - b.fromPriceNum : b.fromPriceNum - a.fromPriceNum;
+        });
 
   // Date/guest editor (reused from the booking flow; no cross-property closed
   // dates — availability is enforced per property once the guest clicks in).
@@ -340,12 +359,22 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             <div className="text-[14px] font-medium" style={{ color: "#857a6c" }}>
               {availableCount} {availableCount === 1 ? "stay" : "stays"} available
             </div>
-            <div
-              className="rounded-full px-4 py-2 text-[14px] font-semibold"
+            <label
+              className="flex items-center rounded-full py-2 pl-4 pr-2 text-[14px] font-semibold"
               style={{ background: "#f7f2ec", border: "1px solid #e3d9c9" }}
             >
-              Sort · Recommended
-            </div>
+              <span className="text-muted-2">Sort ·</span>
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as typeof sort)}
+                aria-label="Sort properties"
+                className="cursor-pointer bg-transparent pl-1.5 pr-1 font-semibold text-ink outline-none"
+              >
+                <option value="recommended">Recommended</option>
+                <option value="asc">Price: low to high</option>
+                <option value="desc">Price: high to low</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -385,7 +414,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
           {properties.length} {properties.length === 1 ? "property" : "properties"}
         </div>
         <h1 className="mb-2 font-serif text-[clamp(30px,6vw,42px)] font-medium leading-[1.05] tracking-[-0.02em]">
-          Choose where you'll stay
+          {heading}
         </h1>
         {intro && (
           <p className="m-0 max-w-[620px] text-[16px] leading-[1.6]" style={{ color: "#6f6557" }}>
@@ -403,8 +432,8 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
               No properties in this collection yet.
             </p>
           )}
-          {properties.map((p, i) => {
-            const id = String(i);
+          {listProps.map((p) => {
+            const id = p.urlSeg;
             const on = hoveredId === id || activeId === id;
             return (
               <div
@@ -512,9 +541,9 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             </div>
 
             {/* pins */}
-            {properties.map((p, i) => {
+            {properties.map((p) => {
               if (p.left == null || p.top == null) return null;
-              const id = String(i);
+              const id = p.urlSeg;
               const on = hoveredId === id || activeId === id;
               return (
                 <div

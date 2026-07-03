@@ -20,6 +20,8 @@ export interface Collection {
   name: string;
   /** Destination label shown in the eyebrow, e.g. "Dublin". */
   destination?: string;
+  /** Page headline (h1). Defaults to "Choose where you'll stay" when unset. */
+  heading?: string;
   /** Intro paragraph under the title. */
   intro?: string;
   /** Contact phone shown in the header. */
@@ -135,6 +137,7 @@ export async function updateCollection(
   }
   if (patch.name !== undefined) c.name = patch.name.trim() || c.name;
   if (patch.destination !== undefined) c.destination = patch.destination.trim() || undefined;
+  if (patch.heading !== undefined) c.heading = patch.heading.trim() || undefined;
   if (patch.intro !== undefined) c.intro = patch.intro.trim() || undefined;
   if (patch.phone !== undefined) c.phone = patch.phone.trim() || undefined;
   if (patch.propertyIds !== undefined) c.propertyIds = patch.propertyIds;
