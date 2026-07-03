@@ -8,6 +8,7 @@
 //
 // Built in loaders only (this is a .server module); the route component renders
 // the returned plain object inside a <script type="application/ld+json">.
+import { getConfig } from "./config.server";
 import { getOverrides, getSettings } from "./overrides.server";
 
 // Industry-standard fallbacks when a property hasn't set its own times. The
@@ -32,6 +33,8 @@ export interface JsonLdRoom {
   name: string;
   /** Max occupancy the price is for. */
   occupancy?: number;
+  /** First room photo (absolute or site-relative); emitted as the Product image. */
+  image?: string;
   offers: JsonLdOffer[];
 }
 interface Stay {
@@ -44,6 +47,10 @@ interface HotelInfo {
   identifier: string;
   name: string;
   address?: string;
+  city?: string;
+  region?: string;
+  postalCode?: string;
+  country?: string;
   currency: string;
   checkinTime: string;
   checkoutTime: string;
@@ -56,6 +63,10 @@ async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
     identifier: pid,
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
+    city: settings.addressCity,
+    region: settings.addressRegion,
+    postalCode: settings.addressPostalCode,
+    country: settings.addressCountry,
     currency: settings.currency || "GBP",
     checkinTime: toSeconds(settings.checkinTime, CHECKIN_TIME),
     checkoutTime: toSeconds(settings.checkoutTime, CHECKOUT_TIME),
@@ -69,8 +80,15 @@ function baseHotel(info: HotelInfo): Record<string, unknown> {
     name: info.name,
     identifier: info.identifier,
   };
-  // We only hold a freeform address string; carry it as streetAddress.
-  if (info.address) hotel.address = { "@type": "PostalAddress", streetAddress: info.address };
+  // Full PostalAddress from the property's structured location (recommended by
+  // Google's hotel-price spec). streetAddress falls back to the freeform line.
+  const addr: Record<string, unknown> = { "@type": "PostalAddress" };
+  if (info.address) addr.streetAddress = info.address;
+  if (info.city) addr.addressLocality = info.city;
+  if (info.region) addr.addressRegion = info.region;
+  if (info.postalCode) addr.postalCode = info.postalCode;
+  if (info.country) addr.addressCountry = info.country;
+  if (Object.keys(addr).length > 1) hotel.address = addr;
   return hotel;
 }
 
@@ -84,6 +102,7 @@ function offer(stay: Stay, info: HotelInfo, o: JsonLdOffer): Record<string, unkn
       "@type": "CompoundPriceSpecification",
       price: round2(o.total),
       priceCurrency: info.currency,
+      valueAddedTaxIncluded: true, // our totals are always tax/fee inclusive
     },
   };
 }
@@ -101,16 +120,20 @@ export async function catalogHotelJsonLd(
     .map((r) => ({ ...r, offers: r.offers.filter((o) => o.total > 0) }))
     .filter((r) => r.offers.length > 0)
     .map((r) => {
-      // HotelRoom only — NOT also "Product". The Product co-type opted these into
-      // Google's merchant-listing rules (which demand image + a flat offers.price
-      // and reject our CompoundPriceSpecification), flagging false "critical"
-      // errors. Our target is Hotel price data (Free Booking Links / Hotel
-      // Center), which uses Hotel + HotelRoom, not Product.
+      // ["HotelRoom","Product"] per Google's hotel-price spec (the generic Rich
+      // Results test judges this as a merchant Product and complains, but that
+      // test isn't the validator for hotel prices — Hotel Center is).
       const room: Record<string, unknown> = {
-        "@type": "HotelRoom",
+        "@type": ["HotelRoom", "Product"],
         name: r.name,
         identifier: r.roomId,
       };
+      // Product recommends an image — emit the room's first photo, absolutised.
+      if (r.image) {
+        room.image = /^https?:\/\//.test(r.image)
+          ? r.image
+          : `${getConfig().appUrl.replace(/\/+$/, "")}${r.image.startsWith("/") ? "" : "/"}${r.image}`;
+      }
       if (r.occupancy && r.occupancy > 0) {
         room.occupancy = { "@type": "QuantitativeValue", value: r.occupancy };
       }

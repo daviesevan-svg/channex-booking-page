@@ -116,6 +116,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       roomId: room.id,
       name: room.title,
       occupancy: capacity,
+      image: room.photos?.[0]?.url,
       offers: ratePlansForParty(room, party).map((rp) => ({
         rateId: rp.parentRatePlanId ?? rp.id,
         total: allIn(Number(rp.totalPrice)),
