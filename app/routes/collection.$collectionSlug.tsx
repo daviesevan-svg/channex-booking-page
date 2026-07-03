@@ -134,7 +134,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           urlSeg: ref.slug || pid,
           name: overrides.hotelName || ref.name,
           area: settings.addressCity || settings.addressRegion || "",
-          typeLabel: settings.singleUnit ? "Apartment" : "Hotel",
+          typeLabel: overrides.propertyType || (settings.singleUnit ? "Apartment" : "Hotel"),
           photo,
           chips,
           fromPrice,
