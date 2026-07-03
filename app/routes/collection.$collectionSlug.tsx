@@ -264,6 +264,8 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       new URLSearchParams({ checkin: dates.checkinIso, checkout: dates.checkoutIso }),
       occupancy,
     );
+    setEditingDates(false); // collapse the editor once a search is submitted
+    dates.setOpen?.(false);
     navigate(`?${qs.toString()}`);
   };
 
