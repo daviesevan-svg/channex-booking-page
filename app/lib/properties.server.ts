@@ -127,6 +127,7 @@ export const RESERVED_SLUGS = new Set([
   "images",
   "feeds",
   "embed",
+  "c", // collection landing pages live at /c/:collectionSlug
   "assets",
   "favicon.ico",
   "robots.txt",
@@ -139,6 +140,22 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/;
 
 export function normalizeSlug(input: string): string {
   return input.trim().toLowerCase();
+}
+
+/** True when `s` is a valid slug FORMAT (shared with collection slugs). */
+export function isValidSlugFormat(s: string): boolean {
+  return SLUG_RE.test(s);
+}
+
+/** Slugify free text into a candidate slug (letters/digits/hyphens). May be
+ *  empty or too short — callers validate/uniquify. */
+export function slugify(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
 }
 
 /** Validates a desired `slug` for property `id` against `list` (the current
