@@ -55,6 +55,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     name: String(form.get("name") || ""),
     slug: String(form.get("slug") || ""),
     destination: String(form.get("destination") || ""),
+    heading: String(form.get("heading") || ""),
     intro: String(form.get("intro") || ""),
     phone: String(form.get("phone") || ""),
     propertyIds: form.getAll("propertyIds").map(String),
@@ -127,6 +128,18 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
               <input name="phone" defaultValue={c.phone} placeholder="+353 1 555 0192" className={FIELD_INPUT} />
             </label>
           </div>
+          <label className="mt-4 block text-[13px] font-semibold text-secondary">
+            Headline
+            <input
+              name="heading"
+              defaultValue={c.heading}
+              placeholder="Choose where you'll stay"
+              className={FIELD_INPUT}
+            />
+            <span className="mt-1 block text-[11px] font-normal text-faint">
+              The big title on the page. Leave blank for “Choose where you’ll stay”.
+            </span>
+          </label>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
             Intro
             <textarea
