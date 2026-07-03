@@ -174,7 +174,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     name: collection.name,
     destination: collection.destination || "",
-    heading: collection.heading || "Choose where you'll stay",
+    heading: collection.heading || "", // blank → localized default in the component
     intro: collection.intro || "",
     phone: collection.phone || "",
     theme: collection.theme ?? DEFAULT_THEME,
@@ -304,11 +304,10 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   }
 
   const datesLabel = hasDates
-    ? `${format(parseISO(checkin), "EEE d")} — ${format(parseISO(checkout), "EEE d MMM")} · ${tr.p(
-        "night",
-        nights,
-      )} · ${tr.p("adult", occ.adults)}`
-    : "Select your dates";
+    ? `${format(parseISO(checkin), "EEE d", { locale: tr.locale })} — ${format(parseISO(checkout), "EEE d MMM", {
+        locale: tr.locale,
+      })} · ${tr.p("night", nights)} · ${tr.p("adult", occ.adults)}`
+    : tr.t("selectYourDates");
 
   return (
     <div
@@ -329,7 +328,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">{name}</span>
           </div>
           <div className="flex items-center gap-6 text-[14px]" style={{ color: "#857a6c" }}>
-            <span className="cursor-pointer hover:text-accent">Manage booking</span>
+            <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
             {phone && <span className="hidden sm:inline">{phone}</span>}
           </div>
         </div>
@@ -352,27 +351,27 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
               className="cursor-pointer text-[14px] font-semibold hover:text-accent"
               style={{ color: "#857a6c" }}
             >
-              {hasDates ? "Edit dates" : "Choose dates"}
+              {hasDates ? tr.t("editDates") : tr.t("chooseDates")}
             </button>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-[14px] font-medium" style={{ color: "#857a6c" }}>
-              {availableCount} {availableCount === 1 ? "stay" : "stays"} available
+              {tr.p("staysAvailable", availableCount)}
             </div>
             <label
               className="flex items-center rounded-full py-2 pl-4 pr-2 text-[14px] font-semibold"
               style={{ background: "#f7f2ec", border: "1px solid #e3d9c9" }}
             >
-              <span className="text-muted-2">Sort ·</span>
+              <span className="text-muted-2">{tr.t("sortLabel")} ·</span>
               <select
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
-                aria-label="Sort properties"
+                aria-label={tr.t("sortLabel")}
                 className="cursor-pointer bg-transparent pl-1.5 pr-1 font-semibold text-ink outline-none"
               >
-                <option value="recommended">Recommended</option>
-                <option value="asc">Price: low to high</option>
-                <option value="desc">Price: high to low</option>
+                <option value="recommended">{tr.t("sortRecommended")}</option>
+                <option value="asc">{tr.t("sortPriceAsc")}</option>
+                <option value="desc">{tr.t("sortPriceDesc")}</option>
               </select>
             </label>
           </div>
@@ -388,8 +387,10 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                   className="rounded-[10px] border px-4 py-2.5 text-left text-[14px] font-semibold"
                   style={{ borderColor: "#e8dfd0", background: "#f7f2ec" }}
                 >
-                  <span className="block text-[11px] uppercase tracking-wide text-muted-2">Dates</span>
-                  {dates.checkinLabel || "Check-in"} — {dates.checkoutLabel || "Check-out"}
+                  <span className="block text-[11px] uppercase tracking-wide text-muted-2">
+                    {tr.t("datesLabel")}
+                  </span>
+                  {dates.checkinLabel || tr.t("checkIn")} — {dates.checkoutLabel || tr.t("checkOut")}
                 </button>
                 {dates.open && <CalendarPopover state={dates} onClose={() => dates.setOpen?.(false)} />}
               </div>
@@ -400,7 +401,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 disabled={!dates.checkinIso || !dates.checkoutIso}
                 className="rounded-[10px] bg-accent px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-50"
               >
-                Search
+                {tr.t("searchLabel")}
               </button>
             </div>
           </div>
@@ -414,7 +415,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
           {properties.length} {properties.length === 1 ? "property" : "properties"}
         </div>
         <h1 className="mb-2 font-serif text-[clamp(30px,6vw,42px)] font-medium leading-[1.05] tracking-[-0.02em]">
-          {heading}
+          {heading || tr.t("collectionHeading")}
         </h1>
         {intro && (
           <p className="m-0 max-w-[620px] text-[16px] leading-[1.6]" style={{ color: "#6f6557" }}>
@@ -429,7 +430,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         <div className="flex min-w-0 flex-col gap-4 lg:flex-[1.25] lg:basis-[380px]">
           {properties.length === 0 && (
             <p className="text-[15px]" style={{ color: "#6f6557" }}>
-              No properties in this collection yet.
+              {tr.t("noPropertiesYet")}
             </p>
           )}
           {listProps.map((p) => {
@@ -483,16 +484,16 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                     <div className="flex items-baseline gap-[7px]">
                       {p.soldOut ? (
                         <span className="text-[15px] font-semibold" style={{ color: "#9a8f80" }}>
-                          {hasDates ? "Sold out for these dates" : ""}
+                          {hasDates ? tr.t("soldOutDates") : ""}
                         </span>
                       ) : p.fromPrice ? (
                         <>
-                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>from</span>
+                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>{tr.t("from")}</span>
                           <span className="font-serif text-[28px] font-semibold leading-none">{p.fromPrice}</span>
-                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>/ night</span>
+                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>{tr.t("perNightShort")}</span>
                         </>
                       ) : (
-                        <span className="text-[14px]" style={{ color: "#9a8f80" }}>Select dates for prices</span>
+                        <span className="text-[14px]" style={{ color: "#9a8f80" }}>{tr.t("selectDatesForPrices")}</span>
                       )}
                     </div>
                     <button
@@ -501,7 +502,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                       disabled={p.soldOut}
                       className="flex-none rounded-[10px] bg-accent px-[22px] py-[11px] text-[14.5px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      View
+                      {tr.t("viewProperty")}
                     </button>
                   </div>
                 </div>
@@ -537,7 +538,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
               style={{ background: "rgba(255,253,250,0.94)", border: "1px solid #e8dfd0", color: "#5a5145", boxShadow: "0 6px 18px -10px rgba(70,55,35,0.4)" }}
             >
               <Diamond />
-              {availableCount} {availableCount === 1 ? "stay" : "stays"} in view
+              {tr.p("staysInView", availableCount)}
             </div>
 
             {/* pins */}
@@ -574,8 +575,8 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       {/* footer */}
       <footer className="border-t" style={{ borderColor: "#ece4d8", background: "#fffdfa" }}>
         <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-[13px]" style={{ color: "#9a8f80" }}>
-          <span>© 2026 {name} · All rights reserved</span>
-          <span>Secure booking · Powered by Channex</span>
+          <span>© 2026 {name} · {tr.t("allRightsReserved")}</span>
+          <span>{tr.t("footerRight")}</span>
         </div>
       </footer>
     </div>
