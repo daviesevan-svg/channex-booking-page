@@ -51,7 +51,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { gate: true },
   );
   const room = rooms.find((r) => r.id === params.roomId);
-  if (!room) throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+  // Single-unit properties auto-forward /rooms → here, so a not-found bounce must
+  // go to the landing (not back to /rooms) or the two would redirect in a loop.
+  if (!room)
+    throw redirect(
+      settings.singleUnit
+        ? `/${params.channelId}?${url.searchParams.toString()}`
+        : `/${params.channelId}/rooms?${url.searchParams.toString()}`,
+    );
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(pid, "detail", lang);
@@ -132,6 +139,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     editIndex,
     editRateId: editLine?.rateId ?? null,
     text,
+    singleUnit: settings.singleUnit ?? false,
     query: { checkin, checkout, currency, adults },
   };
 }
@@ -180,7 +188,7 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
 type DetailRate = RoomWithRates["ratePlans"][number];
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
-  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, query } = loaderData;
+  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -277,7 +285,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <Link
-        to={`/${params.channelId}/rooms?${qs}`}
+        to={singleUnit ? `/${params.channelId}?${qs}` : `/${params.channelId}/rooms?${qs}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {text.backLink}
