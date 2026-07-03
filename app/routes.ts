@@ -71,6 +71,10 @@ export default [
     index("routes/embed.$channelId._index.tsx"),
   ]),
 
+  // Collection landing (multi-property "choose where to stay"). Must precede the
+  // :channelId catch-all; the "c" segment is reserved from property slugs.
+  route("c/:collectionSlug", "routes/collection.$collectionSlug.tsx"),
+
   // Guest booking flow
   route(":channelId", "routes/property/layout.tsx", [
     index("routes/property/search.tsx"),
