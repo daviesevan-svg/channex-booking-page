@@ -42,6 +42,9 @@ async function writeJson(key: string, value: unknown): Promise<void> {
 // ===== property overrides (localized) =====
 export interface PropertyOverrides {
   hotelName?: string;
+  /** Short type label (e.g. "Boutique hotel", "Apartment") — shown on the
+   *  collection page badge. Per-language, so it can be translated. */
+  propertyType?: string;
   address?: string;
   description?: string;
   phone?: string;
@@ -49,6 +52,7 @@ export interface PropertyOverrides {
 }
 const OVERRIDE_FIELDS: (keyof PropertyOverrides)[] = [
   "hotelName",
+  "propertyType",
   "address",
   "description",
   "phone",

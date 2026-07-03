@@ -89,6 +89,13 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       >
         <input type="hidden" name="lang" value={lang} />
         <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
+        <Field
+          name="propertyType"
+          label="Property type"
+          value={overrides.propertyType}
+          placeholder="Boutique hotel, Apartment, Guesthouse…"
+          hint="Short label shown on collection pages. Leave blank to auto-label (Apartment for single-unit, otherwise Hotel)."
+        />
         <Field name="description" label="Description" value={overrides.description} textarea rows={4} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
