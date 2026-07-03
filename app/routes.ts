@@ -34,6 +34,7 @@ export default [
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
+    route("properties/onboard", "routes/admin/onboard-channex.tsx"),
     route("collections", "routes/admin/collections.tsx"),
     route("collections/:slug", "routes/admin/collection.tsx"),
     route("users", "routes/admin/users.tsx"),

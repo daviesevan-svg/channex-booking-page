@@ -216,10 +216,24 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
         </div>
       )}
 
+      {/* Onboard from Channex — pull details/rooms/rates from a Channex account. */}
+      <Link
+        to="/admin/properties/onboard"
+        className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-6 py-5 hover:border-accent"
+      >
+        <span>
+          <span className="block font-serif text-[18px] font-semibold">Onboard from Channex ↗</span>
+          <span className="block text-[13px] text-muted">
+            Import a property’s details, room types and rate plans from your Channex account.
+          </span>
+        </span>
+        <span className="flex-none text-[15px] font-semibold text-accent">Start →</span>
+      </Link>
+
       {/* add */}
       <Form method="post" className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
         <input type="hidden" name="intent" value="add" />
-        <h2 className="font-serif text-[18px] font-semibold">Add a property</h2>
+        <h2 className="font-serif text-[18px] font-semibold">Add a property manually</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
             Name

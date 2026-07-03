@@ -245,6 +245,21 @@ export async function saveEmailSettings(pid: string, form: FormData): Promise<Si
 // ===== general site settings (global, not localized) =====
 const settingsKey = (pid: string) => `settings:${pid}`;
 
+/** Merge a partial into a property's settings (never clobbers untouched fields).
+ *  Undefined values in `partial` are skipped so callers can pass sparse objects. */
+export async function patchSettings(
+  pid: string,
+  partial: Partial<SiteSettings>,
+): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next = { ...existing };
+  for (const [k, v] of Object.entries(partial)) {
+    if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+  }
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
 export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
