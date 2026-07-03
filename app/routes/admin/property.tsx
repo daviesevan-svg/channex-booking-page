@@ -3,8 +3,8 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
-import { langParam, pickLang } from "~/lib/content";
+import { currentPropertyId, renameProperty } from "~/lib/properties.server";
+import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, getSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { COUNTRIES } from "~/lib/countries";
@@ -36,10 +36,16 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
+  const lang = pickLang(String(form.get("lang") ?? ""));
   // Guest-facing copy is localized (per language); the location / check-in /
   // Google fields are global property settings (merged so the rest is untouched).
-  await saveOverrides(propertyId, pickLang(String(form.get("lang") ?? "")), Object.fromEntries(form));
+  await saveOverrides(propertyId, lang, Object.fromEntries(form));
   await savePropertyMeta(propertyId, form);
+  // Keep the property switcher / list label in sync with the hotel name. That
+  // registry label is a single canonical name, so only the default-language
+  // hotel name drives it — editing a translation doesn't rename the property.
+  const hotelName = String(form.get("hotelName") ?? "").trim();
+  if (lang === DEFAULT_LANG && hotelName) await renameProperty(propertyId, hotelName);
   return { ok: true };
 }
 
