@@ -167,6 +167,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             // Access & management
             ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
             { to: "/admin/properties", label: "Properties", end: false },
+            { to: "/admin/collections", label: "Collections", end: false },
             ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
           ].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
