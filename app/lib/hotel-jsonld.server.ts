@@ -93,14 +93,21 @@ function baseHotel(info: HotelInfo): Record<string, unknown> {
 }
 
 function offer(stay: Stay, info: HotelInfo, o: JsonLdOffer): Record<string, unknown> {
+  const price = round2(o.total);
   return {
     "@type": ["Offer", "LodgingReservation"],
     ...(o.rateId ? { identifier: o.rateId } : {}),
     checkinTime: `${stay.checkin} ${info.checkinTime}`,
     checkoutTime: `${stay.checkout} ${info.checkoutTime}`,
+    // Plain price/priceCurrency on the Offer itself — the generic validator
+    // doesn't descend into the CompoundPriceSpecification to find a price, so
+    // without these it reports "Either price or priceSpecification should be
+    // specified". Both are valid on a schema.org Offer.
+    price,
+    priceCurrency: info.currency,
     priceSpecification: {
       "@type": "CompoundPriceSpecification",
-      price: round2(o.total),
+      price,
       priceCurrency: info.currency,
       valueAddedTaxIncluded: true, // our totals are always tax/fee inclusive
     },
