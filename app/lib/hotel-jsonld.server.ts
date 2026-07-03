@@ -101,8 +101,13 @@ export async function catalogHotelJsonLd(
     .map((r) => ({ ...r, offers: r.offers.filter((o) => o.total > 0) }))
     .filter((r) => r.offers.length > 0)
     .map((r) => {
+      // HotelRoom only — NOT also "Product". The Product co-type opted these into
+      // Google's merchant-listing rules (which demand image + a flat offers.price
+      // and reject our CompoundPriceSpecification), flagging false "critical"
+      // errors. Our target is Hotel price data (Free Booking Links / Hotel
+      // Center), which uses Hotel + HotelRoom, not Product.
       const room: Record<string, unknown> = {
-        "@type": ["HotelRoom", "Product"],
+        "@type": "HotelRoom",
         name: r.name,
         identifier: r.roomId,
       };
