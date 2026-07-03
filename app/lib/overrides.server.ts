@@ -269,6 +269,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     privacyUrl: safeUrl(form.get("privacyUrl")),
     languages: form.getAll("languages").map(String),
     liveBooking: form.get("liveBooking") === "on",
+    singleUnit: form.get("singleUnit") === "on",
     timezone: cleanTimezone(form.get("timezone")),
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),

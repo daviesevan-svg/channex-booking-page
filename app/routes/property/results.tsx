@@ -72,6 +72,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { gate: true },
   );
 
+  // Single-unit properties have no room list. Send an empty cart straight to the
+  // one unit's page (this catches landing searches AND widget/deep-link hits on
+  // /rooms). Once a room is in the cart we fall through and render the review.
+  if (settings.singleUnit && parseCart(url.searchParams).length === 0 && rooms.length > 0) {
+    throw redirect(`/${params.channelId}/rooms/${rooms[0].id}?${url.searchParams.toString()}`);
+  }
+
   const party = partySize(occ);
   const cheapest = (room: RoomWithRates) =>
     Math.min(...ratePlansForParty(room, party).map((r) => Number(r.totalPrice)));
@@ -157,6 +164,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     extrasSum,
     text,
     jsonLd,
+    singleUnit: settings.singleUnit ?? false,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
 }
@@ -320,7 +328,7 @@ function CartPanel({
       className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-[18px] border border-line bg-surface p-6"
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
-      <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>
+      {cartTitle && <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>}
       <div className="mb-4 text-[13.5px] text-muted-2">
         {lines.length === 0 ? tr.t("noRoomsSelected") : tr.p("roomsSelected", lines.length)}
       </div>
@@ -415,7 +423,7 @@ function CartPanel({
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, jsonLd, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -467,7 +475,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">
-            {text.heading}
+            {singleUnit ? text.cartTitle : text.heading}
           </h1>
           <div className="text-[15px] text-secondary">{summary}</div>
         </div>
@@ -487,6 +495,26 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           </Link>
           .
         </p>
+      ) : singleUnit ? (
+        // Single-unit review: no room list, just the booking summary + checkout.
+        <div className="mx-auto max-w-[560px]">
+          <CartPanel
+            lines={cartLines}
+            coverage={coverage}
+            covered={covered}
+            party={party}
+            currency={currency}
+            onRemove={onRemove}
+            onContinue={onContinue}
+            continuePending={continuePending}
+            cartTitle=""
+            continueLabel={text.continueButton}
+            channelId={params.channelId}
+            qs={qs}
+            extrasCounts={extrasCounts}
+            extrasSum={extrasSum}
+          />
+        </div>
       ) : (
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
           <div className="flex flex-[1.7] flex-col gap-4">

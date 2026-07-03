@@ -181,6 +181,10 @@ export interface SiteSettings {
   /** When true, checkout pushes real bookings to Channex; when false it simulates.
    *  Unset (never saved) falls back to the ALLOW_LIVE_BOOKING env var. */
   liveBooking?: boolean;
+  /** Single-unit mode: the property is one bookable unit (an apartment/studio),
+   *  so the guest books it straight from its detail page — the room-selection
+   *  list is skipped and results renders as a booking review. */
+  singleUnit?: boolean;
   // ----- Taxes & fees -----
   /** true = inventory prices already include the taxes; false/undefined = add on top. */
   taxesInclusive?: boolean;

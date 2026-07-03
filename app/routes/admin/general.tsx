@@ -385,6 +385,26 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           </div>
         </section>
 
+        {/* Property type */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">Property type</div>
+          <p className="mb-3 text-[13.5px] text-muted">
+            Turn this on for an apartment, studio, or any place that is a{" "}
+            <strong>single bookable unit</strong>. Guests book it straight from its page — the
+            room-selection list is skipped. Leave it off for hotels/guesthouses with multiple room
+            types.
+          </p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input type="checkbox" name="singleUnit" defaultChecked={settings.singleUnit} className="mt-1" />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">Single-unit mode</span>
+              <span className="block text-[12.5px] text-muted">
+                One apartment / unit — skip the “choose a room” step.
+              </span>
+            </span>
+          </label>
+        </section>
+
         {/* Booking mode */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">Booking mode</div>
