@@ -239,19 +239,16 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [editingDates, setEditingDates] = useState(false);
-  const [sort, setSort] = useState<"recommended" | "asc" | "desc">("recommended");
+  const [sort, setSort] = useState<"asc" | "desc">("asc"); // cheapest first by default
 
   // Sort a copy for the list; sold-out / unpriced always sink to the bottom.
   // Pins keep the original set (order is irrelevant — they're positioned by geo).
-  const listProps =
-    sort === "recommended"
-      ? properties
-      : [...properties].sort((a, b) => {
-          if (a.fromPriceNum == null && b.fromPriceNum == null) return 0;
-          if (a.fromPriceNum == null) return 1;
-          if (b.fromPriceNum == null) return -1;
-          return sort === "asc" ? a.fromPriceNum - b.fromPriceNum : b.fromPriceNum - a.fromPriceNum;
-        });
+  const listProps = [...properties].sort((a, b) => {
+    if (a.fromPriceNum == null && b.fromPriceNum == null) return 0;
+    if (a.fromPriceNum == null) return 1;
+    if (b.fromPriceNum == null) return -1;
+    return sort === "asc" ? a.fromPriceNum - b.fromPriceNum : b.fromPriceNum - a.fromPriceNum;
+  });
 
   // Date/guest editor (reused from the booking flow; no cross-property closed
   // dates — availability is enforced per property once the guest clicks in).
@@ -371,7 +368,6 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 aria-label={tr.t("sortLabel")}
                 className="cursor-pointer bg-transparent pl-1.5 pr-1 font-semibold text-ink outline-none"
               >
-                <option value="recommended">{tr.t("sortRecommended")}</option>
                 <option value="asc">{tr.t("sortPriceAsc")}</option>
                 <option value="desc">{tr.t("sortPriceDesc")}</option>
               </select>
