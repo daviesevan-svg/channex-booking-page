@@ -34,6 +34,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     customColor: settings.customColor,
     customBg: settings.customBg,
     themeFont: settings.themeFont,
+    singleUnit: settings.singleUnit ?? false,
     lang,
     languages: enabledLanguages(settings),
   };
@@ -52,7 +53,7 @@ function useStep(channelId: string): Step {
   return "search";
 }
 
-function Stepper({ step, tr }: { step: Step; tr: Translator }) {
+function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleUnit: boolean }) {
   const roomsOn = step === "results" || step === "detail";
   const roomsDone = step === "checkout" || step === "confirmation";
   const detOn = step === "checkout";
@@ -60,7 +61,7 @@ function Stepper({ step, tr }: { step: Step; tr: Translator }) {
   const conOn = step === "confirmation";
 
   const steps = [
-    { n: 1, label: tr.t("step_room"), on: roomsOn || roomsDone },
+    { n: 1, label: tr.t(singleUnit ? "step_stay" : "step_room"), on: roomsOn || roomsDone },
     { n: 2, label: tr.t("step_details"), on: detOn || detDone },
     { n: 3, label: tr.t("step_confirmation"), on: conOn },
   ];
@@ -100,7 +101,7 @@ function Stepper({ step, tr }: { step: Step; tr: Translator }) {
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme, customColor, customBg, themeFont, lang, languages } =
+  const { property, currency, hotelName, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -196,7 +197,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         </div>
       </header>
 
-      {step !== "search" && <Stepper step={step} tr={tr} />}
+      {step !== "search" && <Stepper step={step} tr={tr} singleUnit={singleUnit} />}
 
       <div className="flex-1">
         <Outlet context={context} />
