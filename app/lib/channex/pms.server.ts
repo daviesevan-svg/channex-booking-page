@@ -39,17 +39,25 @@ export interface ChannexRatePlan {
   roomTypeId: string;
   mealPlan?: string;
   currency?: string;
-  /** Best-effort base nightly price from the primary occupancy option (may need
-   *  review after import; live nightly rates flow via Open Channel ARI). */
-  nightlyPrice?: number;
-  defaultOccupancy?: number;
+  occupancy?: number;
+  /** True when this rate plan is distributed to a real OTA channel (Booking.com,
+   *  Expedia, Airbnb…). We default these OFF at import — a commission-free direct
+   *  engine usually sells the property's own direct rates, not its OTA rates. */
+  ota: boolean;
+  /** Titles of the OTA channels this rate plan is mapped to (for display). */
+  otaChannels: string[];
 }
 
 type JsonApiRecord = { id: string; type: string; attributes: Record<string, unknown> };
+interface PmsPage {
+  data: JsonApiRecord[];
+  meta?: Record<string, unknown>;
+}
 
 /** GET a Channex PMS endpoint with the owner's api key. Returns the parsed
- *  `data` (camelCased). Throws a friendly Error on non-2xx / network failure. */
-async function pmsGet(path: string, apiKey: string): Promise<JsonApiRecord[]> {
+ *  `data` (camelCased) plus the raw `meta` (for pagination). Throws a friendly
+ *  Error on non-2xx / network failure. */
+async function pmsFetch(path: string, apiKey: string): Promise<PmsPage> {
   const base = getConfig().apiUrl.replace(/\/+$/, "");
   let res: Response;
   try {
@@ -63,9 +71,31 @@ async function pmsGet(path: string, apiKey: string): Promise<JsonApiRecord[]> {
     throw new Error("Channex rejected that API key. Double-check it and try again.");
   }
   if (!res.ok) throw new Error(`Channex returned an error (${res.status}). Try again shortly.`);
-  const json = (await res.json().catch(() => ({}))) as { data?: unknown };
-  const data = Array.isArray(json.data) ? json.data : json.data ? [json.data] : [];
-  return convertToCamelCase(data) as JsonApiRecord[];
+  const json = (await res.json().catch(() => ({}))) as { data?: unknown; meta?: Record<string, unknown> };
+  const raw = Array.isArray(json.data) ? json.data : json.data ? [json.data] : [];
+  return { data: convertToCamelCase(raw) as JsonApiRecord[], meta: json.meta };
+}
+
+/** Single request — for endpoints that return the whole collection at once
+ *  (the `/options` endpoints, and `/channels`). */
+async function pmsGet(path: string, apiKey: string): Promise<JsonApiRecord[]> {
+  return (await pmsFetch(path, apiKey)).data;
+}
+
+/** Follows Channex JSON:API pagination (`meta.total`/`meta.limit`) so we get the
+ *  ENTIRE collection, not just the default first page of 10. Used for the full
+ *  record endpoints (`/properties`, `/room_types`). Capped at 20 pages (2000
+ *  records) as a runaway guard. */
+async function pmsGetAll(path: string, apiKey: string): Promise<JsonApiRecord[]> {
+  const sep = path.includes("?") ? "&" : "?";
+  const all: JsonApiRecord[] = [];
+  for (let page = 1; page <= 20; page++) {
+    const { data, meta } = await pmsFetch(`${path}${sep}pagination[page]=${page}&pagination[limit]=100`, apiKey);
+    all.push(...data);
+    const total = typeof meta?.total === "number" ? meta.total : all.length;
+    if (data.length === 0 || all.length >= total) break;
+  }
+  return all;
 }
 
 const str = (v: unknown): string | undefined => {
@@ -79,7 +109,7 @@ const num = (v: unknown): number | undefined => {
 
 /** Every property the api key can see. */
 export async function listChannexProperties(apiKey: string): Promise<ChannexProperty[]> {
-  const rows = await pmsGet("/properties", apiKey);
+  const rows = await pmsGetAll("/properties", apiKey);
   return rows.map((r) => {
     const a = r.attributes ?? {};
     const loc = (a.location ?? {}) as Record<string, unknown>;
@@ -107,7 +137,9 @@ export async function getChannexRoomTypes(
   apiKey: string,
   propertyId: string,
 ): Promise<ChannexRoomType[]> {
-  const rows = await pmsGet(`/room_types?filter[property_id]=${encodeURIComponent(propertyId)}`, apiKey);
+  // Full record endpoint (paginated) — the `/options` variant omits the room
+  // description and photo gallery we want to import.
+  const rows = await pmsGetAll(`/room_types?filter[property_id]=${encodeURIComponent(propertyId)}`, apiKey);
   return rows.map((r) => {
     const a = r.attributes ?? {};
     const content = (a.content ?? {}) as Record<string, unknown>;
@@ -149,25 +181,70 @@ const MEAL_LABELS: Record<string, string> = {
   continental_breakfast: "Continental breakfast",
 };
 
-/** Rate plans for one property. */
+// Channel types that are direct/metasearch feeds, NOT commission OTAs — a rate
+// plan being mapped to one of these doesn't make it an "OTA rate plan". (Google
+// Hotel ARI in particular is fed every rate plan, so counting it would flag
+// everything.) Everything else — Booking.com, Expedia, Airbnb, Hopper, Agoda… —
+// is treated as an OTA.
+const NON_OTA_CHANNELS = new Set([
+  "GoogleHotelARI",
+  "GoogleHotelFreeBookingLinks",
+  "GoogleHotelPriceFeed",
+]);
+
+/** Map of rate-plan id → titles of the OTA channels it's distributed to. Read
+ *  from `/channels` (the OTA link lives in the channel's rate-plan mapping, not
+ *  on the rate plan itself). Best-effort: if channels can't be read we just
+ *  treat nothing as OTA rather than failing the import. */
+async function getOtaRatePlanChannels(apiKey: string): Promise<Map<string, string[]>> {
+  let channels: JsonApiRecord[];
+  try {
+    channels = await pmsGet("/channels", apiKey);
+  } catch {
+    return new Map();
+  }
+  const map = new Map<string, string[]>();
+  for (const c of channels) {
+    const a = c.attributes ?? {};
+    const type = str(a.channel) ?? "";
+    if (NON_OTA_CHANNELS.has(type)) continue;
+    const title = str(a.title) ?? (type || "OTA");
+    const mappings = Array.isArray(a.ratePlans) ? (a.ratePlans as Record<string, unknown>[]) : [];
+    for (const m of mappings) {
+      const rid = str(m.ratePlanId);
+      if (!rid) continue;
+      const arr = map.get(rid) ?? [];
+      if (!arr.includes(title)) arr.push(title);
+      map.set(rid, arr);
+    }
+  }
+  return map;
+}
+
+/** Rate plans for one property. Uses the `/options` endpoint, which returns the
+ *  whole set in a single request (the paginated `/rate_plans` list defaults to
+ *  10). Each plan is flagged with whether it's distributed to an OTA channel. */
 export async function getChannexRatePlans(
   apiKey: string,
   propertyId: string,
 ): Promise<ChannexRatePlan[]> {
-  const rows = await pmsGet(`/rate_plans?filter[property_id]=${encodeURIComponent(propertyId)}`, apiKey);
+  const [rows, otaMap] = await Promise.all([
+    pmsGet(`/rate_plans/options?filter[property_id]=${encodeURIComponent(propertyId)}`, apiKey),
+    getOtaRatePlanChannels(apiKey),
+  ]);
   return rows.map((r) => {
     const a = r.attributes ?? {};
-    const options = Array.isArray(a.options) ? (a.options as Record<string, unknown>[]) : [];
-    const primary = options.find((o) => o.isPrimary) ?? options[0];
     const mealRaw = str(a.mealType) ?? str(a.mealPlan);
+    const otaChannels = otaMap.get(r.id) ?? [];
     return {
       id: r.id,
       title: str(a.title) ?? "Rate",
       roomTypeId: str(a.roomTypeId) ?? "",
       mealPlan: mealRaw ? (MEAL_LABELS[mealRaw] ?? mealRaw) : undefined,
       currency: str(a.currency),
-      nightlyPrice: primary ? num(primary.rate) : undefined,
-      defaultOccupancy: primary ? num(primary.occupancy) : undefined,
+      occupancy: num(a.occupancy),
+      ota: otaChannels.length > 0,
+      otaChannels,
     };
   });
 }

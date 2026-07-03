@@ -74,7 +74,9 @@ async function importFromChannex(
       id: rp.id,
       title: rp.title,
       mealPlan: rp.mealPlan,
-      prices: rp.nightlyPrice != null ? { [rp.roomTypeId]: rp.nightlyPrice } : {},
+      // Prices aren't seeded from the options endpoint — live nightly rates flow
+      // in from Channex via Open Channel ARI, and the owner can set a fallback.
+      prices: {},
       refundable: true,
       inclusions: [],
       active: true,
@@ -108,7 +110,10 @@ export async function action({ request }: Route.ActionArgs) {
     if (intent === "import") {
       const propertyId = String(form.get("channexPropertyId") || "");
       const roomIds = new Set(form.getAll("rooms").map(String));
-      const rateIds = new Set(form.getAll("rates").map(String));
+      // Rate plans are chosen by title: Channex stores one rate-plan record per
+      // room type, so a single "Book Direct" plan is really N records. Selecting
+      // by title imports it for every (selected) room type in one tick.
+      const rateTitles = new Set(form.getAll("rateTitles").map(String));
       const [properties, roomTypes, ratePlans] = await Promise.all([
         listChannexProperties(apiKey),
         getChannexRoomTypes(apiKey, propertyId),
@@ -132,7 +137,7 @@ export async function action({ request }: Route.ActionArgs) {
         email,
         property,
         roomTypes.filter((r) => roomIds.has(r.id)),
-        ratePlans.filter((rp) => rateIds.has(rp.id)),
+        ratePlans.filter((rp) => rateTitles.has(rp.title)),
       );
       return redirect("/admin", {
         headers: { "Set-Cookie": await setSessionProperty(request, property.id) },
@@ -158,6 +163,27 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
   const rooms = (actionData && "rooms" in actionData ? actionData.rooms : []) ?? [];
   const rates = (actionData && "rates" in actionData ? actionData.rates : []) ?? [];
   const error = actionData && "error" in actionData ? actionData.error : undefined;
+
+  // Channex keeps one rate-plan record per room type, so a single logical plan
+  // (e.g. "Book Direct") appears once per room. Group by title so the owner
+  // picks logical plans, not dozens of duplicates. A group is "OTA" if any of
+  // its records is distributed to an OTA channel.
+  const rateGroups = Object.values(
+    rates.reduce<
+      Record<string, { title: string; mealPlan?: string; count: number; ota: boolean; otaChannels: string[] }>
+    >((acc, rp) => {
+      const g = (acc[rp.title] ??= { title: rp.title, mealPlan: rp.mealPlan, count: 0, ota: false, otaChannels: [] });
+      g.count++;
+      if (rp.mealPlan && !g.mealPlan) g.mealPlan = rp.mealPlan;
+      if (rp.ota) {
+        g.ota = true;
+        for (const c of rp.otaChannels) if (!g.otaChannels.includes(c)) g.otaChannels.push(c);
+      }
+      return acc;
+    }, {}),
+  );
+  const directGroups = rateGroups.filter((g) => !g.ota);
+  const otaGroups = rateGroups.filter((g) => g.ota);
 
   return (
     <div className="max-w-[720px]">
@@ -278,31 +304,67 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
 
           <section className="rounded-[14px] border border-line bg-surface p-6">
             <div className="mb-1 font-serif text-[18px] font-semibold">
-              Rate plans <span className="font-sans text-[13px] font-normal text-muted">({rates.length})</span>
+              Rate plans <span className="font-sans text-[13px] font-normal text-muted">({rateGroups.length})</span>
             </div>
             <p className="mb-3 text-[12.5px] text-muted">
-              A rate only imports if its room type is also selected. Prices are imported as a starting
-              point — review them after, live nightly rates flow from Channex.
+              A rate only imports if its room type is also selected. Live nightly rates flow from
+              Channex after import.
             </p>
-            {rates.length === 0 ? (
+            {rateGroups.length === 0 ? (
               <p className="text-[13.5px] text-muted">No rate plans found for this property.</p>
             ) : (
               <div className="flex flex-col gap-2">
-                {rates.map((rp) => (
+                {directGroups.map((g) => (
                   <label
-                    key={rp.id}
+                    key={g.title}
                     className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3"
                   >
-                    <input type="checkbox" name="rates" value={rp.id} defaultChecked className="mt-1" />
+                    <input type="checkbox" name="rateTitles" value={g.title} defaultChecked className="mt-1" />
                     <span className="flex-1">
-                      <span className="block text-[14px] font-semibold text-ink">{rp.title}</span>
+                      <span className="block text-[14px] font-semibold text-ink">{g.title}</span>
                       <span className="block text-[12.5px] text-muted">
-                        {rp.mealPlan ?? "Room only"}
-                        {rp.nightlyPrice != null ? ` · from ${rp.currency ?? ""}${rp.nightlyPrice}/night` : ""}
+                        {g.mealPlan ?? "Room only"} · {g.count} room type{g.count === 1 ? "" : "s"}
                       </span>
                     </span>
                   </label>
                 ))}
+
+                {otaGroups.length > 0 && (
+                  <>
+                    <div className="mt-4 mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+                      Distributed to OTAs
+                    </div>
+                    <p className="mb-2 text-[12.5px] text-muted">
+                      These rate plans are already sold on channels like Booking.com or Expedia.
+                      They’re left unticked — a direct booking engine usually sells your own direct
+                      rates. Tick any you also want to offer here.
+                    </p>
+                    {otaGroups.map((g) => (
+                      <label
+                        key={g.title}
+                        className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-dashed border-line-alt bg-surface px-4 py-3"
+                      >
+                        <input type="checkbox" name="rateTitles" value={g.title} className="mt-1" />
+                        <span className="flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span className="text-[14px] font-semibold text-ink">{g.title}</span>
+                            {g.otaChannels.map((c) => (
+                              <span
+                                key={c}
+                                className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted"
+                              >
+                                {c}
+                              </span>
+                            ))}
+                          </span>
+                          <span className="block text-[12.5px] text-muted">
+                            {g.mealPlan ?? "Room only"} · {g.count} room type{g.count === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </section>
