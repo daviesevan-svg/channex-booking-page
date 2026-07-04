@@ -161,6 +161,16 @@ export async function deleteRate(pid: string, id: string): Promise<void> {
   await writeArr(ratesKey(pid), list);
 }
 
+/** Replace the whole rooms / rates list in one write. Used by the Channex
+ *  import so a re-import rebuilds the catalog cleanly instead of piling new
+ *  records on top of a previous import's. */
+export async function replaceRooms(pid: string, rooms: CatalogRoom[]): Promise<void> {
+  await writeArr(roomsKey(pid), rooms);
+}
+export async function replaceRates(pid: string, rates: CatalogRate[]): Promise<void> {
+  await writeArr(ratesKey(pid), rates);
+}
+
 /** The catalog as Open Channel mapping_details: our room types + active rate
  *  plans, with our ids, so Channex can map the hotel's rooms onto them and then
  *  push ARI keyed by these same ids. */
