@@ -12,6 +12,7 @@ import type { AppliedPromo } from "./promotions";
 import type { ResolvedExtra } from "./extras";
 import { resolveBookingCancellation } from "./policy.server";
 import { getRates, rateChannexId } from "./catalog.server";
+import { getProperty } from "./properties.server";
 
 export interface PreparePendingInput {
   pid: string;
@@ -43,6 +44,10 @@ export interface PreparePendingInput {
 
 export async function preparePendingBooking(input: PreparePendingInput): Promise<PendingBooking> {
   const { pid, reference, checkin, checkout, currency, nights, lines, guest, grandTotal } = input;
+
+  // Defence in depth: never build a booking for a property that no longer
+  // exists (deleted from the registry) — its catalog/ARI data can linger in KV.
+  if (!(await getProperty(pid))) throw new Error("This property is no longer available.");
 
   // A consolidated imported rate carries per-room Channex rate ids; the push
   // (and Channex's mapping) key by the room's real id, while our line keeps our

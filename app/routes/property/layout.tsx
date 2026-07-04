@@ -12,7 +12,7 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+import { getProperty, resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -21,6 +21,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // keep params.channelId so the slug stays in the URL through the flow.
   const lang = langFromRequest(request);
   const pid = await resolvePropertyId(params.channelId);
+  // A property that isn't in the registry (never existed, or was deleted) must
+  // 404 — its KV data can linger after removal, so we gate on the registry, not
+  // on whether settings/overrides happen to still be readable.
+  if (!(await getProperty(pid))) {
+    throw new Response("Property not found", { status: 404 });
+  }
   const [overrides, settings] = await Promise.all([
     getOverrides(pid, lang),
     getSettings(pid),
