@@ -44,6 +44,7 @@ export default [
     route("connectivity", "routes/admin/connectivity.tsx"),
     route("google-hotels", "routes/admin/google-hotels.tsx"),
     route("website-widget", "routes/admin/website-widget.tsx"),
+    route("brand-kit", "routes/admin/brand-kit.tsx"),
     route("payments", "routes/admin/payments.tsx"),
     route("payments/callback", "routes/admin/payments.callback.tsx"),
     route("api-keys", "routes/admin/api-keys.tsx"),
