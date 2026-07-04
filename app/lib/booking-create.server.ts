@@ -11,6 +11,7 @@ import type { ResolvedLine } from "./cart";
 import type { AppliedPromo } from "./promotions";
 import type { ResolvedExtra } from "./extras";
 import { resolveBookingCancellation } from "./policy.server";
+import { getRates, rateChannexId } from "./catalog.server";
 
 export interface PreparePendingInput {
   pid: string;
@@ -43,6 +44,15 @@ export interface PreparePendingInput {
 export async function preparePendingBooking(input: PreparePendingInput): Promise<PendingBooking> {
   const { pid, reference, checkin, checkout, currency, nights, lines, guest, grandTotal } = input;
 
+  // A consolidated imported rate carries per-room Channex rate ids; the push
+  // (and Channex's mapping) key by the room's real id, while our line keeps our
+  // catalog id for policy/cancellation lookups. Resolve per line for the push.
+  const ratesById = new Map((await getRates(pid)).map((r) => [r.id, r]));
+  const pushRateId = (roomId: string, rateId: string) => {
+    const r = ratesById.get(rateId);
+    return r ? rateChannexId(r, roomId) : rateId;
+  };
+
   // Open Channel payload — each room's (promo-adjusted) total is spread across
   // the stay nights as days[], so the price we send is exactly what we charge.
   const stayDates = Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkin), i), "yyyy-MM-dd"));
@@ -70,7 +80,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
           date,
           // last night absorbs the rounding remainder so days sum to lineTotal
           price: (i === nights - 1 ? Math.round((lineTotal - per * (nights - 1)) * 100) / 100 : per).toFixed(2),
-          rate_plan_code: l.rateId,
+          rate_plan_code: pushRateId(l.roomId, l.rateId),
         })),
       };
     }),
