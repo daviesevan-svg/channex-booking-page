@@ -6,6 +6,7 @@
 import { getConfig } from "./config.server";
 import { DEFAULT_THEME, THEMES, fontPair } from "./content";
 import { getOverrides, getSettings } from "./overrides.server";
+import { getProperty } from "./properties.server";
 
 // Default font pair (FONT_PAIRS[0]) has no href — it's loaded in root.tsx. Give
 // external sites the same Google Fonts URL so they render identical type.
@@ -150,7 +151,7 @@ function brandJson(hotelName: string, t: BrandTokens): string {
 
 /** The copy-paste AI prompt: everything an assistant needs to build a website
  *  in the same style, with the exact tokens inlined. */
-function brandPrompt(hotelName: string, t: BrandTokens): string {
+function brandPrompt(hotelName: string, t: BrandTokens, bookingUrl: string): string {
   return `You are building a marketing website for "${hotelName}". It must visually match our existing hotel booking engine so the two feel like one brand. Use the exact design tokens below — do not invent new colours or fonts.
 
 ## Fonts
@@ -180,8 +181,16 @@ Load this stylesheet in the <head>:
 ## Style direction
 Warm, editorial, and calm — generous whitespace, large serif headings, restrained accent use (accent is for CTAs, links and small highlights, not big blocks). Buttons are solid --accent with white text; they darken to --accent-deep on hover. Prices/quality signals are understated. Mobile-first and responsive.
 
+## Booking links (send guests to our booking engine — never build your own checkout)
+Booking engine URL: ${bookingUrl}
+- A plain "Book now" button links to that URL.
+- To jump straight to availability, deep-link to ${bookingUrl}/rooms with query params:
+  checkin=YYYY-MM-DD  checkout=YYYY-MM-DD  adults=2  childrenAge=8,12  (children ages comma-separated; omit if none)
+  e.g. ${bookingUrl}/rooms?checkin=2026-09-01&checkout=2026-09-03&adults=2
+- Prefer a small "check availability" search form (check-in date, check-out date, guests) that submits to ${bookingUrl}/rooms via GET — the field names above become the query string automatically. Open it in a new tab (target="_blank").
+
 ## Build
-A clean, fast marketing site (home, rooms/gallery, about, contact). Prominent "Book now" buttons that link out to our booking engine. Keep the palette and type exactly as above so it's indistinguishable in style from the booking flow.`;
+A clean, fast marketing site (home, rooms/gallery, about, contact). Put a booking search form in the hero and prominent "Book now" buttons throughout, all pointing at the booking engine as above. Keep the palette and type exactly as above so it's indistinguishable in style from the booking flow.`;
 }
 
 export interface BrandKit {
@@ -190,21 +199,31 @@ export interface BrandKit {
   css: string;
   json: string;
   prompt: string;
+  /** The public booking-engine URL for this property (uses the shortcode if set). */
   bookingUrl: string;
+  /** Example deep-link into availability with dates/guests prefilled. */
+  deepLinkExample: string;
 }
 
 /** Build the full brand kit for a property from its live theme settings. */
 export async function buildBrandKit(pid: string): Promise<BrandKit> {
-  const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+  const [settings, overrides, property] = await Promise.all([
+    getSettings(pid),
+    getOverrides(pid),
+    getProperty(pid),
+  ]);
   const hotelName = overrides.hotelName || "Our hotel";
   const tokens = resolveTokens(settings.customColor, settings.theme, settings.customBg, settings.themeFont);
   const appUrl = getConfig().appUrl.replace(/\/+$/, "");
+  // Prefer the shortcode/slug for a tidy link; it resolves to the same property.
+  const bookingUrl = `${appUrl}/${property?.slug || pid}`;
   return {
     hotelName,
     tokens,
     css: brandCss(hotelName, tokens),
     json: brandJson(hotelName, tokens),
-    prompt: brandPrompt(hotelName, tokens),
-    bookingUrl: `${appUrl}/${pid}`,
+    prompt: brandPrompt(hotelName, tokens, bookingUrl),
+    bookingUrl,
+    deepLinkExample: `${bookingUrl}/rooms?checkin=2026-09-01&checkout=2026-09-03&adults=2`,
   };
 }

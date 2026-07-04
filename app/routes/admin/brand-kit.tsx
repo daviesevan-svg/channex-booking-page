@@ -17,6 +17,27 @@ export function meta() {
   return [{ title: "Admin · Brand kit" }];
 }
 
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
+        } catch {
+          /* clipboard blocked — the text is visible to copy manually */
+        }
+      }}
+      className="flex-none rounded-[8px] border border-line-alt bg-surface px-3 py-1.5 text-[12px] font-semibold text-secondary hover:border-accent hover:text-accent"
+    >
+      {copied ? "Copied ✓" : label}
+    </button>
+  );
+}
+
 function Swatch({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2.5">
@@ -41,7 +62,15 @@ export default function BrandKit({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const { hotelName, tokens, css, json, prompt } = loaderData;
+  const { hotelName, tokens, css, json, prompt, bookingUrl, deepLinkExample } = loaderData;
+
+  const bookNowSnippet = `<a href="${bookingUrl}" target="_blank" rel="noopener">Book now</a>`;
+  const searchFormSnippet = `<form action="${bookingUrl}/rooms" method="get" target="_blank">
+  <label>Check-in <input type="date" name="checkin" required></label>
+  <label>Check-out <input type="date" name="checkout" required></label>
+  <label>Guests <input type="number" name="adults" value="2" min="1"></label>
+  <button type="submit">Check availability</button>
+</form>`;
 
   const copyPrompt = async () => {
     try {
@@ -73,6 +102,75 @@ export default function BrandKit({ loaderData }: Route.ComponentProps) {
         fonts and shapes your booking pages use, so a designer — or an AI like ChatGPT or Claude — can
         make a site that matches. Copy the prompt, or download the token files to drop straight in.
       </p>
+
+      {/* Booking link + deep-link */}
+      <section className="mb-5 rounded-[14px] border border-line bg-surface p-6">
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">Your booking link</h2>
+        <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
+          This is where “Book now” buttons on your new site should point. You can also deep-link
+          straight to availability with dates and guests prefilled.
+        </p>
+
+        <div className="mb-4 flex items-center gap-2">
+          <code className="min-w-0 flex-1 truncate rounded-[8px] border border-line-alt bg-surface-alt px-3 py-2 font-mono text-[13px] text-ink">
+            {bookingUrl}
+          </code>
+          <CopyButton text={bookingUrl} label="Copy link" />
+          <a href={bookingUrl} target="_blank" rel="noopener" className="flex-none text-[13px] font-semibold text-accent hover:underline">
+            Open ↗
+          </a>
+        </div>
+
+        <div className="mb-4 rounded-[10px] bg-surface-alt p-4">
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">Deep-link to availability</div>
+          <p className="mb-2 text-[12.5px] text-muted">
+            Add <code className="font-mono">/rooms</code> and these query params (children ages are
+            comma-separated; omit if none):
+          </p>
+          <ul className="mb-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[12.5px] text-muted sm:grid-cols-4">
+            <li><code className="font-mono text-ink">checkin</code> YYYY-MM-DD</li>
+            <li><code className="font-mono text-ink">checkout</code> YYYY-MM-DD</li>
+            <li><code className="font-mono text-ink">adults</code> number</li>
+            <li><code className="font-mono text-ink">childrenAge</code> e.g. 8,12</li>
+          </ul>
+          <div className="flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-[8px] border border-line-alt bg-surface px-3 py-2 font-mono text-[12px] text-muted">
+              {deepLinkExample}
+            </code>
+            <CopyButton text={deepLinkExample} />
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[13px] font-semibold text-secondary">“Book now” button (HTML)</span>
+            <CopyButton text={bookNowSnippet} label="Copy" />
+          </div>
+          <pre className="overflow-x-auto rounded-[10px] border border-line-alt bg-surface-alt p-3 font-mono text-[12px] text-secondary">
+            {bookNowSnippet}
+          </pre>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-[13px] font-semibold text-secondary">
+              Mini search widget (HTML — deep-links on submit, no JavaScript)
+            </span>
+            <CopyButton text={searchFormSnippet} label="Copy" />
+          </div>
+          <pre className="overflow-x-auto rounded-[10px] border border-line-alt bg-surface-alt p-3 font-mono text-[12px] text-secondary">
+            {searchFormSnippet}
+          </pre>
+          <p className="mt-2 text-[12.5px] text-muted">
+            The form’s field names become the query string automatically. Want a fully styled,
+            drop-in date-picker instead? Use the{" "}
+            <a href="/admin/website-widget" className="font-semibold text-accent hover:underline">
+              Website widget
+            </a>
+            .
+          </p>
+        </div>
+      </section>
 
       {/* Token preview */}
       <section className="mb-5 rounded-[14px] border border-line bg-surface p-6">
