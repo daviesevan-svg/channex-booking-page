@@ -11,7 +11,7 @@ import {
   type ChannexRatePlan,
   type ChannexRoomType,
 } from "~/lib/channex/pms.server";
-import { saveRate, saveRoom } from "~/lib/catalog.server";
+import { replaceRates, replaceRooms } from "~/lib/catalog.server";
 import { DEFAULT_LANG } from "~/lib/content";
 import { patchSettings, saveOverrides } from "~/lib/overrides.server";
 import { addProperty } from "~/lib/properties.server";
@@ -52,9 +52,9 @@ async function importFromChannex(
   });
 
   const now = new Date().toISOString();
-  let position = 0;
-  for (const r of rooms) {
-    await saveRoom(pid, {
+  await replaceRooms(
+    pid,
+    rooms.map((r, position) => ({
       id: r.id,
       title: r.title,
       description: r.description,
@@ -62,10 +62,10 @@ async function importFromChannex(
       maxAdults: r.maxAdults,
       maxGuests: r.maxGuests,
       facilities: r.facilities,
-      position: position++,
+      position,
       createdAt: now,
-    });
-  }
+    })),
+  );
 
   const importedRoomIds = new Set(rooms.map((r) => r.id));
   // Channex stores one rate-plan record per room type, but our model is one rate
@@ -83,8 +83,11 @@ async function importFromChannex(
     g.channexRateIds[rp.roomTypeId] = rp.id;
     byTitle.set(rp.title, g);
   }
-  for (const g of byTitle.values()) {
-    await saveRate(pid, {
+  // Replace, not append — a re-import rebuilds the catalog cleanly rather than
+  // leaving the previous import's per-room duplicates behind.
+  await replaceRates(
+    pid,
+    [...byTitle.values()].map((g) => ({
       id: g.first.id, // one of the Channex rate ids doubles as our local id
       title: g.first.title,
       mealPlan: g.first.mealPlan,
@@ -94,8 +97,8 @@ async function importFromChannex(
       inclusions: [],
       active: true,
       createdAt: now,
-    });
-  }
+    })),
+  );
 }
 
 export async function action({ request }: Route.ActionArgs) {
