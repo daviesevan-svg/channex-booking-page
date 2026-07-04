@@ -45,6 +45,11 @@ export interface CatalogRate {
   prices: Record<string, number>;
   /** Optional per-person pricing rules (absent = flat price for any party). */
   occupancyPricing?: OccupancyPricing;
+  /** For rates imported from Channex, the real per-room Channex rate_plan_id
+   *  (roomId → id). Channex stores one rate plan per room type, but we present
+   *  a single consolidated rate; ARI, mapping and booking pushes still key by
+   *  the room's own Channex id. Absent for native rates (they key by `id`). */
+  channexRateIds?: Record<string, string>;
   /** Structured payment + cancellation + no-show policy. When absent, the legacy
    *  flat fields below are used (see ratePolicyOf in rate-policy.ts). */
   policy?: RatePolicy;
@@ -72,6 +77,13 @@ function normalizeRate(raw: CatalogRate & { roomId?: string; nightlyPrice?: numb
     children?: number;
   };
   return { ...rest, prices };
+}
+
+/** The Channex rate_plan_id to use for a given room — the imported per-room id
+ *  when present, otherwise the rate's own id. This is the id that ARI, mapping
+ *  and booking pushes key by (see channexRateIds). */
+export function rateChannexId(rate: Pick<CatalogRate, "id" | "channexRateIds">, roomId: string): string {
+  return rate.channexRateIds?.[roomId] ?? rate.id;
 }
 
 /** Lowest price across the rooms a rate is offered on (undefined if none). */
@@ -162,7 +174,9 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
       rate_plans: rates
         .filter((r) => r.active && r.prices[room.id] !== undefined)
         .map((r) => ({
-          id: r.id,
+          // Advertise the room's real Channex rate id so Channel mapping and the
+          // ARI it pushes back line up per room, even though we present one rate.
+          id: rateChannexId(r, room.id),
           title: r.title,
           sell_mode: "per_room",
           max_persons: room.maxGuests,
@@ -242,7 +256,9 @@ export async function getCatalogRooms(
             .map((r): RatePlan | null => {
               const base = r.prices[room.id];
               const pol = ratePolicyOf(r);
-              const k = (d: string) => `${room.id}|${r.id}|${d}`;
+              // ARI is keyed by the room's real Channex rate id, which for a
+              // consolidated imported rate differs from our single `r.id`.
+              const k = (d: string) => `${room.id}|${rateChannexId(r, room.id)}|${d}`;
               if (gate) {
                 if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) return null;
                 const minStay = (checkinDate && inv.restrictions[k(checkinDate)]?.minStay) || 1;
@@ -406,7 +422,7 @@ export async function getCalendarAvailability(
         // getInventory keys restrictions by room|rate|date (see ari.server.ts) —
         // the old rate|date key never matched, so the calendar showed stop-sell/
         // CTA/CTD/min-stay dates as open. Match the booking gate's key exactly.
-        const r = inv.restrictions[`${room.id}|${rt.id}|${date}`];
+        const r = inv.restrictions[`${room.id}|${rateChannexId(rt, room.id)}|${date}`];
         if (r?.stopSell) continue; // rate not bookable this day
         bookable = true;
         minStay = Math.min(minStay, r?.minStay || 1);

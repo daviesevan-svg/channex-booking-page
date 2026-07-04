@@ -68,15 +68,28 @@ async function importFromChannex(
   }
 
   const importedRoomIds = new Set(rooms.map((r) => r.id));
+  // Channex stores one rate-plan record per room type, but our model is one rate
+  // plan spanning many rooms. Consolidate by title into a single rate applied to
+  // every imported room it covers. `channexRateIds` keeps each room's real
+  // Channex rate id so ARI, mapping and booking pushes still key per room.
+  const byTitle = new Map<
+    string,
+    { first: ChannexRatePlan; prices: Record<string, number>; channexRateIds: Record<string, string> }
+  >();
   for (const rp of rates) {
     if (!importedRoomIds.has(rp.roomTypeId)) continue; // its room wasn't imported
+    const g = byTitle.get(rp.title) ?? { first: rp, prices: {}, channexRateIds: {} };
+    g.prices[rp.roomTypeId] = 0; // base 0 — live nightly rates flow in from Channex ARI
+    g.channexRateIds[rp.roomTypeId] = rp.id;
+    byTitle.set(rp.title, g);
+  }
+  for (const g of byTitle.values()) {
     await saveRate(pid, {
-      id: rp.id,
-      title: rp.title,
-      mealPlan: rp.mealPlan,
-      // Prices aren't seeded from the options endpoint — live nightly rates flow
-      // in from Channex via Open Channel ARI, and the owner can set a fallback.
-      prices: {},
+      id: g.first.id, // one of the Channex rate ids doubles as our local id
+      title: g.first.title,
+      mealPlan: g.first.mealPlan,
+      prices: g.prices,
+      channexRateIds: g.channexRateIds,
       refundable: true,
       inclusions: [],
       active: true,
@@ -170,10 +183,10 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
   // its records is distributed to an OTA channel.
   const rateGroups = Object.values(
     rates.reduce<
-      Record<string, { title: string; mealPlan?: string; count: number; ota: boolean; otaChannels: string[] }>
+      Record<string, { title: string; mealPlan?: string; rooms: Set<string>; ota: boolean; otaChannels: string[] }>
     >((acc, rp) => {
-      const g = (acc[rp.title] ??= { title: rp.title, mealPlan: rp.mealPlan, count: 0, ota: false, otaChannels: [] });
-      g.count++;
+      const g = (acc[rp.title] ??= { title: rp.title, mealPlan: rp.mealPlan, rooms: new Set(), ota: false, otaChannels: [] });
+      g.rooms.add(rp.roomTypeId); // distinct room types, not raw records (Channex has one per room)
       if (rp.mealPlan && !g.mealPlan) g.mealPlan = rp.mealPlan;
       if (rp.ota) {
         g.ota = true;
@@ -181,7 +194,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
       }
       return acc;
     }, {}),
-  );
+  ).map((g) => ({ ...g, count: g.rooms.size }));
   const directGroups = rateGroups.filter((g) => !g.ota);
   const otaGroups = rateGroups.filter((g) => g.ota);
 

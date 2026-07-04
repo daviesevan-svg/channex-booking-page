@@ -9,7 +9,7 @@
 import { addDays, format, parseISO } from "date-fns";
 
 import { getInventory } from "../ari.server";
-import { getRates, getRooms } from "../catalog.server";
+import { getRates, getRooms, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
 import { occupancyNightlyDelta } from "../rate-pricing";
@@ -104,10 +104,13 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
     for (const rate of roomRates) {
       const op = rate.occupancyPricing;
       const catalogBase = rate.prices[room.id];
+      // ARI (and Google) key by the room's real Channex rate id, which differs
+      // from our single `rate.id` for a consolidated imported rate.
+      const rid = rateChannexId(rate, room.id);
 
       // Per-occupancy nightly amount vector for a given date.
       const amountsAt = (date: string): { guests: number; amount: number }[] => {
-        const base = inv.prices[`${room.id}|${rate.id}|${date}`] ?? catalogBase;
+        const base = inv.prices[`${room.id}|${rid}|${date}`] ?? catalogBase;
         return Array.from({ length: maxAdults }, (_, i) => {
           const guests = i + 1;
           return { guests, amount: netAmount(base, occupancyNightlyDelta(op, guests, []), vat) };
@@ -116,12 +119,12 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       const sameAmounts = (a: { guests: number; amount: number }[], b: { guests: number; amount: number }[]) =>
         a.length === b.length && a.every((x, i) => x.amount === b[i].amount);
       for (const run of groupRuns(dates, amountsAt, sameAmounts)) {
-        rates.push({ roomId: room.id, rateId: rate.id, start: run.start, end: run.end, currency, amounts: run.value });
+        rates.push({ roomId: room.id, rateId: rid, start: run.start, end: run.end, currency, amounts: run.value });
       }
 
       // Restrictions (authoritative open/close each push).
       const cellAt = (date: string) => {
-        const c = inv.restrictions[`${room.id}|${rate.id}|${date}`];
+        const c = inv.restrictions[`${room.id}|${rid}|${date}`];
         return {
           stopSell: c?.stopSell ?? false,
           cta: c?.cta ?? false,
