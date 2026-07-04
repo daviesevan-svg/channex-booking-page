@@ -172,6 +172,9 @@ export interface SiteSettings {
   customBg?: string;
   /** Curated Google-Font pairing id (see FONT_PAIRS). Unset = default fonts. */
   themeFont?: string;
+  /** Property cover photo (/images/… path). Used as the property's image on the
+   *  Collections cards; falls back to the cheapest room's photo when unset. */
+  coverImage?: string;
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;
   privacyUrl?: string;

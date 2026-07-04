@@ -5,7 +5,8 @@ import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, renameProperty } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
-import { getOverridesRaw, getSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
+import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
+import { uploadPropertyCoverImage } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { COUNTRIES } from "~/lib/countries";
 
@@ -41,6 +42,17 @@ export async function action({ request }: Route.ActionArgs) {
   // Google fields are global property settings (merged so the rest is untouched).
   await saveOverrides(propertyId, lang, Object.fromEntries(form));
   await savePropertyMeta(propertyId, form);
+  // Property cover photo (global; shown on Collections cards).
+  const coverUpload = form.get("coverUpload");
+  if (coverUpload instanceof File && coverUpload.size > 0) {
+    try {
+      await patchSettings(propertyId, { coverImage: await uploadPropertyCoverImage(propertyId, coverUpload) });
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Cover image upload failed." };
+    }
+  } else if (form.get("removeCover") === "1") {
+    await patchSettings(propertyId, { coverImage: "" });
+  }
   // Keep the property switcher / list label in sync with the hotel name. That
   // registry label is a single canonical name, so only the default-language
   // hotel name drives it — editing a translation doesn't rename the property.
@@ -88,13 +100,49 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         The hotel details guests see across the booking engine.
       </p>
 
+      {actionData && "error" in actionData && actionData.error && (
+        <p className="mb-4 rounded-[10px] bg-[#fdecea] px-4 py-2.5 text-[13px] font-semibold text-[#c0392b]">
+          {actionData.error}
+        </p>
+      )}
+
       <Form
         method="post"
+        encType="multipart/form-data"
         key={lang}
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
         <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
+
+        {/* Cover photo — the property's image on Collections cards. Global (not
+            per-language). */}
+        <div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">Cover photo</div>
+          {settings.coverImage ? (
+            <div className="mb-2 flex items-center gap-3">
+              <img
+                src={settings.coverImage}
+                alt="Property cover"
+                className="h-20 w-32 flex-none rounded-[10px] border border-line-alt object-cover"
+              />
+              <label className="flex items-center gap-2 text-[13px] text-secondary">
+                <input type="checkbox" name="removeCover" value="1" /> Remove
+              </label>
+            </div>
+          ) : (
+            <p className="mb-2 text-[12.5px] text-muted">
+              No cover set — collection cards fall back to a room photo. Upload one for a reliable image.
+            </p>
+          )}
+          <input
+            type="file"
+            name="coverUpload"
+            accept="image/*"
+            className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
+          />
+          <p className="mt-1 text-[11px] text-faint">JPG/PNG/WebP, up to 8MB. Uploaded to your R2 bucket.</p>
+        </div>
         <Field
           name="propertyType"
           label="Property type"

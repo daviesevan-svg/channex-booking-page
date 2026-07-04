@@ -73,7 +73,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       const lat = parseFloat(settings.latitude ?? "");
       const lng = parseFloat(settings.longitude ?? "");
 
-      let photo: string | null = null;
+      // The property's own cover photo is the image — shown even before a date
+      // search. Falls back to the cheapest room's photo when no cover is set.
+      let photo: string | null = settings.coverImage || null;
       let chips: string[] = [];
       let fromPrice: string | null = null;
       let fromPriceNum: number | null = null;
@@ -117,7 +119,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           }
         }
         if (cheapestRoom) {
-          photo = cheapestRoom.photos?.[0]?.url ?? null;
+          if (!photo) photo = cheapestRoom.photos?.[0]?.url ?? null;
           chips = (cheapestRoom.facilities ?? []).slice(0, 3);
           fromPrice = formatMoney(cheapest, currency);
           fromPriceNum = cheapest;
