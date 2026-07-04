@@ -161,6 +161,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             { to: "/admin/connectivity", label: "Connectivity", end: false },
             { to: "/admin/google-hotels", label: "Google Hotels", end: false },
             { to: "/admin/website-widget", label: "Website widget", end: false },
+            { to: "/admin/brand-kit", label: "Brand kit", end: false },
             { to: "/admin/payments", label: "Payments", end: false },
             ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys", end: false }] : []),
             ...(canManageCurrent ? [{ to: "/admin/webhooks", label: "Webhooks", end: false }] : []),
