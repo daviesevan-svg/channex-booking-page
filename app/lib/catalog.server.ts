@@ -281,9 +281,15 @@ export async function getCatalogRooms(
               const op = r.occupancyPricing;
               const adults = query.adults && query.adults > 0 ? query.adults : (op?.defaultOccupancy ?? 1);
               const delta = occupancyNightlyDelta(op, adults, childrenAge);
-              const raw = nightDates.length
-                ? nightDates.reduce((s, d) => s + Math.max(0, (inv.prices[k(d)] ?? base) + delta), 0)
-                : Math.max(0, base + delta) * nights;
+              // Effective nightly price for the stay: the ARI price when set, else
+              // the rate's base. A night priced at 0 means no rate is loaded (or
+              // it's free) — we don't sell free rooms, so any unpriced night makes
+              // the rate unbookable (and a room with no priced rate drops out).
+              const nightly = nightDates.length
+                ? nightDates.map((d) => (inv.prices[k(d)] ?? base) + delta)
+                : [base + delta];
+              if (nightly.some((n) => n <= 0)) return null;
+              const raw = nightDates.length ? nightly.reduce((s, n) => s + n, 0) : nightly[0] * nights;
               const gross = Math.round(raw * 100) / 100;
               const sale = offer ? Math.round(gross * (1 - offer.value / 100) * 100) / 100 : gross;
               const total = sale.toFixed(2);
@@ -429,11 +435,16 @@ export async function getCalendarAvailability(
       const avail = inv.availability[`${room.id}|${date}`] ?? 0;
       if (avail <= 0) continue; // no inventory set = not bookable
       for (const rt of roomRates) {
-        // getInventory keys restrictions by room|rate|date (see ari.server.ts) —
-        // the old rate|date key never matched, so the calendar showed stop-sell/
-        // CTA/CTD/min-stay dates as open. Match the booking gate's key exactly.
-        const r = inv.restrictions[`${room.id}|${rateChannexId(rt, room.id)}|${date}`];
+        // getInventory keys restrictions/prices by room|rate|date (see
+        // ari.server.ts) — the old rate|date key never matched, so the calendar
+        // showed stop-sell/CTA/CTD/min-stay dates as open. Match the booking
+        // gate's key exactly.
+        const rid = rateChannexId(rt, room.id);
+        const r = inv.restrictions[`${room.id}|${rid}|${date}`];
         if (r?.stopSell) continue; // rate not bookable this day
+        // A night with no price (or 0) isn't for sale — mirror getCatalogRooms
+        // so the calendar doesn't offer a date the results page will reject.
+        if ((inv.prices[`${room.id}|${rid}|${date}`] ?? rt.prices[room.id]) <= 0) continue;
         bookable = true;
         minStay = Math.min(minStay, r?.minStay || 1);
         if (!r?.cta) arrivalOpen = true;
