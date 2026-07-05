@@ -110,9 +110,10 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
   const token = await getAccessToken();
   if (!token) return null;
 
+  // Filter grammar per Google: `hotelId = 'VALUE'` (equals, spaces, quoted).
   const url =
     `${API}/accounts/${encodeURIComponent(acct)}/hotelViews` +
-    `?pageSize=10&filter=${encodeURIComponent(`partnerHotelId=${hotelId}`)}`;
+    `?pageSize=10&filter=${encodeURIComponent(`hotelId = '${hotelId}'`)}`;
   let json: { hotelViews?: HotelView[] };
   try {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
@@ -130,7 +131,12 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
   // Match by partnerHotelId; if the filter didn't narrow it, fall back to the
   // first row. No row → null (unknown), never a hard "not matched".
   const view = views.find((v) => v.partnerHotelId === hotelId) ?? (views.length === 1 ? views[0] : undefined);
-  if (!view) return null;
+  if (!view) {
+    // Success, but no matching view — tells us "not ingested / SA still
+    // activating" (0 views) apart from a shape/filter surprise (>0 but no match).
+    console.log(`[travelpartner] no matched view for ${hotelId} (${views.length} view(s) returned)`);
+    return null;
+  }
 
   return {
     matched: view.matchStatus === "MATCHED",
