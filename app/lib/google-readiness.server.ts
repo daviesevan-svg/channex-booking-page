@@ -4,6 +4,19 @@
 // gate the feed on `requiredMissing` and surface the gaps in the admin.
 import type { SiteSettings } from "./content";
 import { getOverrides, getSettings, type PropertyOverrides } from "./overrides.server";
+import { hasReceivedAri } from "./ari.server";
+
+/** Whether the property can actually take a booking — required before Google
+ *  advertises it. Either an active Stripe connection (we charge the guest
+ *  directly), OR a live Channex connection where bookings push to Channex for
+ *  payment/reservation. "Live" means Channex has actually sent an ARI push (not
+ *  just that the connection was toggled on), so we never advertise a Channex
+ *  property that isn't really trading. */
+export async function canTakeBookings(pid: string, settings: SiteSettings): Promise<boolean> {
+  if (settings.stripeAccountId && settings.stripeChargesEnabled) return true;
+  if (settings.connectedSystem === "channex" && (await hasReceivedAri(pid))) return true;
+  return false;
+}
 
 export interface ReadinessItem {
   field: string;
@@ -21,8 +34,13 @@ export interface GoogleReadiness {
 }
 
 /** Required for Google to match + accept the listing. Pure so the feed builder
- *  and the admin readiness panel agree on exactly the same rule. */
-export function requiredMissing(settings: SiteSettings, overrides: PropertyOverrides): ReadinessItem[] {
+ *  and the admin readiness panel agree on exactly the same rule. `canBook` is
+ *  resolved by the caller via canTakeBookings(). */
+export function requiredMissing(
+  settings: SiteSettings,
+  overrides: PropertyOverrides,
+  canBook: boolean,
+): ReadinessItem[] {
   const out: ReadinessItem[] = [];
   const need = (ok: unknown, field: string, label: string) => {
     if (!ok) out.push({ field, label });
@@ -32,8 +50,9 @@ export function requiredMissing(settings: SiteSettings, overrides: PropertyOverr
   need(settings.addressCity, "addressCity", "City (Location)");
   need(settings.addressCountry, "addressCountry", "Country (Location)");
   need(settings.latitude && settings.longitude, "geo", "Map coordinates — latitude & longitude (Location)");
-  // Google must not advertise a property that can't take a booking/payment.
-  need(settings.stripeAccountId && settings.stripeChargesEnabled, "stripe", "Active Stripe connection (Payments)");
+  // Google must not advertise a property that can't take a booking: an active
+  // Stripe connection, or a live Channex connection receiving rates.
+  need(canBook, "payment", "A way to take bookings — connect Stripe (Payments), or a live Channex connection receiving rates (Connectivity)");
   return out;
 }
 
@@ -51,10 +70,12 @@ export function recommendedMissing(settings: SiteSettings, overrides: PropertyOv
 
 export async function checkGoogleReadiness(pid: string): Promise<GoogleReadiness> {
   const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+  const canBook = await canTakeBookings(pid, settings);
+  const missingRequired = requiredMissing(settings, overrides, canBook);
   return {
     enabled: settings.googleStructuredData !== false,
-    missingRequired: requiredMissing(settings, overrides),
+    missingRequired,
     missingRecommended: recommendedMissing(settings, overrides),
-    ready: requiredMissing(settings, overrides).length === 0,
+    ready: missingRequired.length === 0,
   };
 }
