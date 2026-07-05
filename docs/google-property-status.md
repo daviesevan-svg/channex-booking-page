@@ -74,9 +74,13 @@ One-time setup — most of it is on Google's side; only step 6 is code.
    access activates ~24h later** — it is not instant.
 4. **Grab the numeric Account ID** from Hotel Center (Account settings). This is
    the `{ACCOUNT_ID}` in the endpoint path.
-5. **Store as Cloudflare secrets** (dashboard, never repo — public):
+5. **Store as Cloudflare ENCRYPTED SECRETS** (dashboard → Settings → Variables &
+   Secrets → type **Secret**, or `wrangler secret put`), never repo — public:
    `GOOGLE_TRAVELPARTNER_SA_EMAIL`, `GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY`
    (the PEM, newlines intact), `GOOGLE_TRAVELPARTNER_ACCOUNT_ID`.
+   ⚠ Must be **Secrets, not plaintext Variables** — a deploy replaces the
+   plaintext-var set with wrangler.jsonc `vars` and drops any dashboard plaintext
+   var not listed there (this is what wiped them the first time). Secrets persist.
 6. **Mint a token in the Worker (code).** No `googleapis` SDK on Workers — do the
    JWT flow manually with WebCrypto:
    - Build a JWT: header `{alg:"RS256",typ:"JWT"}`, claims `{ iss: SA_EMAIL,
