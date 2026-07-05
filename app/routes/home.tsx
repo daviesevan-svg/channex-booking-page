@@ -2,7 +2,7 @@ import { Link, redirect } from "react-router";
 
 import type { Route } from "./+types/home";
 import { getConfig } from "~/lib/config.server";
-import { getPublicProperties } from "~/lib/properties.server";
+import { getProperty, getPublicProperties } from "~/lib/properties.server";
 
 export async function loader() {
   const properties = await getPublicProperties();
@@ -16,10 +16,11 @@ export async function loader() {
     return { properties: properties.map((p) => ({ id: p.id, slug: p.slug, name: p.name })) };
   }
 
-  // None marked public: fall back to the configured default property, or the
-  // setup hint if there isn't one.
+  // None marked public: fall back to the configured default property — but only
+  // if it's actually a registered property, else the property route 404s (its
+  // layout gates on the registry). Otherwise show the setup hint.
   const { defaultPropertyId } = getConfig();
-  if (defaultPropertyId) {
+  if (defaultPropertyId && (await getProperty(defaultPropertyId))) {
     throw redirect(`/${defaultPropertyId}`);
   }
   return { properties: [] as { id: string; slug?: string; name: string }[] };
