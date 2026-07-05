@@ -213,6 +213,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     cancellation,
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
+    collectsCard,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
   };
