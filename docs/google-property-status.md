@@ -45,6 +45,40 @@ the repo (public). Token minting = sign a JWT with the SA private key, exchange 
 `https://oauth2.googleapis.com/token` for a short-lived bearer; cache it in memory
 per isolate.
 
+## How to connect it (provisioning steps)
+
+One-time setup — most of it is on Google's side; only step 6 is code.
+
+1. **Google Cloud project → enable the Travel Partner API.** In the GCP console
+   (any project you control), APIs & Services → Enable APIs → "Travel Partner API".
+2. **Create a service account** in that project → **Keys → Add key → JSON** →
+   download it. You get a `client_email` (…@….iam.gserviceaccount.com) and a
+   `private_key`. (If you already have a service account for the Price Feeds /
+   ARI project, you can reuse the same one — Google allows one SA for both.)
+3. **Invite the service account into Hotel Center.** Hotel Center → Account
+   settings → Users/Access → invite the SA's `client_email` as a user. **API
+   access activates ~24h later** — it is not instant.
+4. **Grab the numeric Account ID** from Hotel Center (Account settings). This is
+   the `{ACCOUNT_ID}` in the endpoint path.
+5. **Store as Cloudflare secrets** (dashboard, never repo — public):
+   `GOOGLE_TRAVELPARTNER_SA_EMAIL`, `GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY`
+   (the PEM, newlines intact), `GOOGLE_TRAVELPARTNER_ACCOUNT_ID`.
+6. **Mint a token in the Worker (code).** No `googleapis` SDK on Workers — do the
+   JWT flow manually with WebCrypto:
+   - Build a JWT: header `{alg:"RS256",typ:"JWT"}`, claims `{ iss: SA_EMAIL,
+     scope: "https://www.googleapis.com/auth/travelpartner",
+     aud: "https://oauth2.googleapis.com/token", iat, exp: iat+3600 }`.
+   - Sign it: `crypto.subtle.importKey("pkcs8", <der from the PEM>, {name:
+     "RSASSA-PKCS1-v1_5", hash:"SHA-256"}, …)` then `crypto.subtle.sign`.
+   - POST to `https://oauth2.googleapis.com/token` with
+     `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=<jwt>` →
+     get `access_token` (valid ~1h). Cache it in-isolate until near expiry.
+   - Call `GET https://travelpartner.googleapis.com/v3/accounts/{ACCOUNT_ID}/hotelViews?filter=…`
+     with `Authorization: Bearer <access_token>`.
+
+Verify with one manual call first (e.g. `filter=liveOnGoogle=TRUE`) to confirm the
+SA is activated and the account id is right, before wiring the gate.
+
 ## Planned integration (when credentials exist)
 
 Chosen shape: **indicator + gate the push.**
