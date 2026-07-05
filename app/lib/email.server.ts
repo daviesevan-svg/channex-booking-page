@@ -45,7 +45,8 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        options: { transactional: true },
+        // Transactional, and no open/click tracking — we don't track recipients.
+        options: { transactional: true, open_tracking: false, click_tracking: false },
         content: {
           from,
           subject: opts.subject,
