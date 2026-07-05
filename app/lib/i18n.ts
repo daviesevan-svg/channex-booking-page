@@ -63,6 +63,7 @@ const EN: Dict = {
   dueAtHotel: "Due at the hotel",
   cardChargedNote: "Your card will be charged now.",
   cardGuaranteeNote: "We just need a card to guarantee the booking — you won’t be charged today.",
+  noCardNote: "Nothing to pay now and no card needed — you’ll pay at the hotel.",
   penaltyFirstNight: "the first night",
   penaltyFullStay: "the full stay",
   penaltyPercent: "{n}% of the stay",
