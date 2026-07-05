@@ -10,6 +10,13 @@ import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 import { requiredMissing } from "./google-readiness.server";
 
+// Brand id stamped on our listings (Google local feed `hotel_brand` client attr).
+// A Google POS `<Match brand="…">` on this value routes our hotels to our own
+// landing pages, while everything else falls through to the partner's catch-all
+// POS — so a single merged feed can send our hotels direct to us and the rest
+// direct to Channex, with no redirect hop.
+export const GOOGLE_HOTEL_BRAND = "roompanda";
+
 function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -64,6 +71,8 @@ export async function googleListingElements(): Promise<string> {
         (hasGeo ? tag("latitude", settings.latitude) + tag("longitude", settings.longitude) : "") +
         (overrides.phone ? `    <phone type="main">${esc(overrides.phone)}</phone>\n` : "") +
         `    <category>hotel</category>\n` +
+        // hotel_brand → lets a Google POS route our hotels to our own landing.
+        `    <content>\n      <attributes>\n        <client_attr name="hotel_brand">${GOOGLE_HOTEL_BRAND}</client_attr>\n      </attributes>\n    </content>\n` +
         `  </listing>`,
     );
   }
