@@ -56,6 +56,12 @@ export interface AppConfig extends ChannexConfig {
   /** Shared secret sent as X-Ari-Proxy-Key when pushing via the egress proxy, so
    *  the proxy isn't an open relay to Google. Unset = header omitted (direct push). */
   googleAriProxyKey?: string;
+  /** Travel Partner API (property match status). Service-account creds + numeric
+   *  Hotel Center account id. All unset = the status check is skipped (fail-open). */
+  googleTravelPartnerAccountId?: string;
+  googleTravelPartnerSaEmail?: string;
+  /** The service account's PEM private key (may contain literal \n from the JSON). */
+  googleTravelPartnerSaKey?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -106,6 +112,9 @@ export function getConfig(): AppConfig {
     googleAriBaseUrl: read("GOOGLE_ARI_BASE_URL", "https://www.google.com").replace(/\/+$/, ""),
     googleAriPartnerKey: read("GOOGLE_ARI_PARTNER_KEY") || undefined,
     googleAriProxyKey: read("GOOGLE_ARI_PROXY_KEY") || undefined,
+    googleTravelPartnerAccountId: read("GOOGLE_TRAVELPARTNER_ACCOUNT_ID") || undefined,
+    googleTravelPartnerSaEmail: read("GOOGLE_TRAVELPARTNER_SA_EMAIL") || undefined,
+    googleTravelPartnerSaKey: read("GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY") || undefined,
   };
   // Fail closed: a production build must never sign with the public default
   // secret. (Dev builds keep the placeholder so local dev needs no setup.)

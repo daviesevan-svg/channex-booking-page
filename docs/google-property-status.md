@@ -93,9 +93,22 @@ One-time setup — most of it is on Google's side; only step 6 is code.
 Verify with one manual call first (e.g. `filter=liveOnGoogle=TRUE`) to confirm the
 SA is activated and the account id is right, before wiring the gate.
 
-## Planned integration (when credentials exist)
+## Integration (BUILT — activates when creds + SA activation land)
 
-Chosen shape: **indicator + gate the push.**
+Chosen shape: **indicator + gate the push.** Implemented in
+`app/lib/google-ari/status.server.ts` (`getGoogleMatchStatus`), wired into the
+push gate (`push.server.ts envelopeFor`) and the admin Google Hotels page.
+Fail-open: with no creds (or on any API/token error, or no matching view) the
+status is `null` and nothing is blocked. The push gate blocks **only** on an
+explicit `matchStatus === "NOT_MATCHED"`.
+
+**Still to confirm live (post ~24h SA activation):** the exact filter key
+(`partnerHotelId=…`) and the response field names are from the docs, not a live
+call. The client logs raw non-2xx bodies (`[travelpartner] …`), so once the SA
+is active, read the logs to confirm the filter narrows correctly and tighten if
+Google names anything differently.
+
+Original shape notes:
 
 - `app/lib/google-ari/status.server.ts` → `getGoogleMatchStatus(hotelId)`:
   calls `hotelViews.list?filter=hotelId=…`, returns `{ matched, liveOnGoogle }`.

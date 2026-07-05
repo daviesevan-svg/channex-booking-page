@@ -25,6 +25,7 @@ import { getProperties } from "../properties.server";
 import { waitUntil } from "cloudflare:workers";
 import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
 import { googlePromotions } from "./promotions.server";
+import { getGoogleMatchStatus } from "./status.server";
 
 /** Google upload paths (joined onto `googleAriBaseUrl`). */
 export const ARI_PATHS = {
@@ -106,6 +107,14 @@ async function envelopeFor(
   if (!readiness.ready) {
     const missing = readiness.missingRequired.map((m) => m.label).join(", ");
     return { ok: false, result: { kind, ok: false, detail: `Property not ready — missing: ${missing}` } };
+  }
+  // Don't push to a property Google explicitly hasn't matched — wasted messages.
+  // Fail-open: only block on a confident NOT_MATCHED; unknown/overlap/error/no
+  // creds all fall through and push, so the status check can never stall ARI.
+  const status = await getGoogleMatchStatus(pid).catch(() => null);
+  if (status && status.matchStatus === "NOT_MATCHED") {
+    const why = status.reasons.length ? ` (${status.reasons.join("; ")})` : "";
+    return { ok: false, result: { kind, ok: false, detail: `Google hasn't matched this property yet${why}. It'll push once matched.` } };
   }
   const partner = googleAriPartnerKey;
   return {
