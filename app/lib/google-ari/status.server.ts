@@ -12,7 +12,16 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/travelpartner";
 const API = "https://travelpartner.googleapis.com/v3";
 
+/** Coarse state for the UI/gate:
+ *  - not_found : Google returned no view for this hotel id (not uploaded yet).
+ *  - not_matched: uploaded, but not matched to a Google business profile.
+ *  - overlap   : uploaded, overlapping another listing (map overlap).
+ *  - matched   : matched — ready for ARI.
+ *  - unknown   : Google returned an unrecognised match status. */
+export type GoogleMatchState = "not_found" | "not_matched" | "overlap" | "matched" | "unknown";
+
 export interface GoogleMatchStatus {
+  state: GoogleMatchState;
   /** Google has matched the property to a listing (ready for ARI). */
   matched: boolean;
   /** Property is switched on for display on Google. */
@@ -21,6 +30,19 @@ export interface GoogleMatchStatus {
   matchStatus: string;
   /** Why it isn't matched, when Google provides reasons. */
   reasons: string[];
+}
+
+function stateOf(matchStatus: string): GoogleMatchState {
+  switch (matchStatus) {
+    case "MATCHED":
+      return "matched";
+    case "NOT_MATCHED":
+      return "not_matched";
+    case "MAP_OVERLAP":
+      return "overlap";
+    default:
+      return "unknown";
+  }
 }
 
 // ---- base64url + PEM helpers ----
@@ -132,16 +154,19 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
   // first row. No row → null (unknown), never a hard "not matched".
   const view = views.find((v) => v.partnerHotelId === hotelId) ?? (views.length === 1 ? views[0] : undefined);
   if (!view) {
-    // Success, but no matching view — tells us "not ingested / SA still
-    // activating" (0 views) apart from a shape/filter surprise (>0 but no match).
+    // The call succeeded but Google has no view for this hotel id — it isn't
+    // uploaded to Google yet (feed not ingested). Distinct from a null "couldn't
+    // check". (>0 views but none matched → likely wrong account id.)
     console.log(`[travelpartner] no matched view for ${hotelId} (${views.length} view(s) returned)`);
-    return null;
+    return { state: "not_found", matched: false, liveOnGoogle: false, matchStatus: "NOT_FOUND", reasons: [] };
   }
 
+  const matchStatus = String(view.matchStatus ?? "MATCH_STATUS_UNKNOWN");
   return {
-    matched: view.matchStatus === "MATCHED",
+    state: stateOf(matchStatus),
+    matched: matchStatus === "MATCHED",
     liveOnGoogle: view.liveOnGoogleStatus === "LIVE_ON_GOOGLE_STATUS_ACTIVE" || view.liveOnGoogle === true,
-    matchStatus: String(view.matchStatus ?? "MATCH_STATUS_UNKNOWN"),
+    matchStatus,
     reasons: Array.isArray(view.matchFailureReasons) ? view.matchFailureReasons : [],
   };
 }
