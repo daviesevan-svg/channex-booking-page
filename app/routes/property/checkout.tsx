@@ -185,6 +185,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
+  // Whether a card is actually taken at checkout: only when Stripe is connected
+  // AND the rate charges now or wants a guarantee card. A pay-at-hotel/guarantee
+  // rate on a property with no Stripe books without a card, so the payment copy
+  // must not promise one.
+  const collectsCard =
+    Boolean(settings.stripeAccountId && getConfig().stripeSecretKey) &&
+    (dueNow(policy, grandTotal, nights) > 0 || policy.payment.card === "guarantee");
   const jsonLd = await reservationHotelJsonLd(
     pid,
     lang,
@@ -524,7 +531,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl, jsonLd } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -689,7 +696,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               )}
             </div>
             <p className="mb-[18px] text-sm leading-[1.55] text-muted">
-              {cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
+              {!collectsCard ? tr.t("noCardNote") : cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
             </p>
 
             {(cancellationText || latePhrase || noShowPhrase) && (
