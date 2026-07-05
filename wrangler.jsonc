@@ -19,10 +19,14 @@
 	//    same-named secret. Keep these OUT of this file:
 	//      SESSION_SECRET, SPARKPOST_API_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET,
 	//      STRIPE_CONNECT_CLIENT_ID, STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY,
-	//      GOOGLE_MAP_KEY, GOOGLE_ARI_PARTNER_KEY, GOOGLE_ARI_PROXY_KEY, GROUP_ID, and
+	//      GOOGLE_MAP_KEY, GOOGLE_ARI_PARTNER_KEY, GOOGLE_ARI_PROXY_KEY, GROUP_ID,
+	//      GOOGLE_TRAVELPARTNER_ACCOUNT_ID / _SA_EMAIL / _SA_PRIVATE_KEY, and
 	//      ADMIN_EMAILS / SUPERADMIN_EMAILS (this repo is public, so admin emails stay
 	//      in the dashboard). (GOOGLE_ARI_BASE_URL is a non-secret proxy URL, pinned
 	//      in `vars` below so a deploy can't drop it.)
+	//  ⚠ Add these in the dashboard as ENCRYPTED SECRETS, not plaintext Variables —
+	//      a deploy replaces the plaintext-var set with `vars` below and drops any
+	//      dashboard plaintext var not listed here. Secrets survive deploys.
 	//
 	//  NOTE: deploy with `npm run deploy` (it builds first). A bare `wrangler deploy`
 	//  ships a stale build snapshot and won't pick up changes here.
