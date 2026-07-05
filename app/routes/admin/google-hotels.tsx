@@ -7,16 +7,18 @@ import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
+import { getGoogleMatchStatus } from "~/lib/google-ari/status.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
-  const [settings, readiness, lastSync] = await Promise.all([
+  const [settings, readiness, lastSync, matchStatus] = await Promise.all([
     getSettings(propertyId),
     checkGoogleReadiness(propertyId),
     getGoogleAriSync(propertyId),
+    getGoogleMatchStatus(propertyId).catch(() => null),
   ]);
   return {
     configured: true as const,
@@ -27,6 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     windowDays: settings.googleAriWindowDays ?? 365,
     lastSync,
     readiness,
+    matchStatus,
   };
 }
 
@@ -85,7 +88,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness } = loaderData;
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus } = loaderData;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -130,6 +133,28 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
                 <li key={m.field}>{m.label}</li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Live match status from Google (Travel Partner API). Only shown when
+            the check is configured + returns something; null = not set up or
+            not yet visible to Google. */}
+        {matchStatus && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-divider pt-3.5 text-[13px]">
+            <span className="text-secondary">On Google:</span>
+            <span
+              className={`rounded-full px-2.5 py-0.5 font-semibold ${
+                matchStatus.matched ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-amber-50 text-amber-800"
+              }`}
+            >
+              {matchStatus.matched ? "Matched — ready for rates" : `Not matched yet (${matchStatus.matchStatus})`}
+            </span>
+            {matchStatus.liveOnGoogle && (
+              <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
+            )}
+            {!matchStatus.matched && matchStatus.reasons.length > 0 && (
+              <span className="text-muted-2">· {matchStatus.reasons.join("; ")}</span>
+            )}
           </div>
         )}
       </section>
