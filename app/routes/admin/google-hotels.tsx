@@ -30,6 +30,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastSync,
     readiness,
     matchStatus,
+    matchConfigured: Boolean(
+      getConfig().googleTravelPartnerAccountId &&
+        getConfig().googleTravelPartnerSaEmail &&
+        getConfig().googleTravelPartnerSaKey,
+    ),
   };
 }
 
@@ -88,7 +93,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus } = loaderData;
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured } = loaderData;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -136,27 +141,36 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </div>
         )}
 
-        {/* Live match status from Google (Travel Partner API). Only shown when
-            the check is configured + returns something; null = not set up or
-            not yet visible to Google. */}
-        {matchStatus && (
-          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-divider pt-3.5 text-[13px]">
-            <span className="text-secondary">On Google:</span>
-            <span
-              className={`rounded-full px-2.5 py-0.5 font-semibold ${
-                matchStatus.matched ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-amber-50 text-amber-800"
-              }`}
-            >
-              {matchStatus.matched ? "Matched — ready for rates" : `Not matched yet (${matchStatus.matchStatus})`}
+        {/* Live match status from Google (Travel Partner API). Always shown so
+            there's feedback: not-configured, unknown/pending, or the real state. */}
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-divider pt-3.5 text-[13px]">
+          <span className="text-secondary">On Google:</span>
+          {!matchConfigured ? (
+            <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
+              Not checked — add Travel Partner API secrets to enable
             </span>
-            {matchStatus.liveOnGoogle && (
-              <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
-            )}
-            {!matchStatus.matched && matchStatus.reasons.length > 0 && (
-              <span className="text-muted-2">· {matchStatus.reasons.join("; ")}</span>
-            )}
-          </div>
-        )}
+          ) : !matchStatus ? (
+            <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
+              Unknown — Google has no data yet (feed not ingested, or the service account is still activating)
+            </span>
+          ) : (
+            <>
+              <span
+                className={`rounded-full px-2.5 py-0.5 font-semibold ${
+                  matchStatus.matched ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {matchStatus.matched ? "Matched — ready for rates" : `Not matched yet (${matchStatus.matchStatus})`}
+              </span>
+              {matchStatus.liveOnGoogle && (
+                <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
+              )}
+              {!matchStatus.matched && matchStatus.reasons.length > 0 && (
+                <span className="text-muted-2">· {matchStatus.reasons.join("; ")}</span>
+              )}
+            </>
+          )}
+        </div>
       </section>
 
       {/* Settings */}
