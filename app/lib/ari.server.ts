@@ -161,6 +161,24 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   return counts;
 }
 
+/** True once we've actually received an ARI push for this hotel — i.e. Channex
+ *  has sent availability or rates into D1, not merely that the connection was
+ *  toggled on. Used to treat a property as genuinely live/sellable via Channex.
+ *  ensureSchema first so an all-empty account returns false instead of throwing. */
+export async function hasReceivedAri(hotelCode: string): Promise<boolean> {
+  if (!hotelCode) return false;
+  await ensureSchema();
+  const D = db();
+  const avail = await D.prepare(`SELECT 1 AS x FROM availability WHERE hotel_code=? LIMIT 1`)
+    .bind(hotelCode)
+    .first<{ x: number }>();
+  if (avail) return true;
+  const rate = await D.prepare(`SELECT 1 AS x FROM rate WHERE hotel_code=? LIMIT 1`)
+    .bind(hotelCode)
+    .first<{ x: number }>();
+  return Boolean(rate);
+}
+
 export interface AriRow {
   room_type_id: string;
   rate_plan_id: string;

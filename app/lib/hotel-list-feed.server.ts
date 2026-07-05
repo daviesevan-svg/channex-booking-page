@@ -8,7 +8,7 @@
 // Google's pull) from a public resource route.
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
-import { requiredMissing } from "./google-readiness.server";
+import { canTakeBookings, requiredMissing } from "./google-readiness.server";
 
 // Brand id stamped on our listings (Google local feed `hotel_brand` client attr).
 // A Google POS `<Match brand="…">` on this value routes our hotels to our own
@@ -51,7 +51,8 @@ export async function googleListingElements(): Promise<string> {
     if (settings.googleStructuredData === false) continue;
     // Skip properties missing data Google requires — an incomplete listing can
     // get the whole feed rejected. The admin readiness panel flags these.
-    if (requiredMissing(settings, overrides).length > 0) continue;
+    const canBook = await canTakeBookings(p.id, settings);
+    if (requiredMissing(settings, overrides, canBook).length > 0) continue;
 
     const id = p.id;
     const name = overrides.hotelName || p.name;
