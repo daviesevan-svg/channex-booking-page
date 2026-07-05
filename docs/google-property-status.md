@@ -49,8 +49,14 @@ per isolate.
 
 One-time setup — most of it is on Google's side; only step 6 is code.
 
-1. **Google Cloud project → enable the Travel Partner API.** In the GCP console
-   (any project you control), APIs & Services → Enable APIs → "Travel Partner API".
+1. **Get the Travel Partner API allowlisted, then enable it.** It's a
+   **restricted, trusted-partner API** — it does NOT appear in the Cloud console
+   API Library search until Google allowlists your project. Email your Google
+   **Technical Account Manager** (the Google Hotels contact for the `channex_ari`
+   partner account) with your **GCP project number** and ask them to grant the
+   Travel Partner API to it. Once granted, APIs & Services → Library → search
+   "Travel Partner API" → **Enable**. (Per Google: "visible to trusted partners
+   only. If you don't find the API… contact your Technical Account Manager.")
 2. **Create a service account** in that project → **Keys → Add key → JSON** →
    download it. You get a `client_email` (…@….iam.gserviceaccount.com) and a
    `private_key`. (If you already have a service account for the Price Feeds /
