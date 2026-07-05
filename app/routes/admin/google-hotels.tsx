@@ -151,21 +151,33 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             </span>
           ) : !matchStatus ? (
             <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-              Unknown — Google has no data yet (feed not ingested, or the service account is still activating)
+              Couldn’t check right now — Google didn’t respond (or the service account is still activating)
             </span>
           ) : (
             <>
               <span
                 className={`rounded-full px-2.5 py-0.5 font-semibold ${
-                  matchStatus.matched ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-amber-50 text-amber-800"
+                  matchStatus.state === "matched"
+                    ? "bg-[#e8f0e6] text-[#3f7a52]"
+                    : matchStatus.state === "not_found"
+                      ? "bg-chip text-muted"
+                      : "bg-amber-50 text-amber-800"
                 }`}
               >
-                {matchStatus.matched ? "Matched — ready for rates" : `Not matched yet (${matchStatus.matchStatus})`}
+                {matchStatus.state === "matched"
+                  ? "Matched — ready for rates"
+                  : matchStatus.state === "not_found"
+                    ? "Not uploaded to Google yet (feed not ingested)"
+                    : matchStatus.state === "not_matched"
+                      ? "Uploaded, but not matched to a business profile yet"
+                      : matchStatus.state === "overlap"
+                        ? "Uploaded — overlaps another listing (map overlap)"
+                        : `Status unclear (${matchStatus.matchStatus})`}
               </span>
               {matchStatus.liveOnGoogle && (
                 <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
               )}
-              {!matchStatus.matched && matchStatus.reasons.length > 0 && (
+              {matchStatus.state !== "matched" && matchStatus.reasons.length > 0 && (
                 <span className="text-muted-2">· {matchStatus.reasons.join("; ")}</span>
               )}
             </>

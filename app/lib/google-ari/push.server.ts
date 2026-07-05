@@ -112,7 +112,7 @@ async function envelopeFor(
   // Fail-open: only block on a confident NOT_MATCHED; unknown/overlap/error/no
   // creds all fall through and push, so the status check can never stall ARI.
   const status = await getGoogleMatchStatus(pid).catch(() => null);
-  if (status && status.matchStatus === "NOT_MATCHED") {
+  if (status && status.state === "not_matched") {
     const why = status.reasons.length ? ` (${status.reasons.join("; ")})` : "";
     return { ok: false, result: { kind, ok: false, detail: `Google hasn't matched this property yet${why}. It'll push once matched.` } };
   }
