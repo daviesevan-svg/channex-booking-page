@@ -8,6 +8,7 @@ import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { uploadPropertyCoverImage } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
+import { getConfig } from "~/lib/config.server";
 import { COUNTRIES } from "~/lib/countries";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -28,6 +29,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     overrides,
     settings,
     googleReadiness,
+    // Test mode = live bookings not enabled → checkout simulates and takes no
+    // payment. Surfaced as a banner so it isn't missed.
+    testMode: !(settings.liveBooking ?? getConfig().allowLiveBooking),
     host: new URL(request.url).host,
   };
 }
@@ -84,10 +88,25 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, settings, googleReadiness, host, lang } = loaderData;
+  const { overrides, settings, googleReadiness, host, lang, testMode } = loaderData;
 
   return (
     <div>
+      {testMode && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-amber-200 bg-amber-50 px-5 py-3.5">
+          <span className="text-[13.5px] text-amber-900">
+            <strong>Test mode.</strong> Bookings are simulated — nothing is sent to Channex and no
+            payment is taken. Guests can’t really book yet.
+          </span>
+          <a
+            href="/admin/general"
+            className="flex-none rounded-[9px] bg-amber-600 px-3.5 py-2 text-[13px] font-semibold text-white hover:bg-amber-700"
+          >
+            Activate live bookings →
+          </a>
+        </div>
+      )}
+
       <div className="mb-5 flex items-center justify-between">
         <h1 className="font-serif text-[26px] font-semibold">Property details</h1>
         {actionData?.ok && (
