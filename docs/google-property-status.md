@@ -47,6 +47,14 @@ per isolate.
 
 ## How to connect it (provisioning steps)
 
+> **Status:** provisioning is already done. Channex has an existing service
+> account (the `gha-…` one used for CI / Google feeds) that is already invited
+> into Hotel Center, so the Travel Partner API is allowlisted and the SA exists.
+> **Reuse it** — one SA works for both Price Feeds and Travel Partner. Steps 1–4
+> below are therefore effectively complete; what's left is getting that SA's
+> **private key** + the numeric **account id** into Cloudflare secrets (step 5)
+> and writing the token flow (step 6).
+
 One-time setup — most of it is on Google's side; only step 6 is code.
 
 1. **Get the Travel Partner API allowlisted, then enable it.** It's a
