@@ -29,8 +29,10 @@ function tag(name: string, value?: string): string {
   return v ? `    <${name}>${esc(v)}</${name}>\n` : "";
 }
 
-/** Build the HLF XML for all public, structured-data-enabled properties. */
-export async function buildHotelListFeed(): Promise<string> {
+/** The `<listing>` elements for all public, structured-data-enabled properties
+ *  (no `<listings>` wrapper) — reused both by our own feed and by the merged
+ *  Channex+us feed. Empty string when we have nothing to advertise. */
+export async function googleListingElements(): Promise<string> {
   const properties = await getProperties();
   const listings: string[] = [];
 
@@ -66,12 +68,18 @@ export async function buildHotelListFeed(): Promise<string> {
     );
   }
 
+  return listings.join("\n");
+}
+
+/** Build the HLF XML for all public, structured-data-enabled properties. */
+export async function buildHotelListFeed(): Promise<string> {
+  const listings = await googleListingElements();
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<listings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n` +
     `    xsi:noNamespaceSchemaLocation="http://www.gstatic.com/localfeed/local_feed.xsd">\n` +
     `  <language>en</language>\n` +
-    (listings.length ? listings.join("\n") + "\n" : "") +
+    (listings ? listings + "\n" : "") +
     `</listings>\n`
   );
 }

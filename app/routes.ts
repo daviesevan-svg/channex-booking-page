@@ -8,6 +8,8 @@ export default [
 
   // Google Hotel List Feed (XML, Google pulls on a schedule).
   route("feeds/google-hotels.xml", "routes/feeds.hotel-list.tsx"),
+  // Merged feed: Channex's partner feed passed through + our properties added.
+  route("feeds/google-hotels-all.xml", "routes/feeds.google-merged.tsx"),
 
   // Open Channel API (Channex → us): ARI push + handshake endpoints.
   route("api/test_connection", "routes/api.test_connection.tsx"),
