@@ -185,11 +185,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
-  // Whether a card is actually taken at checkout: only when Stripe is connected
-  // AND the rate charges now or wants a guarantee card. A pay-at-hotel/guarantee
-  // rate on a property with no Stripe books without a card, so the payment copy
-  // must not promise one.
+  // Whether a card is actually taken at checkout: only in LIVE mode, with Stripe
+  // connected, when the rate charges now or wants a guarantee card. In test mode
+  // (or with no Stripe) nothing is collected, so the payment copy mustn't promise
+  // a card — and the action likewise takes no payment (see below).
+  const live =
+    (settings.liveBooking ?? getConfig().allowLiveBooking) && settings.connectedSystem === "channex";
   const collectsCard =
+    live &&
     Boolean(settings.stripeAccountId && getConfig().stripeSecretKey) &&
     (dueNow(policy, grandTotal, nights) > 0 || policy.payment.card === "guarantee");
   const jsonLd = await reservationHotelJsonLd(
@@ -387,11 +390,15 @@ export async function action({ params, request }: Route.ActionArgs) {
   const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
   const stripeMode: "payment" | "setup" | null = due > 0 ? "payment" : needsGuarantee ? "setup" : null;
 
+  // Only take a real payment in LIVE mode. In test mode the booking is
+  // simulated and pushed nowhere, so charging would take money for a booking
+  // that isn't created — skip Stripe entirely and fall through to the simulated
+  // finalize below.
   // A paid rate with no way to charge must not book unpaid. A guarantee-only
   // rate without Stripe just books without a card (no-show cover is optional).
-  if (due > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
+  if (live && due > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
 
-  if (stripeMode && stripeConnected) {
+  if (live && stripeMode && stripeConnected) {
     const account = settings.stripeAccountId as string;
     await stashPending(reference, pending);
     const common = {
