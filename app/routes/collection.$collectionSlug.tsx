@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/collection.$collectionSlug";
@@ -7,6 +7,7 @@ import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { getCollectionBySlug } from "~/lib/collections.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
+import { getConfig } from "~/lib/config.server";
 import {
   DEFAULT_THEME,
   fontPair,
@@ -39,7 +40,9 @@ type PropView = {
   fromPriceNum: number | null; // numeric all-in nightly, for sorting
   soldOut: boolean;
   currency: string;
-  left: number | null; // pin x %, null when no coordinates
+  lat: number | null; // real coordinates for the Google map (null when unset)
+  lng: number | null;
+  left: number | null; // pin x %, null when no coordinates — stylized-map fallback only
   top: number | null; // pin y %
 };
 
@@ -143,6 +146,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           fromPriceNum,
           soldOut,
           currency,
+          lat: Number.isFinite(lat) ? lat : null,
+          lng: Number.isFinite(lng) ? lng : null,
         },
       };
     }),
@@ -191,6 +196,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     occ,
     availableCount,
     lang,
+    mapKey: getConfig().googleMapKey ?? "",
   };
 }
 
@@ -233,6 +239,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
     occ,
     availableCount,
     lang,
+    mapKey,
   } = loaderData;
 
   const tr = makeTranslator(lang);
@@ -517,57 +524,42 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             className="relative h-[340px] overflow-hidden rounded-[18px] lg:sticky lg:top-[132px] lg:h-[calc(100vh-160px)]"
             style={{ border: "1px solid #e3d9c9", boxShadow: "0 22px 50px -30px rgba(70,55,35,0.35)", minHeight: 320 }}
           >
-            {/* canvas */}
-            <div
-              className="absolute inset-0"
-              style={{
-                background:
-                  "repeating-linear-gradient(0deg,transparent,transparent 46px,rgba(120,110,90,0.055) 46px,rgba(120,110,90,0.055) 48px),repeating-linear-gradient(90deg,transparent,transparent 54px,rgba(120,110,90,0.055) 54px,rgba(120,110,90,0.055) 56px),#e7e3d7",
-              }}
-            >
-              <div style={{ position: "absolute", left: "6%", top: "9%", width: "24%", height: "22%", borderRadius: 16, background: "oklch(0.86 0.045 145)" }} />
-              <div style={{ position: "absolute", left: "70%", top: "60%", width: "26%", height: "30%", borderRadius: 16, background: "oklch(0.86 0.045 145)" }} />
-              <div style={{ position: "absolute", left: "-18%", top: "52%", width: "150%", height: 58, transform: "rotate(-20deg)", background: "oklch(0.82 0.035 232)", boxShadow: "0 0 0 1px oklch(0.76 0.04 232) inset" }} />
-              <div style={{ position: "absolute", left: "-10%", top: "34%", width: "130%", height: 13, transform: "rotate(8deg)", background: "#f1ede2" }} />
-              <div style={{ position: "absolute", left: "40%", top: "-10%", width: 13, height: "130%", transform: "rotate(6deg)", background: "#f1ede2" }} />
-            </div>
+            {mapKey ? (
+              <GoogleCollectionMap
+                mapKey={mapKey}
+                properties={properties}
+                hoveredId={hoveredId}
+                activeId={activeId}
+                setHoveredId={setHoveredId}
+                onPinClick={clickPin}
+                fallback={
+                  <StylizedMap
+                    properties={properties}
+                    hoveredId={hoveredId}
+                    activeId={activeId}
+                    setHoveredId={setHoveredId}
+                    clickPin={clickPin}
+                  />
+                }
+              />
+            ) : (
+              <StylizedMap
+                properties={properties}
+                hoveredId={hoveredId}
+                activeId={activeId}
+                setHoveredId={setHoveredId}
+                clickPin={clickPin}
+              />
+            )}
 
-            {/* chrome */}
+            {/* chrome — sits above whichever map is shown */}
             <div
-              className="absolute left-4 top-4 z-[6] flex items-center gap-2 rounded-full px-[15px] py-2 text-[13px] font-semibold"
+              className="pointer-events-none absolute left-4 top-4 z-[6] flex items-center gap-2 rounded-full px-[15px] py-2 text-[13px] font-semibold"
               style={{ background: "rgba(255,253,250,0.94)", border: "1px solid #e8dfd0", color: "#5a5145", boxShadow: "0 6px 18px -10px rgba(70,55,35,0.4)" }}
             >
               <Diamond />
               {tr.p("staysInView", availableCount)}
             </div>
-
-            {/* pins */}
-            {properties.map((p) => {
-              if (p.left == null || p.top == null) return null;
-              const id = p.urlSeg;
-              const on = hoveredId === id || activeId === id;
-              return (
-                <div
-                  key={id}
-                  onClick={() => clickPin(id)}
-                  onMouseEnter={() => setHoveredId(id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                  className="absolute cursor-pointer whitespace-nowrap rounded-full border-[1.5px] px-3 py-[7px] text-[13px] font-bold transition-all"
-                  style={{
-                    left: `${p.left}%`,
-                    top: `${p.top}%`,
-                    transform: `translate(-50%,-50%) scale(${on ? 1.12 : 1})`,
-                    zIndex: activeId === id ? 14 : hoveredId === id ? 12 : 3,
-                    background: on ? "var(--accent)" : "#fffdfa",
-                    color: on ? "#fff" : "#2a2521",
-                    borderColor: on ? "var(--accent)" : "#e3d9c9",
-                    boxShadow: on ? "0 12px 26px -10px rgba(70,55,35,0.6)" : "0 4px 12px -6px rgba(70,55,35,0.4)",
-                  }}
-                >
-                  {p.fromPrice ?? p.name}
-                </div>
-              );
-            })}
           </div>
         </div>
       </main>
@@ -581,6 +573,217 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       </footer>
     </div>
   );
+}
+
+type MapProps = {
+  properties: PropView[];
+  hoveredId: string | null;
+  activeId: string | null;
+  setHoveredId: (id: string | null) => void;
+};
+
+// ---- Stylized fallback map (no API key / Maps failed to load) ------------
+// The original hand-drawn canvas: pins positioned by normalized lat/lng.
+function StylizedMap({
+  properties,
+  hoveredId,
+  activeId,
+  setHoveredId,
+  clickPin,
+}: MapProps & { clickPin: (id: string) => void }) {
+  return (
+    <>
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "repeating-linear-gradient(0deg,transparent,transparent 46px,rgba(120,110,90,0.055) 46px,rgba(120,110,90,0.055) 48px),repeating-linear-gradient(90deg,transparent,transparent 54px,rgba(120,110,90,0.055) 54px,rgba(120,110,90,0.055) 56px),#e7e3d7",
+        }}
+      >
+        <div style={{ position: "absolute", left: "6%", top: "9%", width: "24%", height: "22%", borderRadius: 16, background: "oklch(0.86 0.045 145)" }} />
+        <div style={{ position: "absolute", left: "70%", top: "60%", width: "26%", height: "30%", borderRadius: 16, background: "oklch(0.86 0.045 145)" }} />
+        <div style={{ position: "absolute", left: "-18%", top: "52%", width: "150%", height: 58, transform: "rotate(-20deg)", background: "oklch(0.82 0.035 232)", boxShadow: "0 0 0 1px oklch(0.76 0.04 232) inset" }} />
+        <div style={{ position: "absolute", left: "-10%", top: "34%", width: "130%", height: 13, transform: "rotate(8deg)", background: "#f1ede2" }} />
+        <div style={{ position: "absolute", left: "40%", top: "-10%", width: 13, height: "130%", transform: "rotate(6deg)", background: "#f1ede2" }} />
+      </div>
+
+      {properties.map((p) => {
+        if (p.left == null || p.top == null) return null;
+        const id = p.urlSeg;
+        const on = hoveredId === id || activeId === id;
+        return (
+          <div
+            key={id}
+            onClick={() => clickPin(id)}
+            onMouseEnter={() => setHoveredId(id)}
+            onMouseLeave={() => setHoveredId(null)}
+            className="absolute cursor-pointer whitespace-nowrap rounded-full border-[1.5px] px-3 py-[7px] text-[13px] font-bold transition-all"
+            style={{
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              transform: `translate(-50%,-50%) scale(${on ? 1.12 : 1})`,
+              zIndex: activeId === id ? 14 : hoveredId === id ? 12 : 3,
+              background: on ? "var(--accent)" : "#fffdfa",
+              color: on ? "#fff" : "#2a2521",
+              borderColor: on ? "var(--accent)" : "#e3d9c9",
+              boxShadow: on ? "0 12px 26px -10px rgba(70,55,35,0.6)" : "0 4px 12px -6px rgba(70,55,35,0.4)",
+            }}
+          >
+            {p.fromPrice ?? p.name}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+// ---- Real Google map -----------------------------------------------------
+// Loads the Maps JS API once (browser only), drops a styled price-pill marker
+// per geocoded property, and keeps hover/active state in sync with the list.
+// Uses classic google.maps.Marker (works with only a JS API key — no Map ID
+// needed, unlike AdvancedMarkerElement). Falls back to the stylized map if the
+// script can't load (offline / bad key / blocked).
+let mapsScriptPromise: Promise<void> | null = null;
+function loadGoogleMaps(key: string): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  const w = window as unknown as { google?: { maps?: unknown } };
+  if (w.google?.maps) return Promise.resolve();
+  if (mapsScriptPromise) return mapsScriptPromise;
+  mapsScriptPromise = new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => {
+      mapsScriptPromise = null; // allow a retry on remount
+      reject(new Error("Google Maps failed to load"));
+    };
+    document.head.appendChild(s);
+  });
+  return mapsScriptPromise;
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/[<>&'"]/g, (c) =>
+    c === "<" ? "&lt;" : c === ">" ? "&gt;" : c === "&" ? "&amp;" : c === "'" ? "&apos;" : "&quot;",
+  );
+}
+
+// A rounded price-pill as an SVG data-URI, matching the list/pin styling.
+function pinIcon(g: any, label: string, active: boolean, accent: string) {
+  const w = Math.max(46, Math.round(label.length * 8.4) + 24);
+  const h = 30;
+  const bg = active ? accent : "#fffdfa";
+  const fg = active ? "#ffffff" : "#2a2521";
+  const stroke = active ? accent : "#d8ccb8";
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>` +
+    `<rect x='1' y='1' rx='15' ry='15' width='${w - 2}' height='${h - 2}' fill='${bg}' stroke='${stroke}' stroke-width='1.5'/>` +
+    `<text x='${w / 2}' y='${h / 2 + 1}' text-anchor='middle' dominant-baseline='middle' font-family='Arial,Helvetica,sans-serif' font-size='13' font-weight='700' fill='${fg}'>${escapeXml(label)}</text>` +
+    `</svg>`;
+  return {
+    url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
+    scaledSize: new g.maps.Size(w, h),
+    anchor: new g.maps.Point(w / 2, h / 2),
+  };
+}
+
+function GoogleCollectionMap({
+  mapKey,
+  properties,
+  hoveredId,
+  activeId,
+  setHoveredId,
+  onPinClick,
+  fallback,
+}: MapProps & { mapKey: string; onPinClick: (id: string) => void; fallback: React.ReactNode }) {
+  const elRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<any>(null);
+  const markersRef = useRef<Map<string, any>>(new Map());
+  const accentRef = useRef<string>("#b45309");
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const geo = properties.filter((p) => p.lat != null && p.lng != null);
+  // Signature so markers rebuild when coordinates or prices change (date search).
+  const sig = geo.map((p) => `${p.urlSeg}:${p.lat}:${p.lng}:${p.fromPrice ?? ""}`).join("|");
+
+  // Init the map once the script is available.
+  useEffect(() => {
+    let cancelled = false;
+    loadGoogleMaps(mapKey)
+      .then(() => {
+        if (cancelled || !elRef.current) return;
+        const g = (window as any).google;
+        accentRef.current =
+          getComputedStyle(elRef.current).getPropertyValue("--accent").trim() || "#b45309";
+        mapRef.current = new g.maps.Map(elRef.current, {
+          mapTypeControl: false,
+          streetViewControl: false,
+          fullscreenControl: false,
+          clickableIcons: false,
+          zoomControl: true,
+          gestureHandling: "greedy",
+          center: { lat: 20, lng: 0 },
+          zoom: 2,
+        });
+        setReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapKey]);
+
+  // (Re)build markers when the map is ready or the property data changes.
+  useEffect(() => {
+    if (!ready || !mapRef.current) return;
+    const g = (window as any).google;
+    markersRef.current.forEach((m) => m.setMap(null));
+    markersRef.current.clear();
+    const bounds = new g.maps.LatLngBounds();
+    geo.forEach((p) => {
+      const pos = { lat: p.lat as number, lng: p.lng as number };
+      const m = new g.maps.Marker({
+        position: pos,
+        map: mapRef.current,
+        title: p.name,
+        icon: pinIcon(g, p.fromPrice ?? p.name, false, accentRef.current),
+      });
+      m.addListener("click", () => onPinClick(p.urlSeg));
+      m.addListener("mouseover", () => setHoveredId(p.urlSeg));
+      m.addListener("mouseout", () => setHoveredId(null));
+      markersRef.current.set(p.urlSeg, m);
+      bounds.extend(pos);
+    });
+    if (geo.length === 1) {
+      mapRef.current.setCenter(bounds.getCenter());
+      mapRef.current.setZoom(14);
+    } else if (geo.length > 1) {
+      mapRef.current.fitBounds(bounds, 64);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, sig]);
+
+  // Reflect hover/active by swapping the pill icon + raising the z-index.
+  useEffect(() => {
+    if (!ready) return;
+    const g = (window as any).google;
+    markersRef.current.forEach((m, id) => {
+      const p = geo.find((x) => x.urlSeg === id);
+      if (!p) return;
+      const on = hoveredId === id || activeId === id;
+      m.setIcon(pinIcon(g, p.fromPrice ?? p.name, on, accentRef.current));
+      m.setZIndex(activeId === id ? 1000 : on ? 500 : 1);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoveredId, activeId, ready]);
+
+  if (failed) return <>{fallback}</>;
+  return <div ref={elRef} className="absolute inset-0" style={{ background: "#e7e3d7" }} />;
 }
 
 // Thin wrapper around useDateRange that also tracks the popover open state, so
