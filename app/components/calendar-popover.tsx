@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { useT } from "~/lib/i18n";
 import type { DayCell, DateRangeState } from "~/lib/use-date-range";
@@ -40,14 +40,30 @@ export function CalendarPopover({
   const tr = useT();
   const weekdays = tr.t("weekdays").split(",");
   const ref = useRef<HTMLDivElement>(null);
+  const [maxH, setMaxH] = useState<number | undefined>(undefined);
 
-  // When opened low on the page the popover can fall below the fold; nudge it
-  // fully into view (no-op when it's already visible).
+  // The popover is anchored below its trigger, which may sit low on the page
+  // (and inside a sticky bar, so the page can't scroll to reveal an overflowing
+  // footer). Cap its height to the space actually available below the trigger
+  // so the pinned footer — Clear/Done — is always reachable; the month grid
+  // scrolls inside. A viewport-unit CSS cap can't do this since it ignores the
+  // trigger offset. Recompute on resize.
   useEffect(() => {
-    const id = requestAnimationFrame(() =>
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }),
-    );
-    return () => cancelAnimationFrame(id);
+    const compute = () => {
+      const el = ref.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setMaxH(Math.max(300, Math.round(window.innerHeight - top - 16)));
+    };
+    const id = requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      compute();
+    });
+    window.addEventListener("resize", compute);
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener("resize", compute);
+    };
   }, []);
 
   return (
@@ -55,10 +71,10 @@ export function CalendarPopover({
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
         ref={ref}
-        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
-        style={{ boxShadow: "var(--shadow-popover)" }}
+        className="absolute left-0 top-[calc(100%+12px)] z-40 flex max-h-[85vh] w-[min(700px,94vw)] flex-col overflow-hidden rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
+        style={{ boxShadow: "var(--shadow-popover)", maxHeight: maxH ? `${maxH}px` : undefined }}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-none items-center justify-between">
           <button
             type="button"
             onClick={state.prevMonth}
@@ -78,6 +94,7 @@ export function CalendarPopover({
           </button>
         </div>
 
+        <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex flex-wrap gap-7">
           {state.months.map((month) => (
             <div key={month.title} className="min-w-[240px] flex-1">
@@ -128,8 +145,9 @@ export function CalendarPopover({
             {state.helper}
           </div>
         )}
+        </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
+        <div className="mt-4 flex flex-none flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
           <div className="flex items-center gap-[18px] text-[12.5px] text-muted-2">
             <span className="flex items-center gap-1.5">
               <span className="text-disabled-day line-through">12</span> {tr.t("unavailable")}
