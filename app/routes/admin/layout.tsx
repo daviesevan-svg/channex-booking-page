@@ -160,6 +160,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           {/* Operations — the day-to-day pages, kept at the top. */}
           {[
             { to: "/admin/inventory", label: "Inventory", end: false },
+            { to: "/admin/ari-log", label: "Change log", end: false },
             { to: "/admin/bookings", label: "Bookings", end: false },
           ].map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
