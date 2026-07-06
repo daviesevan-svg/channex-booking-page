@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/connectivity";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
+import { getLastAriReceivedAt } from "~/lib/ari.server";
 
 /** Systems a property can connect to. Only `available` ones can be selected;
  *  the rest are shown as upcoming so the list reads as a roadmap. */
@@ -27,7 +28,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
-  return { configured: true as const, propertyId, connected: settings.connectedSystem };
+  const connected = settings.connectedSystem;
+  const lastAriAt = connected === "channex" ? await getLastAriReceivedAt(propertyId) : null;
+  return { configured: true as const, propertyId, connected, lastAriAt };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -50,6 +53,26 @@ export async function action({ request }: Route.ActionArgs) {
 
 export function meta() {
   return [{ title: "Admin · Connectivity" }];
+}
+
+/** "Last update received" note. Formatted on the client so it's in the
+ *  operator's browser timezone/locale (server-side would use UTC and mismatch
+ *  on hydration). */
+function LastAriUpdate({ at }: { at: number | null }) {
+  const [text, setText] = useState("");
+  useEffect(() => {
+    if (at) setText(new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }));
+  }, [at]);
+  return (
+    <p className="mt-4 flex items-center gap-2 text-[12.5px] text-muted">
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#3f7a52]" />
+      {at ? (
+        <>Last update received {text || "…"}</>
+      ) : (
+        <>No availability or rate updates received yet.</>
+      )}
+    </p>
+  );
 }
 
 function CopyField({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -95,7 +118,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { propertyId, connected } = loaderData;
+  const { propertyId, connected, lastAriAt } = loaderData;
 
   return (
     <div>
@@ -204,6 +227,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
               hint="Paste this into the channel/mapping setup in your Channex account."
             />
           </div>
+          <LastAriUpdate at={lastAriAt} />
         </section>
       )}
     </div>
