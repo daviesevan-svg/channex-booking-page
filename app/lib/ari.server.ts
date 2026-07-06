@@ -1,7 +1,7 @@
 // Open Channel ARI store. Channex pushes availability/rates/restrictions to
 // POST /api/changes; we upsert them into D1 and read slices on demand at search
 // time. See https://docs.channex.io/for-ota/open-channel-api.
-import { getConfig, getDB } from "./config.server";
+import { getConfig, getConfigKV, getDB } from "./config.server";
 import { timingSafeEqual } from "./hmac.server";
 
 function db(): D1Database {
@@ -88,6 +88,22 @@ interface RateIn {
 }
 type ChangeAttrs = Record<string, unknown>;
 
+/** KV key holding the epoch-ms of the last ARI push we received for a hotel. */
+const lastAriKey = (hotelCode: string) => `ari:last-received:${hotelCode}`;
+
+/** When Channex last pushed ARI to us, as epoch ms (null if never / on error).
+ *  Used to show "last updated" on the connectivity page. */
+export async function getLastAriReceivedAt(hotelCode: string): Promise<number | null> {
+  if (!hotelCode) return null;
+  try {
+    const v = await getConfigKV().get(lastAriKey(hotelCode));
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Apply one or more changes_notification messages. Returns counts by type. */
 export async function applyChanges(body: unknown): Promise<{ availability: number; rates: number; restrictions: number }> {
   await ensureSchema();
@@ -96,6 +112,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
 
   const stmts: D1PreparedStatement[] = [];
   const counts = { availability: 0, rates: 0, restrictions: 0 };
+  const hotels = new Set<string>();
   const D = db();
 
   const availStmt = D.prepare(
@@ -118,6 +135,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   for (const note of notifications) {
     const attrs = (note as { attributes?: ChangeAttrs }).attributes ?? {};
     const hotel = String(attrs.hotel_code ?? "");
+    if (hotel) hotels.add(hotel);
     const changes = Array.isArray(attrs.changes) ? attrs.changes : [];
     for (const change of changes) {
       const type = (change as { type?: string }).type;
@@ -157,6 +175,16 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // D1 batches are atomic; chunk to stay well within limits on big ranges.
   for (let i = 0; i < stmts.length; i += 100) {
     await D.batch(stmts.slice(i, i + 100));
+  }
+
+  // Record "last received" per hotel once the writes land (best-effort — a KV
+  // hiccup must never fail an ARI push). Only stamp hotels that actually had
+  // changes applied, so an empty/no-op notification doesn't move the marker.
+  if (stmts.length > 0 && hotels.size > 0) {
+    const now = String(Date.now());
+    await Promise.all(
+      [...hotels].map((h) => getConfigKV().put(lastAriKey(h), now).catch(() => {})),
+    );
   }
   return counts;
 }
