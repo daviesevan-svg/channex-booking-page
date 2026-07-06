@@ -643,42 +643,63 @@ function StylizedMap({
 // Uses classic google.maps.Marker (works with only a JS API key — no Map ID
 // needed, unlike AdvancedMarkerElement). Falls back to the stylized map if the
 // script can't load (offline / bad key / blocked).
-let mapsScriptPromise: Promise<void> | null = null;
+// Google's official inline bootstrap loader. It defines `google.maps.importLibrary`
+// SYNCHRONOUSLY (queuing calls until the API is fetched), which is the only
+// reliable way to know when the constructors are ready. A hand-rolled
+// `<script>` + `onload` does NOT work with the modern loader: at onload time
+// neither the Map/Marker constructors nor even `importLibrary` are attached yet,
+// so `new google.maps.Map()` throws "not a constructor" — which previously made
+// the map silently fall back to the stylized canvas.
+function bootstrapGoogleMaps(params: Record<string, string>) {
+  ((g: any) => {
+    let h: any, a: any, k: any;
+    const p = "The Google Maps JavaScript API",
+      c = "google",
+      l = "importLibrary",
+      q = "__ib__",
+      m = document,
+      b: any = (window as any)[c] || ((window as any)[c] = {});
+    const d = b.maps || (b.maps = {}),
+      r = new Set<string>(),
+      e = new URLSearchParams(),
+      u = () =>
+        h ||
+        (h = new Promise<void>((f, n) => {
+          a = m.createElement("script");
+          e.set("libraries", [...r] + "");
+          for (k in g) e.set(k.replace(/[A-Z]/g, (t: string) => "_" + t[0].toLowerCase()), g[k]);
+          e.set("callback", c + ".maps." + q);
+          a.src = `https://maps.${c}apis.com/maps/api/js?` + e;
+          d[q] = f;
+          a.onerror = () => (h = n(new Error(p + " could not load.")));
+          a.nonce = (m.querySelector("script[nonce]") as HTMLScriptElement | null)?.nonce || "";
+          m.head.append(a);
+        }));
+    d[l]
+      ? console.warn(p + " only loads once. Ignoring:", g)
+      : (d[l] = (f: string, ...n: any[]) => r.add(f) && u().then(() => d[l](f, ...n)));
+  })(params);
+}
+
+let mapsReadyPromise: Promise<void> | null = null;
 function loadGoogleMaps(key: string): Promise<void> {
   if (typeof window === "undefined") return Promise.reject(new Error("no window"));
-  if (mapsScriptPromise) return mapsScriptPromise;
-  // With the async bootstrap loader, the script's `onload` fires before the
-  // Map/Marker constructors exist — they're lazily loaded. So after the script
-  // is present we must await importLibrary() before using them, or `new
-  // google.maps.Map()` throws "not a constructor" and we'd wrongly fall back.
-  mapsScriptPromise = new Promise<void>((resolve, reject) => {
-    const g = () => (window as any).google;
-    const ready = async () => {
-      try {
-        await Promise.all([
-          g().maps.importLibrary("maps"),
-          g().maps.importLibrary("marker"),
-        ]);
-        resolve();
-      } catch (e) {
-        reject(e);
-      }
-    };
-    if (g()?.maps?.importLibrary) {
-      ready();
-      return;
-    }
-    const s = document.createElement("script");
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&loading=async`;
-    s.async = true;
-    s.onload = () => ready();
-    s.onerror = () => {
-      mapsScriptPromise = null; // allow a retry on remount
-      reject(new Error("Google Maps failed to load"));
-    };
-    document.head.appendChild(s);
-  });
-  return mapsScriptPromise;
+  if (mapsReadyPromise) return mapsReadyPromise;
+  const g = () => (window as any).google;
+  if (!g()?.maps?.importLibrary) {
+    bootstrapGoogleMaps({ key, v: "weekly" });
+  }
+  // importLibrary resolves only once the constructors are actually available.
+  mapsReadyPromise = Promise.all([
+    g().maps.importLibrary("maps"),
+    g().maps.importLibrary("marker"),
+  ])
+    .then(() => undefined)
+    .catch((e) => {
+      mapsReadyPromise = null; // allow a retry on remount
+      throw e;
+    });
+  return mapsReadyPromise;
 }
 
 function escapeXml(s: string): string {
