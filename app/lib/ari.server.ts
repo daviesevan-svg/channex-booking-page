@@ -207,6 +207,30 @@ export async function hasReceivedAri(hotelCode: string): Promise<boolean> {
   return Boolean(rate);
 }
 
+/** Retention: drop ARI rows outside the useful window — anything before today
+ *  (past dates are dead weight; a stay can't start in the past) and anything
+ *  more than `futureDays` ahead (we never sell that far out). Keeps the D1
+ *  tables bounded regardless of how far ahead Channex pushes. `catalog` isn't
+ *  date-keyed, so it's left alone. Runs on the cron; returns rows deleted. */
+export async function pruneAri(
+  futureDays = 730,
+): Promise<{ availability: number; rate: number; restriction: number }> {
+  await ensureSchema();
+  const D = db();
+  const today = new Date().toISOString().slice(0, 10);
+  const horizon = new Date(Date.now() + futureDays * 86_400_000).toISOString().slice(0, 10);
+  // Table names are fixed literals (never user input), so interpolation is safe.
+  const tables = ["availability", "rate", "restriction"] as const;
+  const out = { availability: 0, rate: 0, restriction: 0 };
+  for (const t of tables) {
+    const res = await D.prepare(`DELETE FROM ${t} WHERE date < ? OR date > ?`)
+      .bind(today, horizon)
+      .run();
+    out[t] = res.meta?.changes ?? 0;
+  }
+  return out;
+}
+
 export interface AriRow {
   room_type_id: string;
   rate_plan_id: string;
