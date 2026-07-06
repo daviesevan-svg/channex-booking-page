@@ -7,6 +7,7 @@ import { currentPropertyId, getVisibleProperties, isOwnerOrSuper } from "~/lib/p
 import { isSuperadmin } from "~/lib/users.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
+import { getConfig } from "~/lib/config.server";
 
 export interface AdminContext {
   propertyId?: string;
@@ -22,12 +23,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
   const settings = propertyId ? await getSettings(propertyId) : {};
   const canManageCurrent = propertyId ? await isOwnerOrSuper(request, propertyId) : false;
+  // Test mode = live bookings not enabled → checkout simulates and takes no
+  // payment. Surfaced as a persistent banner so it's never a surprise. Only
+  // meaningful once a property is selected.
+  const testMode = Boolean(propertyId) && !(settings.liveBooking ?? getConfig().allowLiveBooking);
   return {
     email,
     propertyId,
     properties,
     isSuperadmin: superadmin,
     canManageCurrent,
+    testMode,
     lang: langParam(request),
     languages: enabledLanguages(settings),
   };
@@ -39,7 +45,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, properties, isSuperadmin, canManageCurrent, lang, languages } =
+  const { email, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -131,6 +137,23 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
       </header>
+
+      {testMode && (
+        <div className="border-b border-amber-200 bg-amber-50">
+          <div className={`flex ${shell} flex-wrap items-center justify-between gap-3 px-6 py-2.5`}>
+            <span className="text-[13px] text-amber-900">
+              <strong>Test mode.</strong> Bookings are simulated — nothing is sent to Channex and no
+              payment is taken. Guests can’t really book yet.
+            </span>
+            <Link
+              to="/admin/general"
+              className="flex-none rounded-[8px] bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-amber-700"
+            >
+              Activate live bookings →
+            </Link>
+          </div>
+        </div>
+      )}
 
       <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
