@@ -50,8 +50,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
   const { pathname } = useLocation();
-  // Wide pages (the inventory grid) break out of the centred column.
-  const wide = pathname.startsWith("/admin/inventory");
+  // Wide pages (the inventory grid, the change log table) break out of the
+  // centred column to use the full width.
+  const wide = pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/ari-log");
   const shell = wide ? "max-w-none" : "max-w-[960px]";
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) =>
