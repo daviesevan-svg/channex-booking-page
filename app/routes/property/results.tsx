@@ -204,7 +204,7 @@ function RoomCard({
   const perNight = cheapestTotal / nights;
   const photo = room.photos?.[0]?.url;
   const amenities = (room.facilities ?? []).slice(0, 4);
-  const { capacity } = roomCapacity(room);
+  const { maxAdults, capacity } = roomCapacity(room);
   const detailHref = `/${channelId}/rooms/${room.id}?${qs}`;
 
   return (
@@ -237,7 +237,15 @@ function RoomCard({
             {room.title}
           </h3>
         </Link>
-        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">{tr.t("sleeps", { n: capacity })}</div>
+        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">
+          {tr.t("sleeps", { n: capacity })}
+          {capacity > maxAdults && (
+            <span className="font-normal text-faint">
+              {" · "}
+              {tr.p("adult", maxAdults)} + {tr.p("child", capacity - maxAdults)}
+            </span>
+          )}
+        </div>
         {room.description && (
           <p className="mb-4 max-w-[440px] text-[14.5px] leading-[1.55] text-secondary line-clamp-2">
             {room.description}
