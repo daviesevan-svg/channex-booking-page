@@ -130,10 +130,14 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
             <input name="maxAdults" type="number" min={1} defaultValue={room?.maxAdults ?? 2} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
-            Sleeps (total guests)
+            Sleeps <span className="font-normal text-faint">(total guests — adults + children)</span>
             <input name="maxGuests" type="number" min={1} defaultValue={room?.maxGuests ?? 2} className={FIELD_INPUT} />
           </label>
         </div>
+        <p className="-mt-2 text-[12.5px] text-faint">
+          There's no separate children limit — children are allowed up to the total guests minus the
+          adults in a booking (e.g. sleeps 4, max 2 adults → up to 2 children with 2 adults).
+        </p>
 
         <label className="block text-[13px] font-semibold text-secondary">
           Cleaning fee <span className="font-normal text-faint">(per stay, optional — VAT applies)</span>
