@@ -59,6 +59,7 @@ const EN: Dict = {
   freeCancellationEnded: "Free cancellation was available until {date}.",
   freeCancellationAnytime: "Free cancellation any time before arrival.",
   nonRefundableBooking: "This booking is non-refundable.",
+  cancellationVariesByRoom: "Cancellation terms vary by room — each room's policy is shown in your confirmation.",
   dueNow: "Due now",
   dueAtHotel: "Due at the hotel",
   cardChargedNote: "Your card will be charged now.",

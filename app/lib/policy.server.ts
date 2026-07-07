@@ -57,6 +57,24 @@ export async function resolveBookingCancellation(
   };
 }
 
+/** True when the cart mixes refundable and non-refundable rates. A single
+ *  cancellation line can't honestly describe that (the merged policy would call
+ *  the whole booking non-refundable, hiding that one room is flexible), so the
+ *  checkout shows a general "varies by room" note instead. */
+export async function cancellationVaries(pid: string, rateIds: string[]): Promise<boolean> {
+  const rates = await getRates(pid);
+  const byId = new Map(rates.map((r) => [r.id, r]));
+  let anyRefundable = false;
+  let anyNonRefundable = false;
+  for (const id of rateIds) {
+    const rate = byId.get(id);
+    if (!rate) continue;
+    if (ratePolicyOf(rate).cancellation.refundable) anyRefundable = true;
+    else anyNonRefundable = true;
+  }
+  return anyRefundable && anyNonRefundable;
+}
+
 const TIMING_ORD = { pay_at_hotel: 0, deposit: 1, full_prepay: 2 } as const;
 const PENALTY_ORD: Record<PenaltyType, number> = { none: 0, first_night: 1, fixed: 2, percent: 2, full_stay: 3 };
 

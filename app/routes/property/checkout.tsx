@@ -17,7 +17,7 @@ import {
   type ResolvedLine,
 } from "~/lib/cart";
 import { generateReference } from "~/lib/bookings.server";
-import { resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
+import { cancellationVaries, resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow, policyToCancellation } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -166,6 +166,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // cancellation snapshot (for the translated free-until line).
   const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
   const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), stay.checkin);
+  // A mixed cart (some refundable, some not) can't be described by one line, so
+  // the UI shows a general "varies by room" note instead of the merged policy.
+  const mixedCancellation = await cancellationVaries(pid, lines.map((l) => l.rateId));
 
   // Google Hotel price structured data — the final all-in total the guest sees,
   // so Google's price matches right through the last step (no surprise charges).
@@ -214,6 +217,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     extraLines,
     policy,
     cancellation,
+    mixedCancellation,
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
     collectsCard,
@@ -539,7 +543,7 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -707,12 +711,18 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               {!collectsCard ? tr.t("noCardNote") : cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
             </p>
 
-            {(cancellationText || latePhrase || noShowPhrase) && (
-              <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13.5px] text-secondary">
-                {cancellationText && <div>{cancellationText}</div>}
-                {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
-                {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
+            {mixedCancellation ? (
+              <div className="mb-[18px] border-t border-divider pt-3.5 text-[13.5px] text-secondary">
+                {tr.t("cancellationVariesByRoom")}
               </div>
+            ) : (
+              (cancellationText || latePhrase || noShowPhrase) && (
+                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13.5px] text-secondary">
+                  {cancellationText && <div>{cancellationText}</div>}
+                  {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
+                  {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
+                </div>
+              )
             )}
           </section>
         </div>
@@ -914,10 +924,16 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           >
             {submitting ? tr.t("confirming") : text.completeButton}
           </button>
-          {cancellationText && (
+          {mixedCancellation ? (
             <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
-              {cancellationText}
+              {tr.t("cancellationVariesByRoom")}
             </div>
+          ) : (
+            cancellationText && (
+              <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
+                {cancellationText}
+              </div>
+            )
           )}
         </aside>
       </Form>
