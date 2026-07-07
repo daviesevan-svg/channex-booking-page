@@ -478,7 +478,16 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">
             {singleUnit ? text.cartTitle : text.heading}
           </h1>
-          <div className="text-[15px] text-secondary">{summary}</div>
+          <div className="text-[15px] text-secondary">
+            {summary}
+            <span className="mx-1.5 text-line-alt">·</span>
+            <Link
+              to={`/${params.channelId}?${qs}`}
+              className="font-semibold text-accent underline-offset-2 hover:underline"
+            >
+              {text.editSearch}
+            </Link>
+          </div>
         </div>
         <Link
           to={`/${params.channelId}?${qs}`}
