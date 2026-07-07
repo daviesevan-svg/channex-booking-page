@@ -914,9 +914,11 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           >
             {submitting ? tr.t("confirming") : text.completeButton}
           </button>
-          <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
-            {text.cancellationNote}
-          </div>
+          {cancellationText && (
+            <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
+              {cancellationText}
+            </div>
+          )}
         </aside>
       </Form>
     </main>

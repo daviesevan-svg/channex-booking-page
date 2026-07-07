@@ -74,11 +74,6 @@ export const EDITABLE_PAGES: PageDef[] = [
           "Your flexible rate is paid at the hotel. We only need a card to guarantee the booking — you won't be charged today.",
       },
       { key: "completeButton", label: "Complete button", default: "Complete booking" },
-      {
-        key: "cancellationNote",
-        label: "Cancellation note",
-        default: "Free cancellation until 24h before arrival.",
-      },
     ],
   },
   {
@@ -448,12 +443,12 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     nl: { backLink: "Alle kamers", amenitiesTitle: "In deze kamer", rateTitle: "Kies uw tarief", addButton: "Toevoegen aan verblijf" },
   },
   checkout: {
-    fr: { heading: "Vos coordonnées", guestSection: "Informations du client", arrivalSection: "Arrivée et demandes", paymentSection: "Paiement", paymentNote: "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.", completeButton: "Finaliser la réservation", cancellationNote: "Annulation gratuite jusqu'à 24h avant l'arrivée." },
-    de: { heading: "Ihre Angaben", guestSection: "Gästeinformationen", arrivalSection: "Anreise & Wünsche", paymentSection: "Zahlung", paymentNote: "Ihr flexibler Tarif wird im Hotel bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.", completeButton: "Buchung abschließen", cancellationNote: "Kostenlose Stornierung bis 24 Std. vor Anreise." },
-    es: { heading: "Sus datos", guestSection: "Información del huésped", arrivalSection: "Llegada y solicitudes", paymentSection: "Pago", paymentNote: "Su tarifa flexible se paga en el hotel. Solo necesitamos una tarjeta para garantizar la reserva: hoy no se le cobrará nada.", completeButton: "Completar la reserva", cancellationNote: "Cancelación gratuita hasta 24 h antes de la llegada." },
-    it: { heading: "I tuoi dati", guestSection: "Informazioni dell'ospite", arrivalSection: "Arrivo e richieste", paymentSection: "Pagamento", paymentNote: "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.", completeButton: "Completa la prenotazione", cancellationNote: "Cancellazione gratuita fino a 24 ore prima dell'arrivo." },
-    pt: { heading: "Os seus dados", guestSection: "Informações do hóspede", arrivalSection: "Chegada e pedidos", paymentSection: "Pagamento", paymentNote: "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.", completeButton: "Concluir reserva", cancellationNote: "Cancelamento gratuito até 24h antes da chegada." },
-    nl: { heading: "Uw gegevens", guestSection: "Gastinformatie", arrivalSection: "Aankomst & verzoeken", paymentSection: "Betaling", paymentNote: "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.", completeButton: "Boeking voltooien", cancellationNote: "Gratis annulering tot 24 uur voor aankomst." },
+    fr: { heading: "Vos coordonnées", guestSection: "Informations du client", arrivalSection: "Arrivée et demandes", paymentSection: "Paiement", paymentNote: "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.", completeButton: "Finaliser la réservation" },
+    de: { heading: "Ihre Angaben", guestSection: "Gästeinformationen", arrivalSection: "Anreise & Wünsche", paymentSection: "Zahlung", paymentNote: "Ihr flexibler Tarif wird im Hotel bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.", completeButton: "Buchung abschließen" },
+    es: { heading: "Sus datos", guestSection: "Información del huésped", arrivalSection: "Llegada y solicitudes", paymentSection: "Pago", paymentNote: "Su tarifa flexible se paga en el hotel. Solo necesitamos una tarjeta para garantizar la reserva: hoy no se le cobrará nada.", completeButton: "Completar la reserva" },
+    it: { heading: "I tuoi dati", guestSection: "Informazioni dell'ospite", arrivalSection: "Arrivo e richieste", paymentSection: "Pagamento", paymentNote: "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.", completeButton: "Completa la prenotazione" },
+    pt: { heading: "Os seus dados", guestSection: "Informações do hóspede", arrivalSection: "Chegada e pedidos", paymentSection: "Pagamento", paymentNote: "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.", completeButton: "Concluir reserva" },
+    nl: { heading: "Uw gegevens", guestSection: "Gastinformatie", arrivalSection: "Aankomst & verzoeken", paymentSection: "Betaling", paymentNote: "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.", completeButton: "Boeking voltooien" },
   },
   extras: {
     fr: { heading: "Améliorez votre {room}", intro: "Des extras facultatifs pour rendre votre séjour spécial.", stayTitle: "Pour tout votre séjour", summaryLabel: "Extras", continueButton: "Continuer", skipButton: "Passer pour l’instant" },
