@@ -6,7 +6,7 @@
 // hand with WebCrypto since there's no googleapis SDK on Workers. Everything
 // here is best-effort and fails soft (returns null) so a Travel Partner API
 // hiccup can never stall the ARI push.
-import { getConfig } from "../config.server";
+import { getConfig, getConfigKV } from "../config.server";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/travelpartner";
@@ -169,4 +169,30 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
     matchStatus,
     reasons: Array.isArray(view.matchFailureReasons) ? view.matchFailureReasons : [],
   };
+}
+
+// Match status changes rarely (a property gets matched/goes live over hours or
+// days), but the Travel Partner API is slow (OAuth + hotelViews round-trips).
+// Cache successful lookups in KV so the admin page doesn't re-hit Google on
+// every load. Only successes are cached — a transient null keeps trying.
+const MATCH_CACHE_TTL_S = 1800; // 30 min
+const matchCacheKey = (hotelId: string) => `google:match:${hotelId}`;
+
+export async function getGoogleMatchStatusCached(hotelId: string): Promise<GoogleMatchStatus | null> {
+  if (!hotelId) return null;
+  try {
+    const cached = await getConfigKV().get(matchCacheKey(hotelId));
+    if (cached) return JSON.parse(cached) as GoogleMatchStatus;
+  } catch {
+    /* cache miss/parse error — fall through to a live lookup */
+  }
+  const fresh = await getGoogleMatchStatus(hotelId);
+  if (fresh) {
+    try {
+      await getConfigKV().put(matchCacheKey(hotelId), JSON.stringify(fresh), { expirationTtl: MATCH_CACHE_TTL_S });
+    } catch {
+      /* best-effort cache write */
+    }
+  }
+  return fresh;
 }

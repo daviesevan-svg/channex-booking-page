@@ -1,25 +1,31 @@
-import { Form, useNavigation } from "react-router";
+import { Suspense } from "react";
+import { Await, Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/google-hotels";
+import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
-import { getGoogleMatchStatus } from "~/lib/google-ari/status.server";
+import { getGoogleMatchStatusCached } from "~/lib/google-ari/status.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
-  const [settings, readiness, lastSync, matchStatus] = await Promise.all([
+  const [settings, readiness, lastSync] = await Promise.all([
     getSettings(propertyId),
     checkGoogleReadiness(propertyId),
     getGoogleAriSync(propertyId),
-    getGoogleMatchStatus(propertyId).catch(() => null),
   ]);
+  const matchConfigured = Boolean(
+    getConfig().googleTravelPartnerAccountId &&
+      getConfig().googleTravelPartnerSaEmail &&
+      getConfig().googleTravelPartnerSaKey,
+  );
   return {
     configured: true as const,
     canManage,
@@ -29,12 +35,14 @@ export async function loader({ request }: Route.LoaderArgs) {
     windowDays: settings.googleAriWindowDays ?? 365,
     lastSync,
     readiness,
-    matchStatus,
-    matchConfigured: Boolean(
-      getConfig().googleTravelPartnerAccountId &&
-        getConfig().googleTravelPartnerSaEmail &&
-        getConfig().googleTravelPartnerSaKey,
-    ),
+    matchConfigured,
+    // Streamed, NOT awaited: the Travel Partner API is slow (OAuth token +
+    // hotelViews round-trips), so blocking on it made this page take ~10s.
+    // Return the promise so the page renders immediately and the "On Google"
+    // row fills in when it resolves. Cached in KV, so repeat loads are instant.
+    matchStatus: matchConfigured
+      ? getGoogleMatchStatusCached(propertyId).catch(() => null)
+      : Promise.resolve(null),
   };
 }
 
@@ -149,38 +157,26 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
               Not checked — add Travel Partner API secrets to enable
             </span>
-          ) : !matchStatus ? (
-            <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-              Couldn’t check right now — Google didn’t respond (or the service account is still activating)
-            </span>
           ) : (
-            <>
-              <span
-                className={`rounded-full px-2.5 py-0.5 font-semibold ${
-                  matchStatus.state === "matched"
-                    ? "bg-[#e8f0e6] text-[#3f7a52]"
-                    : matchStatus.state === "not_found"
-                      ? "bg-chip text-muted"
-                      : "bg-amber-50 text-amber-800"
-                }`}
-              >
-                {matchStatus.state === "matched"
-                  ? "Matched — ready for rates"
-                  : matchStatus.state === "not_found"
-                    ? "Not uploaded to Google yet (feed not ingested)"
-                    : matchStatus.state === "not_matched"
-                      ? "Uploaded, but not matched to a business profile yet"
-                      : matchStatus.state === "overlap"
-                        ? "Uploaded — overlaps another listing (map overlap)"
-                        : `Status unclear (${matchStatus.matchStatus})`}
-              </span>
-              {matchStatus.liveOnGoogle && (
-                <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
-              )}
-              {matchStatus.state !== "matched" && matchStatus.reasons.length > 0 && (
-                <span className="text-muted-2">· {matchStatus.reasons.join("; ")}</span>
-              )}
-            </>
+            <Suspense
+              fallback={
+                <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
+                  Checking Google…
+                </span>
+              }
+            >
+              <Await resolve={matchStatus}>
+                {(ms: GoogleMatchStatus | null) =>
+                  ms ? (
+                    <MatchStatusBadges status={ms} />
+                  ) : (
+                    <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
+                      Couldn’t check right now — Google didn’t respond (or the service account is still activating)
+                    </span>
+                  )
+                }
+              </Await>
+            </Suspense>
           )}
         </div>
       </section>
@@ -284,5 +280,38 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         </section>
       )}
     </div>
+  );
+}
+
+/** The "On Google" badges, rendered once the Travel Partner status resolves. */
+function MatchStatusBadges({ status }: { status: GoogleMatchStatus }) {
+  return (
+    <>
+      <span
+        className={`rounded-full px-2.5 py-0.5 font-semibold ${
+          status.state === "matched"
+            ? "bg-[#e8f0e6] text-[#3f7a52]"
+            : status.state === "not_found"
+              ? "bg-chip text-muted"
+              : "bg-amber-50 text-amber-800"
+        }`}
+      >
+        {status.state === "matched"
+          ? "Matched — ready for rates"
+          : status.state === "not_found"
+            ? "Not uploaded to Google yet (feed not ingested)"
+            : status.state === "not_matched"
+              ? "Uploaded, but not matched to a business profile yet"
+              : status.state === "overlap"
+                ? "Uploaded — overlaps another listing (map overlap)"
+                : `Status unclear (${status.matchStatus})`}
+      </span>
+      {status.liveOnGoogle && (
+        <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
+      )}
+      {status.state !== "matched" && status.reasons.length > 0 && (
+        <span className="text-muted-2">· {status.reasons.join("; ")}</span>
+      )}
+    </>
   );
 }
