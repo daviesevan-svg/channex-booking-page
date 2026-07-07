@@ -375,7 +375,12 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                 />
               </div>
             )}
-            <div className="mt-2.5 text-[11.5px] text-faint">{tr.t("sleeps", { n: capacity })}</div>
+            <div className="mt-2.5 text-[11.5px] text-faint">
+              {tr.t("sleeps", { n: capacity })}
+              {capacity > maxAdults && (
+                <> · {tr.p("adult", maxAdults)} + {tr.p("child", capacity - maxAdults)}</>
+              )}
+            </div>
           </div>
 
           <div className="mb-5 flex flex-col gap-2.5">
