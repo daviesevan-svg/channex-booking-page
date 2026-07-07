@@ -7,6 +7,7 @@
 // here is best-effort and fails soft (returns null) so a Travel Partner API
 // hiccup can never stall the ARI push.
 import { getConfig, getConfigKV } from "../config.server";
+import { getProperties } from "../properties.server";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/travelpartner";
@@ -171,28 +172,62 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
   };
 }
 
-// Match status changes rarely (a property gets matched/goes live over hours or
-// days), but the Travel Partner API is slow (OAuth + hotelViews round-trips).
-// Cache successful lookups in KV so the admin page doesn't re-hit Google on
-// every load. Only successes are cached — a transient null keeps trying.
-const MATCH_CACHE_TTL_S = 1800; // 30 min
+// Match status changes over hours/days and the Travel Partner API is slow
+// (OAuth + hotelViews round-trips), so we never call it on a page load. Instead
+// the cron refreshes it ~once a day into KV as last-known-good (no expiry, so a
+// failed refresh keeps the previous value), and the admin page only reads KV.
 const matchCacheKey = (hotelId: string) => `google:match:${hotelId}`;
+const REFRESH_AFTER_MS = 20 * 60 * 60 * 1000; // ~daily, tolerant of the 6h cron
 
-export async function getGoogleMatchStatusCached(hotelId: string): Promise<GoogleMatchStatus | null> {
+export interface CachedMatchStatus {
+  status: GoogleMatchStatus;
+  checkedAt: number; // epoch ms of the live check
+}
+
+/** Read the cached match status (KV only — never calls Google). Null when it's
+ *  never been checked yet. Used on page load so it's instant. */
+export async function readCachedMatchStatus(hotelId: string): Promise<CachedMatchStatus | null> {
   if (!hotelId) return null;
   try {
     const cached = await getConfigKV().get(matchCacheKey(hotelId));
-    if (cached) return JSON.parse(cached) as GoogleMatchStatus;
+    return cached ? (JSON.parse(cached) as CachedMatchStatus) : null;
   } catch {
-    /* cache miss/parse error — fall through to a live lookup */
+    return null;
   }
+}
+
+/** Live-check one property and store the result as last-known-good. Only a
+ *  successful lookup overwrites the cache — a transient null leaves the previous
+ *  value in place. Returns whether it stored anything. */
+export async function refreshMatchStatus(hotelId: string): Promise<boolean> {
   const fresh = await getGoogleMatchStatus(hotelId);
-  if (fresh) {
-    try {
-      await getConfigKV().put(matchCacheKey(hotelId), JSON.stringify(fresh), { expirationTtl: MATCH_CACHE_TTL_S });
-    } catch {
-      /* best-effort cache write */
-    }
+  if (!fresh) return false;
+  try {
+    const value: CachedMatchStatus = { status: fresh, checkedAt: Date.now() };
+    await getConfigKV().put(matchCacheKey(hotelId), JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
   }
-  return fresh;
+}
+
+/** Cron entry point: refresh the match status for every registered property
+ *  whose cached value is older than ~a day. No-op when Travel Partner creds
+ *  aren't configured. Self-throttled so the 6h cron effectively checks daily. */
+export async function refreshAllMatchStatuses(): Promise<void> {
+  const { googleTravelPartnerAccountId, googleTravelPartnerSaEmail, googleTravelPartnerSaKey } = getConfig();
+  if (!(googleTravelPartnerAccountId && googleTravelPartnerSaEmail && googleTravelPartnerSaKey)) return;
+  const now = Date.now();
+  let properties: { id: string }[] = [];
+  try {
+    properties = await getProperties();
+  } catch (e) {
+    console.log(`[travelpartner] refreshAll: couldn't list properties: ${e instanceof Error ? e.message : e}`);
+    return;
+  }
+  for (const p of properties) {
+    const cached = await readCachedMatchStatus(p.id);
+    if (cached && now - cached.checkedAt < REFRESH_AFTER_MS) continue; // still fresh
+    await refreshMatchStatus(p.id).catch(() => false);
+  }
 }

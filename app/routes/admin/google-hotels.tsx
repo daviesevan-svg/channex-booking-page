@@ -1,5 +1,4 @@
-import { Suspense } from "react";
-import { Await, Form, useNavigation } from "react-router";
+import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/google-hotels";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
@@ -9,23 +8,26 @@ import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
-import { getGoogleMatchStatusCached } from "~/lib/google-ari/status.server";
+import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
-  const [settings, readiness, lastSync] = await Promise.all([
-    getSettings(propertyId),
-    checkGoogleReadiness(propertyId),
-    getGoogleAriSync(propertyId),
-  ]);
   const matchConfigured = Boolean(
     getConfig().googleTravelPartnerAccountId &&
       getConfig().googleTravelPartnerSaEmail &&
       getConfig().googleTravelPartnerSaKey,
   );
+  // The Travel Partner status is refreshed by the daily cron and read from KV
+  // only here — never a live Google call on page load (that made this ~10s).
+  const [settings, readiness, lastSync, cachedMatch] = await Promise.all([
+    getSettings(propertyId),
+    checkGoogleReadiness(propertyId),
+    getGoogleAriSync(propertyId),
+    matchConfigured ? readCachedMatchStatus(propertyId) : Promise.resolve(null),
+  ]);
   return {
     configured: true as const,
     canManage,
@@ -36,13 +38,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastSync,
     readiness,
     matchConfigured,
-    // Streamed, NOT awaited: the Travel Partner API is slow (OAuth token +
-    // hotelViews round-trips), so blocking on it made this page take ~10s.
-    // Return the promise so the page renders immediately and the "On Google"
-    // row fills in when it resolves. Cached in KV, so repeat loads are instant.
-    matchStatus: matchConfigured
-      ? getGoogleMatchStatusCached(propertyId).catch(() => null)
-      : Promise.resolve(null),
+    matchStatus: cachedMatch?.status ?? null,
+    matchCheckedAt: cachedMatch?.checkedAt ?? null,
   };
 }
 
@@ -101,7 +98,8 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured } = loaderData;
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured } =
+    loaderData;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -157,26 +155,12 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
               Not checked — add Travel Partner API secrets to enable
             </span>
+          ) : matchStatus ? (
+            <MatchStatusBadges status={matchStatus} />
           ) : (
-            <Suspense
-              fallback={
-                <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-                  Checking Google…
-                </span>
-              }
-            >
-              <Await resolve={matchStatus}>
-                {(ms: GoogleMatchStatus | null) =>
-                  ms ? (
-                    <MatchStatusBadges status={ms} />
-                  ) : (
-                    <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-                      Couldn’t check right now — Google didn’t respond (or the service account is still activating)
-                    </span>
-                  )
-                }
-              </Await>
-            </Suspense>
+            <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
+              Not checked yet — refreshed automatically once a day
+            </span>
           )}
         </div>
       </section>
