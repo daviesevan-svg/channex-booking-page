@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, renameProperty } from "~/lib/properties.server";
+import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { uploadPropertyCoverImage } from "~/lib/images.server";
@@ -16,10 +16,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const [overrides, settings, googleReadiness] = await Promise.all([
+  const [overrides, settings, googleReadiness, property] = await Promise.all([
     getOverridesRaw(propertyId, lang),
     getSettings(propertyId),
     checkGoogleReadiness(propertyId),
+    getProperty(propertyId),
   ]);
   return {
     configured: true as const,
@@ -28,6 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     overrides,
     settings,
     googleReadiness,
+    isPublic: Boolean(property?.public),
     host: new URL(request.url).host,
   };
 }
@@ -58,6 +60,9 @@ export async function action({ request }: Route.ActionArgs) {
   // hotel name drives it — editing a translation doesn't rename the property.
   const hotelName = String(form.get("hotelName") ?? "").trim();
   if (lang === DEFAULT_LANG && hotelName) await renameProperty(propertyId, hotelName);
+  // Public listing (registry flag): shown on the home directory + required for
+  // the Google feed. Mirrors the toggle on the Properties page.
+  await setPropertyPublic(propertyId, form.get("public") === "on");
   return { ok: true };
 }
 
@@ -84,7 +89,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, settings, googleReadiness, host, lang } = loaderData;
+  const { overrides, settings, googleReadiness, isPublic, host, lang } = loaderData;
 
   return (
     <div>
@@ -114,6 +119,19 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       >
         <input type="hidden" name="lang" value={lang} />
         <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
+
+        {/* Public listing (registry flag, global — not per-language). Same
+            control as the Properties page, surfaced here where it's edited. */}
+        <label className="flex items-start gap-2.5 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+          <input type="checkbox" name="public" defaultChecked={isPublic} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+          <span className="text-[13.5px]">
+            <span className="font-semibold text-ink">Listed publicly</span>
+            <span className="mt-0.5 block text-[12.5px] text-muted">
+              Shows on the home directory and makes the property eligible for Google Hotels. Turn off
+              to keep it bookable by direct link only.
+            </span>
+          </span>
+        </label>
 
         {/* Cover photo — the property's image on Collections cards. Global (not
             per-language). */}
