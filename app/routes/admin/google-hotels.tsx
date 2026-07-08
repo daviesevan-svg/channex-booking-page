@@ -4,17 +4,19 @@ import type { Route } from "./+types/google-hotels";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { isSuperadmin } from "~/lib/users.server";
 import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
+import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const canManage = await isOwnerOrSuper(request, propertyId);
+  const [canManage, superadmin] = await Promise.all([isOwnerOrSuper(request, propertyId), isSuperadmin(email)]);
   const matchConfigured = Boolean(
     getConfig().googleTravelPartnerAccountId &&
       getConfig().googleTravelPartnerSaEmail &&
@@ -38,20 +40,32 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastSync,
     readiness,
     matchConfigured,
+    superadmin,
     matchStatus: cachedMatch?.status ?? null,
     matchCheckedAt: cachedMatch?.checkedAt ?? null,
   };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
+  const form = await request.formData();
+  const intent = String(form.get("intent") ?? "");
+
+  // Rebuilding the merged Google feed is a global (all-property) action, so it's
+  // superadmin-only and not tied to the current property.
+  if (intent === "refreshFeed") {
+    if (!(await isSuperadmin(email))) return { error: "Only a superadmin can refresh the Google feed." };
+    const res = await refreshMergedGoogleFeed(true);
+    return res.ok
+      ? { feedRefreshed: true as const }
+      : { error: "Feed rebuild failed — the previous snapshot is unchanged (Channex feed unreachable?)." };
+  }
+
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   if (!(await isOwnerOrSuper(request, propertyId))) {
     return { error: "Only an owner or manager can manage Google Hotels." };
   }
-  const form = await request.formData();
-  const intent = String(form.get("intent") ?? "");
 
   if (intent === "save") {
     const windowDays = Number(form.get("windowDays"));
@@ -98,7 +112,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured } =
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin } =
     loaderData;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
@@ -261,6 +275,35 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
               </div>
             ))}
           </div>
+        </section>
+      )}
+
+      {/* Merged Google feed — global, superadmin only. Google pulls a once-a-day
+          snapshot; this forces an immediate rebuild (e.g. after a property goes
+          public) instead of waiting for the daily cron. */}
+      {superadmin && (
+        <section className="rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">Merged Google feed</h2>
+          <p className="mb-4 max-w-2xl text-[13px] text-muted">
+            Google pulls <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-hotels-all.xml</code>,
+            rebuilt automatically once a day. Rebuild it now to publish changes (like a property that
+            just went public) without waiting for the daily refresh.
+          </p>
+          {actionData && "feedRefreshed" in actionData && actionData.feedRefreshed && (
+            <p className="mb-3 rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">
+              ✓ Feed rebuilt — Google will see the latest listings on its next crawl.
+            </p>
+          )}
+          <Form method="post">
+            <input type="hidden" name="intent" value="refreshFeed" />
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+            >
+              {busy ? "Rebuilding…" : "Refresh Google feed now"}
+            </button>
+          </Form>
         </section>
       )}
     </div>
