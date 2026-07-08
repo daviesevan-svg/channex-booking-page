@@ -52,7 +52,7 @@ export async function googleListingElements(): Promise<string> {
     // Skip properties missing data Google requires — an incomplete listing can
     // get the whole feed rejected. The admin readiness panel flags these.
     const canBook = await canTakeBookings(p.id, settings);
-    if (requiredMissing(settings, overrides, canBook).length > 0) continue;
+    if (requiredMissing(settings, overrides, canBook, p.public).length > 0) continue;
 
     const id = p.id;
     const name = overrides.hotelName || p.name;

@@ -4,6 +4,7 @@
 // gate the feed on `requiredMissing` and surface the gaps in the admin.
 import type { SiteSettings } from "./content";
 import { getOverrides, getSettings, type PropertyOverrides } from "./overrides.server";
+import { getProperty } from "./properties.server";
 import { hasReceivedAri } from "./ari.server";
 
 /** Whether the property can actually take a booking — required before Google
@@ -40,11 +41,15 @@ export function requiredMissing(
   settings: SiteSettings,
   overrides: PropertyOverrides,
   canBook: boolean,
+  isPublic: boolean,
 ): ReadinessItem[] {
   const out: ReadinessItem[] = [];
   const need = (ok: unknown, field: string, label: string) => {
     if (!ok) out.push({ field, label });
   };
+  // The feed only includes public properties — a private one is silently
+  // dropped, so it's a hard requirement here too.
+  need(isPublic, "public", "Make the property Public (Properties)");
   need(overrides.hotelName, "hotelName", "Hotel name (Property details)");
   need(overrides.address, "address", "Street (Location)");
   need(settings.addressCity, "addressCity", "City (Location)");
@@ -69,9 +74,13 @@ export function recommendedMissing(settings: SiteSettings, overrides: PropertyOv
 }
 
 export async function checkGoogleReadiness(pid: string): Promise<GoogleReadiness> {
-  const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+  const [settings, overrides, property] = await Promise.all([
+    getSettings(pid),
+    getOverrides(pid),
+    getProperty(pid),
+  ]);
   const canBook = await canTakeBookings(pid, settings);
-  const missingRequired = requiredMissing(settings, overrides, canBook);
+  const missingRequired = requiredMissing(settings, overrides, canBook, Boolean(property?.public));
   return {
     enabled: settings.googleStructuredData !== false,
     missingRequired,
