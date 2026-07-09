@@ -17,6 +17,7 @@ import {
   type ExtraUnit,
 } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
+import { uploadExtraImage } from "~/lib/images.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
 const UNITS: ExtraUnit[] = ["stay", "night", "person", "person_night", "trip"];
@@ -141,10 +142,24 @@ export async function action({ request }: Route.ActionArgs) {
 
   const existing = await getExtras(propertyId);
   const prev = existing.find((e) => e.id === id);
+  const finalId = id || crypto.randomUUID();
+
+  // Image: keep the current one unless "remove" is ticked or a new file replaces it.
+  let image = form.get("removeImage") != null ? undefined : prev?.image;
+  const upload = form.getAll("image").find((f): f is File => f instanceof File && f.size > 0);
+  if (upload) {
+    try {
+      image = await uploadExtraImage(propertyId, finalId, upload);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Image upload failed.", values };
+    }
+  }
+
   const extra: Extra = {
-    id: id || crypto.randomUUID(),
+    id: finalId,
     name,
     desc,
+    image,
     unit,
     price: configurable ? undefined : price,
     options: configurable ? options : undefined,
@@ -230,6 +245,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
       {showForm && (
       <Form
         method="post"
+        encType="multipart/form-data"
         key={editing?.id ?? "new"}
         className="mb-7 flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6"
       >
@@ -270,6 +286,34 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
+
+        <div className="text-[13px] font-semibold text-secondary">
+          Photo <span className="font-normal text-faint">(optional — shown on the extra's card)</span>
+          <div className="mt-1.5 flex items-start gap-4">
+            {editing?.image && (
+              <div className="flex flex-none flex-col items-center gap-1.5">
+                <img
+                  src={editing.image}
+                  alt=""
+                  className="h-[72px] w-[104px] flex-none rounded-[10px] border border-line object-cover"
+                />
+                <label className="flex items-center gap-1.5 text-[12px] font-medium text-muted">
+                  <input type="checkbox" name="removeImage" className={checkbox} />
+                  Remove
+                </label>
+              </div>
+            )}
+            <input
+              type="file"
+              name="image"
+              accept="image/*"
+              className="block w-full text-[13px] font-normal text-muted file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent-soft file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-accent-deep hover:file:bg-accent-soft-strong"
+            />
+          </div>
+          <span className="mt-1 block text-[11px] font-normal text-faint">
+            {editing?.image ? "Upload a new file to replace it." : "JPG or PNG, up to 8MB."}
+          </span>
+        </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
           Price <span className="font-normal text-faint">(for a simple extra — leave blank if using options)</span>
@@ -420,7 +464,13 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
               key={e.id}
               className={`flex items-center justify-between gap-4 px-5 py-4 ${i > 0 ? "border-t border-divider" : ""}`}
             >
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-3.5">
+                {e.image ? (
+                  <img src={e.image} alt="" className="h-11 w-16 flex-none rounded-[8px] border border-line object-cover" />
+                ) : (
+                  <div className="h-11 w-16 flex-none rounded-[8px] border border-line" style={{ background: "repeating-linear-gradient(135deg,#efe7da,#efe7da 8px,#e7ddcc 8px,#e7ddcc 16px)" }} />
+                )}
+                <div className="min-w-0">
                 <div className="flex items-center gap-2.5">
                   <span className="font-semibold">{e.name}</span>
                   {e.active ? (
@@ -441,6 +491,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                   ) : null}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency)}</div>
+                </div>
               </div>
               <div className="flex flex-none items-center gap-3">
                 <Form method="post">

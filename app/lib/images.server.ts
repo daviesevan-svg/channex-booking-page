@@ -34,6 +34,10 @@ export function uploadCatalogRoomImage(propertyId: string, roomId: string, file:
   return uploadImage(`catalog/${propertyId}/${roomId}`, file);
 }
 
+export function uploadExtraImage(propertyId: string, extraId: string, file: File): Promise<string> {
+  return uploadImage(`extras/${propertyId}/${extraId}`, file);
+}
+
 export function uploadRatePlanImage(
   propertyId: string,
   rateId: string,

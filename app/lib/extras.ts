@@ -35,6 +35,9 @@ export interface Extra {
   id: string;
   name: string;
   desc?: string;
+  /** Photo shown on the extra's card / configure popup (served /images/…).
+   *  Falls back to a hatch placeholder when unset. */
+  image?: string;
   /** Default unit (simple extras, and option fallback). */
   unit: ExtraUnit;
   /** Simple extra unit price. Undefined for configurable extras. */
