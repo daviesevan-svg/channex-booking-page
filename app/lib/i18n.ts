@@ -60,6 +60,7 @@ const EN: Dict = {
   freeCancellationAnytime: "Free cancellation any time before arrival.",
   nonRefundableBooking: "This booking is non-refundable.",
   cancellationVariesByRoom: "Cancellation terms vary by room — each room's policy is shown in your confirmation.",
+  walletsAccepted: "Apple Pay, Google Pay & cards accepted — secure checkout.",
   dueNow: "Due now",
   dueAtHotel: "Due at the hotel",
   cardChargedNote: "Your card will be charged now.",
