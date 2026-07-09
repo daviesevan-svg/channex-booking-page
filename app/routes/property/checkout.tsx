@@ -924,6 +924,15 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           >
             {submitting ? tr.t("confirming") : text.completeButton}
           </button>
+          {collectsCard && (
+            <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[12px] text-muted-2">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="4" y="10" width="16" height="11" rx="2.5" />
+                <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+              </svg>
+              {tr.t("walletsAccepted")}
+            </div>
+          )}
           {mixedCancellation ? (
             <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
               {tr.t("cancellationVariesByRoom")}
