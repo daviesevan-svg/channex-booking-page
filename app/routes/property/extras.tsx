@@ -343,7 +343,11 @@ function ExtraCard({
       className="flex flex-col overflow-hidden rounded-[16px] border bg-surface"
       style={{ borderColor: has ? "var(--accent)" : "var(--line)" }}
     >
-      <div className="h-[120px] w-full flex-none" style={{ background: stripe }} />
+      {extra.image ? (
+        <img src={extra.image} alt="" className="h-[120px] w-full flex-none object-cover" />
+      ) : (
+        <div className="h-[120px] w-full flex-none" style={{ background: stripe }} />
+      )}
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-1 flex items-baseline justify-between gap-2">
           <h3 className="font-serif text-[19px] font-semibold">{extra.name}</h3>
@@ -445,7 +449,11 @@ function ConfigureModal({
         className="flex max-h-[88vh] w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="h-[120px] w-full flex-none" style={{ background: stripe }} />
+        {extra.image ? (
+          <img src={extra.image} alt="" className="h-[120px] w-full flex-none object-cover" />
+        ) : (
+          <div className="h-[120px] w-full flex-none" style={{ background: stripe }} />
+        )}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
             <h2 className="font-serif text-[22px] font-semibold">{extra.name}</h2>
