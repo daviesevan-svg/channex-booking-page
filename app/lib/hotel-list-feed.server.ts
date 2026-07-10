@@ -44,11 +44,9 @@ export async function googleListingElements(): Promise<string> {
   const listings: string[] = [];
 
   for (const p of properties) {
-    // Only properties opted into the public listing AND not opted out of the
-    // Google structured data are advertised to Google.
+    // Only properties opted into the public listing are advertised to Google.
     if (!p.public) continue;
     const [settings, overrides] = await Promise.all([getSettings(p.id), getOverrides(p.id)]);
-    if (settings.googleStructuredData === false) continue;
     // Skip properties missing data Google requires — an incomplete listing can
     // get the whole feed rejected. The admin readiness panel flags these.
     const canBook = await canTakeBookings(p.id, settings);

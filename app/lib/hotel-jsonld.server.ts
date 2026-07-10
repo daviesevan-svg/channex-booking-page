@@ -43,7 +43,6 @@ interface Stay {
 }
 
 interface HotelInfo {
-  enabled: boolean;
   identifier: string;
   name: string;
   address?: string;
@@ -59,7 +58,6 @@ interface HotelInfo {
 async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
   const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid, lang)]);
   return {
-    enabled: settings.googleStructuredData !== false, // undefined = on
     identifier: pid,
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
@@ -122,7 +120,6 @@ export async function catalogHotelJsonLd(
   rooms: JsonLdRoom[],
 ): Promise<Record<string, unknown> | null> {
   const info = await hotelInfo(pid, lang);
-  if (!info.enabled) return null;
   const places = rooms
     .map((r) => ({ ...r, offers: r.offers.filter((o) => o.total > 0) }))
     .filter((r) => r.offers.length > 0)
@@ -161,6 +158,6 @@ export async function reservationHotelJsonLd(
   total: number,
 ): Promise<Record<string, unknown> | null> {
   const info = await hotelInfo(pid, lang);
-  if (!info.enabled || !(total > 0)) return null;
+  if (!(total > 0)) return null;
   return { ...baseHotel(info), makesOffer: offer(stay, info, { total }) };
 }

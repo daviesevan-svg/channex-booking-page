@@ -244,11 +244,6 @@ export interface SiteSettings {
   stripeAccountId?: string;
   /** Cached from the connected account: whether it can accept charges. */
   stripeChargesEnabled?: boolean;
-  // ----- Google Hotels structured data -----
-  /** Emit Google Hotel price structured data (JSON-LD) on results/detail/checkout.
-   *  undefined = on; set false to suppress. The hotel identifier sent to Google
-   *  (HLF + structured data) is always the property id. */
-  googleStructuredData?: boolean;
   // ----- Google Hotels ARI push (direct rooms/rates/discounts/availability) -----
   /** Master switch: push this property's ARI (property data, rates, availability,
    *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */

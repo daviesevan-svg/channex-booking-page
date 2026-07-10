@@ -28,8 +28,6 @@ export interface ReadinessItem {
 export interface GoogleReadiness {
   /** True when no required content is missing — the property is fed to Google. */
   ready: boolean;
-  /** Whether the property opted into Google structured data / the feed at all. */
-  enabled: boolean;
   missingRequired: ReadinessItem[];
   missingRecommended: ReadinessItem[];
 }
@@ -82,7 +80,6 @@ export async function checkGoogleReadiness(pid: string): Promise<GoogleReadiness
   const canBook = await canTakeBookings(pid, settings);
   const missingRequired = requiredMissing(settings, overrides, canBook, Boolean(property?.public));
   return {
-    enabled: settings.googleStructuredData !== false,
     missingRequired,
     missingRecommended: recommendedMissing(settings, overrides),
     ready: missingRequired.length === 0,

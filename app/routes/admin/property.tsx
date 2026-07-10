@@ -278,21 +278,6 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               </ul>
             </div>
           )}
-
-          <label className="mb-3 flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
-            <input
-              type="checkbox"
-              name="googleStructuredData"
-              defaultChecked={settings.googleStructuredData !== false}
-              className="mt-1"
-            />
-            <span>
-              <span className="block text-[14px] font-semibold text-ink">Emit structured data</span>
-              <span className="block text-[12.5px] text-muted">
-                Adds schema.org <code>Hotel</code> price JSON-LD to guest pages.
-              </span>
-            </span>
-          </label>
         </section>
 
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
