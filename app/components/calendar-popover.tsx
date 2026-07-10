@@ -1,4 +1,4 @@
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { useT } from "~/lib/i18n";
 import type { DayCell, DateRangeState } from "~/lib/use-date-range";
@@ -40,16 +40,35 @@ export function CalendarPopover({
   const tr = useT();
   const weekdays = tr.t("weekdays").split(",");
   const ref = useRef<HTMLDivElement>(null);
+  const [maxH, setMaxH] = useState<number | undefined>(undefined);
 
-  // Ensure the popover is scrolled into view when it opens near the bottom of
-  // the page. The whole picker is rendered at 60% scale (transform below) so it
-  // fits without cropping — no height cap or inner scroll needed, which means
-  // every date and the "Min stay …" notes / legend always show in full.
+  // Render at full size, but cap the popover to the space available below its
+  // trigger (it may sit low, e.g. inside a sticky bar the page can't scroll) and
+  // let the WHOLE popover scroll. So on a tall screen everything shows at once,
+  // and on a short one you scroll inside the popover to reach every date, the
+  // "Min stay …" note, the legend and the Clear/Done buttons — nothing is ever
+  // cropped off. Recompute on resize.
   useEffect(() => {
-    const id = requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const compute = () => {
+      const el = ref.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setMaxH(Math.max(320, Math.round(window.innerHeight - top - 16)));
+    };
+    let inner = 0;
+    // Scroll into view (instant, so layout settles this frame), then measure the
+    // available space on the NEXT frame — measuring before the scroll finishes
+    // would under-cap the height and scroll needlessly on roomy pages.
+    const outer = requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ block: "nearest" });
+      inner = requestAnimationFrame(compute);
     });
-    return () => cancelAnimationFrame(id);
+    window.addEventListener("resize", compute);
+    return () => {
+      cancelAnimationFrame(outer);
+      cancelAnimationFrame(inner);
+      window.removeEventListener("resize", compute);
+    };
   }, []);
 
   return (
@@ -57,10 +76,10 @@ export function CalendarPopover({
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
         ref={ref}
-        className="absolute left-0 top-[calc(100%+12px)] z-40 flex w-[700px] max-w-[94vw] origin-top-left flex-col overflow-hidden rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
-        style={{ boxShadow: "var(--shadow-popover)", transform: "scale(0.6)" }}
+        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
+        style={{ boxShadow: "var(--shadow-popover)", maxHeight: maxH ? `${maxH}px` : undefined }}
       >
-        <div className="mb-3 flex flex-none items-center justify-between">
+        <div className="mb-3 flex items-center justify-between">
           <button
             type="button"
             onClick={state.prevMonth}
@@ -80,7 +99,7 @@ export function CalendarPopover({
           </button>
         </div>
 
-        <div className="flex-1">
+        <div>
         <div className="flex flex-wrap gap-7">
           {state.months.map((month) => (
             <div key={month.title} className="min-w-[240px] flex-1">
@@ -133,7 +152,7 @@ export function CalendarPopover({
         )}
         </div>
 
-        <div className="mt-4 flex flex-none flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
           <div className="flex items-center gap-[18px] text-[12.5px] text-muted-2">
             <span className="flex items-center gap-1.5">
               <span className="text-disabled-day line-through">12</span> {tr.t("unavailable")}
