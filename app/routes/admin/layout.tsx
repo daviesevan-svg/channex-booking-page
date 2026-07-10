@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
@@ -50,6 +50,86 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
   const { pathname } = useLocation();
+
+  // Nav is grouped into collapsible sections. Each starts collapsed; the section
+  // holding the current page auto-expands so you never lose your place.
+  interface NavItem {
+    to: string;
+    label: string;
+    end?: boolean;
+  }
+  const sections: { title: string; items: NavItem[] }[] = [
+    {
+      title: "Operations",
+      items: [
+        { to: "/admin/inventory", label: "Inventory" },
+        { to: "/admin/ari-log", label: "Change log" },
+        { to: "/admin/bookings", label: "Bookings" },
+      ],
+    },
+    {
+      title: "Settings",
+      items: [
+        // Property basics
+        { to: "/admin", label: "Property details", end: true },
+        { to: "/admin/general", label: "General" },
+        { to: "/admin/portal", label: "Customer Portal" },
+        // Catalogue & pricing
+        { to: "/admin/rooms", label: "Rooms" },
+        { to: "/admin/rates", label: "Rates" },
+        { to: "/admin/taxes", label: "Taxes & Fees" },
+        { to: "/admin/promotions", label: "Promotions" },
+        { to: "/admin/extras", label: "Extras" },
+        // Integrations
+        { to: "/admin/connectivity", label: "Connectivity" },
+        { to: "/admin/google-hotels", label: "Google Hotels" },
+        { to: "/admin/website-widget", label: "Website widget" },
+        { to: "/admin/brand-kit", label: "Brand kit" },
+        { to: "/admin/payments", label: "Payments" },
+        ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys" }] : []),
+        ...(canManageCurrent ? [{ to: "/admin/webhooks", label: "Webhooks" }] : []),
+        // Access & management
+        ...(canManageCurrent ? [{ to: "/admin/team", label: "Team" }] : []),
+        { to: "/admin/properties", label: "Properties" },
+        { to: "/admin/collections", label: "Collections" },
+        ...(isSuperadmin ? [{ to: "/admin/users", label: "Users" }] : []),
+      ],
+    },
+    {
+      title: "Pages",
+      items: [
+        { to: "/admin/home", label: "Home" },
+        { to: "/admin/pages/results", label: "Results" },
+        { to: "/admin/pages/detail", label: "Room detail" },
+        { to: "/admin/pages/extras", label: "Extras" },
+        { to: "/admin/pages/checkout", label: "Checkout" },
+        { to: "/admin/pages/confirmation", label: "Confirmation" },
+      ],
+    },
+    {
+      title: "Emails",
+      items: [
+        { to: "/admin/emails", label: "Settings", end: true },
+        { to: "/admin/emails/booking_confirmation", label: "Booking confirmation" },
+        { to: "/admin/emails/host_notification", label: "New booking (to you)" },
+        { to: "/admin/emails/booking_cancellation", label: "Cancellation (guest)" },
+        { to: "/admin/emails/cancellation_notification", label: "Cancellation (to you)" },
+        { to: "/admin/emails/booking_failed", label: "Couldn't confirm (guest)" },
+      ],
+    },
+  ];
+  const itemActive = (it: NavItem) =>
+    it.end ? pathname === it.to : pathname === it.to || pathname.startsWith(`${it.to}/`);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(sections.map((s) => [s.title, s.items.some(itemActive)])),
+  );
+  // Keep the section containing the current page open across client-side
+  // navigations (without collapsing any the user opened themselves).
+  useEffect(() => {
+    const active = sections.find((s) => s.items.some(itemActive));
+    if (active) setOpenSections((o) => (o[active.title] ? o : { ...o, [active.title]: true }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
   // Wide pages (the inventory grid, the change log table) break out of the
   // centred column to use the full width.
   const wide = pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/ari-log");
@@ -158,78 +238,38 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
 
       <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
-          {/* Operations — the day-to-day pages, kept at the top. */}
-          {[
-            { to: "/admin/inventory", label: "Inventory", end: false },
-            { to: "/admin/ari-log", label: "Change log", end: false },
-            { to: "/admin/bookings", label: "Bookings", end: false },
-          ].map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              {item.label}
-            </NavLink>
-          ))}
-          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
-            Settings
-          </div>
-          {[
-            // Property basics
-            { to: "/admin", label: "Property details", end: true },
-            { to: "/admin/general", label: "General", end: false },
-            { to: "/admin/portal", label: "Customer Portal", end: false },
-            // Catalogue & pricing
-            { to: "/admin/rooms", label: "Rooms", end: false },
-            { to: "/admin/rates", label: "Rates", end: false },
-            { to: "/admin/taxes", label: "Taxes & Fees", end: false },
-            { to: "/admin/promotions", label: "Promotions", end: false },
-            { to: "/admin/extras", label: "Extras", end: false },
-            // Integrations
-            { to: "/admin/connectivity", label: "Connectivity", end: false },
-            { to: "/admin/google-hotels", label: "Google Hotels", end: false },
-            { to: "/admin/website-widget", label: "Website widget", end: false },
-            { to: "/admin/brand-kit", label: "Brand kit", end: false },
-            { to: "/admin/payments", label: "Payments", end: false },
-            ...(canManageCurrent ? [{ to: "/admin/api-keys", label: "API keys", end: false }] : []),
-            ...(canManageCurrent ? [{ to: "/admin/webhooks", label: "Webhooks", end: false }] : []),
-            // Access & management
-            ...(canManageCurrent ? [{ to: "/admin/team", label: "Team", end: false }] : []),
-            { to: "/admin/properties", label: "Properties", end: false },
-            { to: "/admin/collections", label: "Collections", end: false },
-            ...(isSuperadmin ? [{ to: "/admin/users", label: "Users", end: false }] : []),
-          ].map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              {item.label}
-            </NavLink>
-          ))}
-          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
-            Pages
-          </div>
-          {[
-            { to: "/admin/home", label: "Home" },
-            { to: "/admin/pages/results", label: "Results" },
-            { to: "/admin/pages/detail", label: "Room detail" },
-            { to: "/admin/pages/extras", label: "Extras" },
-            { to: "/admin/pages/checkout", label: "Checkout" },
-            { to: "/admin/pages/confirmation", label: "Confirmation" },
-          ].map((item) => (
-            <NavLink key={item.to} to={item.to} className={navLinkClass}>
-              {item.label}
-            </NavLink>
-          ))}
-          <div className="px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint">
-            Emails
-          </div>
-          {[
-            { to: "/admin/emails", label: "Settings", end: true },
-            { to: "/admin/emails/booking_confirmation", label: "Booking confirmation" },
-            { to: "/admin/emails/host_notification", label: "New booking (to you)" },
-            { to: "/admin/emails/booking_cancellation", label: "Cancellation (guest)" },
-            { to: "/admin/emails/cancellation_notification", label: "Cancellation (to you)" },
-            { to: "/admin/emails/booking_failed", label: "Couldn't confirm (guest)" },
-          ].map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
-              {item.label}
-            </NavLink>
-          ))}
+          {sections.map((section) => {
+            const isOpen = openSections[section.title] ?? false;
+            return (
+              <div key={section.title}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenSections((o) => ({ ...o, [section.title]: !(o[section.title] ?? false) }))
+                  }
+                  aria-expanded={isOpen}
+                  className="flex w-full items-center justify-between gap-2 rounded-[8px] px-3.5 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-faint hover:text-muted"
+                >
+                  <span>{section.title}</span>
+                  <span
+                    aria-hidden="true"
+                    className={`text-[9px] transition-transform ${isOpen ? "rotate-90" : ""}`}
+                  >
+                    ▶
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="space-y-1">
+                    {section.items.map((item) => (
+                      <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
         <main className="min-w-0 flex-1">
           <Outlet context={context} />
