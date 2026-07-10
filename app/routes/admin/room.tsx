@@ -71,7 +71,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   };
   await saveRoom(propertyId, room);
   await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
-  return isNew ? redirect(`/admin/rooms/${id}`) : { ok: true };
+  // Back to the rooms list after every save. Staying on the editor left the
+  // chosen file in the upload input, so a second save re-uploaded it and created
+  // a duplicate image; navigating away clears the form.
+  return redirect("/admin/rooms");
 }
 
 export function meta() {
@@ -96,11 +99,6 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         <h1 className="font-serif text-[26px] font-semibold">
           {isNew ? "New room" : room?.title}
         </h1>
-        {actionData && "ok" in actionData && actionData.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
-          </span>
-        )}
       </div>
 
       <Form
