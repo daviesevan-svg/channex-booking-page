@@ -149,14 +149,25 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
   return { rates, avail, inventory };
 }
 
-/** Map our fee/city-tax settings to Google TaxFeeInfo lines. VAT is NOT sent here
- *  — it's already folded into the rate's AmountAfterTax (so Google shows a
- *  VAT-inclusive price instead of adding it on top). Only genuinely-extra charges
- *  ride here: fees + city tax → fee lines (the site adds these at checkout too).
- *  (The "VAT applies on top of a fee" flag isn't modelled — fees/city tax are
- *  pushed without compounding VAT; verify against staging before relying on it.) */
-export function googleTaxLines(settings: SiteSettings): { taxes: TaxLine[]; fees: TaxLine[] } {
+/** Map our fee/city-tax settings to Google TaxFeeInfo lines. VAT is NOT sent as a
+ *  tax here — it's folded into the rate's AmountAfterTax (so Google shows a
+ *  VAT-inclusive room price instead of adding it on top). Only genuinely-extra
+ *  charges ride here as fee lines: fees + city tax + cleaning (the site adds
+ *  these at checkout too).
+ *
+ *  Because we send no VAT tax line, Google won't add VAT to these fees — so we
+ *  pre-compute it: a fee that the site marks taxable is pushed VAT-INCLUSIVE
+ *  (fixed amount × (1+VAT); a percent fee has its rate grossed up so Google's
+ *  percent-of-room still lands on the VAT-inclusive figure). Cleaning always
+ *  carries VAT. Non-taxable fees are pushed as-is. `cleaningFee` is the
+ *  per-property (pre-VAT) cleaning amount when uniform across rooms. */
+export function googleTaxLines(
+  settings: SiteSettings,
+  cleaningFee?: number,
+): { taxes: TaxLine[]; fees: TaxLine[] } {
   const currency = settings.currency || "GBP";
+  const vat = vatRate(settings);
+  const gross = (n: number) => round2(n * (1 + vat));
   // VAT is carried in the rate (AmountAfterTax), never as an additive tax line.
   const taxes: TaxLine[] = [];
 
@@ -164,9 +175,14 @@ export function googleTaxLines(settings: SiteSettings): { taxes: TaxLine[]; fees
     .filter((f) => (f.amount || 0) > 0)
     .map((f) =>
       f.kind === "percent"
-        ? { type: "percent", basis: "room", period: "stay", amount: f.amount }
-        : { type: "amount", basis: "room", period: "stay", amount: f.amount, currency },
+        ? { type: "percent", basis: "room", period: "stay", amount: f.taxable ? gross(f.amount) : f.amount }
+        : { type: "amount", basis: "room", period: "stay", amount: f.taxable ? gross(f.amount) : f.amount, currency },
     );
+
+  // Cleaning fee — per room, per stay, always VAT-applicable on the site.
+  if (cleaningFee && cleaningFee > 0) {
+    fees.push({ type: "amount", basis: "room", period: "stay", amount: gross(cleaningFee), currency });
+  }
 
   const ct = settings.cityTax;
   if (ct?.enabled && ct.amount > 0) {
@@ -174,7 +190,7 @@ export function googleTaxLines(settings: SiteSettings): { taxes: TaxLine[]; fees
       type: "amount",
       basis: ct.basis === "person_night" ? "person" : "room",
       period: ct.basis === "room_stay" ? "stay" : "night",
-      amount: ct.amount,
+      amount: ct.taxable ? gross(ct.amount) : ct.amount,
       currency,
     });
   }
