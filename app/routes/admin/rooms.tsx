@@ -18,6 +18,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       title: r.title,
       maxAdults: r.maxAdults,
       maxGuests: r.maxGuests,
+      image: r.images[0] ?? null,
       images: r.images.length,
       rateCount: rates.filter((rt) => rt.prices[r.id] !== undefined).length,
     })),
@@ -72,13 +73,20 @@ export default function AdminRooms({ loaderData }: Route.ComponentProps) {
                 i > 0 ? "border-t border-divider" : ""
               }`}
             >
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-3.5">
+                {room.image ? (
+                  <img src={room.image} alt="" className="h-11 w-16 flex-none rounded-[8px] border border-line object-cover" />
+                ) : (
+                  <div className="h-11 w-16 flex-none rounded-[8px] border border-line" style={{ background: "repeating-linear-gradient(135deg,#efe7da,#efe7da 8px,#e7ddcc 8px,#e7ddcc 16px)" }} />
+                )}
+                <div className="min-w-0">
                 <div className="truncate font-semibold">{room.title}</div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
                   Sleeps {room.maxGuests} · up to {room.maxAdults} adult
                   {room.maxAdults === 1 ? "" : "s"} · {room.images} photo
                   {room.images === 1 ? "" : "s"} · {room.rateCount} rate
                   {room.rateCount === 1 ? "" : "s"}
+                </div>
                 </div>
               </div>
               <span className="flex-none text-[13px] font-semibold text-accent">Edit →</span>
