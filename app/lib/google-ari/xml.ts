@@ -126,7 +126,7 @@ function otaHead(root: string, env: AriEnvelope, extraAttrs = ""): string {
   );
 }
 
-/** One priced product over a date range: per-guest amounts (before tax). */
+/** One priced product over a date range: per-guest amounts. */
 export interface RateEntry {
   roomId: string;
   rateId: string;
@@ -134,21 +134,24 @@ export interface RateEntry {
   start: string;
   end: string;
   currency: string;
-  /** Per-occupancy nightly amounts, before tax. */
-  amounts: { guests: number; amount: number }[];
+  /** Per-occupancy nightly amounts: `net` (ex-VAT) and `gross` (VAT-inclusive). */
+  amounts: { guests: number; net: number; gross: number }[];
 }
 
 const money = (n: number) => n.toFixed(2);
 
-/** OTA_HotelRateAmountNotifRQ — per-product, per-occupancy nightly rates.
- *  Amounts are BEFORE tax; taxes/fees ride in the separate TaxFeeInfo message. */
+/** OTA_HotelRateAmountNotifRQ — per-product, per-occupancy nightly rates. We send
+ *  both AmountBeforeTax (net — US locales show pre-tax by default) and
+ *  AmountAfterTax (VAT-inclusive), so Google displays the room price with VAT
+ *  INCLUDED rather than adding it on top. Genuinely-extra fees + city tax still
+ *  ride in the separate TaxFeeInfo message (they're added at checkout too). */
 export function buildRateAmountXml(env: AriEnvelope, entries: RateEntry[]): string {
   const body = entries
     .map((e) => {
       const amts = e.amounts
         .map(
           (a) =>
-            `          <BaseByGuestAmt AmountBeforeTax="${money(a.amount)}" CurrencyCode="${esc(e.currency)}" NumberOfGuests="${a.guests}"/>\n`,
+            `          <BaseByGuestAmt AmountBeforeTax="${money(a.net)}" AmountAfterTax="${money(a.gross)}" CurrencyCode="${esc(e.currency)}" NumberOfGuests="${a.guests}"/>\n`,
         )
         .join("");
       return (
