@@ -180,6 +180,12 @@ export async function syncTaxes(pid: string): Promise<AriPushResult> {
     gate.settings,
     rooms.map((r) => ({ id: r.id, cleaningFee: r.cleaningFee })),
   );
+  // Nothing to convey — don't POST an empty TaxFeeInfo (Google rejects a message
+  // with no Tax/Fee element). VAT rides in the rate, so a property with no fees,
+  // city tax or cleaning has nothing to send here.
+  if (taxes.length === 0 && fees.length === 0) {
+    return { kind: "taxes", ok: true, detail: "No taxes or fees to push." };
+  }
   const xml = buildTaxesXml(gate.env("taxes"), taxes, fees);
   return postToGoogleAri("taxes", ARI_PATHS.taxes, xml);
 }
@@ -189,6 +195,11 @@ export async function syncPromotions(pid: string): Promise<AriPushResult> {
   const gate = await envelopeFor(pid, "promotions");
   if (!gate.ok) return gate.result;
   const promos = await googlePromotions(pid);
+  // No auto-offers → don't POST an empty <Promotions> (Google rejects it with
+  // "Missing required element Promotion", code 8074).
+  if (promos.length === 0) {
+    return { kind: "promotions", ok: true, detail: "No promotions to push." };
+  }
   const xml = buildPromotionsXml(gate.env("promotions"), promos);
   return postToGoogleAri("promotions", ARI_PATHS.promotions, xml);
 }
