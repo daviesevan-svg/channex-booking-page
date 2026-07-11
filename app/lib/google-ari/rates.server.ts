@@ -102,7 +102,7 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
     }
 
     for (const rate of roomRates) {
-      const op = rate.occupancyPricing;
+      const op = rate.occupancyPricingByRoom?.[room.id] ?? rate.occupancyPricing;
       const catalogBase = rate.prices[room.id];
       // ARI (and Google) key by the room's real Channex rate id, which differs
       // from our single `rate.id` for a consolidated imported rate.

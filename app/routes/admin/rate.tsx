@@ -130,17 +130,32 @@ export async function action({ params, request }: Route.ActionArgs) {
   const tier0 = policy.cancellation.tiers[0];
 
   // Per-person pricing is opt-in: only stored when a default occupancy is set.
-  const defaultOccupancy = posInt(form.get("defaultOccupancy"));
-  const occupancyPricing: OccupancyPricing | undefined = defaultOccupancy
-    ? {
-        defaultOccupancy,
-        extraAdultPrice: money(form.get("extraAdultPrice")),
-        lessGuestDiscount: money(form.get("lessGuestDiscount")),
-        child0to3: money(form.get("child0to3")),
-        child4to12: money(form.get("child4to12")),
-        child13plus: money(form.get("child13plus")),
-      }
-    : undefined;
+  const readOccupancy = (prefix: string): OccupancyPricing | undefined => {
+    const defaultOccupancy = posInt(form.get(`${prefix}defaultOccupancy`));
+    if (!defaultOccupancy) return undefined;
+    return {
+      defaultOccupancy,
+      extraAdultPrice: money(form.get(`${prefix}extraAdultPrice`)),
+      lessGuestDiscount: money(form.get(`${prefix}lessGuestDiscount`)),
+      child0to3: money(form.get(`${prefix}child0to3`)),
+      child4to12: money(form.get(`${prefix}child4to12`)),
+      child13plus: money(form.get(`${prefix}child13plus`)),
+    };
+  };
+  // Rate-wide default (also the fallback for rooms without a per-room override).
+  const occupancyPricing = readOccupancy("");
+  // Optional per-room overrides — only when the "per room" toggle is on. Each
+  // room needs its own default occupancy to be included, mirroring the rate-wide
+  // opt-in rule; rooms left blank fall back to the rate-wide pricing above.
+  let occupancyPricingByRoom: Record<string, OccupancyPricing> | undefined;
+  if (form.get("perRoomOccupancy") === "on") {
+    const map: Record<string, OccupancyPricing> = {};
+    for (const room of rooms) {
+      const op = readOccupancy(`op:${room.id}:`);
+      if (op) map[room.id] = op;
+    }
+    if (Object.keys(map).length > 0) occupancyPricingByRoom = map;
+  }
 
   const rate: CatalogRate = {
     id: existing?.id ?? crypto.randomUUID(),
@@ -148,6 +163,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
     prices,
     occupancyPricing,
+    occupancyPricingByRoom,
     policy,
     // Legacy mirrors (derived from the policy) so the cancellation engine works.
     refundable: policy.cancellation.refundable,
@@ -194,6 +210,54 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const refreshPreview = () => {
     const el = formRef.current;
     if (el) setPreview(describePolicy(buildPolicy((n) => String(new FormData(el).get(n) ?? ""))));
+  };
+
+  // Per-room occupancy pricing: a table of editable rows, one per room, gated by
+  // a toggle. Off = the rate-wide fields apply everywhere (the common case). On =
+  // each room can override; rows autofill from the rate-wide values so the owner
+  // only tweaks the rooms that differ.
+  const OP_FIELDS = ["defaultOccupancy", "extraAdultPrice", "lessGuestDiscount", "child0to3", "child4to12", "child13plus"] as const;
+  type OpField = (typeof OP_FIELDS)[number];
+  type OpRow = Record<OpField, string>;
+  const emptyRow = (): OpRow => ({ defaultOccupancy: "", extraAdultPrice: "", lessGuestDiscount: "", child0to3: "", child4to12: "", child13plus: "" });
+  const opToRow = (op?: OccupancyPricing): OpRow => {
+    const row = emptyRow();
+    if (op) for (const f of OP_FIELDS) if (op[f] != null) row[f] = String(op[f]);
+    return row;
+  };
+  const [perRoomOcc, setPerRoomOcc] = useState<boolean>(
+    !!rate?.occupancyPricingByRoom && Object.keys(rate.occupancyPricingByRoom).length > 0,
+  );
+  const [occRows, setOccRows] = useState<Record<string, OpRow>>(() => {
+    const out: Record<string, OpRow> = {};
+    for (const r of rooms) out[r.id] = opToRow(rate?.occupancyPricingByRoom?.[r.id] ?? rate?.occupancyPricing);
+    return out;
+  });
+  const setOccCell = (roomId: string, field: OpField, value: string) =>
+    setOccRows((prev) => ({ ...prev, [roomId]: { ...(prev[roomId] ?? emptyRow()), [field]: value } }));
+  // Enabling: autofill any blank room row from the current rate-wide field values.
+  const enablePerRoomOcc = () => {
+    const el = formRef.current;
+    const fd = el ? new FormData(el) : null;
+    const wide = emptyRow();
+    if (fd) for (const f of OP_FIELDS) wide[f] = String(fd.get(f) ?? "");
+    setOccRows((prev) => {
+      const out: Record<string, OpRow> = {};
+      for (const r of rooms) {
+        const cur = prev[r.id] ?? emptyRow();
+        out[r.id] = OP_FIELDS.every((f) => !cur[f]) ? { ...wide } : cur;
+      }
+      return out;
+    });
+    setPerRoomOcc(true);
+  };
+  const OP_COL_LABEL: Record<OpField, string> = {
+    defaultOccupancy: "Default occ.",
+    extraAdultPrice: "Extra adult",
+    lessGuestDiscount: "Fewer-adult disc.",
+    child0to3: "Age 0–3",
+    child4to12: "Age 4–12",
+    child13plus: "Age 13+",
   };
 
   return (
@@ -354,6 +418,60 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
             </label>
           </div>
+
+          <label className="mt-5 flex items-center gap-2.5 text-[14px] font-semibold">
+            <input
+              type="checkbox"
+              checked={perRoomOcc}
+              onChange={(e) => (e.target.checked ? enablePerRoomOcc() : setPerRoomOcc(false))}
+              className={checkbox}
+            />
+            Set different per-person pricing per room
+            <span className="font-normal text-faint">(override the values above for specific rooms)</span>
+          </label>
+
+          {perRoomOcc && (
+            <div className="mt-3">
+              {/* Marks per-room mode as on for the action; the row inputs below carry the values. */}
+              <input type="hidden" name="perRoomOccupancy" value="on" />
+              <div className="overflow-x-auto rounded-[12px] border border-line">
+                <table className="w-full border-collapse text-[13px]">
+                  <thead>
+                    <tr className="bg-surface-alt/60 text-[11px] font-semibold uppercase tracking-wide text-muted-2">
+                      <th className="px-3 py-2 text-left">Room</th>
+                      {OP_FIELDS.map((f) => (
+                        <th key={f} className="px-2 py-2 text-center font-semibold">{OP_COL_LABEL[f]}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rooms.map((r, i) => (
+                      <tr key={r.id} className={i > 0 ? "border-t border-divider" : ""}>
+                        <td className="whitespace-nowrap px-3 py-2 font-semibold text-secondary">{r.title}</td>
+                        {OP_FIELDS.map((f) => (
+                          <td key={f} className="px-1.5 py-1.5">
+                            <input
+                              name={`op:${r.id}:${f}`}
+                              type="number"
+                              min={0}
+                              step={f === "defaultOccupancy" ? 1 : 0.01}
+                              value={occRows[r.id]?.[f] ?? ""}
+                              onChange={(e) => setOccCell(r.id, f, e.target.value)}
+                              className="w-[76px] rounded-[8px] border border-line-alt bg-surface-alt px-2 py-1.5 text-right text-[14px] text-ink outline-none focus:border-accent"
+                            />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[12px] text-faint">
+                Pre-filled from the rate-wide values above — edit the rooms that differ and save. A
+                room left without a default occupancy falls back to the rate-wide pricing.
+              </p>
+            </div>
+          )}
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">

@@ -43,8 +43,13 @@ export interface CatalogRate {
    *  offered on a room only when it has a price here, so one rate plan can apply
    *  to every room at its own price. Occupancy is taken from each room. */
   prices: Record<string, number>;
-  /** Optional per-person pricing rules (absent = flat price for any party). */
+  /** Optional per-person pricing rules (absent = flat price for any party).
+   *  This is the rate-wide default, applied to every room unless overridden. */
   occupancyPricing?: OccupancyPricing;
+  /** Optional per-room overrides of `occupancyPricing`, keyed by room id — for
+   *  hotels where an extra adult costs more in some rooms than others. A room
+   *  not listed here falls back to the rate-wide `occupancyPricing`. */
+  occupancyPricingByRoom?: Record<string, OccupancyPricing>;
   /** For rates imported from Channex, the real per-room Channex rate_plan_id
    *  (roomId → id). Channex stores one rate plan per room type, but we present
    *  a single consolidated rate; ARI, mapping and booking pushes still key by
@@ -278,7 +283,8 @@ export async function getCatalogRooms(
               }
               // Per-person pricing: adjust each night for the searched party. With
               // no adults given, price at the rate's default occupancy (no delta).
-              const op = r.occupancyPricing;
+              // A per-room override wins over the rate-wide default when present.
+              const op = r.occupancyPricingByRoom?.[room.id] ?? r.occupancyPricing;
               const adults = query.adults && query.adults > 0 ? query.adults : (op?.defaultOccupancy ?? 1);
               const delta = occupancyNightlyDelta(op, adults, childrenAge);
               // Effective nightly price for the stay: the ARI price when set, else
