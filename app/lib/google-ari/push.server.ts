@@ -173,14 +173,13 @@ export async function syncAri(pid: string): Promise<AriPushResult[]> {
 export async function syncTaxes(pid: string): Promise<AriPushResult> {
   const gate = await envelopeFor(pid, "taxes");
   if (!gate.ok) return gate.result;
-  // Cleaning is a per-room fee, but Google's TaxFeeInfo is property-level — push
-  // it only when it's uniform across the priced rooms (the common case). If rooms
-  // disagree we can't represent it property-wide, so it's left out (a room's own
-  // VAT-inclusive rate still covers the room; only its cleaning fee is omitted).
+  // Cleaning is a per-room fee; googleTaxLines scopes each to its room type
+  // (<RoomTypes>), so rooms with different cleaning fees are all represented.
   const rooms = await getRooms(pid);
-  const cleanings = [...new Set(rooms.map((r) => Math.round((r.cleaningFee ?? 0) * 100) / 100).filter((c) => c > 0))];
-  const cleaningFee = cleanings.length === 1 ? cleanings[0] : undefined;
-  const { taxes, fees } = googleTaxLines(gate.settings, cleaningFee);
+  const { taxes, fees } = googleTaxLines(
+    gate.settings,
+    rooms.map((r) => ({ id: r.id, cleaningFee: r.cleaningFee })),
+  );
   const xml = buildTaxesXml(gate.env("taxes"), taxes, fees);
   return postToGoogleAri("taxes", ARI_PATHS.taxes, xml);
 }

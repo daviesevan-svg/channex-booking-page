@@ -159,11 +159,12 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
  *  pre-compute it: a fee that the site marks taxable is pushed VAT-INCLUSIVE
  *  (fixed amount × (1+VAT); a percent fee has its rate grossed up so Google's
  *  percent-of-room still lands on the VAT-inclusive figure). Cleaning always
- *  carries VAT. Non-taxable fees are pushed as-is. `cleaningFee` is the
- *  per-property (pre-VAT) cleaning amount when uniform across rooms. */
+ *  carries VAT. Non-taxable fees are pushed as-is. `rooms` supplies each room's
+ *  (pre-VAT) cleaning fee — pushed as a per-room-scoped fee via <RoomTypes>, so
+ *  rooms with different cleaning fees are each represented correctly. */
 export function googleTaxLines(
   settings: SiteSettings,
-  cleaningFee?: number,
+  rooms: { id: string; cleaningFee?: number }[] = [],
 ): { taxes: TaxLine[]; fees: TaxLine[] } {
   const currency = settings.currency || "GBP";
   const vat = vatRate(settings);
@@ -179,9 +180,13 @@ export function googleTaxLines(
         : { type: "amount", basis: "room", period: "stay", amount: f.taxable ? gross(f.amount) : f.amount, currency },
     );
 
-  // Cleaning fee — per room, per stay, always VAT-applicable on the site.
-  if (cleaningFee && cleaningFee > 0) {
-    fees.push({ type: "amount", basis: "room", period: "stay", amount: gross(cleaningFee), currency });
+  // Cleaning fee — per room, per stay, always VAT-applicable on the site. Scoped
+  // to its room type so differing per-room cleaning fees are each correct.
+  for (const room of rooms) {
+    const clean = Math.round((room.cleaningFee ?? 0) * 100) / 100;
+    if (clean > 0) {
+      fees.push({ type: "amount", basis: "room", period: "stay", amount: gross(clean), currency, roomIds: [room.id] });
+    }
   }
 
   const ct = settings.cityTax;
