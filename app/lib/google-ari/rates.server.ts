@@ -51,17 +51,20 @@ function groupRuns<T>(
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** VAT fraction (e.g. 0.2) used to carve tax out of inclusive prices. */
-function vatFraction(settings: SiteSettings): number {
-  if (!settings.taxesInclusive) return 0; // prices already net; nothing to carve
-  const pct = (settings.taxes ?? []).reduce((s, t) => s + (t.rate || 0), 0);
-  return pct / 100;
+/** The property's total VAT rate as a fraction (e.g. 0.2 for 20%). */
+function vatRate(settings: SiteSettings): number {
+  return (settings.taxes ?? []).reduce((s, t) => s + (t.rate || 0), 0) / 100;
 }
 
-/** Net (pre-tax) nightly amount for a gross base + occupancy delta. */
-function netAmount(base: number, delta: number, vat: number): number {
-  const gross = Math.max(0, base + delta);
-  return round2(vat > 0 ? gross / (1 + vat) : gross);
+/** Net (ex-VAT) and gross (VAT-inclusive) nightly amounts for a base + occupancy
+ *  delta. In inclusive mode the base already contains VAT (carve it out for net);
+ *  in on-top mode the base is net (add VAT for gross). We push both to Google so
+ *  it shows the VAT-inclusive price rather than adding VAT on top. */
+function netGross(base: number, delta: number, vat: number, inclusive: boolean): { net: number; gross: number } {
+  const priced = Math.max(0, base + delta);
+  const net = round2(inclusive && vat > 0 ? priced / (1 + vat) : priced);
+  const gross = round2(net * (1 + vat));
+  return { net, gross };
 }
 
 /** Everything needed for the four ARI messages, computed from one inventory read. */
@@ -79,7 +82,8 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
     getInventory(pid, window.from, window.to),
   ]);
   const currency = settings.currency || "GBP";
-  const vat = vatFraction(settings);
+  const vat = vatRate(settings);
+  const inclusive = settings.taxesInclusive === true;
   const dates = eachDate(window.from, window.to);
   const activeRates = allRates.filter((r) => r.active);
 
@@ -108,16 +112,18 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       // from our single `rate.id` for a consolidated imported rate.
       const rid = rateChannexId(rate, room.id);
 
-      // Per-occupancy nightly amount vector for a given date.
-      const amountsAt = (date: string): { guests: number; amount: number }[] => {
+      // Per-occupancy nightly amounts (net + VAT-inclusive) for a given date.
+      const amountsAt = (date: string): { guests: number; net: number; gross: number }[] => {
         const base = inv.prices[`${room.id}|${rid}|${date}`] ?? catalogBase;
         return Array.from({ length: maxAdults }, (_, i) => {
           const guests = i + 1;
-          return { guests, amount: netAmount(base, occupancyNightlyDelta(op, guests, []), vat) };
+          return { guests, ...netGross(base, occupancyNightlyDelta(op, guests, []), vat, inclusive) };
         });
       };
-      const sameAmounts = (a: { guests: number; amount: number }[], b: { guests: number; amount: number }[]) =>
-        a.length === b.length && a.every((x, i) => x.amount === b[i].amount);
+      const sameAmounts = (
+        a: { guests: number; net: number; gross: number }[],
+        b: { guests: number; net: number; gross: number }[],
+      ) => a.length === b.length && a.every((x, i) => x.net === b[i].net && x.gross === b[i].gross);
       for (const run of groupRuns(dates, amountsAt, sameAmounts)) {
         rates.push({ roomId: room.id, rateId: rid, start: run.start, end: run.end, currency, amounts: run.value });
       }
@@ -143,15 +149,16 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
   return { rates, avail, inventory };
 }
 
-/** Map our tax/fee/city-tax settings to Google TaxFeeInfo lines. VAT → percent
- *  taxes on the room; fees + city tax → fee lines. (The "VAT applies on top of a
- *  fee" flag isn't modelled in v1 — fees/city tax are pushed without compounding
- *  VAT; verify against staging before relying on it.) */
+/** Map our fee/city-tax settings to Google TaxFeeInfo lines. VAT is NOT sent here
+ *  — it's already folded into the rate's AmountAfterTax (so Google shows a
+ *  VAT-inclusive price instead of adding it on top). Only genuinely-extra charges
+ *  ride here: fees + city tax → fee lines (the site adds these at checkout too).
+ *  (The "VAT applies on top of a fee" flag isn't modelled — fees/city tax are
+ *  pushed without compounding VAT; verify against staging before relying on it.) */
 export function googleTaxLines(settings: SiteSettings): { taxes: TaxLine[]; fees: TaxLine[] } {
   const currency = settings.currency || "GBP";
-  const taxes: TaxLine[] = (settings.taxes ?? [])
-    .filter((t) => (t.rate || 0) > 0)
-    .map((t) => ({ type: "percent", basis: "room", period: "stay", amount: t.rate }));
+  // VAT is carried in the rate (AmountAfterTax), never as an additive tax line.
+  const taxes: TaxLine[] = [];
 
   const fees: TaxLine[] = (settings.fees ?? [])
     .filter((f) => (f.amount || 0) > 0)
