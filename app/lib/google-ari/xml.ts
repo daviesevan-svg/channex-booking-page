@@ -262,12 +262,20 @@ export interface TaxLine {
   amount: number;
   /** Currency for amount-type lines. */
   currency?: string;
+  /** Room type ids this line is scoped to (omit = applies to all rooms). Lets a
+   *  per-room fee — e.g. a different cleaning fee per room — be expressed even
+   *  though TaxFeeInfo is otherwise property-wide. */
+  roomIds?: string[];
 }
 
-/** TaxFeeInfo — VAT as percent taxes, fees + city tax as fee lines. */
+/** TaxFeeInfo — VAT as percent taxes, fees + city tax as fee lines. A line's
+ *  optional `roomIds` scope it to specific room types (via <RoomTypes>). */
 export function buildTaxesXml(env: AriEnvelope, taxes: TaxLine[], fees: TaxLine[]): string {
   const line = (tag: "Tax" | "Fee", t: TaxLine) =>
     `      <${tag}>\n` +
+    (t.roomIds?.length
+      ? `        <RoomTypes>\n${t.roomIds.map((id) => `          <RoomType id="${esc(id)}"/>\n`).join("")}        </RoomTypes>\n`
+      : "") +
     `        <Type>${t.type}</Type>\n` +
     `        <Basis>${t.basis}</Basis>\n` +
     `        <Period>${t.period}</Period>\n` +
