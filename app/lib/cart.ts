@@ -34,6 +34,19 @@ export function parseCart(sp: URLSearchParams): CartLine[] {
     .filter((l): l is CartLine => l !== null);
 }
 
+/** The effective occupancy for a cart line. A line that carries its own
+ *  occupancy (adults set) is taken as-is, with an ABSENT children segment meaning
+ *  "no children in this room" — NOT the searched children. Only a bare line (no
+ *  occupancy at all, e.g. a legacy/deep link) falls back to the whole searched
+ *  party. Treating adults and children as independent fallbacks silently re-added
+ *  a searched child to a room the guest had deliberately sized for adults only
+ *  (and to a room too small to hold it). */
+export function lineOccupancy(line: CartLine, searched: Occupancy): Occupancy {
+  return line.adults != null
+    ? { adults: line.adults, childrenAge: line.childrenAge ?? [] }
+    : { adults: searched.adults, childrenAge: searched.childrenAge };
+}
+
 export function serializeCart(lines: CartLine[]): string {
   return lines
     .map((l) => {
