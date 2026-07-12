@@ -13,7 +13,8 @@ import { getPromotions } from "./promotions.server";
 import { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
 import { ratePolicyOf, type RatePolicy } from "./rate-policy";
 import { policyToCancellation } from "./policy-copy";
-import type { CartLine, ResolvedLine } from "./cart";
+import { lineOccupancy, type CartLine, type ResolvedLine } from "./cart";
+import { roomCapacity } from "./occupancy";
 
 // Re-export so existing importers (admin rate editor) keep their import path.
 export { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
@@ -347,10 +348,7 @@ export async function resolveCartByOccupancy(
   lines: CartLine[],
   searched: { adults: number; childrenAge: number[] },
 ): Promise<ResolvedLine[]> {
-  const occOf = (l: CartLine) => ({
-    adults: l.adults ?? searched.adults,
-    childrenAge: l.childrenAge ?? searched.childrenAge,
-  });
+  const occOf = (l: CartLine) => lineOccupancy(l, searched);
   const sig = (o: { adults: number; childrenAge: number[] }) =>
     `${o.adults}|${[...o.childrenAge].sort((a, b) => a - b).join(".")}`;
 
@@ -382,6 +380,13 @@ export async function resolveCartByOccupancy(
     const room = rooms?.find((r) => r.id === l.roomId);
     const rate = room?.ratePlans.find((p) => p.id === l.rateId);
     if (room && rate) {
+      // Hard capacity ceiling: a line can never claim more heads than the room
+      // physically sleeps, whatever the `sel` string asked for (bare/deep/stale
+      // links included). Keeps coverage honest — an over-sized party yields
+      // "Sleeps N of M" and blocks checkout instead of a false "Sleeps all".
+      const cap = roomCapacity(room);
+      const adults = Math.min(occ.adults, cap.maxAdults);
+      const children = Math.min(occ.childrenAge.length, Math.max(0, cap.capacity - adults));
       out.push({
         roomId: l.roomId,
         rateId: l.rateId,
@@ -389,7 +394,7 @@ export async function resolveCartByOccupancy(
         childrenAge: l.childrenAge,
         roomTitle: room.title,
         rateTitle: rate.title,
-        occupancy: { adults: occ.adults, children: occ.childrenAge.length, infants: 0 },
+        occupancy: { adults, children, infants: 0 },
         total: Number(rate.totalPrice),
         net: Number(rate.netPrice ?? rate.totalPrice),
         cleaningFee: Number(room.cleaningFee ?? 0),

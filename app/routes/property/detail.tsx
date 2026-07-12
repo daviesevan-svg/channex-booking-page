@@ -14,7 +14,7 @@ import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.serv
 import { resolvePropertyId } from "~/lib/properties.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
-import { addLine, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
+import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { occupancyNightlyDelta } from "~/lib/rate-pricing";
 import { cancellationMessage } from "~/lib/cancellation";
@@ -81,8 +81,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const assignedChildren: number[] = [];
   cart.forEach((l, idx) => {
     if (idx === editIndex) return; // re-choosing this line — don't count it as already assigned
-    assignedAdults += l.adults ?? adults;
-    for (const a of l.childrenAge ?? childrenAge) assignedChildren.push(a);
+    const o = lineOccupancy(l, { adults, childrenAge });
+    assignedAdults += o.adults;
+    for (const a of o.childrenAge) assignedChildren.push(a);
   });
   const childrenPool = [...childrenAge];
   for (const a of assignedChildren) {
