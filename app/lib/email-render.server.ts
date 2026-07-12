@@ -223,6 +223,32 @@ export function composeEmail(args: {
   };
 }
 
+/** A branded, booking-free transactional email (header band + prose + optional
+ *  CTA button), sharing the same shell as the booking emails. Used for messages
+ *  that aren't about a booking — e.g. the team invite. Prose is plain text;
+ *  blank-line-separated blocks become paragraphs. */
+export function renderSimpleEmail(args: {
+  hotelName: string;
+  accent: string;
+  heading: string;
+  body: string;
+  cta?: { label: string; url: string };
+}): string {
+  const button = args.cta
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:10px;background:${args.accent};">
+         <a href="${esc(args.cta.url)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${esc(args.cta.label)}</a>
+       </td></tr></table>`
+    : "";
+  return shell({
+    hotelName: args.hotelName,
+    accent: args.accent,
+    heading: esc(args.heading),
+    introHtml: paragraphs(args.body),
+    details: button,
+    outroHtml: "",
+  });
+}
+
 /** A representative booking for editor previews + test sends. */
 export function sampleBooking(currency = "GBP"): BookingRecord {
   return {

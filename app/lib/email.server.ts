@@ -12,7 +12,7 @@
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
-import { accentHex, composeEmail } from "./email-render.server";
+import { accentHex, composeEmail, renderSimpleEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 
 export interface SendEmailOptions {
@@ -124,6 +124,43 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
   } catch (e) {
     console.log(`[email] sendBookingFailedEmail failed: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/** Tells a newly-added teammate they now have access to a property and points
+ *  them at the sign-in page (they get a fresh magic link there — we don't bake a
+ *  15-minute token into an email that may be read hours later). Branded with the
+ *  property's name + accent. Never throws — a mail failure must not break the
+ *  invite (the member is already added). */
+export async function sendTeamInviteEmail(
+  pid: string,
+  toEmail: string,
+  invitedBy: string,
+  signInUrl: string,
+): Promise<{ sent: boolean }> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+    const hotelName = ov.hotelName || "the property";
+    const html = renderSimpleEmail({
+      hotelName,
+      accent: accentHex(settings),
+      heading: `You've been added to ${hotelName}`,
+      body:
+        `${invitedBy} has given you access to manage ${hotelName} on Roompanda.\n\n` +
+        `To get started, sign in with your email address (${toEmail}) — no password needed. ` +
+        `We'll email you a one-time link each time you sign in.`,
+      cta: { label: "Sign in", url: signInUrl },
+    });
+    return await sendEmail({
+      to: toEmail,
+      subject: `You've been added to ${hotelName} on Roompanda`,
+      from: senderFrom(settings, getConfig()),
+      replyTo: settings.emailReplyTo,
+      html,
+    });
+  } catch (e) {
+    console.log(`[email] sendTeamInviteEmail failed: ${e instanceof Error ? e.message : e}`);
+    return { sent: false };
   }
 }
 
