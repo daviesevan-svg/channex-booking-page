@@ -3,6 +3,7 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/team";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
+import { sendTeamInviteEmail } from "~/lib/email.server";
 import {
   addPropertyMember,
   currentPropertyId,
@@ -27,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  const inviter = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId || !(await isOwnerOrSuper(request, propertyId))) throw redirect("/admin");
   const form = await request.formData();
@@ -39,6 +40,11 @@ export async function action({ request }: Route.ActionArgs) {
     // Pre-create the user so they can sign in (even once sign-up is locked down)
     // and show up in the superadmin Users list.
     await upsertUser(email);
+    // Let them know they've been added. The link lands on the sign-in page with
+    // their email pre-filled; they request a fresh magic link there.
+    const origin = new URL(request.url).origin;
+    const signInUrl = `${origin}/admin/login?email=${encodeURIComponent(email)}`;
+    await sendTeamInviteEmail(propertyId, email, inviter, signInUrl);
   } else if (intent === "remove" && email) {
     await removePropertyMember(propertyId, email);
   }
@@ -117,7 +123,8 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
             className={FIELD_INPUT}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            They sign in with a magic link to this address and get full access to this property.
+            We'll email them an invite. They sign in with a magic link to this address and get full
+            access to this property.
           </span>
         </label>
         <div>

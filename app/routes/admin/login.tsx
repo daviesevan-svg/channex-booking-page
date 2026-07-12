@@ -10,7 +10,9 @@ import {
 
 export async function loader({ request }: Route.LoaderArgs) {
   if (await getAdminEmail(request)) throw redirect("/admin");
-  return null;
+  // A team invite links here with ?email= so the invitee's address is pre-filled.
+  const email = new URL(request.url).searchParams.get("email") ?? "";
+  return { email };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -32,7 +34,7 @@ export function meta() {
   return [{ title: "Admin · Sign in" }];
 }
 
-export default function Login({ actionData }: Route.ComponentProps) {
+export default function Login({ actionData, loaderData }: Route.ComponentProps) {
   const nav = useNavigation();
   const sending = nav.state === "submitting";
 
@@ -68,6 +70,7 @@ export default function Login({ actionData }: Route.ComponentProps) {
               type="email"
               required
               autoFocus
+              defaultValue={loaderData?.email ?? ""}
               placeholder="you@example.com"
               className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
             />
