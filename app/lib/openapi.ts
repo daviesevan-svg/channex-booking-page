@@ -132,7 +132,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.0.0",
+    version: "1.1.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -296,7 +296,7 @@ export const openApiSpec = {
         tags: ["Bookings"],
         summary: "Create a booking",
         description:
-          "Pay-at-hotel rates confirm immediately and return the booking. Rates requiring an online deposit/prepayment return `status: \"pending_payment\"` plus a `payment_url` (Stripe hosted Checkout); the booking finalizes once payment completes.",
+          "Pay-at-hotel rates confirm immediately and return the booking. Rates requiring an online deposit/prepayment return `status: \"pending_payment\"` plus a `payment_url` (Stripe hosted Checkout); the booking finalizes once payment completes. Add-ons ride along via `rooms[].extras` (per-room) and the top-level `extras` (whole stay) — VAT-applicable extras are folded into the taxed total, exempt ones added on top, identically to the hosted checkout.",
         parameters: [
           { name: "Idempotency-Key", in: "header", schema: { type: "string" }, description: "Safe-retry key; a repeat returns the original response." },
         ],
@@ -445,6 +445,18 @@ export const openApiSpec = {
         },
       },
       Booking: booking,
+      ExtraSelection: {
+        type: "object",
+        required: ["extra_id"],
+        description:
+          "An add-on selection (see GET /v1/extras for the catalogue). Prices are always resolved server-side — only ids, quantity and info values travel. An invalid selection (unknown extra, wrong scope, missing option_id or required info field, room/rate exclusion) fails the whole booking with 422 `invalid_extra`.",
+        properties: {
+          extra_id: uuid,
+          option_id: { ...uuidNullable, description: "Required when the extra has options (configurable)." },
+          qty: { type: "integer", minimum: 1, maximum: 99, default: 1 },
+          info: { type: "object", additionalProperties: { type: "string" }, description: "Values for the extra's info fields, keyed by field id. Required fields must be non-empty." },
+        },
+      },
       BookingCreate: {
         type: "object",
         required: ["checkin", "checkout", "rooms", "guest"],
@@ -462,9 +474,11 @@ export const openApiSpec = {
                 rate_id: uuid,
                 adults: { type: "integer", minimum: 1, description: "Defaults to the rate's occupancy when omitted." },
                 children_ages: { type: "array", items: { type: "integer", minimum: 0, maximum: 17 }, description: "Exact age of each child (0–17)." },
+                extras: { type: "array", items: { $ref: "#/components/schemas/ExtraSelection" }, description: "Room-scoped add-ons for this room. Per-person extras price against this room's guests." },
               },
             },
           },
+          extras: { type: "array", items: { $ref: "#/components/schemas/ExtraSelection" }, description: "Booking-scoped add-ons (offered once for the whole stay). Per-person extras price against the whole party." },
           guest: {
             type: "object",
             required: ["first_name", "last_name", "email", "phone"],
