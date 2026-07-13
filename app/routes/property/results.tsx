@@ -88,6 +88,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     .sort((a, b) => Number(b.fits) - Number(a.fits) || cheapest(a) - cheapest(b));
 
   const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
+
+  // Can the property seat this party AT ALL on these dates — even taking every
+  // bookable room? Sum each room type's (sellable count × its capacity). If the
+  // ceiling is below the party (or there aren't enough adult beds), no cart can
+  // ever cover them, so we warn instead of dangling a "add another room" prompt
+  // with nothing left to add.
+  const avail = (room: RoomWithRates) => {
+    const a = roomAvailability(room);
+    return Number.isFinite(a) ? a : 99;
+  };
+  const maxCapacity = enriched.reduce((s, r) => s + avail(r) * roomCapacity(r).capacity, 0);
+  const maxAdultsCap = enriched.reduce((s, r) => s + avail(r) * roomCapacity(r).maxAdults, 0);
+  const fitsParty = maxCapacity >= partySize(occ) && maxAdultsCap >= occ.adults;
+
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(pid, "results", lang);
 
@@ -159,6 +173,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     nights,
     bestMatchId,
     party: partySize(occ),
+    fitsParty,
+    maxCapacity,
     cartLines,
     coverage,
     covered,
@@ -304,6 +320,7 @@ function CartPanel({
   lines,
   coverage,
   covered,
+  fitsParty,
   party,
   currency,
   onRemove,
@@ -319,6 +336,7 @@ function CartPanel({
   lines: ResolvedLine[];
   coverage: { capacity: number; total: number };
   covered: boolean;
+  fitsParty: boolean;
   party: number;
   currency: string;
   onRemove: (index: number) => void;
@@ -403,7 +421,9 @@ function CartPanel({
         )}
         {covered
           ? tr.t("sleepsAll", { n: party })
-          : tr.t("sleepsOf", { x: coverage.capacity, y: party })}
+          : fitsParty
+            ? tr.t("sleepsOf", { x: coverage.capacity, y: party })
+            : tr.t("capacityShort", { x: coverage.capacity, y: party })}
       </div>
 
       {extrasSum > 0 && (
@@ -432,7 +452,7 @@ function CartPanel({
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -505,6 +525,23 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
         </Link>
       </div>
 
+      {rooms.length > 0 && !fitsParty && (
+        <div className="mb-6 rounded-[14px] border border-accent/40 bg-[#f9ede6] p-5">
+          <div className="mb-1 font-serif text-[18px] font-semibold text-[#8a4a2f]">
+            {tr.t("capacityTitle", { n: party })}
+          </div>
+          <p className="text-[14px] text-secondary">
+            {tr.t("capacityBody", { max: maxCapacity })}{" "}
+            <Link
+              to={`/${params.channelId}?${qs}`}
+              className="font-semibold text-accent underline-offset-2 hover:underline"
+            >
+              {text.editSearch}
+            </Link>
+          </p>
+        </div>
+      )}
+
       {rooms.length === 0 ? (
         <p className="text-secondary">
           {tr.t("noAvailability")}{" "}
@@ -520,6 +557,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
             lines={cartLines}
             coverage={coverage}
             covered={covered}
+            fitsParty={fitsParty}
             party={party}
             currency={currency}
             onRemove={onRemove}
@@ -555,6 +593,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
               lines={cartLines}
               coverage={coverage}
               covered={covered}
+              fitsParty={fitsParty}
               party={party}
               currency={currency}
               onRemove={onRemove}
