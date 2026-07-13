@@ -62,6 +62,7 @@ export default [
     route("rates", "routes/admin/rates.tsx"),
     route("rates/:rateId", "routes/admin/rate.tsx"),
     route("inventory", "routes/admin/inventory.tsx"),
+    route("analytics", "routes/admin/analytics.tsx"),
     route("ari-log", "routes/admin/ari-log.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),

@@ -4,6 +4,7 @@ import { scheduledGoogleAriSync } from "../app/lib/google-ari/push.server";
 import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
 import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
 import { pruneAri } from "../app/lib/ari.server";
+import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -25,6 +26,8 @@ export default {
     ctx.waitUntil(scheduledGoogleAriSync());
     ctx.waitUntil(refreshMergedGoogleFeed());
     ctx.waitUntil(pruneAri().catch((e) => console.log(`[cron] pruneAri failed: ${e}`)));
+    // Search-demand events beyond the longest dashboard window get dropped too.
+    ctx.waitUntil(pruneSearchEvents().catch((e) => console.log(`[cron] pruneSearchEvents failed: ${e}`)));
     // Refresh the Google match status ~daily (self-throttled) so the admin page
     // reads it from KV instead of calling the slow Travel Partner API on load.
     ctx.waitUntil(refreshAllMatchStatuses().catch((e) => console.log(`[cron] refreshAllMatchStatuses failed: ${e}`)));

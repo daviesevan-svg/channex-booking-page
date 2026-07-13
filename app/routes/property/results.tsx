@@ -24,6 +24,7 @@ import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getPageText, getSettings } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
+import { queueSearchEvent } from "~/lib/search-analytics.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -72,6 +73,46 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { gate: true },
   );
 
+  const party = partySize(occ);
+  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
+
+  // Can the property seat this party AT ALL on these dates — even taking every
+  // bookable room? Sum each room type's (sellable count × its capacity). If the
+  // ceiling is below the party (or there aren't enough adult beds), no cart can
+  // ever cover them, so we warn instead of dangling a "add another room" prompt
+  // with nothing left to add. (Computed before the single-unit redirect so the
+  // search log below sees every search.)
+  const avail = (room: RoomWithRates) => {
+    const a = roomAvailability(room);
+    return Number.isFinite(a) ? a : 99;
+  };
+  const maxCapacity = rooms.reduce((s, r) => s + avail(r) * roomCapacity(r).capacity, 0);
+  const maxAdultsCap = rooms.reduce((s, r) => s + avail(r) * roomCapacity(r).maxAdults, 0);
+  const fitsParty = maxCapacity >= party && maxAdultsCap >= occ.adults;
+
+  // Demand analytics for the admin dashboard: log each fresh search (an empty
+  // cart — adding rooms re-runs this loader with the same dates, and prefetches
+  // don't count). Non-fatal by design.
+  const purpose = request.headers.get("sec-purpose") ?? request.headers.get("purpose") ?? "";
+  if (parseCart(url.searchParams).length === 0 && !purpose.includes("prefetch")) {
+    queueSearchEvent({
+      propertyId: pid,
+      checkin,
+      checkout,
+      nights,
+      leadDays: Math.max(0, differenceInCalendarDays(parseISO(checkin), new Date())),
+      adults: occ.adults,
+      children: occ.childrenAge?.length ?? 0,
+      country:
+        request.headers.get("cf-ipcountry") ??
+        (request as { cf?: { country?: string } }).cf?.country ??
+        null,
+      lang,
+      hasAvailability: rooms.length > 0 && fitsParty,
+      resultsCount: rooms.length,
+    });
+  }
+
   // Single-unit properties have no room list. Send an empty cart straight to the
   // one unit's page (this catches landing searches AND widget/deep-link hits on
   // /rooms). Once a room is in the cart we fall through and render the review.
@@ -79,7 +120,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(`/${params.channelId}/rooms/${rooms[0].id}?${url.searchParams.toString()}`);
   }
 
-  const party = partySize(occ);
   const cheapest = (room: RoomWithRates) =>
     Math.min(...ratePlansForParty(room, party).map((r) => Number(r.totalPrice)));
 
@@ -88,21 +128,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     .sort((a, b) => Number(b.fits) - Number(a.fits) || cheapest(a) - cheapest(b));
 
   const bestMatchId = enriched.find((r) => r.fits)?.id ?? null;
-
-  // Can the property seat this party AT ALL on these dates — even taking every
-  // bookable room? Sum each room type's (sellable count × its capacity). If the
-  // ceiling is below the party (or there aren't enough adult beds), no cart can
-  // ever cover them, so we warn instead of dangling a "add another room" prompt
-  // with nothing left to add.
-  const avail = (room: RoomWithRates) => {
-    const a = roomAvailability(room);
-    return Number.isFinite(a) ? a : 99;
-  };
-  const maxCapacity = enriched.reduce((s, r) => s + avail(r) * roomCapacity(r).capacity, 0);
-  const maxAdultsCap = enriched.reduce((s, r) => s + avail(r) * roomCapacity(r).maxAdults, 0);
-  const fitsParty = maxCapacity >= partySize(occ) && maxAdultsCap >= occ.adults;
-
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(pid, "results", lang);
 
   // Tax-/fee-inclusive (all-in) total per rate, so the headline price matches the
