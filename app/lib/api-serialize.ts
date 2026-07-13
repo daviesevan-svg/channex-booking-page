@@ -5,10 +5,71 @@ import type { PropertyRef } from "./properties.server";
 import type { CatalogRoom, CatalogRate } from "./catalog.server";
 import type { RoomWithRates, RatePlan } from "./channex/types";
 import type { BookingRecord } from "./bookings.server";
+import type { SiteSettings } from "./content";
 import type { Extra } from "./extras";
+import type { PropertyOverrides } from "./overrides.server";
 
-export function serializeProperty(p: PropertyRef) {
-  return { id: p.id, name: p.name };
+/** Everything an external booking frontend needs to render a branded property:
+ *  display content (localizable via ?lang=), contact + location, stay logistics,
+ *  brand theme tokens, and the tax/fee DISPLAY config — rates from
+ *  /v1/availability are room-only, so a client needs this to explain how the
+ *  all-in total composes (the authoritative total still comes from
+ *  POST /v1/bookings). `accent` is pre-resolved to hex by the caller. */
+export function serializePropertyContent(
+  p: PropertyRef,
+  settings: SiteSettings,
+  ov: PropertyOverrides,
+  accent: string,
+) {
+  const ct = settings.cityTax;
+  return {
+    id: p.id,
+    name: p.name,
+    hotel_name: ov.hotelName || p.name,
+    property_type: ov.propertyType ?? null,
+    description: ov.description ?? null,
+    address: ov.address ?? null,
+    phone: ov.phone ?? null,
+    email: ov.email ?? null,
+    location: {
+      city: settings.addressCity ?? null,
+      region: settings.addressRegion ?? null,
+      postal_code: settings.addressPostalCode ?? null,
+      country: settings.addressCountry ?? null,
+      latitude: settings.latitude ?? null,
+      longitude: settings.longitude ?? null,
+    },
+    currency: settings.currency || "GBP",
+    timezone: settings.timezone ?? null,
+    checkin_time: settings.checkinTime ?? null,
+    checkout_time: settings.checkoutTime ?? null,
+    languages: settings.languages?.length ? settings.languages : ["en"],
+    terms_url: settings.termsUrl ?? null,
+    privacy_url: settings.privacyUrl ?? null,
+    single_unit: settings.singleUnit === true,
+    cover_image: settings.coverImage ?? null,
+    theme: {
+      accent,
+      background: settings.customBg ?? null,
+      font: settings.themeFont ?? null, // curated font-pair id; null = default fonts
+    },
+    pricing_display: {
+      taxes_inclusive: settings.taxesInclusive === true,
+      taxes: (settings.taxes ?? []).map((t) => ({ name: t.name, rate_percent: t.rate })),
+      fees: (settings.fees ?? []).map((f) => ({ name: f.name, kind: f.kind, amount: f.amount, taxable: f.taxable })),
+      city_tax:
+        ct?.enabled && ct.amount > 0
+          ? {
+              name: ct.name,
+              amount: ct.amount,
+              basis: ct.basis,
+              taxable: ct.taxable,
+              children_exempt: ct.childrenExempt,
+              max_nights: ct.maxNights > 0 ? ct.maxNights : null,
+            }
+          : null,
+    },
+  };
 }
 
 /** Unpriced room content (GET /v1/rooms) — for rendering room cards. */
@@ -116,7 +177,15 @@ export function serializeBooking(b: BookingRecord) {
       children: r.children,
       total: r.total,
     })),
-    extras: (b.extras ?? []).map((x) => ({ id: x.id, name: x.name, qty: x.qty, amount: x.amount })),
+    extras: (b.extras ?? []).map((x) => ({
+      id: x.id,
+      name: x.name,
+      option: x.optionName ?? null,
+      qty: x.qty,
+      amount: x.amount,
+      room_title: x.roomTitle ?? null, // null = whole-stay extra
+      info: x.infoLine ?? null,
+    })),
     cancellation: b.cancellation ? { refundable: b.cancellation.refundable, cancel_by: b.cancellation.cancelByISO } : null,
     payment: b.payment
       ? {

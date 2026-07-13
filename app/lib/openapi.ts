@@ -93,7 +93,15 @@ const booking = {
       type: "array",
       items: {
         type: "object",
-        properties: { id: uuid, name: { type: "string" }, qty: { type: "integer", minimum: 1 }, amount: money },
+        properties: {
+          id: uuid,
+          name: { type: "string" },
+          option: { type: ["string", "null"], description: "Chosen option name, for configurable extras." },
+          qty: { type: "integer", minimum: 1 },
+          amount: money,
+          room_title: { type: ["string", "null"], description: "The room this extra is attached to; null = whole stay." },
+          info: { type: ["string", "null"], description: "One-line summary of captured info fields." },
+        },
       },
     },
     cancellation: {
@@ -147,6 +155,9 @@ export const openApiSpec = {
       get: {
         tags: ["Catalog"],
         summary: "Retrieve the property this key is scoped to",
+        parameters: [
+          { name: "lang", in: "query", schema: { type: "string" }, description: "Content language (see the property's `languages`); defaults to the property's default language." },
+        ],
         responses: {
           "200": {
             description: "The property",
@@ -167,7 +178,10 @@ export const openApiSpec = {
       get: {
         tags: ["Catalog"],
         summary: "Retrieve a property by id (must match the key's property)",
-        parameters: [{ name: "id", in: "path", required: true, schema: uuid }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: uuid },
+          { name: "lang", in: "query", schema: { type: "string" }, description: "Content language (see the property's `languages`); defaults to the property's default language." },
+        ],
         responses: {
           "200": {
             description: "The property",
@@ -376,7 +390,80 @@ export const openApiSpec = {
     },
     responses: { Error: errorResponse },
     schemas: {
-      Property: { type: "object", properties: { id: uuid, name: { type: "string" } } },
+      Property: {
+        type: "object",
+        description:
+          "The property's display content for building a booking frontend. Text fields (hotel_name, description, address, property_type) are localized by `?lang=`. `pricing_display` explains how the all-in total composes on top of the room-only rates from /v1/availability — for display; the authoritative total always comes from POST /v1/bookings.",
+        properties: {
+          id: uuid,
+          name: { type: "string", description: "Internal/admin name." },
+          hotel_name: { type: "string", description: "Guest-facing display name." },
+          property_type: { type: ["string", "null"], description: "Short type label, e.g. \"Boutique hotel\"." },
+          description: { type: ["string", "null"] },
+          address: { type: ["string", "null"], description: "Free-text display address." },
+          phone: { type: ["string", "null"] },
+          email: { type: ["string", "null"] },
+          location: {
+            type: "object",
+            properties: {
+              city: { type: ["string", "null"] },
+              region: { type: ["string", "null"] },
+              postal_code: { type: ["string", "null"] },
+              country: { type: ["string", "null"], description: "ISO 3166-1 alpha-2, e.g. GB." },
+              latitude: { type: ["string", "null"] },
+              longitude: { type: ["string", "null"] },
+            },
+          },
+          currency,
+          timezone: { type: ["string", "null"], description: "IANA timezone, e.g. Europe/London." },
+          checkin_time: { type: ["string", "null"], description: "e.g. \"15:00\"." },
+          checkout_time: { type: ["string", "null"], description: "e.g. \"11:00\"." },
+          languages: { type: "array", items: { type: "string" }, description: "Enabled content languages (usable as `?lang=`)." },
+          terms_url: { type: ["string", "null"], format: "uri" },
+          privacy_url: { type: ["string", "null"], format: "uri" },
+          single_unit: { type: "boolean", description: "The property is one bookable unit (apartment mode)." },
+          cover_image: { type: ["string", "null"], description: "Cover photo URL path." },
+          theme: {
+            type: "object",
+            description: "Brand tokens so an external frontend can match the property's look.",
+            properties: {
+              accent: { type: "string", description: "Accent colour, hex." },
+              background: { type: ["string", "null"], description: "Page background, hex." },
+              font: { type: ["string", "null"], description: "Curated font-pair id; null = default fonts." },
+            },
+          },
+          pricing_display: {
+            type: "object",
+            properties: {
+              taxes_inclusive: { type: "boolean", description: "true = rate prices already include the taxes below." },
+              taxes: { type: "array", items: { type: "object", properties: { name: { type: "string" }, rate_percent: { type: "number" } } } },
+              fees: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    kind: { type: "string", enum: ["percent", "fixed"] },
+                    amount: { type: "number", description: "Percent when kind=percent, else a fixed amount per stay." },
+                    taxable: { type: "boolean", description: "The taxes above apply on top of this fee." },
+                  },
+                },
+              },
+              city_tax: {
+                type: ["object", "null"],
+                properties: {
+                  name: { type: "string" },
+                  amount: money,
+                  basis: { type: "string", enum: ["person_night", "room_night", "room_stay"] },
+                  taxable: { type: "boolean" },
+                  children_exempt: { type: "boolean" },
+                  max_nights: { type: ["integer", "null"], minimum: 1, description: "Cap on nights charged; null = no cap." },
+                },
+              },
+            },
+          },
+        },
+      },
       Calendar: {
         type: "object",
         properties: {
