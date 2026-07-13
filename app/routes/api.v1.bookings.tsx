@@ -9,6 +9,19 @@ import { getSettings, getBookingCutoff } from "~/lib/overrides.server";
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { cartCoverage, withinAvailability, serializeCart, type CartLine, type ResolvedLine } from "~/lib/cart";
+import {
+  extraEligible,
+  isConfigurable,
+  resolveAllExtras,
+  scopeOf,
+  taxableExtrasTotal,
+  untaxedExtrasTotal,
+  type Extra,
+  type ExtraContextLine,
+  type ExtraSelection,
+  type ResolvedExtra,
+} from "~/lib/extras";
+import { getActiveExtras } from "~/lib/extras.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow, policyToCancellation } from "~/lib/policy-copy";
@@ -31,6 +44,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   return Response.json({ data: all.slice(offset, offset + limit).map(serializeBooking), total: all.length, limit, offset });
 }
 
+// An add-on selection. Only ids/qty/info travel — prices are always resolved
+// server-side from the extras catalog (same as the hosted checkout).
+const ExtraSel = z.object({
+  extra_id: z.string().min(1),
+  option_id: z.string().min(1).optional(),
+  qty: z.number().int().min(1).max(99).optional(),
+  /** Values for the extra's info fields, keyed by field id. */
+  info: z.record(z.string(), z.string()).optional(),
+});
+
 const Body = z.object({
   checkin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   checkout: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -43,9 +66,13 @@ const Body = z.object({
         rate_id: z.string().min(1),
         adults: z.number().int().positive().optional(),
         children_ages: z.array(z.number().int().min(0)).optional(),
+        /** Room-scoped add-ons for this room (see GET /v1/extras). */
+        extras: z.array(ExtraSel).optional(),
       }),
     )
     .min(1),
+  /** Booking-scoped add-ons, offered once for the whole stay. */
+  extras: z.array(ExtraSel).optional(),
   guest: z.object({
     first_name: z.string().min(1),
     last_name: z.string().min(1),
@@ -56,6 +83,42 @@ const Body = z.object({
   }),
   promo_code: z.string().optional(),
   marketing_opt_in: z.boolean().optional(),
+});
+
+/** Why an extras selection can't be booked, or null when it's valid. The web
+ *  checkout silently drops invalid selections (the guest sees the re-priced
+ *  cart); an API client gets no such feedback, so a bad selection must be a
+ *  hard 422 — otherwise "breakfast" silently vanishes from a paid booking. */
+function extraSelectionError(
+  catalog: Extra[],
+  sel: z.infer<typeof ExtraSel>,
+  ctx: { scope: "room" | "booking"; roomId?: string; rateId?: string },
+): string | null {
+  const extra = catalog.find((e) => e.id === sel.extra_id);
+  if (!extra) return `extra ${sel.extra_id} does not exist or is not active`;
+  if (scopeOf(extra) !== ctx.scope) {
+    return scopeOf(extra) === "booking"
+      ? `"${extra.name}" is a whole-stay extra — send it in the top-level \`extras\` array, not on a room`
+      : `"${extra.name}" is a per-room extra — send it on a room's \`extras\` array`;
+  }
+  if (ctx.scope === "room" && !extraEligible(extra, ctx.roomId ?? "", ctx.rateId ?? "")) {
+    return `"${extra.name}" is not offered for that room/rate`;
+  }
+  if (isConfigurable(extra)) {
+    if (!sel.option_id) return `"${extra.name}" requires \`option_id\` (see its options in GET /v1/extras)`;
+    if (!extra.options!.some((o) => o.id === sel.option_id)) return `"${extra.name}" has no option ${sel.option_id}`;
+  }
+  for (const f of extra.fields ?? []) {
+    if (f.required && !sel.info?.[f.id]?.trim()) return `"${extra.name}" requires info field "${f.id}" (${f.label})`;
+  }
+  return null;
+}
+
+const toSelection = (s: z.infer<typeof ExtraSel>): ExtraSelection => ({
+  id: s.extra_id,
+  optionId: s.option_id,
+  qty: s.qty ?? 1,
+  info: s.info,
 });
 
 /** The automatic offer baked into line prices (mirror of checkout's deriveOffer). */
@@ -143,11 +206,44 @@ export async function action({ request }: Route.ActionArgs) {
   const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
   const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
   const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
+
+  // Add-ons: reject any invalid selection outright (never silently drop a paid
+  // extra), then price authoritatively from the catalog — mirroring checkout.
+  // `lines` preserves body.rooms order, so per-room buckets align by index.
+  let extraLines: ResolvedExtra[] = [];
+  if (body.rooms.some((r) => r.extras?.length) || body.extras?.length) {
+    const catalog = await getActiveExtras(pid);
+    for (const [i, r] of body.rooms.entries()) {
+      for (const sel of r.extras ?? []) {
+        const err = extraSelectionError(catalog, sel, { scope: "room", roomId: r.room_id, rateId: r.rate_id });
+        if (err) return apiError(422, "invalid_extra", `rooms[${i}].extras: ${err}`);
+      }
+    }
+    for (const sel of body.extras ?? []) {
+      const err = extraSelectionError(catalog, sel, { scope: "booking" });
+      if (err) return apiError(422, "invalid_extra", `extras: ${err}`);
+    }
+    const ctx: ExtraContextLine[] = lines.map((l) => ({
+      roomId: l.roomId,
+      rateId: l.rateId,
+      roomTitle: l.roomTitle,
+      guests: l.occupancy.adults + l.occupancy.children,
+    }));
+    extraLines = resolveAllExtras(
+      catalog,
+      { lines: body.rooms.map((r) => (r.extras ?? []).map(toSelection)), booking: (body.extras ?? []).map(toSelection) },
+      ctx,
+      nights,
+      adults + children,
+    );
+  }
+
   const pricing = computePricing(
-    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee, taxableExtras: 0 },
+    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee, taxableExtras: taxableExtrasTotal(extraLines) },
     taxConfigFrom(settings),
   );
-  const grandTotal = Math.round(pricing.total * 100) / 100;
+  // VAT-exempt extras ride on top of the taxed total untouched (same as checkout).
+  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
   const due = dueNow(policy, grandTotal, nights);
@@ -190,7 +286,7 @@ export async function action({ request }: Route.ActionArgs) {
     discountedTotal,
     applied: applied ?? undefined,
     offer,
-    extraLines: [],
+    extraLines,
     consent: {
       acceptedAt: new Date().toISOString(),
       ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined,
