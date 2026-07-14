@@ -6,7 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
-import { uploadPropertyCoverImage } from "~/lib/images.server";
+import { uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { COUNTRIES } from "~/lib/countries";
 
@@ -54,6 +54,17 @@ export async function action({ request }: Route.ActionArgs) {
     }
   } else if (form.get("removeCover") === "1") {
     await patchSettings(propertyId, { coverImage: "" });
+  }
+  // Property logo (global; shown in the guest booking header).
+  const logoUpload = form.get("logoUpload");
+  if (logoUpload instanceof File && logoUpload.size > 0) {
+    try {
+      await patchSettings(propertyId, { logoImage: await uploadPropertyLogo(propertyId, logoUpload) });
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Logo upload failed." };
+    }
+  } else if (form.get("removeLogo") === "1") {
+    await patchSettings(propertyId, { logoImage: "" });
   }
   // Keep the property switcher / list label in sync with the hotel name. That
   // registry label is a single canonical name, so only the default-language
@@ -132,6 +143,35 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             </span>
           </span>
         </label>
+
+        {/* Logo — replaces the diamond + name lockup in the guest booking
+            header. Global (not per-language). */}
+        <div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">Logo</div>
+          {settings.logoImage ? (
+            <div className="mb-2 flex items-center gap-3">
+              <div className="flex h-16 w-44 flex-none items-center justify-center rounded-[10px] border border-line-alt bg-chip px-3">
+                <img src={settings.logoImage} alt="Property logo" className="max-h-12 max-w-full object-contain" />
+              </div>
+              <label className="flex items-center gap-2 text-[13px] text-secondary">
+                <input type="checkbox" name="removeLogo" value="1" /> Remove
+              </label>
+            </div>
+          ) : (
+            <p className="mb-2 text-[12.5px] text-muted">
+              No logo set — the booking pages show your hotel name as text. Upload one to replace it.
+            </p>
+          )}
+          <input
+            type="file"
+            name="logoUpload"
+            accept="image/*"
+            className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
+          />
+          <p className="mt-1 text-[11px] text-faint">
+            Shown ~40px tall in the booking header — a wide wordmark on a transparent background (PNG/WebP) works best.
+          </p>
+        </div>
 
         {/* Cover photo — the property's image on Collections cards. Global (not
             per-language). */}
