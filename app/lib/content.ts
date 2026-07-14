@@ -281,6 +281,7 @@ export const LANGUAGES = [
   { code: "it", label: "Italiano", flag: "🇮🇹" },
   { code: "pt", label: "Português", flag: "🇵🇹" },
   { code: "nl", label: "Nederlands", flag: "🇳🇱" },
+  { code: "el", label: "Ελληνικά", flag: "🇬🇷" },
 ] as const;
 
 export const DEFAULT_LANG = "en";
