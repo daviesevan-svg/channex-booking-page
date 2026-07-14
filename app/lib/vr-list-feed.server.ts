@@ -40,6 +40,108 @@ function propertyUrl(idOrSlug: string): string {
   return `${origin}/${idOrSlug}`;
 }
 
+/** Absolute URL for an uploaded image path (/images/… → https://host/images/…).
+ *  Already-absolute URLs are returned unchanged. Empty when there's no source. */
+function absImage(src: string | undefined): string {
+  const s = (src ?? "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s)) return s;
+  const origin = getConfig().appUrl.replace(/\/+$/, "");
+  return `${origin}${s.startsWith("/") ? "" : "/"}${s}`;
+}
+
+/** `<client_attr name="k">v</client_attr>`, omitted when empty. */
+function clientAttr(name: string, value?: string): string {
+  const v = (value ?? "").trim();
+  return v ? `        <client_attr name="${name}">${esc(v)}</client_attr>\n` : "";
+}
+
+// Free-text facility → Google VR amenity attribute. Google only accepts a fixed
+// vocabulary (client_attr with Yes/No or a small enum), so we map the facilities
+// we can recognise and DROP the rest — never send a guess. Booleans are set to
+// "Yes"; negated phrasings ("no …") are handled for the two amenities where a
+// negative is itself meaningful (pets, smoking).
+const BOOL_AMENITIES: { name: string; re: RegExp }[] = [
+  { name: "wifi", re: /wi-?fi|wireless/ },
+  { name: "ac", re: /air.?con|\ba\/?c\b/ },
+  { name: "heating", re: /\bheat(ing|er)?\b/ },
+  { name: "tv", re: /\btv\b|television/ },
+  { name: "kitchen", re: /kitchen(ette)?/ },
+  { name: "microwave", re: /microwave/ },
+  { name: "oven_stove", re: /\boven\b|\bstove\b|cooktop|\bhob\b|\bcooker\b/ },
+  { name: "washer_dryer", re: /washer|dryer|washing machine|laundry/ },
+  { name: "balcony", re: /balcony/ },
+  { name: "patio", re: /patio|terrace/ },
+  { name: "elevator", re: /elevator|\blift\b/ },
+  { name: "gym_fitness_equipment", re: /\bgym\b|fitness/ },
+  { name: "hot_tub", re: /hot ?tub|jacuzzi|whirlpool/ },
+  { name: "fire_place", re: /fire ?place/ },
+  { name: "crib", re: /\bcrib\b|\bcot\b/ },
+  { name: "child_friendly", re: /child.?friendly|family.?friendly|kid.?friendly/ },
+  { name: "wheelchair_accessible", re: /wheelchair|disabled access|step.?free access/ },
+  { name: "beach_access", re: /beach ?access|beachfront|on the beach/ },
+  { name: "airport_shuttle", re: /airport (shuttle|transfer)/ },
+  { name: "free_breakfast", re: /free breakfast|breakfast included|complimentary breakfast/ },
+  { name: "ironing_board", re: /\biron(ing)?\b/ },
+  { name: "outdoor_grill", re: /\bgrill\b|\bbbq\b|barbec/ },
+];
+
+/** Map a property's free-text facilities to Google VR amenity client_attr lines.
+ *  Recognised amenities only; unknown facilities (e.g. "Garden view") are dropped. */
+function amenityAttrs(facilities: string[]): string {
+  const out = new Map<string, string>(); // attr name → value (deduped)
+  for (const raw of facilities) {
+    const f = raw.toLowerCase().trim();
+    if (!f) continue;
+    const negated = /^(no|without)\b/.test(f) || /\bnot (allowed|available|permitted|included)\b/.test(f);
+
+    // Smoking: "non-smoking" / "smoke-free" / "no smoking" all mean smoke-free = Yes.
+    if (/non.?smoking|smoke.?free|smoking.?free/.test(f) || (/smoking/.test(f) && negated)) {
+      out.set("smoking_free_property", "Yes");
+    }
+    // Pets: a negative is meaningful (pets_allowed = No).
+    if (/\bpets?\b/.test(f)) out.set("pets_allowed", negated ? "No" : "Yes");
+
+    // Enum amenities.
+    if (/\bpool\b|swimming/.test(f) && !negated) {
+      out.set("pool_type", /indoor/.test(f) ? "Indoors" : "Outdoors");
+    }
+    if (/parking|garage|car ?park/.test(f) && !negated) {
+      out.set("parking_type", /paid/.test(f) ? "Paid" : "Free");
+    }
+    if (/wi-?fi|internet|wireless/.test(f) && !negated) {
+      out.set("internet_type", /paid/.test(f) ? "Paid" : "Free");
+    }
+
+    // Boolean amenities (positive only — a listed facility is something offered).
+    if (!negated) {
+      for (const rule of BOOL_AMENITIES) {
+        if (rule.re.test(f)) out.set(rule.name, "Yes");
+      }
+    }
+  }
+  return [...out].map(([name, value]) => clientAttr(name, value)).join("");
+}
+
+/** `<image>` elements (inside <content>) for a set of image URLs, titled with the
+ *  property name. Absolute-ised and deduped; empty sources skipped. */
+function imageElements(sources: (string | undefined)[], title: string): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const src of sources) {
+    const url = absImage(src);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(
+      `      <image type="photo" url="${esc(url)}">\n` +
+        `        <link>${esc(url)}</link>\n` +
+        (title ? `        <title>${esc(title)}</title>\n` : "") +
+        `      </image>\n`,
+    );
+  }
+  return out.join("");
+}
+
 /** The `<listing>` elements for every public, ready, vacation-rental property
  *  (no `<listings>` wrapper) — reused both by our own VR feed and by the merged
  *  Channex+us VR feed. Empty string when there's nothing to advertise. */
@@ -71,13 +173,21 @@ export async function vrListingElements(): Promise<string> {
       component("province", settings.addressRegion) +
       component("postal_code", settings.addressPostalCode);
     const website = propertyUrl(p.slug || p.id);
+    // As much content as we hold — Google builds & showcases the listing from
+    // this feed. Photos from the unit (+ the property cover); amenities mapped
+    // from the unit's facilities; description + instant-book flag.
+    const images = imageElements([...unit.images, settings.coverImage], name);
     const attrs =
-      `      <website>${esc(website)}</website>\n` +
-      `      <client_attr name="capacity">${unit.maxGuests}</client_attr>\n` +
+      `        <website>${esc(website)}</website>\n` +
+      clientAttr("capacity", String(unit.maxGuests)) +
       // hotel_brand → lets a Google POS <Match brand="…"> route our listings to
       // our own booking pages (same mechanism as the Hotel List Feed), so a
       // merged feed sends ours to us and Channex's rest to Channex.
-      `      <client_attr name="hotel_brand">${GOOGLE_HOTEL_BRAND}</client_attr>\n`;
+      clientAttr("hotel_brand", GOOGLE_HOTEL_BRAND) +
+      // We confirm bookings instantly (Stripe or a live Channex connection).
+      clientAttr("instant_bookable", "Yes") +
+      clientAttr("description", overrides.description || unit.description) +
+      amenityAttrs(unit.facilities);
 
     listings.push(
       `  <listing>\n` +
@@ -90,8 +200,7 @@ export async function vrListingElements(): Promise<string> {
         (overrides.phone ? `    <phone type="main">${esc(overrides.phone)}</phone>\n` : "") +
         // Free-text per Google ("use whatever property type categories you wish").
         tag("category", overrides.propertyType || "vacation_rental") +
-        (overrides.description ? tag("description", overrides.description) : "") +
-        `    <content>\n      <attributes>\n${attrs}      </attributes>\n    </content>\n` +
+        `    <content>\n${images}      <attributes>\n${attrs}      </attributes>\n    </content>\n` +
         `  </listing>`,
     );
   }
