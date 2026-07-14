@@ -83,7 +83,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/extras", label: "Extras" },
         // Integrations
         { to: "/admin/connectivity", label: "Connectivity" },
-        { to: "/admin/google-hotels", label: "Google Hotels" },
+        { to: "/admin/google-hotels", label: "Google" },
         { to: "/admin/website-widget", label: "Website widget" },
         { to: "/admin/brand-kit", label: "Brand kit" },
         { to: "/admin/payments", label: "Payments" },
