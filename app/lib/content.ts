@@ -301,6 +301,12 @@ export interface SiteSettings {
   /** Google VR enum amenities (from VR_AMENITY_ENUMS), keyed by attr name, e.g.
    *  { parking_type: "Free", pool_type: "Outdoors" }. Empty/absent = omitted. */
   vrAmenityOptions?: Record<string, string>;
+  /** Google VR unit size, sent as client_attr number_of_* — Google REQUIRES these
+   *  before a VR listing can go live. undefined = not set (0 bedrooms is valid —
+   *  a studio); bathrooms may be a half (e.g. 1.5). */
+  vrBedrooms?: number;
+  vrBathrooms?: number;
+  vrBeds?: number;
   /** Master switch: push this property's ARI (property data, rates, availability,
    *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */
   googleAriPush?: boolean;
