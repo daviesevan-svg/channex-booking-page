@@ -68,7 +68,10 @@ export function bookingVars(
   manageUrl: string,
 ): Record<string, string> {
   const money = (n: number) => formatMoney(n, booking.currency);
-  const dueNow = booking.consent?.dueNow ?? 0;
+  // Mirror detailsHtml: once a payment was captured, {due_now} is what was paid
+  // and {due_at_hotel} is the true remainder — not the policy's pre-payment split.
+  const paid = booking.payment?.mode === "payment" ? (booking.payment.amount ?? 0) : 0;
+  const dueNow = paid > 0 ? paid : (booking.consent?.dueNow ?? 0);
   return {
     hotel_name: hotelName,
     guest_first_name: booking.guest.firstName,
@@ -97,8 +100,12 @@ function detailsHtml(
   opts: { recipient: "guest" | "host"; manageUrl: string; accent: string },
 ): string {
   const money = (n: number) => formatMoney(n, booking.currency);
+  // What was actually captured wins over the policy's "due now": a guest who has
+  // already paid must see "Paid", not an amount still owing. (mode "setup" only
+  // stores a guarantee card — nothing is charged, so it stays "due".)
+  const paid = booking.payment?.mode === "payment" ? (booking.payment.amount ?? 0) : 0;
   const dueNow = booking.consent?.dueNow ?? 0;
-  const dueAtHotel = Math.max(0, booking.total - dueNow);
+  const dueAtHotel = Math.max(0, booking.total - (paid > 0 ? paid : dueNow));
 
   const occ = (a: number, c: number) =>
     `${a} adult${a === 1 ? "" : "s"}${c ? `, ${c} child${c === 1 ? "" : "ren"}` : ""}`;
@@ -158,8 +165,8 @@ function detailsHtml(
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
         ${ROW("Total", money(booking.total), true)}
-        ${dueNow > 0 ? ROW("Due now", money(dueNow)) : ""}
-        ${ROW("Due at the hotel", money(dueAtHotel))}
+        ${paid > 0 ? ROW("Paid", money(paid)) : dueNow > 0 ? ROW("Due now", money(dueNow)) : ""}
+        ${dueAtHotel > 0 ? ROW("Due at the hotel", money(dueAtHotel)) : ""}
       </table>
       ${cancelLine ? `<p style="margin:12px 0 0;color:#8a8a8a;font-size:12px;">${esc(cancelLine)}</p>` : ""}
       ${contactBlock}

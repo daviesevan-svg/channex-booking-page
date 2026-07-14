@@ -48,13 +48,19 @@ export async function resolveBookingCancellation(
     earliestCancelBy = earliestCancelBy == null ? cancelBy : Math.min(earliestCancelBy, cancelBy);
   }
 
-  return {
-    refundable,
-    cancelByISO:
-      earliestCancelBy == null || Number.isNaN(earliestCancelBy)
-        ? null
-        : new Date(earliestCancelBy).toISOString(),
-  };
+  const cancelByISO =
+    earliestCancelBy == null || Number.isNaN(earliestCancelBy)
+      ? null
+      : new Date(earliestCancelBy).toISOString();
+  // A free-cancellation window that already closed before the booking was made
+  // is, for THIS booking, non-refundable — the guest can never use it. Snapshot
+  // it that way, or the confirmation email would promise "free cancellation
+  // until <a past date>" (checkout already showed — and the guest acknowledged —
+  // non-refundable).
+  if (refundable && earliestCancelBy != null && earliestCancelBy <= Date.now()) {
+    return { refundable: false, cancelByISO: null };
+  }
+  return { refundable, cancelByISO };
 }
 
 /** True when the cart mixes refundable and non-refundable rates. A single
