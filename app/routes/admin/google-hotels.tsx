@@ -30,11 +30,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     getGoogleAriSync(propertyId),
     matchConfigured ? readCachedMatchStatus(propertyId) : Promise.resolve(null),
   ]);
+  const program = settings.googleProgram === "vacation_rentals" ? ("vacation_rentals" as const) : ("hotels" as const);
+  const partnerConfigured =
+    program === "vacation_rentals"
+      ? Boolean(getConfig().googleVrPartnerKey)
+      : Boolean(getConfig().googleAriPartnerKey);
   return {
     configured: true as const,
     canManage,
     propertyId,
-    partnerConfigured: Boolean(getConfig().googleAriPartnerKey),
+    program,
+    singleUnit: settings.singleUnit ?? false,
+    partnerConfigured,
     push: settings.googleAriPush ?? false,
     windowDays: settings.googleAriWindowDays ?? 365,
     lastSync,
@@ -69,7 +76,8 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "save") {
     const windowDays = Number(form.get("windowDays"));
-    await saveGoogleAriSettings(propertyId, { push: form.get("push") === "on", windowDays });
+    const program = form.get("program") === "vacation_rentals" ? "vacation_rentals" : "hotels";
+    await saveGoogleAriSettings(propertyId, { push: form.get("push") === "on", windowDays, program });
     return { ok: true as const };
   }
   if (intent === "push") {
@@ -112,8 +120,9 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin } =
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit } =
     loaderData;
+  const isVr = program === "vacation_rentals";
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -121,16 +130,17 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Google Hotels</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{isVr ? "Google Vacation Rentals" : "Google Hotels"}</h1>
         {actionData && "ok" in actionData && actionData.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
         )}
       </div>
 
       <p className="max-w-2xl text-[14px] text-secondary">
-        Push this property's rooms, rates, discounts and availability (ARI) directly to Google Hotels.
-        Prices and discounts are computed by Roompanda, so Google always shows exactly what your site
-        does. Google matches the property by its ID (same as the Hotel List Feed).
+        Push this property's rooms, rates, discounts and availability (ARI) directly to{" "}
+        {isVr ? "Google Vacation Rentals" : "Google Hotels"}. Prices and discounts are computed by Roompanda,
+        so Google always shows exactly what your site does. Google matches the property by its ID (same as the{" "}
+        {isVr ? "Vacation Rentals list feed" : "Hotel List Feed"}).
       </p>
 
       {actionData && "error" in actionData && actionData.error && (
@@ -144,8 +154,8 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         <h2 className="mb-3 font-serif text-[18px] font-semibold">Readiness</h2>
         {!partnerConfigured && (
           <p className="mb-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
-            <strong>GOOGLE_ARI_PARTNER_KEY</strong> is not set. Add your Hotel Center partner key as a
-            Cloudflare secret before pushing.
+            <strong>{isVr ? "GOOGLE_VR_PARTNER_KEY" : "GOOGLE_ARI_PARTNER_KEY"}</strong> is not set. Add your{" "}
+            {isVr ? "Vacation Rentals" : "Hotel Center"} partner key as a Cloudflare secret before pushing.
           </p>
         )}
         {readiness.ready ? (
@@ -161,8 +171,10 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </div>
         )}
 
-        {/* Live match status from Google (Travel Partner API). Always shown so
-            there's feedback: not-configured, unknown/pending, or the real state. */}
+        {/* Live match status from Google (Travel Partner API) — the Hotel Center
+            matching flow, so it's shown for hotels only (VR ingests via the VR
+            list feed, a different pipeline). */}
+        {!isVr && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-divider pt-3.5 text-[13px]">
           <span className="text-secondary">On Google:</span>
           {!matchConfigured ? (
@@ -177,6 +189,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             </span>
           )}
         </div>
+        )}
       </section>
 
       {/* Settings */}
@@ -184,9 +197,23 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         <h2 className="mb-4 font-serif text-[18px] font-semibold">Settings</h2>
         <Form method="post" className="space-y-4">
           <input type="hidden" name="intent" value="save" />
+          <div className="max-w-md">
+            <span className="mb-1.5 block text-[13px] font-semibold text-secondary">Google program</span>
+            <select name="program" defaultValue={program} className={`${input} w-full`}>
+              <option value="hotels">Google Hotels</option>
+              <option value="vacation_rentals" disabled={!singleUnit}>
+                Google Vacation Rentals{singleUnit ? "" : " — single-unit properties only"}
+              </option>
+            </select>
+            <span className="mt-1 block text-[12px] text-muted">
+              {isVr
+                ? "Pushes to your Vacation Rentals account as a single-unit listing with binary availability."
+                : "Pushes to your Hotel Center account. Vacation Rentals is available for single-unit properties."}
+            </span>
+          </div>
           <label className="flex items-center gap-2.5 text-[14px] font-semibold text-ink">
             <input type="checkbox" name="push" defaultChecked={push} className="h-4 w-4 accent-[var(--accent)]" />
-            Push this property to Google Hotels
+            Push this property to {isVr ? "Google Vacation Rentals" : "Google Hotels"}
           </label>
           <label className="block max-w-xs">
             <span className="mb-1.5 block text-[13px] font-semibold text-secondary">Days ahead to push</span>

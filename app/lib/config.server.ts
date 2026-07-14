@@ -53,6 +53,11 @@ export interface AppConfig extends ChannexConfig {
    *  ARI message. Auth is IP-whitelist based; this only identifies the account.
    *  Unset = ARI push can't run (surfaced in the admin). */
   googleAriPartnerKey?: string;
+  /** Partner account key for the Google Vacation Rentals account, stamped on ARI
+   *  messages from properties whose googleProgram is "vacation_rentals". Same
+   *  transport/egress as hotels — only the partner account differs. Unset = VR
+   *  push can't run (surfaced in the admin). */
+  googleVrPartnerKey?: string;
   /** Shared secret sent as X-Ari-Proxy-Key when pushing via the egress proxy, so
    *  the proxy isn't an open relay to Google. Unset = header omitted (direct push). */
   googleAriProxyKey?: string;
@@ -111,6 +116,7 @@ export function getConfig(): AppConfig {
     ),
     googleAriBaseUrl: read("GOOGLE_ARI_BASE_URL", "https://www.google.com").replace(/\/+$/, ""),
     googleAriPartnerKey: read("GOOGLE_ARI_PARTNER_KEY") || undefined,
+    googleVrPartnerKey: read("GOOGLE_VR_PARTNER_KEY") || undefined,
     googleAriProxyKey: read("GOOGLE_ARI_PROXY_KEY") || undefined,
     googleTravelPartnerAccountId: read("GOOGLE_TRAVELPARTNER_ACCOUNT_ID") || undefined,
     googleTravelPartnerSaEmail: read("GOOGLE_TRAVELPARTNER_SA_EMAIL") || undefined,

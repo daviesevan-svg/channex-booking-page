@@ -403,12 +403,21 @@ export async function saveConnectivity(pid: string, system: string | undefined):
  *  rest of settings untouched. */
 export async function saveGoogleAriSettings(
   pid: string,
-  input: { push: boolean; windowDays?: number },
+  input: { push: boolean; windowDays?: number; program?: "hotels" | "vacation_rentals" },
 ): Promise<SiteSettings> {
   const existing = await getSettings(pid);
   const n = input.windowDays;
   const windowDays = Number.isFinite(n) && (n as number) > 0 ? Math.min(500, Math.round(n as number)) : undefined;
-  const next: SiteSettings = { ...existing, googleAriPush: input.push, googleAriWindowDays: windowDays };
+  // Vacation Rentals is only valid for a single-unit property; ignore the choice
+  // otherwise so a multi-room property can't be pushed as a single VR listing.
+  const program: "hotels" | "vacation_rentals" =
+    input.program === "vacation_rentals" && existing.singleUnit ? "vacation_rentals" : "hotels";
+  const next: SiteSettings = {
+    ...existing,
+    googleAriPush: input.push,
+    googleAriWindowDays: windowDays,
+    googleProgram: program,
+  };
   await writeJson(settingsKey(pid), next);
   return next;
 }

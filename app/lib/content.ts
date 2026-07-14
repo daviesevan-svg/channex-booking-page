@@ -248,6 +248,11 @@ export interface SiteSettings {
   /** Cached from the connected account: whether it can accept charges. */
   stripeChargesEnabled?: boolean;
   // ----- Google Hotels ARI push (direct rooms/rates/discounts/availability) -----
+  /** Which Google program this property pushes to. "hotels" (default) uses the
+   *  Hotel Center partner account; "vacation_rentals" uses the VR partner account
+   *  and pushes VR-shaped messages (single unit, binary inventory) + is fed via
+   *  the VR list feed. VR is only valid for single-unit properties. */
+  googleProgram?: "hotels" | "vacation_rentals";
   /** Master switch: push this property's ARI (property data, rates, availability,
    *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */
   googleAriPush?: boolean;

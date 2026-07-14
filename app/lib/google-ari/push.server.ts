@@ -86,22 +86,31 @@ export async function postToGoogleAri(kind: string, path: string, xml: string): 
   }
 }
 
+/** The Google program a property pushes to. */
+export type GoogleProgram = "hotels" | "vacation_rentals";
+
 /** True + envelope when this property is configured and ready to push; otherwise
- *  a single failed result explaining why (so callers can short-circuit). */
+ *  a single failed result explaining why (so callers can short-circuit). The
+ *  partner account is chosen by the property's Google program: hotels use the
+ *  Hotel Center key, vacation rentals the VR key. `program` is returned so the
+ *  sync functions can shape VR-specific messages (single unit, binary inventory). */
 async function envelopeFor(
   pid: string,
   kind: string,
 ): Promise<
-  | { ok: true; env: (k: string) => AriEnvelope; settings: SiteSettings }
+  | { ok: true; env: (k: string) => AriEnvelope; settings: SiteSettings; program: GoogleProgram }
   | { ok: false; result: AriPushResult }
 > {
-  const { googleAriPartnerKey } = getConfig();
+  const { googleAriPartnerKey, googleVrPartnerKey } = getConfig();
   const settings = await getSettings(pid);
   if (!settings.googleAriPush) {
     return { ok: false, result: { kind, ok: false, detail: "Google ARI push is disabled for this property." } };
   }
-  if (!googleAriPartnerKey) {
-    return { ok: false, result: { kind, ok: false, detail: "GOOGLE_ARI_PARTNER_KEY is not configured." } };
+  const program: GoogleProgram = settings.googleProgram === "vacation_rentals" ? "vacation_rentals" : "hotels";
+  const partnerKey = program === "vacation_rentals" ? googleVrPartnerKey : googleAriPartnerKey;
+  if (!partnerKey) {
+    const which = program === "vacation_rentals" ? "GOOGLE_VR_PARTNER_KEY" : "GOOGLE_ARI_PARTNER_KEY";
+    return { ok: false, result: { kind, ok: false, detail: `${which} is not configured.` } };
   }
   const readiness = await checkGoogleReadiness(pid);
   if (!readiness.ready) {
@@ -116,10 +125,11 @@ async function envelopeFor(
     const why = status.reasons.length ? ` (${status.reasons.join("; ")})` : "";
     return { ok: false, result: { kind, ok: false, detail: `Google hasn't matched this property yet${why}. It'll push once matched.` } };
   }
-  const partner = googleAriPartnerKey;
+  const partner = partnerKey;
   return {
     ok: true,
     settings,
+    program,
     env: (k: string) => ({ partner, hotelId: pid, id: messageId(k), timestamp: nowTimestamp() }),
   };
 }
@@ -129,8 +139,11 @@ export async function syncPropertyData(pid: string): Promise<AriPushResult> {
   const gate = await envelopeFor(pid, "property_data");
   if (!gate.ok) return gate.result;
 
-  const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  const [allRooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
   const settings = gate.settings; // envelopeFor already loaded them
+  // Google Vacation Rentals: each listing is exactly one room of one room type.
+  // A VR property is single-unit, so it has one room — take the first defensively.
+  const rooms = gate.program === "vacation_rentals" ? allRooms.slice(0, 1) : allRooms;
   const active = rates.filter((r) => r.active);
   const propRooms: PropertyRoom[] = rooms.map((room) => ({
     id: room.id,
@@ -162,10 +175,16 @@ export async function syncAri(pid: string): Promise<AriPushResult[]> {
   if (!gate.ok) return [gate.result];
   const window = ariWindow(gate.settings.googleAriWindowDays ?? 365);
   const { rates, avail, inventory } = await collectAri(pid, window);
+  // Google Vacation Rentals expects a binary count per unit: 1 if the unit is
+  // free on a date, 0 if it's booked — not a physical room count.
+  const invCounts =
+    gate.program === "vacation_rentals"
+      ? inventory.map((e) => ({ ...e, count: e.count > 0 ? 1 : 0 }))
+      : inventory;
   const out: AriPushResult[] = [];
   out.push(await postToGoogleAri("rate", ARI_PATHS.rate, buildRateAmountXml(gate.env("rate"), rates)));
   out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(gate.env("avail"), avail)));
-  out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), inventory)));
+  out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), invCounts)));
   return out;
 }
 
