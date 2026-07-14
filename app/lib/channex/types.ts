@@ -164,6 +164,8 @@ export interface RoomWithRates {
   description?: string;
   spaces?: RoomSpace[];
   facilities?: string[];
+  /** Structured amenity keys (Google vocabulary — see VR_AMENITIES). */
+  amenities?: string[];
   photos?: Photo[];
   codes?: Record<string, unknown>;
   isBestOffer?: boolean;

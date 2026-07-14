@@ -4,8 +4,10 @@ import type { Route } from "./+types/room";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
+import { VR_AMENITY_KEYS } from "~/lib/content";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
+import { AmenitiesPicker } from "~/components/amenities-picker";
 import { FIELD_INPUT } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -66,6 +68,8 @@ export async function action({ params, request }: Route.ActionArgs) {
       .split("\n")
       .map((s) => s.trim())
       .filter(Boolean),
+    // Structured amenities — only known vocabulary keys are stored.
+    amenities: form.getAll("amenity").map(String).filter((k) => VR_AMENITY_KEYS.has(k)),
     position: existing?.position ?? rooms.length,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
@@ -150,13 +154,22 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
           />
         </label>
 
+        <div>
+          <div className="mb-2 text-[13px] font-semibold text-secondary">Amenities</div>
+          <p className="mb-3 text-[12.5px] text-muted">
+            Tick what this room offers. Shown to guests in their language, and sent to Google
+            (which only accepts this fixed list).
+          </p>
+          <AmenitiesPicker selected={room?.amenities ?? []} />
+        </div>
+
         <label className="block text-[13px] font-semibold text-secondary">
-          Facilities <span className="font-normal text-faint">(one per line)</span>
+          Other facilities <span className="font-normal text-faint">(free text, one per line — shown to guests, not sent to Google)</span>
           <textarea
             name="facilities"
             rows={4}
             defaultValue={room?.facilities.join("\n")}
-            placeholder={"Free Wi-Fi\nEn-suite bathroom\nAir conditioning"}
+            placeholder={"Garden view\nEn-suite bathroom\nNespresso machine"}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>

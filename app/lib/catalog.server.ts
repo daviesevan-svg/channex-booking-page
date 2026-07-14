@@ -31,7 +31,12 @@ export interface CatalogRoom {
   maxGuests: number;
   /** Flat cleaning fee, charged once per room per stay (VAT always applies). */
   cleaningFee?: number;
+  /** Free-text facilities, one per line in the editor. Shown to guests as-is;
+   *  NOT sent to Google (which only accepts its fixed amenity vocabulary). */
   facilities: string[];
+  /** Structured amenities — Google amenity keys from VR_AMENITIES (content.ts).
+   *  Shown to guests (translated) and sent to Google for VR listings. */
+  amenities?: string[];
   position: number;
   createdAt: string;
 }
@@ -330,6 +335,7 @@ export async function getCatalogRooms(
         title: room.title,
         description: room.description,
         facilities: room.facilities,
+        amenities: room.amenities ?? [],
         photos: room.images.map((url) => ({ url })),
         cleaningFee: room.cleaningFee,
         ratePlans,

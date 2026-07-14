@@ -81,6 +81,7 @@ export function serializeRoom(r: CatalogRoom) {
     description: r.description ?? null,
     images: r.images ?? [],
     facilities: r.facilities ?? [],
+    amenities: r.amenities ?? [],
     max_adults: r.maxAdults,
     max_guests: r.maxGuests,
     cleaning_fee: r.cleaningFee ?? 0,
@@ -113,6 +114,7 @@ export function serializeAvailabilityRoom(r: RoomWithRates) {
     description: r.description ?? null,
     images: (r.photos ?? []).map((p) => p.url),
     facilities: r.facilities ?? [],
+    amenities: r.amenities ?? [],
     cleaning_fee: r.cleaningFee ?? 0,
     rates: r.ratePlans.map(serializeRatePlan),
   };

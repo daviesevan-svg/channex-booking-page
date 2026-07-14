@@ -4,10 +4,11 @@ import type { Route } from "./+types/property";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
-import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
+import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
+import { AmenitiesPicker } from "~/components/amenities-picker";
 import { COUNTRIES } from "~/lib/countries";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -66,6 +67,28 @@ export async function action({ request }: Route.ActionArgs) {
   } else if (form.get("removeLogo") === "1") {
     await patchSettings(propertyId, { logoImage: "" });
   }
+  // Property amenities (global; shown to guests + sent to Google). Only known
+  // vocabulary keys / enum values are stored. Unit size is a Google VR go-live
+  // requirement for single-unit properties; blank leaves the stored value.
+  const vrAmenities = form.getAll("amenity").map(String).filter((k) => VR_AMENITY_KEYS.has(k));
+  const vrAmenityOptions: Record<string, string> = {};
+  for (const def of VR_AMENITY_ENUMS) {
+    const v = String(form.get(`enum_${def.key}`) ?? "");
+    if (def.options.includes(v)) vrAmenityOptions[def.key] = v;
+  }
+  const count = (name: string): number | undefined => {
+    const raw = String(form.get(name) ?? "").trim();
+    if (raw === "") return undefined;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
+  await patchSettings(propertyId, {
+    vrAmenities,
+    vrAmenityOptions,
+    vrBedrooms: count("vrBedrooms"),
+    vrBathrooms: count("vrBathrooms"),
+    vrBeds: count("vrBeds"),
+  });
   // Keep the property switcher / list label in sync with the hotel name. That
   // registry label is a single canonical name, so only the default-language
   // hotel name drives it — editing a translation doesn't rename the property.
@@ -213,6 +236,65 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
           <Field name="email" label="Email" value={overrides.email} placeholder="stay@hotel.com" />
         </div>
+
+        {/* Amenities (global; shown to guests + sent to Google, which only
+            accepts its fixed vocabulary — free-text room facilities stay
+            guest-display-only). */}
+        <section className="border-t border-divider pt-5">
+          <div className="mb-1 text-[15px] font-semibold">Amenities</div>
+          <p className="mb-3 text-[13px] text-muted">
+            What the property offers. Shown to guests in their language and used to build your
+            Google listing. Room-specific amenities are set per room type on the Rooms page.
+          </p>
+          <AmenitiesPicker selected={settings.vrAmenities ?? []} />
+          <div className="mt-4 flex flex-wrap gap-4">
+            {VR_AMENITY_ENUMS.map((def) => (
+              <label key={def.key} className="block text-[13px] font-semibold text-secondary">
+                {def.label}
+                <select name={`enum_${def.key}`} defaultValue={settings.vrAmenityOptions?.[def.key] ?? ""} className={`${FIELD_INPUT} cursor-pointer`}>
+                  <option value="">Not specified</option>
+                  {def.options.map((o) => (
+                    <option key={o} value={o}>
+                      {o}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+
+          {/* Unit size — single-unit properties only; required before Google
+              publishes a Vacation Rentals listing. */}
+          {settings.singleUnit && (
+            <div className="mt-5">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="text-[13px] font-semibold text-secondary">Property size</span>
+                {settings.vrBedrooms == null || settings.vrBathrooms == null || settings.vrBeds == null ? (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[12px] font-semibold text-amber-800">
+                    Required for Google Vacation Rentals
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[12px] font-semibold text-[#3f7a52]">
+                    ✓ Complete
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {[
+                  { name: "vrBedrooms", label: "Bedrooms", value: settings.vrBedrooms, step: "1", hint: "0 for a studio" },
+                  { name: "vrBathrooms", label: "Bathrooms", value: settings.vrBathrooms, step: "0.5", hint: "e.g. 1.5" },
+                  { name: "vrBeds", label: "Beds", value: settings.vrBeds, step: "1", hint: "" },
+                ].map((f) => (
+                  <label key={f.name} className="block text-[13px] font-semibold text-secondary">
+                    {f.label}
+                    <input type="number" name={f.name} min={0} step={f.step} defaultValue={f.value ?? ""} className={`${FIELD_INPUT} w-28`} />
+                    {f.hint && <span className="mt-1 block text-[11px] font-normal text-faint">{f.hint}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Check-in / check-out times (global; shown to guests + Google). */}
         <section className="border-t border-divider pt-5">
