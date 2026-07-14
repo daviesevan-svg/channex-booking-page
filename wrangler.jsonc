@@ -44,7 +44,10 @@
 		"SPARKPOST_API_URL": "https://api.eu.sparkpost.com",
 		// Channex Open Channel: our provider code + outbound new_booking webhook.
 		"PROVIDER_CODE": "RoomPanda",
-		"OPEN_CHANNEL_BOOKING_URL": "https://staging.channex.io/api/v1/channel_webhooks/roompanda/new_booking",
+		// PRODUCTION host — live hotels are connected on app.channex.io. (This var is
+		// pinned, so it re-applies on every deploy; pointing it at staging sent a real
+		// paid booking to the wrong host, 422 "invalid hotel_code".)
+		"OPEN_CHANNEL_BOOKING_URL": "https://app.channex.io/api/v1/channel_webhooks/roompanda/new_booking",
 		// Google ARI pushes go through the static-egress-IP proxy (ari-proxy/, whose
 		// IP is whitelisted in Google). Pinned here — it's a fixed non-secret value, so
 		// pinning stops a deploy from wiping it (a bare dashboard var gets dropped on
