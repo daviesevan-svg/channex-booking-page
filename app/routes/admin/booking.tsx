@@ -10,7 +10,7 @@ import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking, retryChannexPush } from "~/lib/booking-finalize.server";
 import { incrementAvailability } from "~/lib/ari.server";
-import { sendCancellationEmails } from "~/lib/email.server";
+import { sendCancellationEmails, sendGuestBookingEmail } from "~/lib/email.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
 import { refundBookingCharge } from "~/lib/refunds.server";
@@ -49,6 +49,17 @@ export async function action({ params, request }: Route.ActionArgs) {
             ? "No stored Channex payload to retry (legacy failed booking)."
             : `Channex rejected it again: ${r.error}`,
     };
+  }
+
+  if (intent === "resendEmail") {
+    // Re-send the guest confirmation (e.g. after fixing content or a mail
+    // hiccup). Confirmation only makes sense for a booking that stands.
+    if (booking.status === "failed") return { error: "This booking isn't confirmed — retry the Channex push first." };
+    if ((booking.lifecycle ?? "active") !== "active") return { error: "This booking is cancelled — there's no confirmation to resend." };
+    const sent = await sendGuestBookingEmail(propertyId, booking, new URL(request.url).origin);
+    return sent
+      ? { emailResent: true as const }
+      : { error: "The email couldn't be sent — check the email settings (SparkPost key / sender)." };
   }
 
   if (intent === "cancel") {
@@ -113,6 +124,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const intent = nav.formData?.get("intent");
   const refunding = nav.state !== "idle" && intent === "refund";
   const retrying = nav.state !== "idle" && intent === "retry";
+  const resending = nav.state !== "idle" && intent === "resendEmail";
   const cancelling = nav.state !== "idle" && intent === "cancel";
   const active = (b.lifecycle ?? "active") === "active";
   const en = makeTranslator("en"); // admin UI is English
@@ -159,6 +171,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {actionData?.cancelled && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
           Booking cancelled. A cancellation email has been sent to the guest.
+        </div>
+      )}
+      {actionData?.emailResent && (
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+          ✓ Confirmation email re-sent to {b.guest.email}.
         </div>
       )}
 
@@ -413,27 +430,46 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {active && (
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
           <h2 className="mb-3 font-serif text-[18px] font-semibold">Manage booking</h2>
-          <Form
-            method="post"
-            onSubmit={(e) => {
-              if (!confirm("Cancel this booking? The guest will be emailed and the nights returned to inventory. This can't be undone.")) {
-                e.preventDefault();
-              }
-            }}
-          >
-            <input type="hidden" name="intent" value="cancel" />
-            <button
-              type="submit"
-              disabled={cancelling}
-              className="rounded-[10px] border border-[#e0b4ab] bg-surface px-4 py-2.5 text-[14px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
+          <div className="flex flex-wrap items-start gap-6">
+            {/* Re-send the guest confirmation — e.g. after fixing email content
+                or a delivery hiccup. Not for failed bookings (retry the push). */}
+            {b.status !== "failed" && (
+              <Form method="post">
+                <input type="hidden" name="intent" value="resendEmail" />
+                <button
+                  type="submit"
+                  disabled={resending}
+                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {resending ? "Sending…" : "Resend confirmation email"}
+                </button>
+                <p className="mt-2 text-[12.5px] text-muted">
+                  Re-sends the booking confirmation to {b.guest.email}.
+                </p>
+              </Form>
+            )}
+            <Form
+              method="post"
+              onSubmit={(e) => {
+                if (!confirm("Cancel this booking? The guest will be emailed and the nights returned to inventory. This can't be undone.")) {
+                  e.preventDefault();
+                }
+              }}
             >
-              {cancelling ? "Cancelling…" : "Cancel booking"}
-            </button>
-            <p className="mt-2 text-[12.5px] text-muted">
-              Marks the booking cancelled, emails the guest, and frees the inventory. Issue a refund
-              separately (Payment section above) if one is due.
-            </p>
-          </Form>
+              <input type="hidden" name="intent" value="cancel" />
+              <button
+                type="submit"
+                disabled={cancelling}
+                className="rounded-[10px] border border-[#e0b4ab] bg-surface px-4 py-2.5 text-[14px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
+              >
+                {cancelling ? "Cancelling…" : "Cancel booking"}
+              </button>
+              <p className="mt-2 text-[12.5px] text-muted">
+                Marks the booking cancelled, emails the guest, and frees the inventory. Issue a refund
+                separately (Payment section above) if one is due.
+              </p>
+            </Form>
+          </div>
         </section>
       )}
     </div>

@@ -86,6 +86,26 @@ function senderFrom(settings: SiteSettings, config: AppConfig): string | undefin
   return `${settings.emailFromName} <${addr}>`;
 }
 
+/** Send (or re-send) just the guest booking confirmation. Returns whether the
+ *  send was accepted, so the admin "Resend email" button can show the outcome.
+ *  Never throws. */
+export async function sendGuestBookingEmail(pid: string, booking: BookingRecord, origin: string): Promise<boolean> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
+    const hotelName = ov.hotelName || "Your hotel";
+    const accent = accentHex(settings);
+    const from = senderFrom(settings, getConfig());
+    const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
+    const gtext = await getEmailTemplate(pid, "booking_confirmation", booking.lang);
+    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, accent, manageUrl });
+    const r = await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
+    return r.sent;
+  } catch (e) {
+    console.log(`[email] sendGuestBookingEmail failed: ${e instanceof Error ? e.message : e}`);
+    return false;
+  }
+}
+
 /** Guest booking confirmation + (opt-in) host new-booking notification. Never
  *  throws — a mail failure must never break the booking flow. */
 export async function sendBookingEmails(pid: string, booking: BookingRecord, origin: string): Promise<void> {
@@ -96,9 +116,7 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
     const from = senderFrom(settings, getConfig());
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
-    const gtext = await getEmailTemplate(pid, "booking_confirmation", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, accent, manageUrl });
-    await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
+    await sendGuestBookingEmail(pid, booking, origin);
 
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (settings.notifyHostOnBooking !== false && hostTo) {
