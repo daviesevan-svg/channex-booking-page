@@ -273,6 +273,7 @@ export async function action({ request }: Route.ActionArgs) {
     currency,
     nights,
     lines,
+    pricing: { charges: pricing.charges, taxLines: pricing.taxLines, taxIncluded: pricing.taxIncluded },
     guest: {
       firstName: body.guest.first_name,
       lastName: body.guest.last_name,

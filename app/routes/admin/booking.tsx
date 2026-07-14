@@ -313,6 +313,19 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             ))}
           </div>
         )}
+        {/* Taxes & fees charged on top of the room prices (snapshotted at
+            booking time; absent on legacy bookings). */}
+        {b.pricing && (b.pricing.charges.length > 0 || b.pricing.taxLines.length > 0) && (
+          <div className="mt-3 flex flex-col gap-1.5 border-t border-divider pt-3">
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">Taxes &amp; fees</div>
+            {[...b.pricing.charges, ...b.pricing.taxLines].map((c, i) => (
+              <div key={i} className="flex justify-between text-[13.5px]">
+                <span>{c.label}</span>
+                <span className="whitespace-nowrap font-semibold">{formatMoney(c.amount, b.currency)}</span>
+              </div>
+            ))}
+          </div>
+        )}
         {b.offer && (
           <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
             <span>{b.offer.name || "Offer"} (−{b.offer.value}%)</span>
@@ -331,6 +344,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             {formatMoney(b.total, b.currency)}
           </span>
         </div>
+        {b.pricing && b.pricing.taxIncluded > 0 && (
+          <div className="mt-1 text-right text-[12px] text-muted-2">
+            Includes {formatMoney(b.pricing.taxIncluded, b.currency)} VAT
+          </div>
+        )}
       </section>
 
       {cancellationText && (

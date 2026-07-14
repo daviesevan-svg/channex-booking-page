@@ -127,6 +127,13 @@ function detailsHtml(
     )
     .join("");
 
+  // Taxes & fees charged on top of the room prices (snapshotted at booking
+  // time; legacy bookings without the snapshot just skip these rows).
+  const pricingRows = [...(booking.pricing?.charges ?? []), ...(booking.pricing?.taxLines ?? [])]
+    .map((c) => ROW(c.label, money(c.amount)))
+    .join("");
+  const taxIncluded = booking.pricing?.taxIncluded ?? 0;
+
   const cancel = booking.cancellation;
   const cancelLine = !cancel
     ? ""
@@ -163,11 +170,13 @@ function detailsHtml(
       </table>
       <table role="presentation" width="100%">${roomRows}</table>
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
+      ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
         ${ROW("Total", money(booking.total), true)}
         ${paid > 0 ? ROW("Paid", money(paid)) : dueNow > 0 ? ROW("Due now", money(dueNow)) : ""}
         ${dueAtHotel > 0 ? ROW("Due at the hotel", money(dueAtHotel)) : ""}
       </table>
+      ${taxIncluded > 0 ? `<p style="margin:4px 0 0;color:#8a8a8a;font-size:11px;text-align:right;">Includes ${esc(money(taxIncluded))} VAT</p>` : ""}
       ${cancelLine ? `<p style="margin:12px 0 0;color:#8a8a8a;font-size:12px;">${esc(cancelLine)}</p>` : ""}
       ${contactBlock}
       ${manageBtn}

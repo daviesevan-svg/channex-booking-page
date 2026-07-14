@@ -79,6 +79,14 @@ export interface BookingRecord {
   promo?: AppliedPromo;
   /** Automatic offer baked into the room prices for this stay, if any. */
   offer?: AppliedPromo;
+  /** Taxes & fees breakdown snapshotted at booking time — the amounts charged on
+   *  top of the room prices (fees, city tax, cleaning, on-top VAT) plus the VAT
+   *  share already inside inclusive prices. Absent on legacy bookings. */
+  pricing?: {
+    charges: { label: string; amount: number }[];
+    taxLines: { label: string; amount: number }[];
+    taxIncluded: number;
+  };
   /** True once the booking has decremented inventory (so cancel restores it once). */
   inventoryHeld?: boolean;
   createdAt: string;
