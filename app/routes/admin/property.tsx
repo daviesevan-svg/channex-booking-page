@@ -282,8 +282,8 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               <div className="flex flex-wrap gap-4">
                 {[
                   { name: "vrBedrooms", label: "Bedrooms", value: settings.vrBedrooms, step: "1", hint: "0 for a studio" },
-                  { name: "vrBathrooms", label: "Bathrooms", value: settings.vrBathrooms, step: "0.5", hint: "e.g. 1.5" },
-                  { name: "vrBeds", label: "Beds", value: settings.vrBeds, step: "1", hint: "" },
+                  { name: "vrBathrooms", label: "Bathrooms", value: settings.vrBathrooms, step: "0.5", hint: "Half counts — e.g. 1.5" },
+                  { name: "vrBeds", label: "Beds", value: settings.vrBeds, step: "1", hint: "Physical beds, not guests — one double bed = 1" },
                 ].map((f) => (
                   <label key={f.name} className="block text-[13px] font-semibold text-secondary">
                     {f.label}
