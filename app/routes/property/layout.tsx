@@ -8,9 +8,9 @@ import {
   enabledLanguages,
   fontPair,
   langFromRequest,
-  langLabel,
   LANG_COOKIE,
 } from "~/lib/content";
+import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getProperty, resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
@@ -189,18 +189,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           </Link>
           <div className="flex items-center gap-5 text-sm text-muted">
             {languages.length > 1 && (
-              <select
-                value={lang}
-                onChange={(e) => changeLang(e.target.value)}
-                aria-label="Language"
-                className="cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt px-2 py-1 text-[13px] font-semibold text-secondary outline-none focus:border-accent"
-              >
-                {languages.map((code) => (
-                  <option key={code} value={code}>
-                    {langLabel(code)}
-                  </option>
-                ))}
-              </select>
+              <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
             )}
             {isHome && (
               <Link to={`${base}/manage`} className="hover:text-accent">

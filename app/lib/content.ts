@@ -270,15 +270,17 @@ export function bookingCutoffOf(s: SiteSettings): BookingCutoff {
 
 export const isDeadlineUnit = (v: string): v is DeadlineUnit => v === "hours" || v === "days";
 
-// Supported content languages for the booking pages.
+// Supported content languages for the booking pages. `label` is the endonym
+// (the language's name in itself); `flag` is a representative country flag emoji
+// (a pragmatic convention — a language isn't a country, but it reads instantly).
 export const LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "fr", label: "Français" },
-  { code: "de", label: "Deutsch" },
-  { code: "es", label: "Español" },
-  { code: "it", label: "Italiano" },
-  { code: "pt", label: "Português" },
-  { code: "nl", label: "Nederlands" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "fr", label: "Français", flag: "🇫🇷" },
+  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: "es", label: "Español", flag: "🇪🇸" },
+  { code: "it", label: "Italiano", flag: "🇮🇹" },
+  { code: "pt", label: "Português", flag: "🇵🇹" },
+  { code: "nl", label: "Nederlands", flag: "🇳🇱" },
 ] as const;
 
 export const DEFAULT_LANG = "en";
@@ -311,6 +313,10 @@ export function langParam(request: Request): string {
 
 export function langLabel(code: string): string {
   return LANGUAGES.find((l) => l.code === code)?.label ?? code.toUpperCase();
+}
+
+export function langFlag(code: string): string {
+  return LANGUAGES.find((l) => l.code === code)?.flag ?? "🌐";
 }
 
 /** Enabled languages from settings — always includes the default, only valid codes. */
