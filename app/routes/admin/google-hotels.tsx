@@ -6,7 +6,8 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { getConfig } from "~/lib/config.server";
-import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
+import { getGoogleAriSync, getSettings, patchSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
+import { VR_AMENITIES, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
@@ -46,6 +47,8 @@ export async function loader({ request }: Route.LoaderArgs) {
         ? new URL("/feeds/google-vacation-rentals.xml", request.url).toString()
         : null,
     singleUnit: settings.singleUnit ?? false,
+    vrAmenities: settings.vrAmenities ?? [],
+    vrAmenityOptions: settings.vrAmenityOptions ?? {},
     partnerConfigured,
     push: settings.googleAriPush ?? false,
     windowDays: settings.googleAriWindowDays ?? 365,
@@ -83,6 +86,18 @@ export async function action({ request }: Route.ActionArgs) {
     const windowDays = Number(form.get("windowDays"));
     const program = form.get("program") === "vacation_rentals" ? "vacation_rentals" : "hotels";
     await saveGoogleAriSettings(propertyId, { push: form.get("push") === "on", windowDays, program });
+    return { ok: true as const };
+  }
+  if (intent === "saveAmenities") {
+    // Only known amenity keys / enum values are stored (the form can't smuggle
+    // an attribute Google would reject).
+    const vrAmenities = form.getAll("amenity").map(String).filter((k) => VR_AMENITY_KEYS.has(k));
+    const vrAmenityOptions: Record<string, string> = {};
+    for (const def of VR_AMENITY_ENUMS) {
+      const v = String(form.get(`enum_${def.key}`) ?? "");
+      if (def.options.includes(v)) vrAmenityOptions[def.key] = v;
+    }
+    await patchSettings(propertyId, { vrAmenities, vrAmenityOptions });
     return { ok: true as const };
   }
   if (intent === "push") {
@@ -125,7 +140,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl } =
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl, vrAmenities, vrAmenityOptions } =
     loaderData;
   const isVr = program === "vacation_rentals";
   const input =
@@ -255,6 +270,57 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[13px] text-secondary">
             {vrFeedUrl}
           </code>
+        </section>
+      )}
+
+      {/* Amenities — Google's controlled vocabulary. Google builds the listing
+          from the feed, so these enrich it. VR-only (fed into the VR feed). */}
+      {isVr && (
+        <section className="rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="mb-1 font-serif text-[18px] font-semibold">Amenities</h2>
+          <p className="mb-4 max-w-2xl text-[13px] text-muted">
+            Tick what this property offers — Google uses these to build and filter your Vacation
+            Rentals listing. (Free-text room facilities aren't sent to Google; only these.)
+          </p>
+          <Form method="post" className="space-y-5">
+            <input type="hidden" name="intent" value="saveAmenities" />
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+              {VR_AMENITIES.map((a) => (
+                <label key={a.key} className="flex items-center gap-2 text-[13.5px] text-secondary">
+                  <input
+                    type="checkbox"
+                    name="amenity"
+                    value={a.key}
+                    defaultChecked={vrAmenities.includes(a.key)}
+                    className="h-4 w-4 accent-[var(--accent)]"
+                  />
+                  {a.label}
+                </label>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-4 border-t border-divider pt-4">
+              {VR_AMENITY_ENUMS.map((def) => (
+                <label key={def.key} className="block">
+                  <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{def.label}</span>
+                  <select name={`enum_${def.key}`} defaultValue={vrAmenityOptions[def.key] ?? ""} className={input}>
+                    <option value="">Not specified</option>
+                    {def.options.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+            >
+              Save amenities
+            </button>
+          </Form>
         </section>
       )}
 
