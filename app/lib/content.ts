@@ -161,6 +161,47 @@ export function isFontPairId(value: string): value is FontPairId {
 
 export type DeadlineUnit = "hours" | "days";
 
+// Google Vacation Rentals amenities — Google accepts a fixed vocabulary of
+// <client_attr> amenity names, not free text. These power the property amenities
+// picker and the VR list feed. Boolean amenities are sent as "Yes" when enabled;
+// the enum amenities take one of their listed values.
+// https://developers.google.com/hotels/vacation-rentals/dev-guide/vr-attributes
+export const VR_AMENITIES: { key: string; label: string }[] = [
+  { key: "wifi", label: "Wi-Fi" },
+  { key: "ac", label: "Air conditioning" },
+  { key: "heating", label: "Heating" },
+  { key: "kitchen", label: "Kitchen" },
+  { key: "washer_dryer", label: "Washer / dryer" },
+  { key: "tv", label: "TV" },
+  { key: "microwave", label: "Microwave" },
+  { key: "oven_stove", label: "Oven / stove" },
+  { key: "balcony", label: "Balcony" },
+  { key: "patio", label: "Patio" },
+  { key: "elevator", label: "Elevator" },
+  { key: "gym_fitness_equipment", label: "Gym / fitness equipment" },
+  { key: "hot_tub", label: "Hot tub" },
+  { key: "fire_place", label: "Fireplace" },
+  { key: "crib", label: "Crib" },
+  { key: "child_friendly", label: "Child friendly" },
+  { key: "pets_allowed", label: "Pets allowed" },
+  { key: "smoking_free_property", label: "Smoke-free property" },
+  { key: "wheelchair_accessible", label: "Wheelchair accessible" },
+  { key: "beach_access", label: "Beach access" },
+  { key: "airport_shuttle", label: "Airport shuttle" },
+  { key: "free_breakfast", label: "Free breakfast" },
+  { key: "ironing_board", label: "Ironing board" },
+  { key: "outdoor_grill", label: "Outdoor grill / BBQ" },
+];
+
+/** VR amenities that take one of a set of values rather than a yes/no. */
+export const VR_AMENITY_ENUMS: { key: string; label: string; options: string[] }[] = [
+  { key: "parking_type", label: "Parking", options: ["Free", "Paid", "None"] },
+  { key: "pool_type", label: "Pool", options: ["Indoors", "Outdoors", "Indoors/Outdoors", "None"] },
+  { key: "internet_type", label: "Internet", options: ["Free", "Paid", "None"] },
+];
+
+export const VR_AMENITY_KEYS = new Set(VR_AMENITIES.map((a) => a.key));
+
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
@@ -253,6 +294,13 @@ export interface SiteSettings {
    *  and pushes VR-shaped messages (single unit, binary inventory) + is fed via
    *  the VR list feed. VR is only valid for single-unit properties. */
   googleProgram?: "hotels" | "vacation_rentals";
+  /** Google Vacation Rentals amenities (from VR_AMENITIES) the property offers —
+   *  a curated allowlist so the feed sends Google's controlled vocabulary, not
+   *  free-text. Boolean amenities present here are sent as "Yes". */
+  vrAmenities?: string[];
+  /** Google VR enum amenities (from VR_AMENITY_ENUMS), keyed by attr name, e.g.
+   *  { parking_type: "Free", pool_type: "Outdoors" }. Empty/absent = omitted. */
+  vrAmenityOptions?: Record<string, string>;
   /** Master switch: push this property's ARI (property data, rates, availability,
    *  inventory, taxes, promotions) directly to Google. Off (default) = no push. */
   googleAriPush?: boolean;

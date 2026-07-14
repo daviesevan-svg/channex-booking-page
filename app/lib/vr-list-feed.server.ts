@@ -9,6 +9,7 @@
 // (short cache) from a public resource route for Google's scheduled pull.
 import { getConfig } from "./config.server";
 import { getRooms } from "./catalog.server";
+import { VR_AMENITY_ENUMS, VR_AMENITY_KEYS, type SiteSettings } from "./content";
 import { checkGoogleReadiness } from "./google-readiness.server";
 import { GOOGLE_HOTEL_BRAND } from "./hotel-list-feed.server";
 import { getOverrides, getSettings } from "./overrides.server";
@@ -56,71 +57,22 @@ function clientAttr(name: string, value?: string): string {
   return v ? `        <client_attr name="${name}">${esc(v)}</client_attr>\n` : "";
 }
 
-// Free-text facility → Google VR amenity attribute. Google only accepts a fixed
-// vocabulary (client_attr with Yes/No or a small enum), so we map the facilities
-// we can recognise and DROP the rest — never send a guess. Booleans are set to
-// "Yes"; negated phrasings ("no …") are handled for the two amenities where a
-// negative is itself meaningful (pets, smoking).
-const BOOL_AMENITIES: { name: string; re: RegExp }[] = [
-  { name: "wifi", re: /wi-?fi|wireless/ },
-  { name: "ac", re: /air.?con|\ba\/?c\b/ },
-  { name: "heating", re: /\bheat(ing|er)?\b/ },
-  { name: "tv", re: /\btv\b|television/ },
-  { name: "kitchen", re: /kitchen(ette)?/ },
-  { name: "microwave", re: /microwave/ },
-  { name: "oven_stove", re: /\boven\b|\bstove\b|cooktop|\bhob\b|\bcooker\b/ },
-  { name: "washer_dryer", re: /washer|dryer|washing machine|laundry/ },
-  { name: "balcony", re: /balcony/ },
-  { name: "patio", re: /patio|terrace/ },
-  { name: "elevator", re: /elevator|\blift\b/ },
-  { name: "gym_fitness_equipment", re: /\bgym\b|fitness/ },
-  { name: "hot_tub", re: /hot ?tub|jacuzzi|whirlpool/ },
-  { name: "fire_place", re: /fire ?place/ },
-  { name: "crib", re: /\bcrib\b|\bcot\b/ },
-  { name: "child_friendly", re: /child.?friendly|family.?friendly|kid.?friendly/ },
-  { name: "wheelchair_accessible", re: /wheelchair|disabled access|step.?free access/ },
-  { name: "beach_access", re: /beach ?access|beachfront|on the beach/ },
-  { name: "airport_shuttle", re: /airport (shuttle|transfer)/ },
-  { name: "free_breakfast", re: /free breakfast|breakfast included|complimentary breakfast/ },
-  { name: "ironing_board", re: /\biron(ing)?\b/ },
-  { name: "outdoor_grill", re: /\bgrill\b|\bbbq\b|barbec/ },
-];
-
-/** Map a property's free-text facilities to Google VR amenity client_attr lines.
- *  Recognised amenities only; unknown facilities (e.g. "Garden view") are dropped. */
-function amenityAttrs(facilities: string[]): string {
-  const out = new Map<string, string>(); // attr name → value (deduped)
-  for (const raw of facilities) {
-    const f = raw.toLowerCase().trim();
-    if (!f) continue;
-    const negated = /^(no|without)\b/.test(f) || /\bnot (allowed|available|permitted|included)\b/.test(f);
-
-    // Smoking: "non-smoking" / "smoke-free" / "no smoking" all mean smoke-free = Yes.
-    if (/non.?smoking|smoke.?free|smoking.?free/.test(f) || (/smoking/.test(f) && negated)) {
-      out.set("smoking_free_property", "Yes");
-    }
-    // Pets: a negative is meaningful (pets_allowed = No).
-    if (/\bpets?\b/.test(f)) out.set("pets_allowed", negated ? "No" : "Yes");
-
-    // Enum amenities.
-    if (/\bpool\b|swimming/.test(f) && !negated) {
-      out.set("pool_type", /indoor/.test(f) ? "Indoors" : "Outdoors");
-    }
-    if (/parking|garage|car ?park/.test(f) && !negated) {
-      out.set("parking_type", /paid/.test(f) ? "Paid" : "Free");
-    }
-    if (/wi-?fi|internet|wireless/.test(f) && !negated) {
-      out.set("internet_type", /paid/.test(f) ? "Paid" : "Free");
-    }
-
-    // Boolean amenities (positive only — a listed facility is something offered).
-    if (!negated) {
-      for (const rule of BOOL_AMENITIES) {
-        if (rule.re.test(f)) out.set(rule.name, "Yes");
-      }
-    }
+/** Google VR amenity client_attr lines from the property's structured amenities
+ *  (set in the admin). Booleans in `vrAmenities` (restricted to the known
+ *  vocabulary) are sent as "Yes"; enum selections in `vrAmenityOptions` are sent
+ *  as-is. Free-text room facilities are intentionally NOT used here — Google only
+ *  accepts its fixed vocabulary. */
+function amenityAttrs(settings: SiteSettings): string {
+  const lines: string[] = [];
+  for (const key of settings.vrAmenities ?? []) {
+    if (VR_AMENITY_KEYS.has(key)) lines.push(clientAttr(key, "Yes"));
   }
-  return [...out].map(([name, value]) => clientAttr(name, value)).join("");
+  const enums = settings.vrAmenityOptions ?? {};
+  for (const def of VR_AMENITY_ENUMS) {
+    const v = enums[def.key];
+    if (v && def.options.includes(v)) lines.push(clientAttr(def.key, v));
+  }
+  return lines.join("");
 }
 
 /** `<image>` elements (inside <content>) for a set of image URLs, titled with the
@@ -187,7 +139,7 @@ export async function vrListingElements(): Promise<string> {
       // We confirm bookings instantly (Stripe or a live Channex connection).
       clientAttr("instant_bookable", "Yes") +
       clientAttr("description", overrides.description || unit.description) +
-      amenityAttrs(unit.facilities);
+      amenityAttrs(settings);
 
     listings.push(
       `  <listing>\n` +
