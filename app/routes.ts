@@ -10,6 +10,8 @@ export default [
   route("feeds/google-hotels.xml", "routes/feeds.hotel-list.tsx"),
   // Merged feed: Channex's partner feed passed through + our properties added.
   route("feeds/google-hotels-all.xml", "routes/feeds.google-merged.tsx"),
+  // Google Vacation Rentals list feed (XML, Google pulls on a schedule).
+  route("feeds/google-vacation-rentals.xml", "routes/feeds.google-vr.tsx"),
   // Google Hotels landing target: routes our hotels to our flow, forwards the
   // rest to Channex's booking_link. (Google POS <URL> points here.)
   route("go/booking", "routes/go.booking.tsx"),
