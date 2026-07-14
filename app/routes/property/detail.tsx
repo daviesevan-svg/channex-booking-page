@@ -253,7 +253,11 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const galleryPhotos = [...ratePhotos, ...(room.photos ?? [])];
   const hero = galleryPhotos[0]?.url;
   const thumbs = galleryPhotos.slice(1, 3);
-  const amenities = room.facilities ?? [];
+  // Structured amenities (translated) first, then the host's free-text extras.
+  const amenities = [
+    ...(room.amenities ?? []).map((k) => tr.t(`am_${k}`)),
+    ...(room.facilities ?? []),
+  ];
 
   function addToStay() {
     if (!chosen) return;

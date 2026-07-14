@@ -62,7 +62,7 @@ function clientAttr(name: string, value?: string): string {
  *  vocabulary) are sent as "Yes"; enum selections in `vrAmenityOptions` are sent
  *  as-is. Free-text room facilities are intentionally NOT used here — Google only
  *  accepts its fixed vocabulary. */
-function amenityAttrs(settings: SiteSettings): string {
+function amenityAttrs(settings: SiteSettings, unitAmenities: string[] = []): string {
   const lines: string[] = [];
   // Unit size — Google requires these before a VR listing goes live. 0 is valid
   // (a studio has 0 bedrooms), so emit whenever a non-negative number is set.
@@ -71,7 +71,9 @@ function amenityAttrs(settings: SiteSettings): string {
   num("number_of_bedrooms", settings.vrBedrooms);
   num("number_of_bathrooms", settings.vrBathrooms);
   num("number_of_beds", settings.vrBeds);
-  for (const key of settings.vrAmenities ?? []) {
+  // Property-wide amenities ∪ the unit's own (deduped) — the VR listing IS the
+  // unit, so what the room offers belongs on the listing too.
+  for (const key of new Set([...(settings.vrAmenities ?? []), ...unitAmenities])) {
     if (VR_AMENITY_KEYS.has(key)) lines.push(clientAttr(key, "Yes"));
   }
   const enums = settings.vrAmenityOptions ?? {};
@@ -146,7 +148,7 @@ export async function vrListingElements(): Promise<string> {
       // We confirm bookings instantly (Stripe or a live Channex connection).
       clientAttr("instant_bookable", "Yes") +
       clientAttr("description", overrides.description || unit.description) +
-      amenityAttrs(settings);
+      amenityAttrs(settings, unit.amenities ?? []);
 
     listings.push(
       `  <listing>\n` +

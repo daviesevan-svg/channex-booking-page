@@ -244,7 +244,11 @@ function RoomCard({
   const cheapestTotal = cheapest ? (cheapest.allInTotal ?? Number(cheapest.totalPrice)) : 0;
   const perNight = cheapestTotal / nights;
   const photo = room.photos?.[0]?.url;
-  const amenities = (room.facilities ?? []).slice(0, 4);
+  // Structured amenities (translated) first, then free-text — first 4 as chips.
+  const amenities = [
+    ...(room.amenities ?? []).map((k: string) => tr.t(`am_${k}`)),
+    ...(room.facilities ?? []),
+  ].slice(0, 4);
   const { maxAdults, capacity } = roomCapacity(room);
   const detailHref = `/${channelId}/rooms/${room.id}?${qs}`;
 
