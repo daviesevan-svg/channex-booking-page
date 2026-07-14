@@ -331,7 +331,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   const cancelAtBooking = policyToCancellation(policy, stay.checkin);
   const freeWindowClosed =
     cancelAtBooking.refundable && cancelAtBooking.cancelByISO != null && Date.now() > parseISO(cancelAtBooking.cancelByISO).getTime();
-  const needAck = !policy.cancellation.refundable || freeWindowClosed || due > 0;
+  // Mirrors the UI: the charged-today acknowledgment is only required when a
+  // card is really collected (live + Stripe connected + something due).
+  const chargesToday = live && Boolean(settings.stripeAccountId && config.stripeSecretKey) && due > 0;
+  const needAck = !policy.cancellation.refundable || freeWindowClosed || chargesToday;
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
   if (!agreed || (needAck && !nonRefundableAck)) {
@@ -624,12 +627,16 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   // Either the rate is non-refundable, or its free-cancellation window already
   // closed before this booking is being made — both mean "can't cancel free".
   const nonRefundable = !policy.cancellation.refundable || freeWindowClosed;
-  const needAck = nonRefundable || due > 0;
+  // "Charged today" is only true when a card is really collected at checkout —
+  // a prepay policy without payments set up charges nothing, so the guest must
+  // not be asked to acknowledge a charge that won't happen.
+  const chargedToday = due > 0 && collectsCard;
+  const needAck = nonRefundable || chargedToday;
   const ackText = nonRefundable
-    ? due > 0
-      ? `I understand this booking is non-refundable and my card will be charged ${formatMoney(due, currency)} today.`
-      : "I understand this booking is non-refundable."
-    : `I understand my card will be charged ${formatMoney(due, currency)} today.`;
+    ? chargedToday
+      ? tr.t("ackNonRefundableCharged", { amount: formatMoney(due, currency) })
+      : tr.t("ackNonRefundable")
+    : tr.t("ackCharged", { amount: formatMoney(due, currency) });
   const [agree, setAgree] = useState(false);
   const [ack, setAck] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -695,18 +702,24 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className="rounded-[16px] border border-line bg-surface p-[26px]">
             <h3 className="mb-3 font-serif text-[20px] font-semibold">{text.paymentSection}</h3>
 
-            <div className="mb-3 flex flex-col gap-1.5 text-[14.5px]">
-              <div className="flex justify-between">
-                <span className="text-secondary">{tr.t("dueNow")}</span>
-                <span className="font-semibold">{formatMoney(due, currency)}</span>
-              </div>
-              {atHotel > 0 && (
+            {/* The due-now/at-hotel split only makes sense when a card is really
+                collected at checkout. Without payments set up nothing is charged
+                today — showing a policy-derived "Due now" would contradict the
+                note below. */}
+            {collectsCard && (
+              <div className="mb-3 flex flex-col gap-1.5 text-[14.5px]">
                 <div className="flex justify-between">
-                  <span className="text-secondary">{tr.t("dueAtHotel")}</span>
-                  <span className="font-semibold">{formatMoney(atHotel, currency)}</span>
+                  <span className="text-secondary">{tr.t("dueNow")}</span>
+                  <span className="font-semibold">{formatMoney(due, currency)}</span>
                 </div>
-              )}
-            </div>
+                {atHotel > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-secondary">{tr.t("dueAtHotel")}</span>
+                    <span className="font-semibold">{formatMoney(atHotel, currency)}</span>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="mb-[18px] text-sm leading-[1.55] text-muted">
               {!collectsCard ? tr.t("noCardNote") : cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
             </p>
