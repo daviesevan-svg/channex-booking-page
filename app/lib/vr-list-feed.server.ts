@@ -64,6 +64,13 @@ function clientAttr(name: string, value?: string): string {
  *  accepts its fixed vocabulary. */
 function amenityAttrs(settings: SiteSettings): string {
   const lines: string[] = [];
+  // Unit size — Google requires these before a VR listing goes live. 0 is valid
+  // (a studio has 0 bedrooms), so emit whenever a non-negative number is set.
+  const num = (name: string, v: number | undefined) =>
+    typeof v === "number" && Number.isFinite(v) && v >= 0 ? lines.push(clientAttr(name, String(v))) : 0;
+  num("number_of_bedrooms", settings.vrBedrooms);
+  num("number_of_bathrooms", settings.vrBathrooms);
+  num("number_of_beds", settings.vrBeds);
   for (const key of settings.vrAmenities ?? []) {
     if (VR_AMENITY_KEYS.has(key)) lines.push(clientAttr(key, "Yes"));
   }

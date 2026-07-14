@@ -49,6 +49,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     singleUnit: settings.singleUnit ?? false,
     vrAmenities: settings.vrAmenities ?? [],
     vrAmenityOptions: settings.vrAmenityOptions ?? {},
+    vrBedrooms: settings.vrBedrooms,
+    vrBathrooms: settings.vrBathrooms,
+    vrBeds: settings.vrBeds,
     partnerConfigured,
     push: settings.googleAriPush ?? false,
     windowDays: settings.googleAriWindowDays ?? 365,
@@ -97,7 +100,21 @@ export async function action({ request }: Route.ActionArgs) {
       const v = String(form.get(`enum_${def.key}`) ?? "");
       if (def.options.includes(v)) vrAmenityOptions[def.key] = v;
     }
-    await patchSettings(propertyId, { vrAmenities, vrAmenityOptions });
+    // Unit size: a valid non-negative number is saved; blank is left unchanged
+    // (patchSettings skips undefined — these are required, rarely cleared).
+    const count = (name: string): number | undefined => {
+      const raw = String(form.get(name) ?? "").trim();
+      if (raw === "") return undefined;
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? n : undefined;
+    };
+    await patchSettings(propertyId, {
+      vrAmenities,
+      vrAmenityOptions,
+      vrBedrooms: count("vrBedrooms"),
+      vrBathrooms: count("vrBathrooms"),
+      vrBeds: count("vrBeds"),
+    });
     return { ok: true as const };
   }
   if (intent === "push") {
@@ -140,9 +157,10 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl, vrAmenities, vrAmenityOptions } =
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl, vrAmenities, vrAmenityOptions, vrBedrooms, vrBathrooms, vrBeds } =
     loaderData;
   const isVr = program === "vacation_rentals";
+  const countsMissing = vrBedrooms == null || vrBathrooms == null || vrBeds == null;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -284,7 +302,42 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </p>
           <Form method="post" className="space-y-5">
             <input type="hidden" name="intent" value="saveAmenities" />
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
+            {/* Unit size — required by Google before a VR listing can go live. */}
+            <div>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <span className="text-[13px] font-semibold text-secondary">Property size</span>
+                {countsMissing ? (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[12px] font-semibold text-amber-800">
+                    Required — Google won't publish the listing without these
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[12px] font-semibold text-[#3f7a52]">
+                    ✓ Complete
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {[
+                  { name: "vrBedrooms", label: "Bedrooms", value: vrBedrooms, step: "1", hint: "0 for a studio" },
+                  { name: "vrBathrooms", label: "Bathrooms", value: vrBathrooms, step: "0.5", hint: "e.g. 1.5" },
+                  { name: "vrBeds", label: "Beds", value: vrBeds, step: "1", hint: "" },
+                ].map((f) => (
+                  <label key={f.name} className="block">
+                    <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{f.label}</span>
+                    <input
+                      type="number"
+                      name={f.name}
+                      min={0}
+                      step={f.step}
+                      defaultValue={f.value ?? ""}
+                      className={`${input} w-28`}
+                    />
+                    {f.hint && <span className="mt-1 block text-[12px] text-muted">{f.hint}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 border-t border-divider pt-4 sm:grid-cols-3">
               {VR_AMENITIES.map((a) => (
                 <label key={a.key} className="flex items-center gap-2 text-[13.5px] text-secondary">
                   <input
