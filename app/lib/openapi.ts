@@ -140,7 +140,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.2.0",
+    version: "1.3.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -422,6 +422,26 @@ export const openApiSpec = {
           terms_url: { type: ["string", "null"], format: "uri" },
           privacy_url: { type: ["string", "null"], format: "uri" },
           single_unit: { type: "boolean", description: "The property is one bookable unit (apartment mode)." },
+          amenities: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Property-wide structured amenity keys (fixed vocabulary, e.g. wifi, kitchen, elevator — same keys as room `amenities`).",
+          },
+          amenity_options: {
+            type: "object",
+            additionalProperties: { type: "string" },
+            description: 'Enum amenities keyed by name, e.g. { "parking_type": "Free", "pool_type": "Outdoors", "internet_type": "Free" }.',
+          },
+          unit_size: {
+            type: "object",
+            description: "Unit size for single-unit properties; fields are null until the host sets them.",
+            properties: {
+              bedrooms: { type: ["number", "null"], description: "0 = studio." },
+              bathrooms: { type: ["number", "null"], description: "May be a half, e.g. 1.5." },
+              beds: { type: ["number", "null"] },
+            },
+          },
           cover_image: { type: ["string", "null"], description: "Cover photo URL path." },
           logo: { type: ["string", "null"], description: "Logo URL path (shown in the booking header)." },
           theme: {

@@ -47,6 +47,16 @@ export function serializePropertyContent(
     terms_url: settings.termsUrl ?? null,
     privacy_url: settings.privacyUrl ?? null,
     single_unit: settings.singleUnit === true,
+    // Property-wide structured amenities (fixed vocabulary — same keys as room
+    // `amenities`) + the enum ones keyed by name (parking_type/pool_type/…).
+    amenities: settings.vrAmenities ?? [],
+    amenity_options: settings.vrAmenityOptions ?? {},
+    // Unit size (single-unit properties): null until the host sets it.
+    unit_size: {
+      bedrooms: settings.vrBedrooms ?? null,
+      bathrooms: settings.vrBathrooms ?? null,
+      beds: settings.vrBeds ?? null,
+    },
     cover_image: settings.coverImage ?? null,
     logo: settings.logoImage ?? null,
     theme: {
