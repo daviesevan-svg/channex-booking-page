@@ -31,6 +31,14 @@ export interface PreparePendingInput {
   discountedTotal: number;
   applied?: AppliedPromo;
   offer?: AppliedPromo;
+  /** Taxes & fees breakdown from computePricing — pushed to Channex as services
+   *  (the day prices carry only the room amounts) and snapshotted on the record
+   *  for display. taxLines = on-top VAT; taxIncluded = VAT inside gross prices. */
+  pricing: {
+    charges: { label: string; amount: number }[];
+    taxLines: { label: string; amount: number }[];
+    taxIncluded: number;
+  };
   extraLines: ResolvedExtra[];
   consent: BookingRecord["consent"];
   lang: string;
@@ -62,6 +70,31 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
   // the stay nights as days[], so the price we send is exactly what we charge.
   const stayDates = Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkin), i), "yyyy-MM-dd"));
   const ratio = input.baseTotal > 0 ? input.discountedTotal / input.baseTotal : 1;
+
+  // Everything charged on top of the room day-prices rides as Channex services
+  // (excluded: true = not part of the day prices, so Channex adds them to the
+  // booking total): fees + city tax + cleaning, on-top VAT, and extras. Then
+  // sum(days) + sum(services) equals exactly what the guest paid. Inclusive-mode
+  // VAT is already inside the day prices, so it sends no service line.
+  const partySize = lines.reduce((s, l) => s + l.occupancy.adults + l.occupancy.children, 0);
+  const service = (type: "Fee" | "Extra", name: string, amount: number) => ({
+    type,
+    name,
+    price_mode: "Per stay",
+    price_per_unit: amount.toFixed(2),
+    total_price: amount.toFixed(2),
+    persons: partySize,
+    nights,
+    excluded: true,
+  });
+  const services = [
+    ...input.pricing.charges.map((c) => service("Fee", c.label, c.amount)),
+    ...input.pricing.taxLines.map((t) => service("Fee", t.label, t.amount)),
+    ...input.extraLines.map((x) =>
+      service("Extra", x.optionName ? `${x.name} — ${x.optionName}` : x.name, x.amount),
+    ),
+  ].filter((s) => Number(s.total_price) > 0);
+
   const channexPayload = {
     status: "new",
     provider_code: input.providerCode,
@@ -89,6 +122,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
         })),
       };
     }),
+    ...(services.length ? { services } : {}),
   };
 
   const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), checkin);
@@ -108,6 +142,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     total: grandTotal,
     promo: input.applied,
     offer: input.offer,
+    pricing: input.pricing,
     extras: input.extraLines.length ? input.extraLines : undefined,
     consent: input.consent,
     guest: {

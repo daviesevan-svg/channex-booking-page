@@ -368,6 +368,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     currency: stay.currency,
     nights,
     lines,
+    pricing: { charges: pricing.charges, taxLines: pricing.taxLines, taxIncluded: pricing.taxIncluded },
     guest: {
       firstName: g.firstName,
       lastName: g.lastName,
