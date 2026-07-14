@@ -226,6 +226,10 @@ const EN: Dict = {
   am_free_breakfast: "Free breakfast",
   am_ironing_board: "Ironing board",
   am_outdoor_grill: "Outdoor grill / BBQ",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "I understand this booking is non-refundable and my card will be charged {amount} today.",
+  ackNonRefundable: "I understand this booking is non-refundable.",
+  ackCharged: "I understand my card will be charged {amount} today.",
 };
 
 const FR: Dict = {
@@ -380,6 +384,10 @@ const FR: Dict = {
   am_free_breakfast: "Petit-déjeuner gratuit",
   am_ironing_board: "Planche à repasser",
   am_outdoor_grill: "Barbecue extérieur",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Je comprends que cette réservation est non remboursable et que ma carte sera débitée de {amount} aujourd’hui.",
+  ackNonRefundable: "Je comprends que cette réservation est non remboursable.",
+  ackCharged: "Je comprends que ma carte sera débitée de {amount} aujourd’hui.",
 };
 
 const DE: Dict = {
@@ -534,6 +542,10 @@ const DE: Dict = {
   am_free_breakfast: "Kostenloses Frühstück",
   am_ironing_board: "Bügelbrett",
   am_outdoor_grill: "Außengrill",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Ich verstehe, dass diese Buchung nicht erstattungsfähig ist und meine Karte heute mit {amount} belastet wird.",
+  ackNonRefundable: "Ich verstehe, dass diese Buchung nicht erstattungsfähig ist.",
+  ackCharged: "Ich verstehe, dass meine Karte heute mit {amount} belastet wird.",
 };
 
 const ES: Dict = {
@@ -688,6 +700,10 @@ const ES: Dict = {
   am_free_breakfast: "Desayuno gratuito",
   am_ironing_board: "Tabla de planchar",
   am_outdoor_grill: "Barbacoa exterior",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Entiendo que esta reserva no es reembolsable y que hoy se cargará {amount} en mi tarjeta.",
+  ackNonRefundable: "Entiendo que esta reserva no es reembolsable.",
+  ackCharged: "Entiendo que hoy se cargará {amount} en mi tarjeta.",
 };
 
 const IT: Dict = {
@@ -842,6 +858,10 @@ const IT: Dict = {
   am_free_breakfast: "Colazione gratuita",
   am_ironing_board: "Asse da stiro",
   am_outdoor_grill: "Barbecue all'aperto",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Comprendo che questa prenotazione non è rimborsabile e che oggi verrà addebitato {amount} sulla mia carta.",
+  ackNonRefundable: "Comprendo che questa prenotazione non è rimborsabile.",
+  ackCharged: "Comprendo che oggi verrà addebitato {amount} sulla mia carta.",
 };
 
 const PT: Dict = {
@@ -996,6 +1016,10 @@ const PT: Dict = {
   am_free_breakfast: "Pequeno-almoço gratuito",
   am_ironing_board: "Tábua de engomar",
   am_outdoor_grill: "Grelhador exterior",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Compreendo que esta reserva não é reembolsável e que hoje será cobrado {amount} no meu cartão.",
+  ackNonRefundable: "Compreendo que esta reserva não é reembolsável.",
+  ackCharged: "Compreendo que hoje será cobrado {amount} no meu cartão.",
 };
 
 const NL: Dict = {
@@ -1150,6 +1174,10 @@ const NL: Dict = {
   am_free_breakfast: "Gratis ontbijt",
   am_ironing_board: "Strijkplank",
   am_outdoor_grill: "Buitenbarbecue",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Ik begrijp dat deze boeking niet-restitueerbaar is en dat vandaag {amount} van mijn kaart wordt afgeschreven.",
+  ackNonRefundable: "Ik begrijp dat deze boeking niet-restitueerbaar is.",
+  ackCharged: "Ik begrijp dat vandaag {amount} van mijn kaart wordt afgeschreven.",
 };
 
 const EL: Dict = {
@@ -1362,6 +1390,10 @@ const EL: Dict = {
   am_free_breakfast: "Δωρεάν πρωινό",
   am_ironing_board: "Σιδερώστρα",
   am_outdoor_grill: "Ψησταριά εξωτερικού χώρου",
+  // Checkout consent acknowledgments ({amount} = formatted due-now).
+  ackNonRefundableCharged: "Κατανοώ ότι αυτή η κράτηση δεν επιστρέφεται και ότι η κάρτα μου θα χρεωθεί με {amount} σήμερα.",
+  ackNonRefundable: "Κατανοώ ότι αυτή η κράτηση δεν επιστρέφεται.",
+  ackCharged: "Κατανοώ ότι η κάρτα μου θα χρεωθεί με {amount} σήμερα.",
 };
 
 const UI: Record<string, Dict> = { en: EN, fr: FR, de: DE, es: ES, it: IT, pt: PT, nl: NL, el: EL };
