@@ -11,6 +11,7 @@ import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
 import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
+import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
@@ -64,9 +65,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   // Rebuilding the merged Google feed is a global (all-property) action, so it's
   // superadmin-only and not tied to the current property.
-  if (intent === "refreshFeed") {
+  if (intent === "refreshFeed" || intent === "refreshVrFeed") {
     if (!(await isSuperadmin(email))) return { error: "Only a superadmin can refresh the Google feed." };
-    const res = await refreshMergedGoogleFeed(true);
+    const res = intent === "refreshVrFeed" ? await refreshMergedVrFeed(true) : await refreshMergedGoogleFeed(true);
     return res.ok
       ? { feedRefreshed: true as const }
       : { error: "Feed rebuild failed — the previous snapshot is unchanged (Channex feed unreachable?)." };
@@ -332,25 +333,41 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <h2 className="mb-2 font-serif text-[18px] font-semibold">Merged Google feed</h2>
           <p className="mb-4 max-w-2xl text-[13px] text-muted">
-            Google pulls <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-hotels-all.xml</code>,
-            rebuilt automatically once a day. Rebuild it now to publish changes (like a property that
-            just went public) without waiting for the daily refresh.
+            Each merges Channex's partner feed with our own listings, rebuilt automatically once a day.
+            Rebuild now to publish changes (like a property that just went public) without waiting for the
+            daily refresh.
           </p>
+          <ul className="mb-4 space-y-1 text-[12px] text-muted-2">
+            <li>Hotels: <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-hotels-all.xml</code></li>
+            <li>Vacation Rentals: <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-vacation-rentals-all.xml</code></li>
+          </ul>
           {actionData && "feedRefreshed" in actionData && actionData.feedRefreshed && (
             <p className="mb-3 rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">
               ✓ Feed rebuilt — Google will see the latest listings on its next crawl.
             </p>
           )}
-          <Form method="post">
-            <input type="hidden" name="intent" value="refreshFeed" />
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-            >
-              {busy ? "Rebuilding…" : "Refresh Google feed now"}
-            </button>
-          </Form>
+          <div className="flex flex-wrap gap-2.5">
+            <Form method="post">
+              <input type="hidden" name="intent" value="refreshFeed" />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+              >
+                {busy ? "Rebuilding…" : "Refresh Hotels feed"}
+              </button>
+            </Form>
+            <Form method="post">
+              <input type="hidden" name="intent" value="refreshVrFeed" />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {busy ? "Rebuilding…" : "Refresh Vacation Rentals feed"}
+              </button>
+            </Form>
+          </div>
         </section>
       )}
     </div>

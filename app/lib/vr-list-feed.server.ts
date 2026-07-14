@@ -10,6 +10,7 @@
 import { getConfig } from "./config.server";
 import { getRooms } from "./catalog.server";
 import { checkGoogleReadiness } from "./google-readiness.server";
+import { GOOGLE_HOTEL_BRAND } from "./hotel-list-feed.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 
@@ -39,9 +40,10 @@ function propertyUrl(idOrSlug: string): string {
   return `${origin}/${idOrSlug}`;
 }
 
-/** Build the VR list feed XML for every public, ready, vacation-rental property.
- *  Empty `<listings>` when there are none (a valid feed Google accepts). */
-export async function buildVrListFeed(): Promise<string> {
+/** The `<listing>` elements for every public, ready, vacation-rental property
+ *  (no `<listings>` wrapper) — reused both by our own VR feed and by the merged
+ *  Channex+us VR feed. Empty string when there's nothing to advertise. */
+export async function vrListingElements(): Promise<string> {
   const properties = await getProperties();
   const listings: string[] = [];
 
@@ -71,7 +73,11 @@ export async function buildVrListFeed(): Promise<string> {
     const website = propertyUrl(p.slug || p.id);
     const attrs =
       `      <website>${esc(website)}</website>\n` +
-      `      <client_attr name="capacity">${unit.maxGuests}</client_attr>\n`;
+      `      <client_attr name="capacity">${unit.maxGuests}</client_attr>\n` +
+      // hotel_brand → lets a Google POS <Match brand="…"> route our listings to
+      // our own booking pages (same mechanism as the Hotel List Feed), so a
+      // merged feed sends ours to us and Channex's rest to Channex.
+      `      <client_attr name="hotel_brand">${GOOGLE_HOTEL_BRAND}</client_attr>\n`;
 
     listings.push(
       `  <listing>\n` +
@@ -90,12 +96,19 @@ export async function buildVrListFeed(): Promise<string> {
     );
   }
 
+  return listings.join("\n");
+}
+
+/** Build the standalone VR list feed XML (our properties only). Empty
+ *  `<listings>` when there are none (a valid feed Google accepts). */
+export async function buildVrListFeed(): Promise<string> {
+  const listings = await vrListingElements();
   return (
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<listings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n` +
     `    xsi:noNamespaceSchemaLocation="http://www.gstatic.com/localfeed/local_feed.xsd">\n` +
     `  <language>en</language>\n` +
-    (listings.length ? listings.join("\n") + "\n" : "") +
+    (listings.trim() ? listings + "\n" : "") +
     `</listings>\n`
   );
 }
