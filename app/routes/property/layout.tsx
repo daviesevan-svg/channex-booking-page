@@ -36,6 +36,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     property: { address: overrides.address, phone: overrides.phone, photos: [] },
     currency: settings.currency || "GBP",
     hotelName: overrides.hotelName || "Your hotel",
+    logoImage: settings.logoImage || null,
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
@@ -107,7 +108,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
+  const { property, currency, hotelName, logoImage, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -170,13 +171,21 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       >
         <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4 px-7 py-4">
           <Link to={base} className="flex items-center gap-3">
-            <span
-              className="inline-block h-[13px] w-[13px] rounded-[2px] bg-accent"
-              style={{ transform: "rotate(45deg)" }}
-            />
-            <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">
-              {hotelName}
-            </span>
+            {logoImage ? (
+              // Most logos are wordmarks, so the image replaces the whole
+              // lockup; the hotel name stays as alt text for accessibility.
+              <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
+            ) : (
+              <>
+                <span
+                  className="inline-block h-[13px] w-[13px] rounded-[2px] bg-accent"
+                  style={{ transform: "rotate(45deg)" }}
+                />
+                <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">
+                  {hotelName}
+                </span>
+              </>
+            )}
           </Link>
           <div className="flex items-center gap-5 text-sm text-muted">
             {languages.length > 1 && (

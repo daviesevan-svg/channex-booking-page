@@ -423,6 +423,7 @@ export const openApiSpec = {
           privacy_url: { type: ["string", "null"], format: "uri" },
           single_unit: { type: "boolean", description: "The property is one bookable unit (apartment mode)." },
           cover_image: { type: ["string", "null"], description: "Cover photo URL path." },
+          logo: { type: ["string", "null"], description: "Logo URL path (shown in the booking header)." },
           theme: {
             type: "object",
             description: "Brand tokens so an external frontend can match the property's look.",

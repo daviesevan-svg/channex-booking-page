@@ -48,6 +48,7 @@ export function serializePropertyContent(
     privacy_url: settings.privacyUrl ?? null,
     single_unit: settings.singleUnit === true,
     cover_image: settings.coverImage ?? null,
+    logo: settings.logoImage ?? null,
     theme: {
       accent,
       background: settings.customBg ?? null,
