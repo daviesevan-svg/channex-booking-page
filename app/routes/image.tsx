@@ -15,6 +15,14 @@ export async function loader({ params }: Route.LoaderArgs) {
       "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
       "Cache-Control": "public, max-age=31536000, immutable",
       ETag: object.httpEtag,
+      // Uploads are admin-supplied and served same-origin, so treat them as
+      // untrusted documents: `sandbox` strips scripts (an SVG can embed
+      // <script>, which would otherwise run when the /images/… URL is opened
+      // directly — stored XSS against logged-in admins) and nosniff stops a
+      // spoofed content type being sniffed into something executable. <img>
+      // rendering is unaffected.
+      "Content-Security-Policy": "sandbox",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }
