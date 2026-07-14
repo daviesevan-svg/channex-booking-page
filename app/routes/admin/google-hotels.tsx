@@ -40,6 +40,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     canManage,
     propertyId,
     program,
+    vrFeedUrl:
+      program === "vacation_rentals"
+        ? new URL("/feeds/google-vacation-rentals.xml", request.url).toString()
+        : null,
     singleUnit: settings.singleUnit ?? false,
     partnerConfigured,
     push: settings.googleAriPush ?? false,
@@ -120,7 +124,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit } =
+  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl } =
     loaderData;
   const isVr = program === "vacation_rentals";
   const input =
@@ -236,6 +240,22 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </button>
         </Form>
       </section>
+
+      {/* VR list feed — Google ingests a property's content from this feed before
+          ARI prices attach. Shown for vacation-rental properties. */}
+      {isVr && vrFeedUrl && (
+        <section className="rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">Vacation Rentals list feed</h2>
+          <p className="mb-3 max-w-2xl text-[13px] text-muted">
+            Give this URL to your Google Vacation Rentals Technical Account Manager. Google pulls it on
+            a schedule to ingest your property's content (name, address, location, capacity). A property
+            must be ingested here before the prices you push above will show.
+          </p>
+          <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[13px] text-secondary">
+            {vrFeedUrl}
+          </code>
+        </section>
+      )}
 
       {/* Push */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
