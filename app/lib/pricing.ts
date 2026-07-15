@@ -58,6 +58,10 @@ export function cityTaxNightlyAmount(ct: CityTaxConfig, isoDate: string): number
   return 0;
 }
 
+/** How a FIXED fee multiplies: once per booking (default), or per room /
+ *  person, optionally per night. Percent fees are always % of the room total. */
+export type FeeBasis = "booking" | "room" | "room_night" | "person" | "person_night";
+
 export interface FeeRule {
   id: string;
   name: string;
@@ -65,6 +69,24 @@ export interface FeeRule {
   amount: number;
   /** VAT is added on top of this fee. */
   taxable: boolean;
+  /** Fixed fees only. Absent = "booking" (flat per stay — the legacy shape). */
+  basis?: FeeBasis;
+}
+
+/** Multiplier for a fixed fee's basis. Persons = adults + children. */
+export function feeUnits(basis: FeeBasis | undefined, ctx: { nights: number; rooms: number; persons: number }): number {
+  switch (basis) {
+    case "room":
+      return ctx.rooms;
+    case "room_night":
+      return ctx.rooms * ctx.nights;
+    case "person":
+      return ctx.persons;
+    case "person_night":
+      return ctx.persons * ctx.nights;
+    default:
+      return 1; // per booking
+  }
 }
 
 export interface TaxConfig {
@@ -133,7 +155,11 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   }
 
   for (const f of fees) {
-    const amount = round2(f.kind === "percent" ? (base * (f.amount || 0)) / 100 : f.amount || 0);
+    const amount = round2(
+      f.kind === "percent"
+        ? (base * (f.amount || 0)) / 100
+        : (f.amount || 0) * feeUnits(f.basis, { nights, rooms, persons: adults + children }),
+    );
     if (amount <= 0) continue;
     charges.push({ label: f.kind === "percent" ? `${f.name} (${f.amount}%)` : f.name, amount });
     chargesTotal += amount;

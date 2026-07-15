@@ -175,11 +175,17 @@ export function googleTaxLines(
 
   const fees: TaxLine[] = (settings.fees ?? [])
     .filter((f) => (f.amount || 0) > 0)
-    .map((f) =>
-      f.kind === "percent"
-        ? { type: "percent", basis: "room", period: "stay", amount: f.taxable ? gross(f.amount) : f.amount }
-        : { type: "amount", basis: "room", period: "stay", amount: f.taxable ? gross(f.amount) : f.amount, currency },
-    );
+    .map((f) => {
+      if (f.kind === "percent") {
+        return { type: "percent" as const, basis: "room" as const, period: "stay" as const, amount: f.taxable ? gross(f.amount) : f.amount };
+      }
+      // Fixed-fee basis → Google's basis/period grid. "booking" approximates to
+      // per-room-per-stay (exact for single-room stays; Google has no per-booking
+      // notion, and checkout stays authoritative).
+      const basis = f.basis === "person" || f.basis === "person_night" ? ("person" as const) : ("room" as const);
+      const period = f.basis === "room_night" || f.basis === "person_night" ? ("night" as const) : ("stay" as const);
+      return { type: "amount" as const, basis, period, amount: f.taxable ? gross(f.amount) : f.amount, currency };
+    });
 
   // Cleaning fee — per room, per stay, always VAT-applicable on the site. Scoped
   // to its room type so differing per-room cleaning fees are each correct.

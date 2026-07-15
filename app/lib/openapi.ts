@@ -140,7 +140,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.4.0",
+    version: "1.5.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -465,8 +465,13 @@ export const openApiSpec = {
                   properties: {
                     name: { type: "string" },
                     kind: { type: "string", enum: ["percent", "fixed"] },
-                    amount: { type: "number", description: "Percent when kind=percent, else a fixed amount per stay." },
+                    amount: { type: "number", description: "Percent when kind=percent, else the fixed amount per basis unit." },
                     taxable: { type: "boolean", description: "The taxes above apply on top of this fee." },
+                    basis: {
+                      type: ["string", "null"],
+                      enum: ["booking", "room", "room_night", "person", "person_night", null],
+                      description: "Fixed fees only: how the amount multiplies (booking = flat per stay). null for percent fees.",
+                    },
                   },
                 },
               },
