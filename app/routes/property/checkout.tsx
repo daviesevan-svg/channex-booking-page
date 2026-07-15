@@ -184,6 +184,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       rooms: lines.length,
       cleaningFee: lines.reduce((s, l) => s + l.cleaningFee, 0),
       taxableExtras: taxableExtrasTotal(extraLines),
+      checkin: stay.checkin,
     },
     taxConfigFrom(settings),
   );
@@ -317,6 +318,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       rooms: lines.length,
       cleaningFee,
       taxableExtras: taxableExtrasTotal(extraLines),
+      checkin: stay.checkin,
     },
     taxConfigFrom(settings),
   );
@@ -581,6 +583,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       rooms: lines.length,
       cleaningFee,
       taxableExtras: taxableExtrasTotal(extraLines),
+      checkin: stay.checkin,
     },
     loaderData.taxConfig,
   );

@@ -112,6 +112,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
                   rooms: 1,
                   cleaningFee: room.cleaningFee ?? 0,
                   taxableExtras: 0,
+                  checkin: checkin!,
                 },
                 taxConfig,
               ).total / nights;

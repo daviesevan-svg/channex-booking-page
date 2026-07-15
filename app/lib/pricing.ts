@@ -15,6 +15,16 @@ export interface TaxRule {
 
 export type CityTaxBasis = "person_night" | "room_night" | "room_stay";
 
+/** A seasonal city-tax rate: an annual recurring date range (month-day, no
+ *  year) with its own nightly amount. Greek-style overnight fees change by
+ *  season (e.g. Nov–Mar €2, Apr–Oct €8) and a range may wrap the year end. */
+export interface CityTaxSeason {
+  /** Inclusive "MM-DD" bounds. from > to means the range wraps the year end. */
+  from: string;
+  to: string;
+  amount: number;
+}
+
 export interface CityTaxConfig {
   enabled: boolean;
   name: string;
@@ -26,6 +36,23 @@ export interface CityTaxConfig {
   childrenExempt: boolean;
   /** Cap on nights charged (0 = no cap). */
   maxNights: number;
+  /** Advanced: 2–3 seasonal rates. Each night is charged at the rate of the
+   *  season containing its DATE (a cross-season stay mixes rates, per night);
+   *  nights outside every season fall back to `amount`. */
+  seasons?: CityTaxSeason[];
+}
+
+/** The nightly city-tax amount for a calendar date (ISO yyyy-mm-dd): the first
+ *  season whose annual range contains it, else the base amount. Lexicographic
+ *  MM-DD comparison; from > to wraps the year end (Nov–Mar). */
+export function cityTaxNightlyAmount(ct: CityTaxConfig, isoDate: string): number {
+  const md = isoDate.slice(5, 10);
+  for (const s of ct.seasons ?? []) {
+    if (!s.from || !s.to) continue;
+    const hit = s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to;
+    if (hit) return s.amount;
+  }
+  return ct.amount;
 }
 
 export interface FeeRule {
@@ -55,6 +82,9 @@ export interface PricingInput {
   rooms: number;
   /** Total cleaning fee across the booked rooms (per stay). VAT always applies. */
   cleaningFee?: number;
+  /** Check-in date (ISO yyyy-mm-dd). Lets a seasonal city tax price each night
+   *  by its own date; without it, seasonal rates fall back to the base amount. */
+  checkin?: string;
   /** Sum of VAT-applicable extras. Folded into the VAT base and the total;
    *  non-taxable extras are added on top by the caller. */
   taxableExtras?: number;
@@ -108,16 +138,30 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   }
 
   const ct = cfg.cityTax;
-  if (ct && ct.enabled && ct.amount > 0) {
+  if (ct && ct.enabled && (ct.amount > 0 || ct.seasons?.some((s) => s.amount > 0))) {
     const chargeableNights = ct.maxNights > 0 ? Math.min(nights, ct.maxNights) : nights;
     const persons = adults + (ct.childrenExempt ? 0 : children);
-    const units =
+    // Seasonal rates price each charged night by its own DATE (a stay spanning
+    // two seasons mixes rates); needs the check-in date, else the base amount
+    // applies to every night. UTC date math so it's client/server identical.
+    const nightlySum = (() => {
+      if (!ct.seasons?.length || !input.checkin) return ct.amount * chargeableNights;
+      const start = Date.parse(`${input.checkin}T00:00:00Z`);
+      if (Number.isNaN(start)) return ct.amount * chargeableNights;
+      let sum = 0;
+      for (let i = 0; i < chargeableNights; i++) {
+        sum += cityTaxNightlyAmount(ct, new Date(start + i * 86400000).toISOString().slice(0, 10));
+      }
+      return sum;
+    })();
+    const amount = round2(
       ct.basis === "person_night"
-        ? persons * chargeableNights
+        ? nightlySum * persons
         : ct.basis === "room_night"
-          ? rooms * chargeableNights
-          : rooms; // room_stay
-    const amount = round2(ct.amount * units);
+          ? nightlySum * rooms
+          : // room_stay: one charge per room, at the check-in date's seasonal rate.
+            (input.checkin ? cityTaxNightlyAmount(ct, input.checkin) : ct.amount) * rooms,
+    );
     if (amount > 0) {
       charges.push({ label: ct.name || "City tax", amount });
       chargesTotal += amount;

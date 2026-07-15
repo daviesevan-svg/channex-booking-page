@@ -505,6 +505,14 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
     .filter((f) => f.amount > 0);
 
   const ctRaw = parseJson<Partial<CityTaxConfig>>(form, "cityTaxJson")[0];
+  // Advanced seasonal rates: valid MM-DD bounds + a positive amount, max 3.
+  // Fewer than 2 valid seasons = not seasonal (a single "season" is just the
+  // base amount), so the config stays simple.
+  const isMonthDay = (v: unknown): v is string => typeof v === "string" && /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v);
+  const seasons = (Array.isArray(ctRaw?.seasons) ? ctRaw.seasons : [])
+    .filter((s) => isMonthDay(s?.from) && isMonthDay(s?.to) && num(s?.amount) >= 0)
+    .map((s) => ({ from: s.from, to: s.to, amount: num(s.amount) }))
+    .slice(0, 3);
   const cityTax: CityTaxConfig | undefined = ctRaw
     ? {
         enabled: ctRaw.enabled === true,
@@ -517,6 +525,7 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
         taxable: ctRaw.taxable === true,
         childrenExempt: ctRaw.childrenExempt === true,
         maxNights: Math.round(num(ctRaw.maxNights)),
+        ...(seasons.length >= 2 ? { seasons } : {}),
       }
     : undefined;
 

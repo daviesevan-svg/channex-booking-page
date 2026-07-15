@@ -12,9 +12,44 @@ import {
   computePricing,
   type CityTaxBasis,
   type CityTaxConfig,
+  type CityTaxSeason,
   type FeeRule,
   type TaxRule,
 } from "~/lib/pricing";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Annual month-day picker ("MM-DD") for the seasonal city-tax ranges. */
+function MonthDay({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [mm = "01", dd = "01"] = value.split("-");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <select
+        value={dd}
+        onChange={(e) => onChange(`${mm}-${e.target.value}`)}
+        className="rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
+      >
+        {Array.from({ length: 31 }, (_, i) => (
+          <option key={i} value={pad(i + 1)}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+      <select
+        value={mm}
+        onChange={(e) => onChange(`${e.target.value}-${dd}`)}
+        className="rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
+      >
+        {MONTHS.map((m, i) => (
+          <option key={m} value={pad(i + 1)}>
+            {m}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -101,7 +136,9 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
 
   // Live worked example so the setup isn't a black box.
   const preview = computePricing(
-    { base: 200, nights: 2, adults: 2, children: 0, rooms: 1 },
+    // Priced as if checking in today, so a seasonal city tax previews at the
+    // currently applicable season's rate.
+    { base: 200, nights: 2, adults: 2, children: 0, rooms: 1, checkin: new Date().toISOString().slice(0, 10) },
     { inclusive, taxes, fees, cityTax: cityTax ?? undefined },
   );
 
@@ -257,15 +294,22 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   Children exempt
                 </label>
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
-                  Max nights charged
                   <input
-                    type="number"
-                    min={0}
-                    value={cityTax.maxNights}
-                    onChange={(e) => setCity({ maxNights: Number(e.target.value) })}
-                    className={`${smallInput} w-20`}
+                    type="checkbox"
+                    checked={!!cityTax.seasons}
+                    onChange={(e) =>
+                      setCity({
+                        seasons: e.target.checked
+                          ? [
+                              { from: "04-01", to: "10-31", amount: cityTax.amount },
+                              { from: "11-01", to: "03-31", amount: cityTax.amount },
+                            ]
+                          : undefined,
+                      })
+                    }
+                    className={checkbox}
                   />
-                  <span className="font-normal text-faint">(0 = no cap)</span>
+                  Advanced (seasonal rates)
                 </label>
                 <button
                   type="button"
@@ -275,6 +319,74 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   Remove
                 </button>
               </div>
+
+              {/* Seasonal rates: each night is charged at the rate of the season
+                  its date falls in — a cross-season stay mixes rates per night
+                  (Greek overnight-fee model). Ranges recur every year and may
+                  wrap the year end (e.g. 1 Nov → 31 Mar). */}
+              {cityTax.seasons && (
+                <div className="flex flex-col gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3.5">
+                  {cityTax.seasons.map((s, i) => {
+                    const setSeason = (patch: Partial<CityTaxSeason>) =>
+                      setCity({ seasons: cityTax.seasons!.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+                    return (
+                      <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px]">
+                        <span className="w-16 font-semibold text-secondary">Season {i + 1}</span>
+                        <MonthDay value={s.from} onChange={(from) => setSeason({ from })} />
+                        <span className="text-muted-2">→</span>
+                        <MonthDay value={s.to} onChange={(to) => setSeason({ to })} />
+                        <label className="flex items-center gap-1.5 font-semibold text-secondary">
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={s.amount}
+                            onChange={(e) => setSeason({ amount: Number(e.target.value) })}
+                            className={`${smallInput} w-24`}
+                          />
+                          {currency}
+                        </label>
+                        {cityTax.seasons!.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => setCity({ seasons: cityTax.seasons!.filter((_, j) => j !== i) })}
+                            className="text-[12.5px] font-semibold text-[#c0392b] hover:underline"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {cityTax.seasons.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCity({ seasons: [...cityTax.seasons!, { from: "01-01", to: "03-31", amount: cityTax.amount }] })
+                      }
+                      className="self-start text-[13px] font-semibold text-accent hover:underline"
+                    >
+                      + Add a third season
+                    </button>
+                  )}
+                  <p className="text-[12px] text-muted">
+                    Dates recur every year (a range may wrap the year end). Each night is charged at
+                    its own date's rate — a stay spanning two seasons mixes them. Nights outside every
+                    season use the base amount above.
+                  </p>
+                  <label className="flex items-center gap-2 text-[13px] font-semibold text-secondary">
+                    Max nights charged
+                    <input
+                      type="number"
+                      min={0}
+                      value={cityTax.maxNights}
+                      onChange={(e) => setCity({ maxNights: Number(e.target.value) })}
+                      className={`${smallInput} w-20`}
+                    />
+                    <span className="font-normal text-faint">(0 = no cap)</span>
+                  </label>
+                </div>
+              )}
             </div>
           )}
         </section>

@@ -140,7 +140,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.3.0",
+    version: "1.4.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -479,6 +479,19 @@ export const openApiSpec = {
                   taxable: { type: "boolean" },
                   children_exempt: { type: "boolean" },
                   max_nights: { type: ["integer", "null"], minimum: 1, description: "Cap on nights charged; null = no cap." },
+                  seasons: {
+                    type: ["array", "null"],
+                    description:
+                      "Seasonal nightly rates (annual recurring MM-DD ranges; from > to wraps the year end). Each night is charged at its date's rate; dates outside every season use `amount`. null = flat rate.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        from: { type: "string", pattern: "^\\d{2}-\\d{2}$", description: "Inclusive start, MM-DD." },
+                        to: { type: "string", pattern: "^\\d{2}-\\d{2}$", description: "Inclusive end, MM-DD." },
+                        amount: money,
+                      },
+                    },
+                  },
                 },
               },
             },

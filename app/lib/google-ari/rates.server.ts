@@ -12,6 +12,7 @@ import { getInventory } from "../ari.server";
 import { getRates, getRooms, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
+import { cityTaxNightlyAmount } from "../pricing";
 import { occupancyNightlyDelta } from "../rate-pricing";
 import type { AvailEntry, InvEntry, RateEntry, TaxLine } from "./xml";
 
@@ -190,14 +191,21 @@ export function googleTaxLines(
   }
 
   const ct = settings.cityTax;
-  if (ct?.enabled && ct.amount > 0) {
-    fees.push({
-      type: "amount",
-      basis: ct.basis === "person_night" ? "person" : "room",
-      period: ct.basis === "room_stay" ? "stay" : "night",
-      amount: ct.taxable ? gross(ct.amount) : ct.amount,
-      currency,
-    });
+  if (ct?.enabled) {
+    // TaxFeeInfo can't express date-varying fees, so a seasonal city tax pushes
+    // the CURRENTLY applicable season's rate. The 6-hourly taxes sync re-pushes
+    // it, so the fee flips with the season; only stays spanning a boundary
+    // compose slightly differently on Google than at checkout.
+    const nightly = cityTaxNightlyAmount(ct, new Date().toISOString().slice(0, 10));
+    if (nightly > 0) {
+      fees.push({
+        type: "amount",
+        basis: ct.basis === "person_night" ? "person" : "room",
+        period: ct.basis === "room_stay" ? "stay" : "night",
+        amount: ct.taxable ? gross(nightly) : nightly,
+        currency,
+      });
+    }
   }
   return { taxes, fees };
 }
