@@ -107,7 +107,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const allIn = (base: number) =>
     Math.round(
       computePricing(
-        { base, nights, adults, children: childrenAge.length, rooms: 1, cleaningFee: room.cleaningFee ?? 0, taxableExtras: 0 },
+        { base, nights, adults, children: childrenAge.length, rooms: 1, cleaningFee: room.cleaningFee ?? 0, taxableExtras: 0, checkin },
         taxConfig,
       ).total * 100,
     ) / 100;
@@ -226,7 +226,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const allInOf = (base: number) =>
     Math.round(
       computePricing(
-        { base, nights, adults, children: childrenAges.length, rooms: 1, cleaningFee, taxableExtras: 0 },
+        { base, nights, adults, children: childrenAges.length, rooms: 1, cleaningFee, taxableExtras: 0, checkin: query.checkin },
         taxConfig,
       ).total * 100,
     ) / 100;

@@ -93,6 +93,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       rooms: rooms.length,
       cleaningFee,
       taxableExtras: taxableExtrasTotal(extraLines),
+      checkin: checkin ?? undefined,
     },
     taxConfigFrom(settings),
   );

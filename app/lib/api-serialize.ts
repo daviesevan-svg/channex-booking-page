@@ -69,7 +69,7 @@ export function serializePropertyContent(
       taxes: (settings.taxes ?? []).map((t) => ({ name: t.name, rate_percent: t.rate })),
       fees: (settings.fees ?? []).map((f) => ({ name: f.name, kind: f.kind, amount: f.amount, taxable: f.taxable })),
       city_tax:
-        ct?.enabled && ct.amount > 0
+        ct?.enabled && (ct.amount > 0 || ct.seasons?.some((s) => s.amount > 0))
           ? {
               name: ct.name,
               amount: ct.amount,
@@ -77,6 +77,12 @@ export function serializePropertyContent(
               taxable: ct.taxable,
               children_exempt: ct.childrenExempt,
               max_nights: ct.maxNights > 0 ? ct.maxNights : null,
+              // Seasonal nightly rates (annual recurring MM-DD ranges; a range
+              // may wrap the year end). Each night is charged at its date's
+              // rate; dates outside every season use `amount`. null = flat.
+              seasons: ct.seasons?.length
+                ? ct.seasons.map((s) => ({ from: s.from, to: s.to, amount: s.amount }))
+                : null,
             }
           : null,
     },

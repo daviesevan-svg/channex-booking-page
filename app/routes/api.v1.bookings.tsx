@@ -239,7 +239,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const pricing = computePricing(
-    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee, taxableExtras: taxableExtrasTotal(extraLines) },
+    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee, taxableExtras: taxableExtrasTotal(extraLines), checkin },
     taxConfigFrom(settings),
   );
   // VAT-exempt extras ride on top of the taxed total untouched (same as checkout).
