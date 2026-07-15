@@ -14,6 +14,8 @@ export default [
   route("feeds/google-vacation-rentals.xml", "routes/feeds.google-vr.tsx"),
   // Merged VR feed: Channex's VR partner feed passed through + our properties added.
   route("feeds/google-vacation-rentals-all.xml", "routes/feeds.google-merged-vr.tsx"),
+  // Same feed zipped — Google requires the pulled VR list-feed URL to be a .zip.
+  route("feeds/google-vacation-rentals-all.zip", "routes/feeds.google-vr-zip.tsx"),
   // Google Hotels landing target: routes our hotels to our flow, forwards the
   // rest to Channex's booking_link. (Google POS <URL> points here.)
   route("go/booking", "routes/go.booking.tsx"),

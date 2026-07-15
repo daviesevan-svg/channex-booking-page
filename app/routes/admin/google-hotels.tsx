@@ -248,13 +248,27 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <h2 className="mb-2 font-serif text-[18px] font-semibold">Vacation Rentals list feed</h2>
           <p className="mb-3 max-w-2xl text-[13px] text-muted">
-            Give this URL to your Google Vacation Rentals Technical Account Manager. Google pulls it on
-            a schedule to ingest your property's content (name, address, location, capacity). A property
-            must be ingested here before the prices you push above will show.
+            Give Google's Vacation Rentals Technical Account Manager the <strong>merged .zip</strong> URL
+            — Google requires the pulled feed to be a zip, and the merged file carries Channex's VR
+            listings plus ours. Google pulls it on a schedule to ingest each property's content; a
+            property must be ingested before the prices you push above will show.
           </p>
-          <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[13px] text-secondary">
-            {vrFeedUrl}
-          </code>
+          <div className="flex flex-col gap-2">
+            <div>
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">For Google (merged, zipped)</div>
+              <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[13px] text-secondary">
+                {new URL("/feeds/google-vacation-rentals-all.zip", vrFeedUrl).toString()}
+              </code>
+            </div>
+            <div>
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">Plain XML (merged / ours only)</div>
+              <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[12.5px] text-secondary">
+                {new URL("/feeds/google-vacation-rentals-all.xml", vrFeedUrl).toString()}
+                {"  ·  "}
+                {vrFeedUrl}
+              </code>
+            </div>
+          </div>
           <p className="mt-3 text-[12.5px] text-muted">
             Listing content — amenities, property size (bedrooms / bathrooms / beds), photos and
             description — is edited on{" "}
