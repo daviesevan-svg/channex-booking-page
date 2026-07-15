@@ -42,17 +42,20 @@ export interface CityTaxConfig {
   seasons?: CityTaxSeason[];
 }
 
-/** The nightly city-tax amount for a calendar date (ISO yyyy-mm-dd): the first
- *  season whose annual range contains it, else the base amount. Lexicographic
- *  MM-DD comparison; from > to wraps the year end (Nov–Mar). */
+/** The nightly city-tax amount for a calendar date (ISO yyyy-mm-dd). With
+ *  seasonal rates the seasons alone define the price — the first season whose
+ *  annual range contains the date wins, and a date outside every season is NOT
+ *  charged (the base amount is disabled in the editor while seasons are on).
+ *  Lexicographic MM-DD comparison; from > to wraps the year end (Nov–Mar). */
 export function cityTaxNightlyAmount(ct: CityTaxConfig, isoDate: string): number {
+  if (!ct.seasons?.length) return ct.amount;
   const md = isoDate.slice(5, 10);
-  for (const s of ct.seasons ?? []) {
+  for (const s of ct.seasons) {
     if (!s.from || !s.to) continue;
     const hit = s.from <= s.to ? md >= s.from && md <= s.to : md >= s.from || md <= s.to;
     if (hit) return s.amount;
   }
-  return ct.amount;
+  return 0;
 }
 
 export interface FeeRule {
