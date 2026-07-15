@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
+import { geocodeAddress } from "~/lib/google-maps-client";
+import { getConfig } from "~/lib/config.server";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
@@ -32,6 +35,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     googleReadiness,
     isPublic: Boolean(property?.public),
     host: new URL(request.url).host,
+    // Enables the "Find coordinates" geocode button (unset = button hidden).
+    mapKey: getConfig().googleMapKey ?? null,
   };
 }
 
@@ -123,7 +128,37 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, settings, googleReadiness, isPublic, host, lang } = loaderData;
+  const { overrides, settings, googleReadiness, isPublic, host, lang, mapKey } = loaderData;
+
+  // "Find coordinates" — geocodes the address fields (reading their CURRENT
+  // values from the form, unsaved edits included) and fills lat/long in place.
+  const [geoStatus, setGeoStatus] = useState<{ kind: "busy" | "ok" | "error"; text: string } | null>(null);
+  async function findCoordinates(btn: HTMLButtonElement) {
+    const form = btn.form;
+    if (!form || !mapKey) return;
+    const val = (name: string) =>
+      (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null)?.value?.trim() ?? "";
+    const parts = ["address", "addressCity", "addressRegion", "addressPostalCode", "addressCountry"]
+      .map(val)
+      .filter(Boolean);
+    if (parts.length === 0) {
+      setGeoStatus({ kind: "error", text: "Fill in the address first." });
+      return;
+    }
+    setGeoStatus({ kind: "busy", text: "Looking up…" });
+    try {
+      const hit = await geocodeAddress(mapKey, parts.join(", "));
+      if (!hit) {
+        setGeoStatus({ kind: "error", text: "No match found — check the address." });
+        return;
+      }
+      (form.elements.namedItem("latitude") as HTMLInputElement).value = hit.lat.toFixed(6);
+      (form.elements.namedItem("longitude") as HTMLInputElement).value = hit.lng.toFixed(6);
+      setGeoStatus({ kind: "ok", text: `✓ ${hit.formatted} — remember to save.` });
+    } catch {
+      setGeoStatus({ kind: "error", text: "Lookup failed — check the Maps key (Geocoding API enabled?)." });
+    }
+  }
 
   return (
     <div>
@@ -358,6 +393,23 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={FIELD_INPUT} />
             </label>
           </div>
+          {mapKey && (
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={(e) => findCoordinates(e.currentTarget)}
+                disabled={geoStatus?.kind === "busy"}
+                className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {geoStatus?.kind === "busy" ? "Looking up…" : "Find coordinates from address"}
+              </button>
+              {geoStatus && geoStatus.kind !== "busy" && (
+                <span className={`text-[12.5px] ${geoStatus.kind === "ok" ? "text-[#3f7a52]" : "text-[#c0392b]"}`}>
+                  {geoStatus.text}
+                </span>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Google Hotels (global). */}
