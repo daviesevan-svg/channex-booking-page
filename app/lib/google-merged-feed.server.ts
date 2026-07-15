@@ -3,12 +3,12 @@
 // Used for both Hotels (this file's wrappers) and Vacation Rentals
 // (google-merged-vr-feed.server.ts) — the splice + snapshot logic is generic.
 //
-// Contract: we DO NOT touch Channex's feed. Their XML is passed through
-// byte-for-byte and our <listing> blocks are spliced in immediately before the
-// closing </listings> tag, so nothing of theirs is reparsed or altered. Our
-// listings come from the same generators as our own feeds, so they conform to
-// the Google local_feed.xsd (incomplete properties are already filtered out) and
-// can't invalidate the document.
+// Contract: we pass Channex's feed through untouched — EXCEPT one mechanical
+// schema repair (normalizeRelations below) — and splice our <listing> blocks in
+// immediately before the closing </listings> tag, so nothing of theirs is
+// reparsed. Our listings come from the same generators as our own feeds, so
+// they conform to the Google local_feed.xsd (incomplete properties are already
+// filtered out) and can't invalidate the document.
 import { googleListingElements } from "./hotel-list-feed.server";
 import { getImagesBucket } from "./config.server";
 
@@ -17,6 +17,20 @@ const CHANNEX_FEED_URL =
   "https://app.channex.io/api/v1/meta/googlehotelari/list?partner_account=channex_ari";
 
 const CLOSE_TAG = "</listings>";
+
+/** Repair Channex's <relation> blocks to satisfy Google's local_feed.xsd: the
+ *  schema requires <parent_id> BEFORE <relation_type>, but Channex's generator
+ *  emits them the other way round — Google's validator rejects the feed with
+ *  cvc-complex-type.2.4.a on every listing that carries a relation. A purely
+ *  mechanical swap (content untouched) keeps the merged feed schema-valid until
+ *  the generator is fixed at the source; already-ordered blocks don't match and
+ *  pass through unchanged. */
+export function normalizeRelations(xml: string): string {
+  return xml.replace(
+    /<relation>(\s*)<relation_type>([^<]*)<\/relation_type>(\s*)<parent_id>([^<]*)<\/parent_id>(\s*)<\/relation>/g,
+    "<relation>$1<parent_id>$4</parent_id>$3<relation_type>$2</relation_type>$5</relation>",
+  );
+}
 
 /** Fetch a Channex list feed and return it with our listings appended. Throws if
  *  the Channex feed can't be fetched or doesn't look like the expected document
@@ -33,7 +47,7 @@ export async function spliceListingsFeed(
     throw new Error("Could not reach the Channex feed.");
   }
   if (!res.ok) throw new Error(`Channex feed returned ${res.status}.`);
-  const channex = await res.text();
+  const channex = normalizeRelations(await res.text());
 
   // Guard: only splice into a document that really is the listings feed.
   const close = channex.lastIndexOf(CLOSE_TAG);
