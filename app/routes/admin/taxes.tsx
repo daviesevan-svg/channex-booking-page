@@ -248,7 +248,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     className={FIELD_INPUT}
                   />
                 </label>
-                <label className="block text-[13px] font-semibold text-secondary">
+                <label className={`block text-[13px] font-semibold text-secondary ${cityTax.seasons ? "opacity-50" : ""}`}>
                   Amount ({currency})
                   <input
                     type="number"
@@ -256,8 +256,12 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     step="0.01"
                     value={cityTax.amount}
                     onChange={(e) => setCity({ amount: Number(e.target.value) })}
+                    disabled={!!cityTax.seasons}
                     className={FIELD_INPUT}
                   />
+                  {cityTax.seasons && (
+                    <span className="mt-1 block text-[11px] font-normal text-faint">Set per season below.</span>
+                  )}
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
                   Charged
@@ -294,6 +298,17 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   Children exempt
                 </label>
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
+                  Max nights charged
+                  <input
+                    type="number"
+                    min={0}
+                    value={cityTax.maxNights}
+                    onChange={(e) => setCity({ maxNights: Number(e.target.value) })}
+                    className={`${smallInput} w-20`}
+                  />
+                  <span className="font-normal text-faint">(0 = no cap)</span>
+                </label>
+                <label className="flex items-center gap-2 text-[14px] font-semibold">
                   <input
                     type="checkbox"
                     checked={!!cityTax.seasons}
@@ -309,7 +324,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     }
                     className={checkbox}
                   />
-                  Advanced (seasonal rates)
+                  Seasonal rates
                 </label>
                 <button
                   type="button"
@@ -372,19 +387,8 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   <p className="text-[12px] text-muted">
                     Dates recur every year (a range may wrap the year end). Each night is charged at
                     its own date's rate — a stay spanning two seasons mixes them. Nights outside every
-                    season use the base amount above.
+                    season aren't charged.
                   </p>
-                  <label className="flex items-center gap-2 text-[13px] font-semibold text-secondary">
-                    Max nights charged
-                    <input
-                      type="number"
-                      min={0}
-                      value={cityTax.maxNights}
-                      onChange={(e) => setCity({ maxNights: Number(e.target.value) })}
-                      className={`${smallInput} w-20`}
-                    />
-                    <span className="font-normal text-faint">(0 = no cap)</span>
-                  </label>
                 </div>
               )}
             </div>
