@@ -494,14 +494,25 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
     }))
     .filter((t) => t.rate > 0);
 
+  const FEE_BASES = ["booking", "room", "room_night", "person", "person_night"] as const;
   const fees: FeeRule[] = parseJson<Partial<FeeRule>>(form, "feesJson")
-    .map((f): FeeRule => ({
-      id: String(f.id || rid()),
-      name: String(f.name ?? "").trim() || "Fee",
-      kind: f.kind === "fixed" ? "fixed" : "percent",
-      amount: num(f.amount),
-      taxable: f.taxable === true,
-    }))
+    .map((f): FeeRule => {
+      const kind = f.kind === "fixed" ? "fixed" : "percent";
+      // Basis applies to fixed fees only; "booking" (flat per stay) is the
+      // default and stored as absent, matching legacy configs.
+      const basis =
+        kind === "fixed" && f.basis && f.basis !== "booking" && (FEE_BASES as readonly string[]).includes(f.basis)
+          ? f.basis
+          : undefined;
+      return {
+        id: String(f.id || rid()),
+        name: String(f.name ?? "").trim() || "Fee",
+        kind,
+        amount: num(f.amount),
+        taxable: f.taxable === true,
+        ...(basis ? { basis } : {}),
+      };
+    })
     .filter((f) => f.amount > 0);
 
   const ctRaw = parseJson<Partial<CityTaxConfig>>(form, "cityTaxJson")[0];

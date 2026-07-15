@@ -67,7 +67,14 @@ export function serializePropertyContent(
     pricing_display: {
       taxes_inclusive: settings.taxesInclusive === true,
       taxes: (settings.taxes ?? []).map((t) => ({ name: t.name, rate_percent: t.rate })),
-      fees: (settings.fees ?? []).map((f) => ({ name: f.name, kind: f.kind, amount: f.amount, taxable: f.taxable })),
+      fees: (settings.fees ?? []).map((f) => ({
+        name: f.name,
+        kind: f.kind,
+        amount: f.amount,
+        taxable: f.taxable,
+        // Fixed fees only: how the amount multiplies. "booking" = flat per stay.
+        basis: f.kind === "fixed" ? (f.basis ?? "booking") : null,
+      })),
       city_tax:
         ct?.enabled && (ct.amount > 0 || ct.seasons?.some((s) => s.amount > 0))
           ? {

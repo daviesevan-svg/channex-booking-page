@@ -412,13 +412,22 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   placeholder="Service charge"
                   className={`${smallInput} min-w-[160px] flex-1`}
                 />
+                {/* One select encodes kind + (for fixed fees) the basis. */}
                 <select
-                  value={f.kind}
-                  onChange={(e) => setFee(i, { kind: e.target.value as FeeRule["kind"] })}
+                  value={f.kind === "percent" ? "percent" : `fixed:${f.basis ?? "booking"}`}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "percent") setFee(i, { kind: "percent", basis: undefined });
+                    else setFee(i, { kind: "fixed", basis: v.slice(6) as FeeRule["basis"] });
+                  }}
                   className={smallInput}
                 >
                   <option value="percent">% of room</option>
-                  <option value="fixed">Fixed ({currency})</option>
+                  <option value="fixed:booking">Fixed ({currency}) — per stay</option>
+                  <option value="fixed:room">Fixed ({currency}) — per room</option>
+                  <option value="fixed:room_night">Fixed ({currency}) — per room, per night</option>
+                  <option value="fixed:person">Fixed ({currency}) — per person</option>
+                  <option value="fixed:person_night">Fixed ({currency}) — per person, per night</option>
                 </select>
                 <input
                   type="number"
