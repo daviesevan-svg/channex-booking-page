@@ -86,6 +86,8 @@ export async function action({ request }: Route.ActionArgs) {
     return { ok: true as const };
   }
   if (intent === "push") {
+    // Manual pushes are internal plumbing — mirror the UI's superadmin gate.
+    if (!(await isSuperadmin(email))) return { error: "Only a superadmin can push to Google manually." };
     const which = String(form.get("kinds") ?? "");
     const kinds: SyncKind[] =
       which === "all"
@@ -243,8 +245,9 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
       </section>
 
       {/* VR list feed — Google ingests a property's content from this feed before
-          ARI prices attach. Shown for vacation-rental properties. */}
-      {isVr && vrFeedUrl && (
+          ARI prices attach. Internal plumbing (the feed is handed to Google's
+          TAM once, account-wide), so superadmin only. */}
+      {isVr && vrFeedUrl && superadmin && (
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <h2 className="mb-2 font-serif text-[18px] font-semibold">Vacation Rentals list feed</h2>
           <p className="mb-3 max-w-2xl text-[13px] text-muted">
@@ -284,7 +287,10 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         </section>
       )}
 
-      {/* Push */}
+      {/* Push — manual re-pushes are an internal/debugging tool (the cron and
+          change-driven pushes keep Google in sync automatically), so superadmin
+          only. Owners keep the settings + readiness above. */}
+      {superadmin && (
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">Push now</h2>
         <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
@@ -335,6 +341,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </div>
         )}
       </section>
+      )}
 
       {/* Last sync */}
       {lastSync && (
