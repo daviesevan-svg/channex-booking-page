@@ -1,13 +1,14 @@
 // Admin · Reviews — everything guests submitted for the current property:
 // overall + category stars, the public text, and the private note (clearly
-// marked — it is never shown publicly). The hotel can publish a response,
-// hide/unhide a review from the public page, or delete it outright.
+// marked — it is never shown publicly). The hotel can publish a public response
+// — nothing more. Reviews are deliberately immutable to the property: it cannot
+// hide or delete them, so it can't bury criticism or cherry-pick its rating.
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/reviews";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
-import { deleteReview, listReviews, setReviewHidden, setReviewResponse } from "~/lib/reviews.server";
+import { listReviews, setReviewResponse } from "~/lib/reviews.server";
 import { REVIEW_CATEGORIES } from "~/lib/reviews";
 import { fmtDate } from "~/lib/dates";
 
@@ -22,9 +23,10 @@ export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
-  // Moderation (hide/delete/respond) is an owner call, not a teammate's.
+  // Publishing a response is an owner call, not a teammate's. There is no hide
+  // or delete — a property can only respond, never remove a review.
   if (!(await isOwnerOrSuper(request, propertyId))) {
-    return { error: "Only an owner or manager can moderate reviews." };
+    return { error: "Only an owner or manager can respond to reviews." };
   }
 
   const form = await request.formData();
@@ -34,14 +36,6 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "respond") {
     const by = (await getAdminEmail(request)) ?? undefined;
     await setReviewResponse(propertyId, bookingId, String(form.get("text") ?? ""), by);
-    return { ok: true as const };
-  }
-  if (intent === "hide" || intent === "unhide") {
-    await setReviewHidden(propertyId, bookingId, intent === "hide");
-    return { ok: true as const };
-  }
-  if (intent === "delete") {
-    await deleteReview(propertyId, bookingId);
     return { ok: true as const };
   }
   return { error: "Unknown action." };
@@ -83,9 +77,8 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
   }
 
   const { reviews } = loaderData;
-  const visible = reviews.filter((r) => !r.hidden);
-  const average = visible.length
-    ? Math.round((visible.reduce((s, r) => s + r.stars, 0) / visible.length) * 10) / 10
+  const average = reviews.length
+    ? Math.round((reviews.reduce((s, r) => s + r.stars, 0) / reviews.length) * 10) / 10
     : null;
 
   return (
@@ -95,7 +88,7 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
         {average != null && (
           <span className="text-[14px] text-secondary">
             <span className="font-serif text-[22px] font-semibold text-ink">{average}</span> / 5 ·{" "}
-            {visible.length} public review{visible.length === 1 ? "" : "s"}
+            {reviews.length} review{reviews.length === 1 ? "" : "s"}
           </span>
         )}
       </div>
@@ -113,10 +106,7 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
         </div>
       ) : (
         reviews.map((r) => (
-          <section
-            key={r.id}
-            className={`rounded-[14px] border border-line bg-surface p-6 ${r.hidden ? "opacity-70" : ""}`}
-          >
+          <section key={r.id} className="rounded-[14px] border border-line bg-surface p-6">
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <StarRow n={r.stars} size={18} />
               <span className="font-semibold">{r.guestName}</span>
@@ -124,9 +114,6 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
                 {fmtDate(r.checkin, "d MMM")} — {fmtDate(r.checkout, "d MMM yyyy")} · reviewed{" "}
                 {fmtDate(r.createdAt, "d MMM yyyy")}
               </span>
-              {r.hidden && (
-                <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11px] font-semibold text-muted">Hidden</span>
-              )}
             </div>
 
             {Object.keys(r.categories).length > 0 && (
@@ -149,8 +136,8 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
               </div>
             )}
 
-            {/* Public response */}
-            <Form method="post" className="mb-3 max-w-2xl">
+            {/* Public response — the only action a property can take on a review. */}
+            <Form method="post" className="max-w-2xl">
               <input type="hidden" name="intent" value="respond" />
               <input type="hidden" name="bookingId" value={r.bookingId} />
               <label className="mb-1 block text-[12px] font-semibold uppercase tracking-wide text-muted-2">
@@ -178,28 +165,6 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
                 )}
               </div>
             </Form>
-
-            <div className="flex gap-4 border-t border-divider pt-3 text-[13px] font-semibold">
-              <Form method="post">
-                <input type="hidden" name="intent" value={r.hidden ? "unhide" : "hide"} />
-                <input type="hidden" name="bookingId" value={r.bookingId} />
-                <button type="submit" disabled={busy} className="text-secondary hover:text-accent disabled:opacity-60">
-                  {r.hidden ? "Unhide" : "Hide from public page"}
-                </button>
-              </Form>
-              <Form
-                method="post"
-                onSubmit={(e) => {
-                  if (!confirm("Delete this review permanently? The guest can submit a new one from their link.")) e.preventDefault();
-                }}
-              >
-                <input type="hidden" name="intent" value="delete" />
-                <input type="hidden" name="bookingId" value={r.bookingId} />
-                <button type="submit" disabled={busy} className="text-[#c0392b] hover:underline disabled:opacity-60">
-                  Delete
-                </button>
-              </Form>
-            </div>
           </section>
         ))
       )}

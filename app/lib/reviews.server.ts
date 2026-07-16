@@ -134,10 +134,6 @@ async function patchReview(pid: string, bookingId: string, patch: Partial<Review
   return next;
 }
 
-export async function setReviewHidden(pid: string, bookingId: string, hidden: boolean) {
-  return patchReview(pid, bookingId, { hidden });
-}
-
 export async function setReviewResponse(pid: string, bookingId: string, text: string, by?: string) {
   const trimmed = text.trim();
   return patchReview(pid, bookingId, {
@@ -145,7 +141,7 @@ export async function setReviewResponse(pid: string, bookingId: string, text: st
   });
 }
 
-export async function deleteReview(pid: string, bookingId: string): Promise<void> {
-  await ensureSchema();
-  await db().prepare(`DELETE FROM review WHERE pid = ? AND booking_id = ?`).bind(pid, bookingId).run();
-}
+// NOTE: there is intentionally no hide/delete API. A property can only respond
+// to a review, never remove one — so it can't bury criticism. The `hidden`
+// column + the `hidden = 0` filter above are kept as a dormant safety valve for
+// any future platform-level (not property-level) moderation.
