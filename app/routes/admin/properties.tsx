@@ -198,7 +198,12 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                   View ↗
                 </Link>
                 {p.id !== current && (
-                  <Form method="post">
+                  // reloadDocument: this sets the property cookie + redirects, so
+                  // the whole admin must re-render from fresh SSR under the new
+                  // property — a SPA navigation races the Set-Cookie against the
+                  // loader fetch and leaves the header switcher (and any loader
+                  // data) on the OLD property. Same fix as the header switcher.
+                  <Form method="post" reloadDocument>
                     <input type="hidden" name="intent" value="switch" />
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className="text-accent hover:underline">
@@ -207,8 +212,11 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                   </Form>
                 )}
                 {p.canManage && (
+                  // reloadDocument: cloning switches the session to the new
+                  // property (see the Edit button above for why SPA nav is unsafe).
                   <Form
                     method="post"
+                    reloadDocument
                     onSubmit={(e) => {
                       if (
                         !confirm(
@@ -259,8 +267,9 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
         <span className="flex-none text-[15px] font-semibold text-accent">Start →</span>
       </Link>
 
-      {/* add */}
-      <Form method="post" className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
+      {/* add — reloadDocument: creating switches the session to the new property
+          (see the Edit button above for why SPA nav is unsafe here). */}
+      <Form method="post" reloadDocument className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
         <input type="hidden" name="intent" value="add" />
         <h2 className="font-serif text-[18px] font-semibold">Add a property manually</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
