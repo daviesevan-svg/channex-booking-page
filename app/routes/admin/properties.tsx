@@ -194,7 +194,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     </span>
                   )
                 )}
-                <Link to={`/${p.id}`} target="_blank" className="text-muted hover:text-accent">
+                <Link to={`/${p.slug || p.id}`} target="_blank" className="text-muted hover:text-accent">
                   View ↗
                 </Link>
                 {p.id !== current && (
