@@ -13,6 +13,7 @@ import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
+import { getPublicReviews } from "~/lib/reviews.server";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
@@ -23,16 +24,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates, cutoff] = await Promise.all([
+  const [content, closedDates, cutoff, reviews] = await Promise.all([
     getSearchContent(pid, lang),
     getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
     ),
     getBookingCutoff(pid),
+    // Fail open too — the landing page must render even if D1 hiccups.
+    getPublicReviews(pid).catch(() => ({ average: 0, count: 0, reviews: [] })),
   ]);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
-  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now) };
+  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now), reviews };
 }
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
@@ -45,7 +48,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates, content, earliestCheckin } = loaderData;
+  const { closedDates, content, earliestCheckin, reviews } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -209,6 +212,41 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           </div>
         ))}
       </div>
+
+      {/* guest reviews — shown once there's at least one public review */}
+      {reviews.count > 0 && reviews.reviews.length > 0 && (
+        <div className="mt-12 max-w-[920px]">
+          <div className="mb-5 flex items-baseline gap-3">
+            <h2 className="font-serif text-[24px] font-semibold">{tr.t("guestReviews")}</h2>
+            <span className="text-[14px] text-secondary">
+              <span style={{ color: "#f5b301" }}>★</span>{" "}
+              <span className="font-semibold text-ink">{reviews.average}</span>/5 · {reviews.count}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
+            {reviews.reviews.map((r) => (
+              <div key={r.id} className="rounded-[14px] border border-line bg-surface p-5">
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="text-[14px] font-semibold">{r.guestName}</span>
+                  <span className="text-[13px]" style={{ color: "#f5b301", letterSpacing: 1 }} aria-label={`${r.stars}/5`}>
+                    {"★".repeat(r.stars)}
+                    <span style={{ color: "#ddd5c8" }}>{"★".repeat(5 - r.stars)}</span>
+                  </span>
+                </div>
+                <p className="text-[14px] leading-[1.6] text-secondary">{r.publicText}</p>
+                {r.response?.text && (
+                  <div className="mt-3 border-l-2 border-line-alt pl-3">
+                    <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-2">
+                      {tr.t("hotelResponse", { hotel: hotelName })}
+                    </div>
+                    <p className="mt-0.5 text-[13px] leading-[1.55] text-muted">{r.response.text}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ambiance image */}
       <div className="relative mt-12 h-[300px] overflow-hidden rounded-[18px]">

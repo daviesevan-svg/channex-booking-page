@@ -68,6 +68,7 @@ export default [
     route("rates", "routes/admin/rates.tsx"),
     route("rates/:rateId", "routes/admin/rate.tsx"),
     route("inventory", "routes/admin/inventory.tsx"),
+    route("reviews", "routes/admin/reviews.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("ari-log", "routes/admin/ari-log.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
@@ -101,5 +102,6 @@ export default [
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
     route("manage", "routes/property/manage.tsx"),
     route("manage/:id", "routes/property/manage-booking.tsx"),
+    route("review/:bookingId", "routes/property/review.tsx"),
   ]),
 ] satisfies RouteConfig;

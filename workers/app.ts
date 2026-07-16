@@ -3,6 +3,7 @@ import { createRequestHandler } from "react-router";
 import { scheduledGoogleAriSync } from "../app/lib/google-ari/push.server";
 import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "../app/lib/google-merged-vr-feed.server";
+import { scheduledReviewRequests } from "../app/lib/review-requests.server";
 import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
 import { pruneAri } from "../app/lib/ari.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
@@ -33,5 +34,7 @@ export default {
     // Refresh the Google match status ~daily (self-throttled) so the admin page
     // reads it from KV instead of calling the slow Travel Partner API on load.
     ctx.waitUntil(refreshAllMatchStatuses().catch((e) => console.log(`[cron] refreshAllMatchStatuses failed: ${e}`)));
+    // Review requests: checkout-evening ask + up to two reminders per booking.
+    ctx.waitUntil(scheduledReviewRequests().catch((e) => console.log(`[cron] scheduledReviewRequests failed: ${e}`)));
   },
 } satisfies ExportedHandler<Env>;

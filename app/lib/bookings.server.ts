@@ -89,6 +89,8 @@ export interface BookingRecord {
   };
   /** True once the booking has decremented inventory (so cancel restores it once). */
   inventoryHeld?: boolean;
+  /** Review-request emails sent so far (max 3; stops once a review exists). */
+  reviewRequests?: { count: number; lastAt: string };
   createdAt: string;
   /** Guest's language at booking time — drives confirmation/cancellation email
    *  language. Absent on legacy bookings (falls back to the default). */

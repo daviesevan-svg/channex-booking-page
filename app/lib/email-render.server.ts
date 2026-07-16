@@ -265,6 +265,34 @@ export function renderSimpleEmail(args: {
   });
 }
 
+/** Review-request email: a row of five tappable stars, each deep-linking into
+ *  the review page with that rating prefilled (?stars=N), plus a plain fallback
+ *  link. `reviewUrl` must not already carry a query string. */
+export function renderReviewRequestEmail(args: {
+  hotelName: string;
+  accent: string;
+  heading: string;
+  body: string;
+  reviewUrl: string;
+}): string {
+  const stars = Array.from({ length: 5 }, (_, i) => {
+    const n = i + 1;
+    return `<a href="${esc(`${args.reviewUrl}?stars=${n}`)}" style="text-decoration:none;font-size:40px;line-height:1;color:#f5b301;padding:0 6px;" aria-label="${n} star${n === 1 ? "" : "s"}">★</a>`;
+  }).join("");
+  const details = `
+    <div style="text-align:center;margin:20px 0 6px;">${stars}</div>
+    <p style="text-align:center;margin:6px 0 18px;color:#8a8a8a;font-size:13px;">Tap a star to start your review</p>
+    <p style="text-align:center;margin:0;"><a href="${esc(args.reviewUrl)}" style="color:${args.accent};font-size:13px;">Or open the review page</a></p>`;
+  return shell({
+    hotelName: args.hotelName,
+    accent: args.accent,
+    heading: esc(args.heading),
+    introHtml: paragraphs(args.body),
+    details,
+    outroHtml: "",
+  });
+}
+
 /** A representative booking for editor previews + test sends. */
 export function sampleBooking(currency = "GBP"): BookingRecord {
   return {
