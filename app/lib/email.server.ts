@@ -12,7 +12,8 @@
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
-import { accentHex, composeEmail, renderSimpleEmail } from "./email-render.server";
+import { accentHex, composeEmail, renderReviewRequestEmail, renderSimpleEmail } from "./email-render.server";
+import { reviewSubject } from "./review-requests.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 
 export interface SendEmailOptions {
@@ -150,6 +151,42 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
  *  15-minute token into an email that may be read hours later). Branded with the
  *  property's name + accent. Never throws — a mail failure must not break the
  *  invite (the member is already added). */
+/** Review-request email (attempt 1–3): five tappable stars deep-linking into
+ *  the review page with the rating prefilled. Returns whether the send was
+ *  accepted so the cron only counts real attempts. Never throws. */
+export async function sendReviewRequestEmail(
+  pid: string,
+  booking: BookingRecord,
+  reviewUrl: string,
+  attempt: number,
+): Promise<boolean> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
+    const hotelName = ov.hotelName || "Your hotel";
+    const html = renderReviewRequestEmail({
+      hotelName,
+      accent: accentHex(settings),
+      heading: `How was your stay, ${booking.guest.firstName}?`,
+      body:
+        `Thanks for staying at ${hotelName}. We'd love to hear how it went — ` +
+        `your feedback helps ${hotelName} improve and helps future guests choose.\n\n` +
+        `It takes less than a minute.`,
+      reviewUrl,
+    });
+    const r = await sendEmail({
+      to: booking.guest.email,
+      subject: reviewSubject(attempt, hotelName, booking.guest.firstName),
+      html,
+      from: senderFrom(settings, getConfig()),
+      replyTo: settings.emailReplyTo,
+    });
+    return r.sent;
+  } catch (e) {
+    console.log(`[email] sendReviewRequestEmail failed: ${e instanceof Error ? e.message : e}`);
+    return false;
+  }
+}
+
 export async function sendTeamInviteEmail(
   pid: string,
   toEmail: string,

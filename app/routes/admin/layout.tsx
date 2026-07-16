@@ -66,6 +66,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/analytics", label: "Analytics" },
         { to: "/admin/ari-log", label: "Change log" },
         { to: "/admin/bookings", label: "Bookings" },
+        { to: "/admin/reviews", label: "Reviews" },
       ],
     },
     {
