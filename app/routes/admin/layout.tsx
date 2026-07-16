@@ -206,7 +206,12 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               </label>
             )}
             {propertyId && (
-              <Link to={`/${propertyId}`} className="hover:text-accent" target="_blank">
+              // Prefer the slug — it's the address guests actually see/share.
+              <Link
+                to={`/${properties.find((p) => p.id === propertyId)?.slug || propertyId}`}
+                className="hover:text-accent"
+                target="_blank"
+              >
                 View site ↗
               </Link>
             )}
