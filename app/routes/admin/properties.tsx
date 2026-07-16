@@ -14,6 +14,7 @@ import {
   setPropertyOwner,
   setPropertyPublic,
 } from "~/lib/properties.server";
+import { cloneProperty } from "~/lib/clone-property.server";
 import { getUsers, isSuperadmin } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -66,6 +67,15 @@ export async function action({ request }: Route.ActionArgs) {
   // Destructive / structural changes require ownership (or superadmin) — a
   // teammate must not delete, rename, or change the public state of a property.
   if (!(await isOwnerOrSuper(request, id))) return redirect("/admin/properties");
+
+  if (intent === "clone") {
+    // Copy of a property's content (rooms, rates, texts, taxes, extras…) under
+    // a fresh id — e.g. one clone per apartment for Google Vacation Rentals.
+    // Connections (Channex, Google push), slug and public state are NOT copied.
+    const newId = await cloneProperty(id, email);
+    // Switch to the clone so the host can rename it and prune rooms right away.
+    return redirect("/admin", { headers: { "Set-Cookie": await setSessionProperty(request, newId) } });
+  }
 
   if (intent === "rename") {
     await renameProperty(id, String(form.get("name") || ""));
@@ -193,6 +203,25 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className="text-accent hover:underline">
                       Edit
+                    </button>
+                  </Form>
+                )}
+                {p.canManage && (
+                  <Form
+                    method="post"
+                    onSubmit={(e) => {
+                      if (
+                        !confirm(
+                          `Clone “${p.name}”? Rooms, rates, texts, taxes and extras are copied to a new property (connections, web address and public listing are not). Handy for multiple apartments in one building: clone once per unit, then delete the rooms that don't apply.`,
+                        )
+                      )
+                        e.preventDefault();
+                    }}
+                  >
+                    <input type="hidden" name="intent" value="clone" />
+                    <input type="hidden" name="id" value={p.id} />
+                    <button type="submit" disabled={saving} className="hover:text-accent hover:underline disabled:opacity-60">
+                      Clone
                     </button>
                   </Form>
                 )}
