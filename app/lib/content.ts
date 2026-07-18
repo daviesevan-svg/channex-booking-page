@@ -211,9 +211,13 @@ export interface SiteSettings {
   /** Property cover photo (/images/… path). Used as the property's image on the
    *  Collections cards; falls back to the cheapest room's photo when unset. */
   coverImage?: string;
-  /** Property logo (/images/… path). Replaces the diamond + name lockup in the
-   *  guest booking header when set (alt text stays the hotel name). */
+  /** Property logo (/images/… path). Shown in the guest booking header in place
+   *  of the diamond mark; the hotel name stays beside it unless `logoHideName`
+   *  is set (for logos that already read as a wordmark). */
   logoImage?: string;
+  /** Hide the text hotel name in the header when a logo is set — for logos that
+   *  already contain the name. Ignored when there's no logo. */
+  logoHideName?: boolean;
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;
   privacyUrl?: string;

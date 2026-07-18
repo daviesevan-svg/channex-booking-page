@@ -140,7 +140,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.5.0",
+    version: "1.6.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -444,6 +444,7 @@ export const openApiSpec = {
           },
           cover_image: { type: ["string", "null"], description: "Cover photo URL path." },
           logo: { type: ["string", "null"], description: "Logo URL path (shown in the booking header)." },
+          logo_hide_name: { type: "boolean", description: "When true, the header shows the logo only; when false, the hotel name text is shown alongside the logo." },
           theme: {
             type: "object",
             description: "Brand tokens so an external frontend can match the property's look.",

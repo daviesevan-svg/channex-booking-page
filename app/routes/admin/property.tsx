@@ -72,6 +72,9 @@ export async function action({ request }: Route.ActionArgs) {
   } else if (form.get("removeLogo") === "1") {
     await patchSettings(propertyId, { logoImage: "" });
   }
+  // Whether to hide the text hotel name beside the logo (only meaningful when a
+  // logo is set; the guest header ignores it otherwise).
+  await patchSettings(propertyId, { logoHideName: form.get("logoHideName") === "1" });
   // Property amenities (global; shown to guests + sent to Google). Only known
   // vocabulary keys / enum values are stored. Unit size is a Google VR go-live
   // requirement for single-unit properties; blank leaves the stored value.
@@ -202,8 +205,9 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           </span>
         </label>
 
-        {/* Logo — replaces the diamond + name lockup in the guest booking
-            header. Global (not per-language). */}
+        {/* Logo — shown in the guest booking header in place of the diamond
+            mark. The hotel name stays beside it unless "Hide name" is ticked.
+            Global (not per-language). */}
         <div>
           <div className="mb-1.5 text-[13px] font-semibold text-secondary">Logo</div>
           {settings.logoImage ? (
@@ -217,7 +221,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             </div>
           ) : (
             <p className="mb-2 text-[12.5px] text-muted">
-              No logo set — the booking pages show your hotel name as text. Upload one to replace it.
+              No logo set — the booking pages show your hotel name as text. Upload one to show it alongside the name.
             </p>
           )}
           <input
@@ -229,6 +233,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           <p className="mt-1 text-[11px] text-faint">
             Shown ~40px tall in the booking header — a wide wordmark on a transparent background (PNG/WebP) works best.
           </p>
+          {settings.logoImage && (
+            <label className="mt-2.5 flex items-center gap-2 text-[13px] text-secondary">
+              <input type="checkbox" name="logoHideName" value="1" defaultChecked={settings.logoHideName ?? false} />
+              Hide the hotel name text — my logo already includes the name
+            </label>
+          )}
         </div>
 
         {/* Cover photo — the property's image on Collections cards. Global (not

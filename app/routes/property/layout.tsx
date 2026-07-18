@@ -37,6 +37,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     currency: settings.currency || "GBP",
     hotelName: overrides.hotelName || "Your hotel",
     logoImage: settings.logoImage || null,
+    logoHideName: settings.logoHideName ?? false,
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
@@ -108,7 +109,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, logoImage, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
+  const { property, currency, hotelName, logoImage, logoHideName, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -172,9 +173,17 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4 px-7 py-4">
           <Link to={base} className="flex items-center gap-3">
             {logoImage ? (
-              // Most logos are wordmarks, so the image replaces the whole
-              // lockup; the hotel name stays as alt text for accessibility.
-              <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
+              // The logo replaces the diamond mark. The hotel name stays beside
+              // it by default; hide it (logoHideName) only for logos that already
+              // read as a wordmark. Alt text keeps the name for accessibility.
+              <>
+                <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
+                {!logoHideName && (
+                  <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">
+                    {hotelName}
+                  </span>
+                )}
+              </>
             ) : (
               <>
                 <span
