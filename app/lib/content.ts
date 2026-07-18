@@ -587,6 +587,16 @@ const FAILED_TOKENS: TokenDef[] = [
   ...GUEST_TOKENS.filter((t) => t.token !== "{manage_url}"),
   { token: "{refund_amount}", desc: "Amount refunded to the guest, with currency" },
 ];
+// The review request has no money/manage link — just stay context. The star
+// rating buttons and the review link are rendered by the system, not typed.
+const REVIEW_TOKENS: TokenDef[] = [
+  { token: "{hotel_name}", desc: "Your property's name" },
+  { token: "{guest_first_name}", desc: "Guest's first name" },
+  { token: "{guest_last_name}", desc: "Guest's last name" },
+  { token: "{checkin}", desc: "Check-in date" },
+  { token: "{checkout}", desc: "Check-out date" },
+  { token: "{nights}", desc: "Number of nights" },
+];
 
 const emailFields = (o: { subject: string; heading: string; intro: string; outro: string }): PageField[] => [
   { key: "subject", label: "Subject line", default: o.subject },
@@ -658,6 +668,19 @@ export const EMAIL_TEMPLATES: EmailDef[] = [
       intro:
         "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. We've refunded {refund_amount} in full to your card — it can take a few days to appear.",
       outro: "We're sorry for the disappointment. Please try different dates, and do reach out if we can help.",
+    }),
+  },
+  {
+    id: "review_request",
+    label: "Review request",
+    recipient: "guest",
+    tokens: REVIEW_TOKENS,
+    fields: emailFields({
+      subject: "How was your stay at {hotel_name}?",
+      heading: "How was your stay, {guest_first_name}?",
+      intro:
+        "Thanks for staying at {hotel_name}. We'd love to hear how it went — your feedback helps us improve and helps future guests choose.\n\nIt only takes a minute — just tap a star below to begin.",
+      outro: "",
     }),
   },
 ];

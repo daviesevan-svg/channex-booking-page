@@ -60,6 +60,39 @@ function addDaysISO(dateISO: string, n: number): string {
   return new Date(Date.parse(`${dateISO}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** UTC epoch ms for `hour`:00 local wall-time on `dateISO` (YYYY-MM-DD) in `tz`.
+ *  One-shot offset correction (accurate except across a DST transition at that
+ *  exact hour, which doesn't matter for a 17:00 "evening" send). Falls back to
+ *  treating the wall-time as UTC when tz is missing or invalid. */
+export function localTimeToUtcMs(dateISO: string, hour: number, tz?: string): number {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const guess = Date.UTC(y, (m || 1) - 1, d || 1, hour, 0, 0);
+  if (!tz) return guess;
+  try {
+    const parts = Object.fromEntries(
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      })
+        .formatToParts(new Date(guess))
+        .map((p) => [p.type, p.value]),
+    );
+    let h = parseInt(parts.hour, 10);
+    if (h === 24) h = 0;
+    // How far the local wall-clock is ahead of UTC at this instant.
+    const offset = Date.UTC(+parts.year, +parts.month - 1, +parts.day, h, +parts.minute, +parts.second) - guess;
+    return guess - offset;
+  } catch {
+    return guess; // invalid tz → treat wall-time as UTC
+  }
+}
+
 /** Parse "HH:MM" to minutes-since-midnight, or null if malformed. */
 function parseHHMM(t?: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec((t ?? "").trim());

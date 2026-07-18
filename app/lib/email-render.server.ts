@@ -265,32 +265,59 @@ export function renderSimpleEmail(args: {
   });
 }
 
-/** Review-request email: a row of five tappable stars, each deep-linking into
- *  the review page with that rating prefilled (?stars=N), plus a plain fallback
- *  link. `reviewUrl` must not already carry a query string. */
-export function renderReviewRequestEmail(args: {
-  hotelName: string;
-  accent: string;
-  heading: string;
-  body: string;
-  reviewUrl: string;
-}): string {
+/** Plain token values for the review-request template (no money/manage link). */
+export function reviewVars(booking: BookingRecord, hotelName: string): Record<string, string> {
+  return {
+    hotel_name: hotelName,
+    guest_first_name: booking.guest.firstName,
+    guest_last_name: booking.guest.lastName,
+    checkin: fmtDate(booking.checkin),
+    checkout: fmtDate(booking.checkout),
+    nights: String(booking.nights),
+  };
+}
+
+/** The system-rendered widget for the review email: a row of five tappable
+ *  stars, each deep-linking into the review page with that rating prefilled
+ *  (?stars=N), plus a plain fallback link. `reviewUrl` must have no query. */
+function reviewStarsHtml(reviewUrl: string, accent: string): string {
   const stars = Array.from({ length: 5 }, (_, i) => {
     const n = i + 1;
-    return `<a href="${esc(`${args.reviewUrl}?stars=${n}`)}" style="text-decoration:none;font-size:40px;line-height:1;color:#f5b301;padding:0 6px;" aria-label="${n} star${n === 1 ? "" : "s"}">★</a>`;
+    return `<a href="${esc(`${reviewUrl}?stars=${n}`)}" style="text-decoration:none;font-size:40px;line-height:1;color:#f5b301;padding:0 6px;" aria-label="${n} star${n === 1 ? "" : "s"}">★</a>`;
   }).join("");
-  const details = `
+  return `
     <div style="text-align:center;margin:20px 0 6px;">${stars}</div>
     <p style="text-align:center;margin:6px 0 18px;color:#8a8a8a;font-size:13px;">Tap a star to start your review</p>
-    <p style="text-align:center;margin:0;"><a href="${esc(args.reviewUrl)}" style="color:${args.accent};font-size:13px;">Or open the review page</a></p>`;
-  return shell({
-    hotelName: args.hotelName,
-    accent: args.accent,
-    heading: esc(args.heading),
-    introHtml: paragraphs(args.body),
-    details,
-    outroHtml: "",
-  });
+    <p style="text-align:center;margin:0;"><a href="${esc(reviewUrl)}" style="color:${accent};font-size:13px;">Or open the review page</a></p>`;
+}
+
+/** Compose the review-request email (subject + HTML) from the editable template
+ *  text: operator prose (subject/heading/intro/outro) surrounds the system star
+ *  widget. Mirrors composeEmail, but the details slot is the stars, not the
+ *  booking breakdown. */
+export function composeReviewEmail(args: {
+  text: Record<string, string>;
+  booking: BookingRecord;
+  hotelName: string;
+  accent: string;
+  reviewUrl: string;
+}): { subject: string; html: string } {
+  const vars = reviewVars(args.booking, args.hotelName);
+  const subject = renderTemplate(args.text.subject ?? "", vars);
+  const heading = esc(renderTemplate(args.text.heading ?? "", vars));
+  const introHtml = paragraphs(renderTemplate(args.text.intro ?? "", vars));
+  const outroHtml = paragraphs(renderTemplate(args.text.outro ?? "", vars));
+  return {
+    subject,
+    html: shell({
+      hotelName: args.hotelName,
+      accent: args.accent,
+      heading,
+      introHtml,
+      details: reviewStarsHtml(args.reviewUrl, args.accent),
+      outroHtml,
+    }),
+  };
 }
 
 /** A representative booking for editor previews + test sends. */

@@ -117,6 +117,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/emails/booking_cancellation", label: "Cancellation (guest)" },
         { to: "/admin/emails/cancellation_notification", label: "Cancellation (to you)" },
         { to: "/admin/emails/booking_failed", label: "Couldn't confirm (guest)" },
+        { to: "/admin/emails/review_request", label: "Review request" },
       ],
     },
   ];
