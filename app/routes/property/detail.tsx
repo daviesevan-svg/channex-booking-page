@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
 
@@ -194,6 +194,8 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const { currency } = useProperty();
   const tr = useT();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
+  // Full-screen photo viewer; null = closed, otherwise the galleryPhotos index.
+  const [lightbox, setLightbox] = useState<number | null>(null);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const navigation = useNavigation();
@@ -297,25 +299,65 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         ← {text.backLink}
       </Link>
 
-      {/* gallery */}
+      {/* gallery — click any photo to open the full-screen viewer */}
       <div className="mb-7 flex h-[380px] gap-3">
-        <div className="flex-[2] overflow-hidden rounded-[16px]" style={{ background: stripe }}>
-          {hero && <img src={hero} alt={room.title} className="h-full w-full object-cover" />}
-        </div>
+        <button
+          type="button"
+          onClick={() => hero && setLightbox(0)}
+          disabled={!hero}
+          aria-label={tr.t("viewAllPhotos")}
+          className="group relative flex-[2] overflow-hidden rounded-[16px] disabled:cursor-default"
+          style={{ background: stripe }}
+        >
+          {hero && (
+            <img
+              src={hero}
+              alt={room.title}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          )}
+          {galleryPhotos.length > 1 && (
+            <span className="pointer-events-none absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-[13px] font-semibold text-white backdrop-blur-sm">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="m21 15-5-5L5 21" />
+              </svg>
+              {tr.t("viewAllPhotos")} · {galleryPhotos.length}
+            </span>
+          )}
+        </button>
         <div className="flex flex-1 flex-col gap-3">
-          {[0, 1].map((i) => (
-            <div
-              key={i}
-              className="flex-1 overflow-hidden rounded-[16px]"
-              style={{ background: stripe }}
-            >
-              {thumbs[i] && (
-                <img src={thumbs[i].url} alt="" className="h-full w-full object-cover" />
-              )}
-            </div>
-          ))}
+          {[0, 1].map((i) => {
+            const more = galleryPhotos.length - 3;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => thumbs[i] && setLightbox(i + 1)}
+                disabled={!thumbs[i]}
+                aria-label={tr.t("viewAllPhotos")}
+                className="group relative flex-1 overflow-hidden rounded-[16px] disabled:cursor-default"
+                style={{ background: stripe }}
+              >
+                {thumbs[i] && (
+                  <img
+                    src={thumbs[i].url}
+                    alt=""
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                  />
+                )}
+                {i === 1 && more > 0 && thumbs[i] && (
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[19px] font-semibold text-white">
+                    +{more}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
+      <Lightbox photos={galleryPhotos} index={lightbox} title={room.title} tr={tr} onChange={setLightbox} onClose={() => setLightbox(null)} />
 
       <div className="flex flex-wrap items-start gap-10">
         <div className="min-w-[320px] flex-[1.6]">
@@ -503,5 +545,95 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         </div>
       </div>
     </main>
+  );
+}
+
+/** Full-screen photo viewer: one large image with prev/next, a counter, and
+ *  close (× button, backdrop click, or Escape). Arrow keys page through. */
+function Lightbox({
+  photos,
+  index,
+  title,
+  tr,
+  onChange,
+  onClose,
+}: {
+  photos: { url: string }[];
+  index: number | null;
+  title: string;
+  tr: Translator;
+  onChange: (i: number) => void;
+  onClose: () => void;
+}) {
+  const total = photos.length;
+  useEffect(() => {
+    if (index == null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") onChange((index + 1) % total);
+      else if (e.key === "ArrowLeft") onChange((index - 1 + total) % total);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, total, onChange, onClose]);
+  if (index == null || total === 0) return null;
+
+  const arrow =
+    "absolute top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/12 text-3xl leading-none text-white hover:bg-white/25";
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={tr.t("viewAllPhotos")}
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/12 text-2xl leading-none text-white hover:bg-white/25"
+      >
+        ×
+      </button>
+      {total > 1 && (
+        <button
+          type="button"
+          aria-label="Previous"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange((index - 1 + total) % total);
+          }}
+          className={`${arrow} left-4`}
+        >
+          ‹
+        </button>
+      )}
+      <figure onClick={(e) => e.stopPropagation()} className="flex max-h-full flex-col items-center">
+        <img
+          src={photos[index].url}
+          alt={title}
+          className="max-h-[82vh] w-auto max-w-full rounded-[12px] object-contain"
+        />
+        {total > 1 && (
+          <figcaption className="mt-3 text-[13px] text-white/70">
+            {index + 1} / {total}
+          </figcaption>
+        )}
+      </figure>
+      {total > 1 && (
+        <button
+          type="button"
+          aria-label="Next"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange((index + 1) % total);
+          }}
+          className={`${arrow} right-4`}
+        >
+          ›
+        </button>
+      )}
+    </div>
   );
 }
