@@ -59,6 +59,7 @@ export function serializePropertyContent(
     },
     cover_image: settings.coverImage ?? null,
     logo: settings.logoImage ?? null,
+    logo_hide_name: settings.logoHideName === true, // true = show logo only, no name text
     theme: {
       accent,
       background: settings.customBg ?? null,
