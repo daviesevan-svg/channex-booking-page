@@ -12,8 +12,7 @@
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
-import { accentHex, composeEmail, renderReviewRequestEmail, renderSimpleEmail } from "./email-render.server";
-import { reviewSubject } from "./review-requests.server";
+import { accentHex, composeEmail, composeReviewEmail, renderSimpleEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 
 export interface SendEmailOptions {
@@ -158,24 +157,24 @@ export async function sendReviewRequestEmail(
   pid: string,
   booking: BookingRecord,
   reviewUrl: string,
-  attempt: number,
 ): Promise<boolean> {
   try {
-    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
+    const [settings, ov, text] = await Promise.all([
+      getSettings(pid),
+      getOverrides(pid, booking.lang),
+      getEmailTemplate(pid, "review_request", booking.lang),
+    ]);
     const hotelName = ov.hotelName || "Your hotel";
-    const html = renderReviewRequestEmail({
+    const { subject, html } = composeReviewEmail({
+      text,
+      booking,
       hotelName,
       accent: accentHex(settings),
-      heading: `How was your stay, ${booking.guest.firstName}?`,
-      body:
-        `Thanks for staying at ${hotelName}. We'd love to hear how it went — ` +
-        `your feedback helps ${hotelName} improve and helps future guests choose.\n\n` +
-        `It takes less than a minute.`,
       reviewUrl,
     });
     const r = await sendEmail({
       to: booking.guest.email,
-      subject: reviewSubject(attempt, hotelName, booking.guest.firstName),
+      subject,
       html,
       from: senderFrom(settings, getConfig()),
       replyTo: settings.emailReplyTo,

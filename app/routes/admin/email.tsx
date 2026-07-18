@@ -6,7 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
-import { accentHex, bookingVars, composeEmail, sampleBooking } from "~/lib/email-render.server";
+import { accentHex, bookingVars, composeEmail, composeReviewEmail, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail } from "~/lib/email.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 
@@ -28,8 +28,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   ]);
   const hotelName = ov.hotelName || "Your hotel";
   const sample = sampleBooking(settings.currency || "GBP");
-  const manageUrl = `${new URL(request.url).origin}/${pid}/manage/${sample.id}`;
-  const { subject, html } = composeEmail({ def, text, booking: sample, hotelName, accent: accentHex(settings), manageUrl });
+  const origin = new URL(request.url).origin;
+  const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
+  const { subject, html } =
+    def.id === "review_request"
+      ? composeReviewEmail({ text, booking: sample, hotelName, accent: accentHex(settings), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
+      : composeEmail({ def, text, booking: sample, hotelName, accent: accentHex(settings), manageUrl });
 
   // Example value per token, for the "variables" reference table.
   const vars = bookingVars(sample, hotelName, manageUrl);
@@ -69,15 +73,13 @@ export async function action({ params, request }: Route.ActionArgs) {
       getEmailTemplate(pid, params.template, lang),
     ]);
     const sample = sampleBooking(settings.currency || "GBP");
-    const manageUrl = `${new URL(request.url).origin}/${pid}/manage/${sample.id}`;
-    const { subject, html } = composeEmail({
-      def,
-      text,
-      booking: sample,
-      hotelName: ov.hotelName || "Your hotel",
-      accent: accentHex(settings),
-      manageUrl,
-    });
+    const origin = new URL(request.url).origin;
+    const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
+    const hotelName = ov.hotelName || "Your hotel";
+    const { subject, html } =
+      def.id === "review_request"
+        ? composeReviewEmail({ text, booking: sample, hotelName, accent: accentHex(settings), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
+        : composeEmail({ def, text, booking: sample, hotelName, accent: accentHex(settings), manageUrl });
     const { sent, error } = await sendEmail({ to: adminEmail, subject, html, replyTo: settings.emailReplyTo });
     return sent
       ? { ok: true as const, message: `Test sent to ${adminEmail}.` }
@@ -109,7 +111,11 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
     );
   }
 
-  const { label, recipient, fields, overrides, tokens, lang, previewSubject, previewHtml } = loaderData;
+  const { label, recipient, fields, overrides, tokens, lang, previewSubject, previewHtml, template } = loaderData;
+  const autoInserted =
+    template === "review_request"
+      ? "the star-rating buttons and the review link are inserted automatically after the intro"
+      : `the booking details (rooms, dates, prices, amount due, ${recipient === "guest" ? "manage-booking link" : "guest contact details"}) are inserted automatically between the intro and outro`;
 
   // Build a paste-ready brief from the live field values for AI editing.
   const copyBrief = async () => {
@@ -125,7 +131,7 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
       tokenLines,
       `- Do NOT invent new tokens; unknown ones appear literally in the email.`,
       `- Plain text only — no HTML. Line breaks are preserved.`,
-      `- The booking details (rooms, dates, prices, amount due, ${recipient === "guest" ? "manage-booking link" : "guest contact details"}) are inserted automatically between the intro and outro — do not recreate them.`,
+      `- Note: ${autoInserted} — do not recreate them.`,
       ``,
       `Current template:`,
       `SUBJECT: ${val("subject")}`,
@@ -155,8 +161,11 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
         )}
       </div>
       <p className="mb-5 text-[14px] text-muted">
-        Edit the wording guests {recipient === "host" ? "and you" : ""} see. The booking details block is added
-        automatically — you only write the surrounding text. Empty fields use the defaults shown.
+        Edit the wording guests {recipient === "host" ? "and you" : ""} see.{" "}
+        {template === "review_request"
+          ? "The star-rating buttons and review link are added automatically"
+          : "The booking details block is added automatically"}{" "}
+        — you only write the surrounding text. Empty fields use the defaults shown.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">
