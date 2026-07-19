@@ -72,6 +72,7 @@ export function bookingVars(
   // and {due_at_hotel} is the true remainder — not the policy's pre-payment split.
   const paid = booking.payment?.mode === "payment" ? (booking.payment.amount ?? 0) : 0;
   const dueNow = paid > 0 ? paid : (booking.consent?.dueNow ?? 0);
+  const voucherPaid = booking.voucher?.amount ?? 0;
   return {
     hotel_name: hotelName,
     guest_first_name: booking.guest.firstName,
@@ -82,7 +83,7 @@ export function bookingVars(
     nights: String(booking.nights),
     total: money(booking.total),
     due_now: money(dueNow),
-    due_at_hotel: money(Math.max(0, booking.total - dueNow)),
+    due_at_hotel: money(Math.max(0, booking.total - voucherPaid - dueNow)),
     refund_amount: money(booking.payment?.refund?.amount ?? booking.payment?.amount ?? 0),
     manage_url: manageUrl,
     guest_email: booking.guest.email,
@@ -105,7 +106,10 @@ function detailsHtml(
   // stores a guarantee card — nothing is charged, so it stays "due".)
   const paid = booking.payment?.mode === "payment" ? (booking.payment.amount ?? 0) : 0;
   const dueNow = booking.consent?.dueNow ?? 0;
-  const dueAtHotel = Math.max(0, booking.total - (paid > 0 ? paid : dueNow));
+  // A gift voucher applied at checkout covered part of the payment — it counts
+  // as paid when computing what's left for the hotel to collect.
+  const voucherPaid = booking.voucher?.amount ?? 0;
+  const dueAtHotel = Math.max(0, booking.total - voucherPaid - (paid > 0 ? paid : dueNow));
 
   const occ = (a: number, c: number) =>
     `${a} adult${a === 1 ? "" : "s"}${c ? `, ${c} child${c === 1 ? "" : "ren"}` : ""}`;
@@ -173,6 +177,7 @@ function detailsHtml(
       ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
         ${ROW("Total", money(booking.total), true)}
+        ${booking.voucher?.amount ? ROW(`Gift voucher ${booking.voucher.code}`, `−${money(booking.voucher.amount)}`) : ""}
         ${paid > 0 ? ROW("Paid", money(paid)) : dueNow > 0 ? ROW("Due now", money(dueNow)) : ""}
         ${dueAtHotel > 0 ? ROW("Due at the hotel", money(dueAtHotel)) : ""}
       </table>

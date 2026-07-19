@@ -8,6 +8,8 @@ import { z } from "zod";
 
 import type { Route } from "./+types/checkout";
 import type { RoomWithRates } from "~/lib/channex/types";
+import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
+import { getVoucherByCode, holdGiftAmount, releaseGiftHold } from "~/lib/vouchers.server";
 import { useProperty } from "~/lib/booking-context";
 import {
   cartCoverage,
@@ -269,6 +271,18 @@ export async function action({ params, request }: Route.ActionArgs) {
     return applied ? { appliedPromo: applied } : { promoError: true, promoCode: normalizeCode(promoCode) };
   }
 
+  // Gift-voucher preview — validate the code and return the spendable balance;
+  // the UI shows how much of the due-now it covers. Re-validated at book time.
+  if (intent === "applyVoucher") {
+    const raw = String(form.get("voucherCode") || "").trim();
+    if (!raw) return { appliedVoucher: null };
+    const gv = await getVoucherByCode(stay.channelId, normalizeVoucherCode(raw)).catch(() => null);
+    const balance = gv && gv.kind === "gift" && displayStatus(gv) === "active" ? giftBalance(gv) : 0;
+    return gv && balance > 0
+      ? { appliedVoucher: { code: gv.code, balance } }
+      : { voucherError: true as const, voucherCode: normalizeVoucherCode(raw) };
+  }
+
   const parsed = GuestSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) {
     return { errors: parsed.error.flatten().fieldErrors };
@@ -328,6 +342,23 @@ export async function action({ params, request }: Route.ActionArgs) {
   // charged-today rate needs the distinct acknowledgment too.
   const policy = await resolveBookingPolicy(stay.channelId, lines.map((l) => l.rateId));
   const due = dueNow(policy, grandTotal, nights);
+
+  // Gift voucher: covers (part of) the amount due today. Re-resolved
+  // server-side — a code that stopped being valid must not book unpaid.
+  const voucherCodeInput = String(form.get("voucherCode") || "").trim();
+  let voucherHold: { code: string; amount: number } | undefined;
+  if (voucherCodeInput) {
+    const gv = await getVoucherByCode(stay.channelId, normalizeVoucherCode(voucherCodeInput)).catch(() => null);
+    const balance = gv && gv.kind === "gift" && displayStatus(gv) === "active" ? giftBalance(gv) : 0;
+    if (!gv || balance <= 0) {
+      return { voucherError: true as const, voucherCode: normalizeVoucherCode(voucherCodeInput) };
+    }
+    // Pay-at-hotel rates collect nothing online — the voucher can't apply here
+    // (v1 simplification; the guest presents it at the desk instead).
+    if (due <= 0) return { voucherError: "payAtHotel" as const, voucherCode: gv.code };
+    voucherHold = { code: gv.code, amount: Math.min(balance, Math.round(due * 100) / 100) };
+  }
+  const dueAfterVoucher = Math.round((due - (voucherHold?.amount ?? 0)) * 100) / 100;
   // A refundable rate whose free-cancellation window has already closed is, for
   // this booking, non-refundable — so it needs the same acknowledgment.
   const cancelAtBooking = policyToCancellation(policy, stay.checkin);
@@ -335,7 +366,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     cancelAtBooking.refundable && cancelAtBooking.cancelByISO != null && Date.now() > parseISO(cancelAtBooking.cancelByISO).getTime();
   // Mirrors the UI: the charged-today acknowledgment is only required when a
   // card is really collected (live + Stripe connected + something due).
-  const chargesToday = live && Boolean(settings.stripeAccountId && config.stripeSecretKey) && due > 0;
+  const chargesToday = live && Boolean(settings.stripeAccountId && config.stripeSecretKey) && dueAfterVoucher > 0;
   const needAck = !policy.cancellation.refundable || freeWindowClosed || chargesToday;
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
@@ -351,7 +382,9 @@ export async function action({ params, request }: Route.ActionArgs) {
       undefined,
     userAgent: request.headers.get("user-agent") || undefined,
     policyText: [desc.payment, desc.cancellation, desc.noShow].filter(Boolean),
-    dueNow: due,
+    // What's actually charged today (after any gift voucher) — the finalize
+    // tripwire compares this against the Stripe amount.
+    dueNow: dueAfterVoucher,
     nonRefundableAck: needAck ? nonRefundableAck : undefined,
     marketingOptIn: form.get("marketing") === "on",
   };
@@ -392,13 +425,16 @@ export async function action({ params, request }: Route.ActionArgs) {
     origin: url.origin,
     returnParams: next.toString(),
     providerCode: config.providerCode,
+    voucherPayment: voucherHold,
   });
 
   // Stripe is needed to charge a deposit/prepay (mode=payment) or to save a
   // guarantee card for a pay-at-hotel rate that asks for one (mode=setup).
   const needsGuarantee = due === 0 && policy.payment.card === "guarantee";
   const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
-  const stripeMode: "payment" | "setup" | null = due > 0 ? "payment" : needsGuarantee ? "setup" : null;
+  // A due fully covered by the voucher needs no charge (and no guarantee card —
+  // the stay is paid); the remainder, if any, goes through Stripe as usual.
+  const stripeMode: "payment" | "setup" | null = dueAfterVoucher > 0 ? "payment" : needsGuarantee ? "setup" : null;
 
   // Only take a real payment in LIVE mode. In test mode the booking is
   // simulated and pushed nowhere, so charging would take money for a booking
@@ -406,7 +442,16 @@ export async function action({ params, request }: Route.ActionArgs) {
   // finalize below.
   // A paid rate with no way to charge must not book unpaid. A guarantee-only
   // rate without Stripe just books without a card (no-show cover is optional).
-  if (live && due > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
+  if (live && dueAfterVoucher > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
+
+  // Reserve the voucher amount before any payment/booking side effects: a hold
+  // that counts against the balance (so a shared code can't double-spend), with
+  // a TTL matching the payment window. finalizeBooking settles or releases it.
+  if (voucherHold) {
+    const ttl = live && stripeMode && stripeConnected ? 3 * 3600 * 1000 : 15 * 60 * 1000;
+    const held = await holdGiftAmount(stay.channelId, voucherHold.code, reference, voucherHold.amount, ttl);
+    if (!held.ok) return { voucherError: true as const, voucherCode: voucherHold.code };
+  }
 
   if (live && stripeMode && stripeConnected) {
     const account = settings.stripeAccountId as string;
@@ -440,12 +485,13 @@ export async function action({ params, request }: Route.ActionArgs) {
 
     let sessionParams: Record<string, unknown>;
     if (stripeMode === "payment") {
-      const amountMinor = Math.round(due * 100);
+      const amountMinor = Math.round(dueAfterVoucher * 100);
       const feeBps = config.stripePlatformFeeBps;
+      const voucherNote = voucherHold ? ` ${money(voucherHold.amount)} covered by gift voucher ${voucherHold.code}.` : "";
       const balanceNote =
-        balance > 0
+        (balance > 0
           ? `Deposit due now — ${money(balance)} balance payable at the hotel.`
-          : "Your stay is paid in full.";
+          : "Your stay is paid in full.") + voucherNote;
       sessionParams = {
         ...common,
         mode: "payment",
@@ -468,8 +514,8 @@ export async function action({ params, request }: Route.ActionArgs) {
           submit: {
             message:
               balance > 0
-                ? `Paying ${money(due)} now to secure your stay at ${hotelName}; ${money(balance)} is due at the hotel.`
-                : `Paying ${money(due)} for your stay at ${hotelName}.`,
+                ? `Paying ${money(dueAfterVoucher)} now to secure your stay at ${hotelName}; ${money(balance)} is due at the hotel.`
+                : `Paying ${money(dueAfterVoucher)} for your stay at ${hotelName}.`,
           },
         },
       };
@@ -498,9 +544,13 @@ export async function action({ params, request }: Route.ActionArgs) {
       console.log(
         `[checkout] stripe session failed for pid=${stay.channelId} acct=${account}: ${e instanceof Error ? e.message : e}`,
       );
+      if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
       return { paymentError: "failed" as const };
     }
-    if (!sessionUrl) return { paymentError: "failed" as const };
+    if (!sessionUrl) {
+      if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+      return { paymentError: "failed" as const };
+    }
     throw redirect(sessionUrl);
   }
 
@@ -567,6 +617,11 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       ? undefined
       : (loaderData.urlPromo ?? undefined);
   const promoCodeValue = actionData?.promoCode ?? appliedPromo?.code ?? "";
+  const voucherError = actionData && "voucherError" in actionData ? actionData.voucherError : false;
+  const appliedVoucher =
+    actionData && "appliedVoucher" in actionData ? (actionData.appliedVoucher ?? undefined) : undefined;
+  const voucherCodeValue =
+    (actionData && "voucherCode" in actionData ? actionData.voucherCode : undefined) ?? appliedVoucher?.code ?? "";
   const submitting = nav.state === "submitting";
 
   const discount = appliedPromo?.discount ?? 0;
@@ -592,6 +647,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   // ---- payment + policy summary (display only; no real charging) ----
   const due = dueNow(policy, grandTotal, nights);
   const atHotel = Math.round((grandTotal - due) * 100) / 100;
+  // Gift voucher preview: how much of the due-now the applied voucher covers.
+  const voucherApplied = appliedVoucher && due > 0 ? Math.min(appliedVoucher.balance, due) : 0;
+  const dueShown = Math.round((due - voucherApplied) * 100) / 100;
   const cardCharged = policy.payment.card === "charge_at_booking" || policy.payment.timing === "full_prepay";
   const penaltyPhrase = (penalty: string, value?: number) => {
     switch (penalty) {
@@ -634,13 +692,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   // "Charged today" is only true when a card is really collected at checkout —
   // a prepay policy without payments set up charges nothing, so the guest must
   // not be asked to acknowledge a charge that won't happen.
-  const chargedToday = due > 0 && collectsCard;
+  const chargedToday = dueShown > 0 && collectsCard;
   const needAck = nonRefundable || chargedToday;
   const ackText = nonRefundable
     ? chargedToday
-      ? tr.t("ackNonRefundableCharged", { amount: formatMoney(due, currency) })
+      ? tr.t("ackNonRefundableCharged", { amount: formatMoney(dueShown, currency) })
       : tr.t("ackNonRefundable")
-    : tr.t("ackCharged", { amount: formatMoney(due, currency) });
+    : tr.t("ackCharged", { amount: formatMoney(dueShown, currency) });
   const [agree, setAgree] = useState(false);
   const [ack, setAck] = useState(false);
   const [marketing, setMarketing] = useState(false);
@@ -712,9 +770,17 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 note below. */}
             {collectsCard && (
               <div className="mb-3 flex flex-col gap-1.5 text-[14.5px]">
+                {voucherApplied > 0 && appliedVoucher && (
+                  <div className="flex justify-between text-[#3f7a52]">
+                    <span>
+                      {tr.t("voucherAppliedLabel")} ({appliedVoucher.code})
+                    </span>
+                    <span className="font-semibold">−{formatMoney(voucherApplied, currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-secondary">{tr.t("dueNow")}</span>
-                  <span className="font-semibold">{formatMoney(due, currency)}</span>
+                  <span className="font-semibold">{formatMoney(dueShown, currency)}</span>
                 </div>
                 {atHotel > 0 && (
                   <div className="flex justify-between">
@@ -820,6 +886,41 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             {promoError && <p className="mt-1.5 text-[12px] text-red-600">{tr.t("promoInvalid")}</p>}
             {appliedPromo && discount > 0 && (
               <p className="mt-1.5 text-[12px] text-[#3f7a52]">{tr.t("promoApplied")}</p>
+            )}
+          </div>
+
+          {/* gift voucher — pays (part of) the amount due today */}
+          <div className="border-b border-divider py-4">
+            <label className="block text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+              {tr.t("voucherHave")}
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                name="voucherCode"
+                defaultValue={voucherCodeValue}
+                placeholder="RP-XXXX-XXXX"
+                autoComplete="off"
+                className="min-w-0 flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+              />
+              <button
+                type="submit"
+                name="intent"
+                value="applyVoucher"
+                formNoValidate
+                disabled={submitting}
+                className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {tr.t("applyCode")}
+              </button>
+            </div>
+            {voucherError === true && <p className="mt-1.5 text-[12px] text-red-600">{tr.t("voucherInvalid")}</p>}
+            {voucherError === "payAtHotel" && (
+              <p className="mt-1.5 text-[12px] text-amber-700">{tr.t("voucherPayAtHotel")}</p>
+            )}
+            {appliedVoucher && voucherApplied > 0 && (
+              <p className="mt-1.5 text-[12px] text-[#3f7a52]">
+                {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
+              </p>
             )}
           </div>
 

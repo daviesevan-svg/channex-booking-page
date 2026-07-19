@@ -92,8 +92,9 @@ export interface BookingRecord {
   inventoryHeld?: boolean;
   /** Review-request emails sent so far (max 3; stops once a review exists). */
   reviewRequests?: { count: number; lastAt: string };
-  /** Present when the stay was booked by redeeming a package voucher. */
-  voucher?: { code: string; title: string };
+  /** Voucher involvement: a redeemed package (code + title) or a gift voucher
+   *  applied at checkout (code + amount covered). */
+  voucher?: { code: string; title?: string; amount?: number };
   /** Admin edits to guest details, oldest first — an audit trail, so the record
    *  as consented at checkout stays reconstructible (dispute defence). */
   edits?: {

@@ -10,7 +10,7 @@
 //   (redemptions, balance) go through an optimistic CAS on the exact old JSON
 //   so concurrent redemptions can't double-spend.
 import { getConfigKV, getDB } from "./config.server";
-import type { VoucherProduct, VoucherRecord } from "./vouchers";
+import { displayStatus, giftBalance, type VoucherProduct, type VoucherRecord } from "./vouchers";
 
 export type { VoucherProduct, VoucherRecord } from "./vouchers";
 
@@ -169,4 +169,107 @@ export async function casUpdateVoucher(
     .bind(next.status, JSON.stringify(next), pid, next.code, JSON.stringify(prev))
     .run();
   return res.meta.changes === 1 ? next : null;
+}
+
+/** Read → mutate → CAS, retried a few times so a concurrent write doesn't fail
+ *  the caller when the mutation is still valid against the fresh record. The
+ *  mutator returns null to signal "no longer valid" (e.g. balance gone). */
+async function casMutate(
+  pid: string,
+  code: string,
+  mutate: (v: VoucherRecord) => VoucherRecord | null,
+): Promise<{ ok: true; voucher: VoucherRecord } | { ok: false }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const v = await getVoucherByCode(pid, code);
+    if (!v) return { ok: false };
+    const next = mutate(v);
+    if (!next) return { ok: false };
+    const written = await casUpdateVoucher(pid, v, next);
+    if (written) return { ok: true, voucher: written };
+  }
+  return { ok: false };
+}
+
+// ---------- gift-voucher checkout lifecycle: hold → settle / release ----------
+
+/** Reserve part of a gift voucher's balance for a checkout in flight. The hold
+ *  counts against the spendable balance (giftBalance) until it's settled,
+ *  released, or its TTL passes (abandoned checkout — no sweep needed, expired
+ *  holds simply stop counting). */
+export async function holdGiftAmount(
+  pid: string,
+  code: string,
+  ref: string,
+  amount: number,
+  ttlMs: number,
+): Promise<{ ok: boolean }> {
+  const r = await casMutate(pid, code, (v) => {
+    if (v.kind !== "gift" || displayStatus(v) !== "active") return null;
+    if (giftBalance(v) < amount) return null;
+    return {
+      ...v,
+      redemptions: [
+        ...v.redemptions,
+        { at: new Date().toISOString(), amount, ref, pendingUntil: new Date(Date.now() + ttlMs).toISOString() },
+      ],
+    };
+  });
+  return { ok: r.ok };
+}
+
+/** Convert a hold into a real spend once its booking finalized. */
+export async function settleGiftHold(pid: string, code: string, ref: string, bookingId: string): Promise<void> {
+  await casMutate(pid, code, (v) => {
+    const i = v.redemptions.findIndex((r) => r.ref === ref && !r.bookingId);
+    if (i === -1) return null; // already settled/released
+    const entry = v.redemptions[i];
+    const redemptions = v.redemptions.slice();
+    redemptions[i] = { at: entry.at, amount: entry.amount, ref, bookingId };
+    return {
+      ...v,
+      balance: Math.max(0, Math.round(((v.balance ?? 0) - (entry.amount ?? 0)) * 100) / 100),
+      redemptions,
+    };
+  });
+}
+
+/** Drop a hold whose checkout didn't complete. */
+export async function releaseGiftHold(pid: string, code: string, ref: string): Promise<void> {
+  await casMutate(pid, code, (v) => {
+    const next = v.redemptions.filter((r) => !(r.ref === ref && !r.bookingId));
+    if (next.length === v.redemptions.length) return null;
+    return { ...v, redemptions: next };
+  });
+}
+
+// ---------- admin management ----------
+
+export async function cancelVoucher(pid: string, code: string): Promise<boolean> {
+  return (await casMutate(pid, code, (v) => (v.status === "active" ? { ...v, status: "cancelled" } : null))).ok;
+}
+
+/** Mark a package voucher redeemed by hand (phone/desk booking). */
+export async function manualRedeemPackage(pid: string, code: string, by: string): Promise<boolean> {
+  return (
+    await casMutate(pid, code, (v) =>
+      v.kind === "package" && v.status === "active"
+        ? { ...v, status: "redeemed", redemptions: [...v.redemptions, { at: new Date().toISOString(), by, note: "manual" }] }
+        : null,
+    )
+  ).ok;
+}
+
+/** Deduct from a gift voucher by hand (spent at the desk). */
+export async function deductGift(pid: string, code: string, amount: number, by: string): Promise<boolean> {
+  return (
+    await casMutate(pid, code, (v) => {
+      if (v.kind !== "gift" || displayStatus(v) !== "active") return null;
+      if (!(amount > 0) || giftBalance(v) < amount) return null;
+      return {
+        ...v,
+        balance: Math.max(0, Math.round(((v.balance ?? 0) - amount) * 100) / 100),
+        redemptions: [...v.redemptions, { at: new Date().toISOString(), amount, by, note: "manual" }],
+      };
+    })
+  ).ok;
 }

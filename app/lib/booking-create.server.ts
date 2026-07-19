@@ -48,6 +48,9 @@ export interface PreparePendingInput {
   origin: string;
   returnParams: string;
   providerCode?: string;
+  /** Gift voucher applied at checkout: `amount` of the due-now covered by the
+   *  voucher (the Stripe charge, if any, is the remainder). */
+  voucherPayment?: { code: string; amount: number };
 }
 
 export async function preparePendingBooking(input: PreparePendingInput): Promise<PendingBooking> {
@@ -97,6 +100,10 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
 
   const channexPayload = {
     status: "new",
+    // Tell the PMS when part of the payment arrived as a gift voucher.
+    ...(input.voucherPayment
+      ? { notes: `Paid ${input.voucherPayment.amount.toFixed(2)} with gift voucher ${input.voucherPayment.code}` }
+      : {}),
     provider_code: input.providerCode,
     hotel_code: pid,
     ota_name: input.providerCode || "Direct",
@@ -164,6 +171,10 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     })),
   };
 
+  if (input.voucherPayment) {
+    record.voucher = { code: input.voucherPayment.code, amount: input.voucherPayment.amount };
+  }
+
   return {
     pid,
     account: input.account,
@@ -172,5 +183,6 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     live: input.live,
     returnParams: input.returnParams,
     origin: input.origin,
+    voucherRedemption: input.voucherPayment,
   };
 }

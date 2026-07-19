@@ -20,6 +20,9 @@ export interface PendingBooking {
   returnParams: string;
   /** Site origin captured at checkout, for absolute links in emails. */
   origin: string;
+  /** Gift-voucher amount held for this checkout — settled onto the voucher
+   *  when the booking finalizes, released if it fails. */
+  voucherRedemption?: { code: string; amount: number };
 }
 
 // 3 hours. Must exceed the Checkout Session's expires_at (60 min, set in
