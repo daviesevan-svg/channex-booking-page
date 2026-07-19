@@ -11,7 +11,7 @@ import {
   type PaymentInfo,
 } from "./bookings.server";
 import { availabilityShortfall, decrementAvailability } from "./ari.server";
-import { pushOpenChannelBooking, pushOpenChannelCancellation } from "./open-channel.server";
+import { pushOpenChannelBooking, pushOpenChannelRevision } from "./open-channel.server";
 import { getConfig } from "./config.server";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
@@ -216,8 +216,58 @@ export async function cancelChannexBooking(pid: string, booking: BookingRecord):
             phone: booking.guest.phone,
           },
         };
-  const res = await pushOpenChannelCancellation({ ...base, status: "cancelled" });
+  const res = await pushOpenChannelRevision({ ...base, status: "cancelled" });
   if (!res.ok) {
     console.log(`[open-channel] cancellation push failed for ${booking.reference}: ${res.error}`);
   }
+}
+
+/** Patch the customer (and per-room guests) inside a stored Open Channel
+ *  payload so revisions carry the corrected guest details. */
+export function payloadWithGuest(payload: unknown, guest: BookingRecord["guest"]): Record<string, unknown> | null {
+  if (!payload || typeof payload !== "object") return null;
+  const base = payload as Record<string, unknown>;
+  const rooms = Array.isArray(base.rooms)
+    ? base.rooms.map((r) =>
+        r && typeof r === "object"
+          ? { ...(r as Record<string, unknown>), guests: [{ name: guest.firstName, surname: guest.lastName }] }
+          : r,
+      )
+    : base.rooms;
+  return {
+    ...base,
+    customer: { name: guest.firstName, surname: guest.lastName, mail: guest.email, phone: guest.phone },
+    rooms,
+  };
+}
+
+/** Push a "modified" revision to Channex after an admin edits guest details, so
+ *  the hotel's PMS copy carries the corrected name/email/phone. Same payload as
+ *  the original push (keyed by reservation_id), status "modified". Best-effort:
+ *  the local edit stands even if the push fails. */
+export async function pushGuestModification(
+  pid: string,
+  booking: BookingRecord,
+): Promise<{ pushed: boolean; error?: string }> {
+  if (!booking.channexId) return { pushed: false }; // never pushed live — nothing upstream to update
+  const cfg = getConfig();
+  const base =
+    payloadWithGuest(booking.channexPayload, booking.guest) ?? {
+      provider_code: cfg.providerCode,
+      hotel_code: pid,
+      ota_name: cfg.providerCode || "Direct",
+      reservation_id: booking.reference,
+      currency: booking.currency,
+      arrival_date: booking.checkin,
+      departure_date: booking.checkout,
+      customer: {
+        name: booking.guest.firstName,
+        surname: booking.guest.lastName,
+        mail: booking.guest.email,
+        phone: booking.guest.phone,
+      },
+    };
+  const res = await pushOpenChannelRevision({ ...base, status: "modified" });
+  if (!res.ok) console.log(`[open-channel] modification push failed for ${booking.reference}: ${res.error}`);
+  return { pushed: res.ok, error: res.error };
 }

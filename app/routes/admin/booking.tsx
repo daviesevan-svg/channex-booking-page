@@ -8,7 +8,8 @@ import { makeTranslator } from "~/lib/i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
-import { cancelChannexBooking, retryChannexPush } from "~/lib/booking-finalize.server";
+import { cancelChannexBooking, payloadWithGuest, pushGuestModification, retryChannexPush } from "~/lib/booking-finalize.server";
+import { FIELD_INPUT } from "~/components/admin-form";
 import { incrementAvailability } from "~/lib/ari.server";
 import { sendCancellationEmails, sendGuestBookingEmail } from "~/lib/email.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
@@ -60,6 +61,56 @@ export async function action({ params, request }: Route.ActionArgs) {
     return sent
       ? { emailResent: true as const }
       : { error: "The email couldn't be sent — check the email settings (SparkPost key / sender)." };
+  }
+
+  if (intent === "editGuest") {
+    // Fix typos in the guest's contact details (wrong email = no confirmation,
+    // no portal access, no review request). Contact details only — never the
+    // stay or the money. Every change lands in the record's audit trail.
+    if ((booking.lifecycle ?? "active") !== "active") {
+      return { error: "This booking is cancelled — guest details can no longer be edited." };
+    }
+    const next = {
+      firstName: String(form.get("firstName") ?? "").trim(),
+      lastName: String(form.get("lastName") ?? "").trim(),
+      email: String(form.get("email") ?? "").trim(),
+      phone: String(form.get("phone") ?? "").trim(),
+    };
+    if (!next.firstName || !next.lastName) return { error: "First and last name are required." };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next.email)) return { error: "That email address doesn't look valid." };
+
+    const fields = ["firstName", "lastName", "email", "phone"] as const;
+    const changes = fields
+      .filter((f) => next[f] !== (booking.guest[f] ?? ""))
+      .map((f) => ({ field: f, from: booking.guest[f] ?? "", to: next[f] }));
+    if (changes.length === 0) return { error: "Nothing changed." };
+    const emailChanged = changes.some((c) => c.field === "email");
+
+    const by = (await getAdminEmail(request)) ?? undefined;
+    const guest = { ...booking.guest, ...next };
+    // Also patch the stored Channex payload so any later revision (cancellation)
+    // carries the corrected details too.
+    const patchedPayload = payloadWithGuest(booking.channexPayload, guest);
+    const updated =
+      (await updateBooking(propertyId, booking.id, {
+        guest,
+        edits: [...(booking.edits ?? []), { at: new Date().toISOString(), by, changes }],
+        ...(patchedPayload ? { channexPayload: patchedPayload } : {}),
+      })) ?? booking;
+
+    // Tell Channex (status "modified", same payload) so the PMS copy is corrected.
+    // Best-effort: the local edit stands either way; a failure is surfaced below.
+    const push = await pushGuestModification(propertyId, updated);
+    const pushWarning =
+      booking.channexId && !push.pushed
+        ? `Saved here, but the update couldn't be sent to Channex — the PMS copy keeps the old details. (${push.error ?? "push failed"})`
+        : undefined;
+
+    let emailResent = false;
+    if (emailChanged && form.get("resend") === "1" && updated.status !== "failed") {
+      emailResent = await sendGuestBookingEmail(propertyId, updated, new URL(request.url).origin);
+    }
+    return { guestEdited: true as const, pushWarning, emailResent: emailResent || undefined };
   }
 
   if (intent === "cancel") {
@@ -118,6 +169,13 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  firstName: "First name",
+  lastName: "Last name",
+  email: "Email",
+  phone: "Phone",
+};
+
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
   const { booking: b, canRefund } = loaderData;
   const nav = useNavigation();
@@ -126,6 +184,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const retrying = nav.state !== "idle" && intent === "retry";
   const resending = nav.state !== "idle" && intent === "resendEmail";
   const cancelling = nav.state !== "idle" && intent === "cancel";
+  const editingGuest = nav.state !== "idle" && intent === "editGuest";
   const active = (b.lifecycle ?? "active") === "active";
   const en = makeTranslator("en"); // admin UI is English
   const msg = cancellationMessage(b.cancellation, Date.now());
@@ -176,6 +235,16 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {actionData?.emailResent && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
           ✓ Confirmation email re-sent to {b.guest.email}.
+        </div>
+      )}
+      {actionData?.guestEdited && (
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+          ✓ Guest details updated.
+        </div>
+      )}
+      {actionData?.pushWarning && (
+        <div className="mb-5 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-900">
+          {actionData.pushWarning}
         </div>
       )}
 
@@ -247,6 +316,68 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           <Row label="Phone" value={b.guest.phone} />
           {b.guest.arrival && <Row label="Arrival time" value={b.guest.arrival} />}
           {b.guest.requests && <Row label="Requests" value={b.guest.requests} />}
+
+          {/* Contact-detail fixes (typo'd email = no confirmation, no portal,
+              no review request). Contact only — never the stay or the money. */}
+          {active && (
+            <details className="mt-3 border-t border-divider pt-3">
+              <summary className="cursor-pointer text-[13px] font-semibold text-secondary hover:text-accent">
+                Edit guest details
+              </summary>
+              <Form method="post" className="mt-3 space-y-3">
+                <input type="hidden" name="intent" value="editGuest" />
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block text-[12.5px] font-semibold text-secondary">
+                    First name
+                    <input name="firstName" defaultValue={b.guest.firstName} required className={FIELD_INPUT} />
+                  </label>
+                  <label className="block text-[12.5px] font-semibold text-secondary">
+                    Last name
+                    <input name="lastName" defaultValue={b.guest.lastName} required className={FIELD_INPUT} />
+                  </label>
+                </div>
+                <label className="block text-[12.5px] font-semibold text-secondary">
+                  Email
+                  <input name="email" type="email" defaultValue={b.guest.email} required className={FIELD_INPUT} />
+                </label>
+                <label className="block text-[12.5px] font-semibold text-secondary">
+                  Phone
+                  <input name="phone" defaultValue={b.guest.phone} className={FIELD_INPUT} />
+                </label>
+                <label className="flex items-center gap-2 text-[13px] text-secondary">
+                  <input type="checkbox" name="resend" value="1" defaultChecked />
+                  Email the confirmation to the corrected address (when the email changed)
+                </label>
+                <button
+                  type="submit"
+                  disabled={editingGuest}
+                  className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                >
+                  {editingGuest ? "Saving…" : "Save guest details"}
+                </button>
+              </Form>
+            </details>
+          )}
+
+          {/* Audit trail — the record as consented at checkout stays reconstructible. */}
+          {(b.edits?.length ?? 0) > 0 && (
+            <div className="mt-3 border-t border-divider pt-3">
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-2">Edit history</div>
+              {b.edits!.map((e, i) => (
+                <div key={i} className="mb-1.5 text-[12px] text-muted">
+                  <span className="text-muted-2">
+                    {fmtDate(e.at, "d MMM yyyy, HH:mm")}
+                    {e.by ? ` · ${e.by}` : ""}
+                  </span>
+                  {e.changes.map((c) => (
+                    <div key={c.field}>
+                      {FIELD_LABELS[c.field] ?? c.field}: <s>{c.from || "—"}</s> → {c.to || "—"}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       </div>
 
