@@ -2,12 +2,17 @@
 // manually when the guest didn't receive the confirmation email. Generated
 // with pdf-lib (pure JS, no headless browser in a Worker) and mirrors the
 // email's details block: stay dates, rooms, extras, taxes & fees, totals,
-// cancellation line.
-import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb, type RGB } from "pdf-lib";
+// cancellation line. Text uses an embedded Noto Sans subset (Latin + Greek +
+// Cyrillic), so guest names like "Νίκος" or "Дмитрий" render properly —
+// pdf-lib's standard fonts are WinAnsi-only.
+import { PDFDocument, PDFFont, PDFPage, rgb, type RGB } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
 import { formatMoney } from "./money";
+import notoSansRegularB64 from "./fonts/noto-sans-regular";
+import notoSansBoldB64 from "./fonts/noto-sans-bold";
 
 const PAGE_W = 595.28; // A4
 const PAGE_H = 841.89;
@@ -18,19 +23,18 @@ const INK = rgb(0.12, 0.12, 0.12);
 const MUTED = rgb(0.54, 0.54, 0.54);
 const LINE = rgb(0.9, 0.88, 0.85);
 
-/** Standard fonts only encode WinAnsi — replace anything outside it (after
- *  stripping diacritics) rather than throwing mid-render. */
-function winAnsiSafe(s: string): string {
-  return [...s]
-    .map((ch) => {
-      const code = ch.codePointAt(0)!;
-      if ((code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff)) return ch;
-      if ("€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ".includes(ch)) return ch;
-      const stripped = ch.normalize("NFKD").replace(/[̀-ͯ]/g, "");
-      if (stripped !== ch && stripped) return winAnsiSafe(stripped);
-      return "?";
-    })
-    .join("");
+// The subsetted Noto Sans TTFs, base64-inlined (~119 KB each). Decoded once
+// per isolate and reused across renders.
+function b64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+let fontBytes: { regular: Uint8Array; bold: Uint8Array } | null = null;
+function getFontBytes() {
+  fontBytes ??= { regular: b64ToBytes(notoSansRegularB64), bold: b64ToBytes(notoSansBoldB64) };
+  return fontBytes;
 }
 
 function hexToRgb(hex: string): RGB {
@@ -85,8 +89,12 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
   const { booking: b, hotelName } = input;
   const accent = hexToRgb(input.accent);
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  doc.registerFontkit(fontkit);
+  // subset: true → only the glyphs actually used are embedded in the PDF, so
+  // the download stays small despite the full LGC coverage in the source font.
+  const bytes = getFontBytes();
+  const font = await doc.embedFont(bytes.regular, { subset: true });
+  const bold = await doc.embedFont(bytes.bold, { subset: true });
   doc.setTitle(`Booking confirmation ${b.reference}`);
 
   let page = doc.addPage([PAGE_W, PAGE_H]);
@@ -107,9 +115,8 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
   ) => {
     const f = opts.font ?? font;
     const size = opts.size ?? 10.5;
-    const safe = winAnsiSafe(s);
-    const x = opts.rightAt != null ? opts.rightAt - f.widthOfTextAtSize(safe, size) : (opts.x ?? MARGIN);
-    page.drawText(safe, { x, y, size, font: f, color: opts.color ?? INK });
+    const x = opts.rightAt != null ? opts.rightAt - f.widthOfTextAtSize(s, size) : (opts.x ?? MARGIN);
+    page.drawText(s, { x, y, size, font: f, color: opts.color ?? INK });
   };
   const rule = (top = 10, bottom = 12) => {
     y -= top;
@@ -236,7 +243,7 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     thickness: 0.7,
     color: LINE,
   });
-  page.drawText(winAnsiSafe(footer), { x: MARGIN, y: MARGIN, size: 8.5, font, color: MUTED });
+  page.drawText(footer, { x: MARGIN, y: MARGIN, size: 8.5, font, color: MUTED });
 
   return doc.save();
 }
