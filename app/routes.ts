@@ -78,6 +78,7 @@ export default [
     route("emails/:template", "routes/admin/email.tsx"),
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),
+    route("bookings/:id/pdf", "routes/admin/booking-pdf.tsx"),
   ]),
 
   // Embeddable booking widget for hotels' own sites: a public loader script +
