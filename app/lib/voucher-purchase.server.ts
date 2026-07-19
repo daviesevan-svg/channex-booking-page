@@ -122,3 +122,104 @@ export async function sendVoucherEmails(
     console.log(`[vouchers] purchase emails failed for ${v.code}: ${e instanceof Error ? e.message : e}`);
   }
 }
+
+/** Reminder to the gift recipient ("your voucher is waiting"), sent from the
+ *  buyer's manage page. Requires a recipient email on the record. Returns
+ *  whether the send was accepted. */
+export async function sendVoucherReminderEmail(
+  pid: string,
+  v: VoucherRecord,
+  origin: string,
+  channel: string,
+): Promise<boolean> {
+  if (!v.gift?.recipientEmail) return false;
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+    const hotelName = ov.hotelName || "Your hotel";
+    const currency = settings.currency || "GBP";
+    const voucherUrl = `${origin.replace(/\/+$/, "")}/${channel}/voucher/${v.code}`;
+    const what =
+      v.kind === "gift"
+        ? `a ${formatMoney(v.product.value ?? v.product.price, currency)} gift voucher`
+        : `"${v.product.title}"`;
+    const r = await sendEmail({
+      to: v.gift.recipientEmail,
+      subject: `A little reminder — your ${hotelName} gift is waiting 🎁`,
+      html: renderSimpleEmail({
+        hotelName,
+        accent: accentHex(settings),
+        heading: `Your gift is still waiting, ${v.gift.recipientName}!`,
+        body:
+          `Just a friendly nudge from ${v.buyer.name}: you have ${what} at ${hotelName}.` +
+          (v.gift.message ? `\n\n“${v.gift.message}”` : "") +
+          `\n\nYour voucher code is ${v.code}. Valid until ${v.expiresAt.slice(0, 10)}.` +
+          (v.kind === "package"
+            ? `\n\nYou can book your stay online — pick your dates on the voucher page below.`
+            : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`),
+        cta: { label: v.kind === "package" ? "View & book your stay" : "View your voucher", url: voucherUrl },
+      }),
+      replyTo: settings.emailReplyTo,
+    });
+    return r.sent;
+  } catch (e) {
+    console.log(`[vouchers] reminder email failed for ${v.code}: ${e instanceof Error ? e.message : e}`);
+    return false;
+  }
+}
+
+/** Cooling-off cancellation emails: confirmation to the buyer (with the refund
+ *  line when one was issued) and a notification to the hotel. Never throws. */
+export async function sendVoucherCancelEmails(
+  pid: string,
+  v: VoucherRecord,
+  opts: { refundAmount?: number; refundFailed?: boolean },
+): Promise<void> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+    const hotelName = ov.hotelName || "Your hotel";
+    const accent = accentHex(settings);
+    const currency = settings.currency || "GBP";
+    const money = (n: number) => formatMoney(n, currency);
+
+    await sendEmail({
+      to: v.buyer.email,
+      subject: `Your ${hotelName} voucher has been cancelled`,
+      html: renderSimpleEmail({
+        hotelName,
+        accent,
+        heading: "Voucher cancelled",
+        body:
+          `Hi ${v.buyer.name} — your voucher "${v.product.title}" (${v.code}) has been cancelled as requested.\n\n` +
+          (opts.refundAmount != null
+            ? `${money(opts.refundAmount)} is on its way back to your original payment method. Depending on your bank it can take 5–10 business days to appear.`
+            : opts.refundFailed
+              ? `${hotelName} will process your ${money(v.product.price)} refund shortly.`
+              : `No payment was taken for this voucher, so there is nothing to refund.`),
+      }),
+      replyTo: settings.emailReplyTo,
+    });
+
+    const hostTo = settings.hostNotifyEmail || ov.email;
+    if (hostTo) {
+      await sendEmail({
+        to: hostTo,
+        subject: `Voucher ${v.code} cancelled by the buyer`,
+        html: renderSimpleEmail({
+          hotelName,
+          accent,
+          heading: "A voucher was cancelled",
+          body:
+            `${v.buyer.name} (${v.buyer.email}) cancelled "${v.product.title}" (${v.code}) within the cooling-off window.\n\n` +
+            (opts.refundAmount != null
+              ? `The ${money(opts.refundAmount)} charge was refunded automatically.`
+              : opts.refundFailed
+                ? `⚠️ The automatic refund FAILED — please refund ${money(v.product.price)} manually from your Stripe dashboard.`
+                : `No charge was taken (test/complimentary voucher), so no refund was needed.`),
+        }),
+        replyTo: v.buyer.email,
+      });
+    }
+  } catch (e) {
+    console.log(`[vouchers] cancel emails failed for ${v.code}: ${e instanceof Error ? e.message : e}`);
+  }
+}

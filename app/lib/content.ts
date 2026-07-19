@@ -243,6 +243,9 @@ export interface SiteSettings {
   /** Auto-refund the Stripe charge when a guest cancels within the free window.
    *  Off (default) = the hotel issues any refund manually. */
   autoRefund?: boolean;
+  /** Voucher cooling-off: days after purchase in which the BUYER can self-cancel
+   *  for a full (auto-refunded) refund. Unset = 14; 0 disables self-cancel. */
+  voucherCoolingOffDays?: number;
   /** Default windows used when a rate plan doesn't set its own. */
   cancelDeadlineValue?: number;
   cancelDeadlineUnit?: DeadlineUnit;

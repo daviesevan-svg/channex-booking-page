@@ -109,6 +109,7 @@ export default [
     route("checkout/complete", "routes/property/checkout.complete.tsx"),
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
     route("manage", "routes/property/manage.tsx"),
+    route("manage/voucher/:code", "routes/property/manage-voucher.tsx"),
     route("manage/:id", "routes/property/manage-booking.tsx"),
     route("review/:bookingId", "routes/property/review.tsx"),
   ]),
