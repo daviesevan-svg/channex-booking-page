@@ -42,6 +42,10 @@ export function uploadExtraImage(propertyId: string, extraId: string, file: File
   return uploadImage(`extras/${propertyId}/${extraId}`, file);
 }
 
+export function uploadVoucherImage(propertyId: string, productId: string, file: File): Promise<string> {
+  return uploadImage(`vouchers/${propertyId}/${productId}`, file);
+}
+
 export function uploadRatePlanImage(
   propertyId: string,
   rateId: string,

@@ -202,6 +202,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/taxes", label: "Taxes & Fees" },
         { to: "/admin/promotions", label: "Promotions" },
         { to: "/admin/extras", label: "Extras" },
+        { to: "/admin/vouchers", label: "Vouchers" },
         // Integrations
         { to: "/admin/connectivity", label: "Connectivity" },
         { to: "/admin/google-hotels", label: "Google" },
