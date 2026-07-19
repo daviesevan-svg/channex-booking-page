@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
@@ -43,6 +43,126 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-[10px] px-3.5 py-2.5 text-[14px] font-semibold ${
     isActive ? "bg-surface text-ink" : "text-muted hover:text-ink"
   }`;
+
+/** Header property switcher: a dropdown with a search box for filtering long
+ *  property lists. Picking a property submits a NATIVE form (not a React
+ *  Router <Form>), so the switch is a full-document POST → the whole admin
+ *  re-renders from fresh SSR under the new property cookie. A client-side
+ *  navigation could leave the page showing the old property (stale
+ *  uncontrolled inputs, or the Set-Cookie racing revalidation). */
+function PropertySwitcher({
+  properties,
+  propertyId,
+  pathname,
+}: {
+  properties: { id: string; name: string }[];
+  propertyId?: string;
+  pathname: string;
+}) {
+  const current = properties.find((p) => p.id === propertyId);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const boxRef = useRef<HTMLDivElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const pickRef = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const needle = q.trim().toLowerCase();
+  const filtered = needle ? properties.filter((p) => p.name.toLowerCase().includes(needle)) : properties;
+
+  useEffect(() => {
+    if (!open) return;
+    searchRef.current?.focus();
+    const onDown = (e: MouseEvent) => {
+      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const pick = (id: string) => {
+    if (id === propertyId) {
+      setOpen(false);
+      return;
+    }
+    if (pickRef.current) pickRef.current.value = id;
+    // HTMLFormElement.submit() bypasses React Router — a real document POST.
+    formRef.current?.submit();
+  };
+
+  return (
+    <div ref={boxRef} className="relative">
+      <form ref={formRef} method="post" action="/admin/select-property" className="hidden">
+        <input type="hidden" name="redirectTo" value={pathname} />
+        <input ref={pickRef} type="hidden" name="propertyId" value={propertyId ?? ""} />
+      </form>
+      <button
+        type="button"
+        onClick={() => {
+          setQ("");
+          setOpen((v) => !v);
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Current property"
+        className="flex max-w-[260px] items-center gap-1.5 rounded-[8px] border border-line-alt bg-surface px-2.5 py-1 text-[13px] font-semibold text-ink hover:border-accent"
+      >
+        <span className="truncate">{current?.name ?? "Select property"}</span>
+        <span aria-hidden="true" className={`text-[9px] text-muted transition-transform ${open ? "rotate-180" : ""}`}>
+          ▼
+        </span>
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-full z-40 mt-1.5 w-[280px] overflow-hidden rounded-[12px] border border-line bg-surface"
+          style={{ boxShadow: "var(--shadow-card)" }}
+        >
+          <div className="border-b border-divider p-2">
+            <input
+              ref={searchRef}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && filtered[0]) pick(filtered[0].id);
+              }}
+              placeholder="Search properties…"
+              aria-label="Search properties"
+              className="w-full rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+            />
+          </div>
+          <div className="max-h-[290px] overflow-y-auto p-1">
+            {filtered.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                role="option"
+                aria-selected={p.id === propertyId}
+                onClick={() => pick(p.id)}
+                className={`flex w-full items-center justify-between gap-2 rounded-[8px] px-2.5 py-1.5 text-left text-[13px] ${
+                  p.id === propertyId ? "bg-chip font-semibold text-ink" : "text-secondary hover:bg-surface-alt hover:text-ink"
+                }`}
+              >
+                <span className="truncate">{p.name}</span>
+                {p.id === propertyId && <span className="flex-none text-accent">✓</span>}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-2.5 py-3 text-center text-[12.5px] text-muted">No properties match “{q.trim()}”</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const { email, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages } =
@@ -169,27 +289,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
           </div>
           <div className="flex items-center gap-5 text-[13px] text-muted">
             {properties.length > 0 && (
-              // reloadDocument: switching property does a full-page reload, so the
-              // whole admin re-renders from fresh SSR under the new property. A
-              // client-side navigation could leave the page showing the old
-              // property (stale uncontrolled inputs, or the Set-Cookie racing
-              // revalidation); a document reload is deterministic across envs.
-              <Form method="post" action="/admin/select-property" reloadDocument className="flex items-center gap-1.5">
-                <input type="hidden" name="redirectTo" value={pathname} />
-                <select
-                  name="propertyId"
-                  defaultValue={propertyId ?? ""}
-                  onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                  aria-label="Current property"
-                  className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[13px] font-semibold text-ink outline-none focus:border-accent"
-                >
-                  {properties.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </Form>
+              <PropertySwitcher properties={properties} propertyId={propertyId} pathname={pathname} />
             )}
             {languages.length > 1 && (
               <label className="flex items-center gap-1.5">
