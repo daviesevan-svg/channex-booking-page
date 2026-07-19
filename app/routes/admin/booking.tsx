@@ -466,6 +466,20 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 </p>
               </Form>
             )}
+            {b.status !== "failed" && (
+              <div>
+                {/* Plain <a>, not <Link> — a resource route serving a file download. */}
+                <a
+                  href={`/admin/bookings/${b.id}/pdf`}
+                  className="inline-block rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent"
+                >
+                  Download confirmation (PDF)
+                </a>
+                <p className="mt-2 text-[12.5px] text-muted">
+                  Print it or send it to the guest yourself if the email didn't arrive.
+                </p>
+              </div>
+            )}
             <Form
               method="post"
               onSubmit={(e) => {
