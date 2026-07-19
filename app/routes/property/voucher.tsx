@@ -10,6 +10,7 @@ import { formatMoney } from "~/lib/money";
 import { fmtDate } from "~/lib/dates";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getVoucherByCode } from "~/lib/vouchers.server";
+import { getBooking } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -17,10 +18,25 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const v = await getVoucherByCode(pid, normalizeVoucherCode(params.code));
   if (!v) throw new Response("Voucher not found", { status: 404 });
   const issued = new URL(request.url).searchParams.get("issued") === "1";
+  const justBooked = new URL(request.url).searchParams.get("booked") === "1";
+  // A redeemed package links its booking — show the stay (public projection).
+  const bookingId = v.redemptions.find((r) => r.bookingId)?.bookingId;
+  const booking = v.kind === "package" && bookingId ? await getBooking(pid, bookingId).catch(() => null) : null;
   // Strict public projection — no buyer email, no payment ids (the code holder
   // sees names/message, which is the point of a gift).
   return {
     issued,
+    justBooked,
+    booking:
+      booking && (booking.lifecycle ?? "active") === "active"
+        ? {
+            reference: booking.reference,
+            checkin: booking.checkin,
+            checkout: booking.checkout,
+            roomTitle: booking.rooms[0]?.roomTitle ?? "",
+            guestName: `${booking.guest.firstName} ${booking.guest.lastName}`,
+          }
+        : null,
     voucher: {
       code: v.code,
       kind: v.kind,
@@ -64,7 +80,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function Voucher({ loaderData, params }: Route.ComponentProps) {
-  const { voucher: v, issued } = loaderData;
+  const { voucher: v, issued, justBooked, booking } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const money = (n: number) => formatMoney(n, currency);
@@ -81,6 +97,18 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
       {v.simulated && (
         <div className="mb-6 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           Test voucher — no payment was taken.
+        </div>
+      )}
+      {booking && (
+        <div
+          className={`mb-6 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3.5 text-[14px] leading-[1.6] text-[#3f7a52]`}
+        >
+          {justBooked && <div className="font-semibold">✓ {tr.t("bookingConfirmedTitle")}</div>}
+          <div>
+            {booking.guestName} · {booking.roomTitle} · {fmtDate(booking.checkin, "EEE d MMM")} —{" "}
+            {fmtDate(booking.checkout, "EEE d MMM yyyy")} ·{" "}
+            <span className="font-mono font-semibold">{booking.reference}</span>
+          </div>
         </div>
       )}
 

@@ -291,9 +291,12 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           {b.payment?.mode === "payment" && (
             <Row
               label="Payment"
-              value={`Paid ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} via Stripe`}
+              value={`Paid ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} ${
+                b.payment.provider === "voucher" ? "with a voucher" : "via Stripe"
+              }`}
             />
           )}
+          {b.voucher && <Row label="Voucher" value={`${b.voucher.code} — ${b.voucher.title}`} />}
           {b.payment?.mode === "setup" && (
             <Row
               label="Guarantee card"

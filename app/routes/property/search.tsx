@@ -14,6 +14,7 @@ import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
 import { getPublicReviews } from "~/lib/reviews.server";
+import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
@@ -24,7 +25,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates, cutoff, reviews] = await Promise.all([
+  const [content, closedDates, cutoff, reviews, hasVouchers] = await Promise.all([
     getSearchContent(pid, lang),
     getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
@@ -32,10 +33,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getBookingCutoff(pid),
     // Fail open too — the landing page must render even if D1 hiccups.
     getPublicReviews(pid).catch(() => ({ average: 0, count: 0, reviews: [] })),
+    getActiveVoucherProducts(pid).then((v) => v.length > 0).catch(() => false),
   ]);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
-  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now), reviews };
+  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now), reviews, hasVouchers };
 }
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
@@ -48,7 +50,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates, content, earliestCheckin, reviews } = loaderData;
+  const { closedDates, content, earliestCheckin, reviews, hasVouchers } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -245,6 +247,23 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* voucher shop teaser — shown while the property has vouchers on sale */}
+      {hasVouchers && (
+        <div className="mt-12 flex max-w-[920px] flex-wrap items-center justify-between gap-4 rounded-[18px] border border-line bg-surface px-7 py-6">
+          <div>
+            <h2 className="mb-1 font-serif text-[22px] font-semibold">{tr.t("vouchersTeaser")}</h2>
+            <p className="max-w-[520px] text-[14px] leading-[1.55] text-muted">{tr.t("vouchersTeaserBody")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/${params.channelId}/vouchers`)}
+            className="flex-none cursor-pointer rounded-[12px] border border-accent px-6 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
+          >
+            {tr.t("vouchersTeaserCta")}
+          </button>
         </div>
       )}
 
