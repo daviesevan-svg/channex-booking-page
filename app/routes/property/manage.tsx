@@ -77,7 +77,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 }
 
 export function meta() {
-  return [{ title: "Manage your booking" }];
+  return [{ title: "Manage your booking" }, { name: "robots", content: "noindex" }];
 }
 
 export default function Manage({ loaderData, actionData, params }: Route.ComponentProps) {

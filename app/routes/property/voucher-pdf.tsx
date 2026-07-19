@@ -3,14 +3,15 @@
 import type { Route } from "./+types/voucher-pdf";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
-import { getVoucherByCode } from "~/lib/vouchers.server";
+import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { normalizeVoucherCode } from "~/lib/vouchers";
 import { accentHex } from "~/lib/email-render.server";
 import { renderVoucherPdf } from "~/lib/voucher-pdf.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
-  const voucher = await getVoucherByCode(pid, normalizeVoucherCode(params.code));
+  const voucher = await lookupVoucherGuarded(pid, params.code, request);
+  if (voucher === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!voucher) throw new Response("Voucher not found", { status: 404 });
 
   const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
@@ -25,6 +26,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return new Response(bytes as unknown as BodyInit, {
     headers: {
       "Content-Type": "application/pdf",
+      "X-Robots-Tag": "noindex",
       "Content-Disposition": `attachment; filename="voucher-${voucher.code}.pdf"`,
       "Cache-Control": "no-store",
     },

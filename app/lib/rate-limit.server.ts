@@ -22,6 +22,17 @@ export async function rateLimit(
   return true;
 }
 
+/** Read-only check: has this bucket already exceeded `limit`? Unlike
+ *  rateLimit() it never increments — use it to short-circuit BEFORE doing the
+ *  expensive work, and call rateLimit() afterwards only on the outcomes that
+ *  should count (e.g. failed lookups). Fails open without KV. */
+export async function overLimit(bucket: string, limit: number): Promise<boolean> {
+  const kv = getConfigKV();
+  if (!kv) return false;
+  const count = Number((await kv.get(`rl:${bucket}`)) ?? 0) || 0;
+  return count >= limit;
+}
+
 /** A stable per-client key for throttling, from Cloudflare's connecting-IP
  *  header (falls back to X-Forwarded-For, then a constant for local dev). */
 export function clientKey(request: Request): string {

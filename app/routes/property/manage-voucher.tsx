@@ -28,6 +28,7 @@ import {
 } from "~/lib/vouchers";
 import {
   getVoucherByCode,
+  lookupVoucherGuarded,
   refundVoucherCharge,
   selfCancelVoucher,
   setGiftRecipientEmail,
@@ -44,8 +45,8 @@ async function requireOwnVoucher(
   const email = await getGuestEmail(request);
   if (!email) throw redirect(base);
   const pid = await resolvePropertyId(channelId);
-  const v = await getVoucherByCode(pid, normalizeVoucherCode(code));
-  if (!v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(base);
+  const v = await lookupVoucherGuarded(pid, code, request);
+  if (v === "limited" || !v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(base);
   return { pid, email, v };
 }
 
@@ -154,7 +155,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }];
+  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }, { name: "robots", content: "noindex" }];
 }
 
 const STATUS_STYLE: Record<string, string> = {
