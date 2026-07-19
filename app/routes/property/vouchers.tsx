@@ -28,6 +28,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       nights: p.package?.nights,
       adults: p.package?.adults,
       children: p.package?.children,
+      guests: p.kind === "experience" ? p.guests : undefined,
       soldOut,
     });
   }
@@ -76,7 +77,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
               <div className="p-5">
                 <div className="mb-1.5 flex items-center gap-2">
                   <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11px] font-semibold text-muted">
-                    {p.kind === "gift" ? tr.t("voucherKindGift") : tr.t("voucherKindPackage")}
+                    {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
                   </span>
                   {p.soldOut && (
                     <span className="rounded-full bg-[#fbe9e7] px-2.5 py-0.5 text-[11px] font-semibold text-[#c0392b]">
@@ -91,7 +92,11 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
                   <span className="text-[12.5px] text-muted-2">
                     {p.kind === "gift"
                       ? tr.t("voucherValue", { amount: money(p.value ?? p.price) })
-                      : `${tr.p("night", p.nights ?? 1)} · ${tr.p("adult", p.adults ?? 2)}${p.children ? ` + ${tr.p("child", p.children)}` : ""}`}
+                      : p.kind === "experience"
+                        ? p.guests
+                          ? tr.p("voucherGuests", p.guests)
+                          : tr.t("voucherAtHotel")
+                        : `${tr.p("night", p.nights ?? 1)} · ${tr.p("adult", p.adults ?? 2)}${p.children ? ` + ${tr.p("child", p.children)}` : ""}`}
                   </span>
                 </div>
               </div>

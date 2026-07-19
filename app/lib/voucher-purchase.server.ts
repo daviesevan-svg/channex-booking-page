@@ -110,7 +110,9 @@ export async function sendVoucherEmails(
             `\n\nYour voucher code is ${v.code}.` +
             (v.kind === "package"
               ? `\n\nYou can book your stay online — pick your dates on the voucher page below.`
-              : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`) +
+              : v.kind === "experience"
+                ? `\n\nSimply present the code at ${hotelName} to redeem it.`
+                : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`) +
             `\n\n${expiry}`,
           cta: { label: v.kind === "package" ? "View & book your stay" : "View your voucher", url: voucherUrl },
         }),
@@ -155,7 +157,9 @@ export async function sendVoucherReminderEmail(
           `\n\nYour voucher code is ${v.code}. Valid until ${v.expiresAt.slice(0, 10)}.` +
           (v.kind === "package"
             ? `\n\nYou can book your stay online — pick your dates on the voucher page below.`
-            : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`),
+            : v.kind === "experience"
+              ? `\n\nSimply present the code at ${hotelName} to redeem it.`
+              : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`),
         cta: { label: v.kind === "package" ? "View & book your stay" : "View your voucher", url: voucherUrl },
       }),
       replyTo: settings.emailReplyTo,

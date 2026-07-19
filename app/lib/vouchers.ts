@@ -8,7 +8,7 @@
 //              redeemed by BOOKING ONLINE under the hotel's rules (stay window,
 //              blocked dates, allowed check-in weekdays, allowed room types).
 
-export type VoucherKind = "gift" | "package";
+export type VoucherKind = "gift" | "package" | "experience";
 
 export interface PackageRules {
   /** Length of the stay, in nights. */
@@ -46,6 +46,9 @@ export interface VoucherProduct {
   terms?: string;
   /** "What's included" bullet points shown on the gift page, one per entry. */
   included?: string[];
+  /** Experience vouchers (Day Pass, Spa, Dinner for 2): how many people it
+   *  covers. Display only — shown on the gift page, voucher and PDF. */
+  guests?: number;
   /** Package rules; present iff kind === "package". */
   package?: PackageRules;
 }
@@ -60,6 +63,7 @@ export interface VoucherProductSnapshot {
   value?: number;
   terms?: string;
   included?: string[];
+  guests?: number;
   package?: PackageRules;
   /** Display names of the package's allowed room types, resolved at purchase. */
   roomTitles?: string[];

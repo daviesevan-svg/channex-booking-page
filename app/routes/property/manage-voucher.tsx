@@ -69,9 +69,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       type:
         r.note === "cooling-off cancel"
           ? ("cancelled" as const)
-          : v.kind === "package" && r.bookingId
-            ? ("booked" as const)
-            : ("spent" as const),
+          : r.note === "manual" && v.kind !== "gift"
+            ? ("redeemed" as const)
+            : v.kind === "package" && r.bookingId
+              ? ("booked" as const)
+              : ("spent" as const),
     }));
 
   return {
@@ -230,9 +232,11 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
                   <span>
                     {a.type === "cancelled"
                       ? tr.t("voucherStatus_cancelled")
-                      : a.type === "booked"
-                        ? tr.t("voucherActivityBooked")
-                        : tr.t("voucherActivitySpent", { amount: a.amount != null ? money(a.amount) : "" })}
+                      : a.type === "redeemed"
+                        ? tr.t("voucherActivityRedeemed")
+                        : a.type === "booked"
+                          ? tr.t("voucherActivityBooked")
+                          : tr.t("voucherActivitySpent", { amount: a.amount != null ? money(a.amount) : "" })}
                   </span>
                   <span className="text-muted-2">{date(a.at)}</span>
                 </div>

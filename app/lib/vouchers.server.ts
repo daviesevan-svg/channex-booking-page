@@ -335,11 +335,13 @@ export async function cancelVoucher(pid: string, code: string): Promise<boolean>
   return (await casMutate(pid, code, (v) => (v.status === "active" ? { ...v, status: "cancelled" } : null))).ok;
 }
 
-/** Mark a package voucher redeemed by hand (phone/desk booking). */
-export async function manualRedeemPackage(pid: string, code: string, by: string): Promise<boolean> {
+/** Mark a package or experience voucher redeemed by hand — a phone/desk
+ *  booking, or the guest presenting an experience voucher (Day Pass, Spa,
+ *  Dinner) in person. Gift vouchers are balance-based (use deductGift). */
+export async function manualRedeemVoucher(pid: string, code: string, by: string): Promise<boolean> {
   return (
     await casMutate(pid, code, (v) =>
-      v.kind === "package" && v.status === "active"
+      v.kind !== "gift" && v.status === "active"
         ? { ...v, status: "redeemed", redemptions: [...v.redemptions, { at: new Date().toISOString(), by, note: "manual" }] }
         : null,
     )
