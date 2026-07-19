@@ -30,7 +30,7 @@ import {
   getVoucherProduct,
   getVoucherProducts,
   listVouchers,
-  manualRedeemPackage,
+  manualRedeemVoucher,
   saveVoucherProduct,
   toggleVoucherProduct,
 } from "~/lib/vouchers.server";
@@ -146,7 +146,7 @@ export async function action({ request }: Route.ActionArgs) {
     const gate = await ownerGate();
     if (gate) return gate;
     const by = (await getAdminEmail(request)) ?? "admin";
-    if (!(await manualRedeemPackage(propertyId, code, by))) return { error: "Only an active package voucher can be marked redeemed." };
+    if (!(await manualRedeemVoucher(propertyId, code, by))) return { error: "Only an active package or experience voucher can be marked redeemed." };
     return redirect(soldTab);
   }
   if (intent === "voucherDeduct") {
@@ -191,6 +191,7 @@ export async function action({ request }: Route.ActionArgs) {
         price: product.price,
         value: product.kind === "gift" ? (product.value ?? product.price) : undefined,
         terms: product.terms,
+        guests: product.guests,
         package: product.package,
         roomTitles,
       },
@@ -211,7 +212,8 @@ export async function action({ request }: Route.ActionArgs) {
 
   // intent === "save"
   const id = String(form.get("id") || "").trim();
-  const kind: VoucherKind = form.get("kind") === "package" ? "package" : "gift";
+  const rawKind = form.get("kind");
+  const kind: VoucherKind = rawKind === "package" ? "package" : rawKind === "experience" ? "experience" : "gift";
   const title = String(form.get("title") ?? "").trim();
   const description = String(form.get("description") ?? "").trim() || undefined;
   const price = Math.round(Number(String(form.get("price") ?? "").trim()) * 100) / 100;
@@ -234,8 +236,15 @@ export async function action({ request }: Route.ActionArgs) {
   if (cap !== undefined && (!Number.isFinite(cap) || cap < 1)) return { error: "The sale limit must be a positive number." };
 
   let value: number | undefined;
+  let guests: number | undefined;
   let pkg: VoucherProduct["package"];
-  if (kind === "gift") {
+  if (kind === "experience") {
+    const guestsRaw = String(form.get("guests") ?? "").trim();
+    guests = guestsRaw === "" ? undefined : Math.round(Number(guestsRaw));
+    if (guests !== undefined && (!Number.isFinite(guests) || guests < 1 || guests > 50)) {
+      return { error: "Guests must be between 1 and 50 (or left blank)." };
+    }
+  } else if (kind === "gift") {
     value = valueRaw === "" ? price : Math.round(Number(valueRaw) * 100) / 100;
     if (!Number.isFinite(value) || value <= 0) return { error: "The gift value must be a positive amount." };
   } else {
@@ -298,6 +307,7 @@ export async function action({ request }: Route.ActionArgs) {
     cap,
     terms,
     included: included.length ? included : undefined,
+    guests,
     package: pkg,
   };
   await saveVoucherProduct(propertyId, product);
@@ -311,6 +321,7 @@ export function meta() {
 function summary(p: VoucherProduct, currency: string): string {
   const bits = [formatMoney(p.price, currency)];
   if (p.kind === "gift") bits.push(`${formatMoney(p.value ?? p.price, currency)} value`);
+  else if (p.kind === "experience") bits.push(p.guests ? `for ${p.guests} guest${p.guests === 1 ? "" : "s"} · redeemed in person` : "redeemed in person");
   else if (p.package) {
     bits.push(`${p.package.nights} night${p.package.nights === 1 ? "" : "s"} · ${p.package.adults} adult${p.package.adults === 1 ? "" : "s"}${p.package.children ? ` + ${p.package.children} child${p.package.children === 1 ? "" : "ren"}` : ""}`);
     if (p.package.checkinDays.length) bits.push(`check-in ${p.package.checkinDays.map((d) => WEEKDAY_LABELS[d]).join("/")}`);
@@ -339,7 +350,9 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
   // from the record being edited (or ?kind= for a fresh form).
-  const [kind, setKind] = useState<VoucherKind>(editing?.kind ?? (searchParams.get("kind") === "package" ? "package" : "gift"));
+  const [kind, setKind] = useState<VoucherKind>(
+    editing?.kind ?? (searchParams.get("kind") === "package" ? "package" : searchParams.get("kind") === "experience" ? "experience" : "gift"),
+  );
 
   return (
     <div>
@@ -379,7 +392,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                 <select name="productId" className={FIELD_INPUT}>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.title} ({p.kind === "gift" ? "gift" : "package"})
+                      {p.title} ({p.kind})
                     </option>
                   ))}
                 </select>
@@ -460,8 +473,8 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                           <input type="hidden" name="code" value={v.code} />
                           <button type="submit" disabled={saving} className="text-muted hover:text-accent">Resend</button>
                         </Form>
-                        {v.status === "active" && v.kind === "package" && (
-                          <Form method="post" onSubmit={(e) => { if (!confirm("Mark this package voucher as redeemed (booked by phone/at the desk)?")) e.preventDefault(); }}>
+                        {v.status === "active" && v.kind !== "gift" && (
+                          <Form method="post" onSubmit={(e) => { if (!confirm(v.kind === "package" ? "Mark this package voucher as redeemed (booked by phone/at the desk)?" : "Mark this experience voucher as redeemed (the guest used it)?")) e.preventDefault(); }}>
                             <input type="hidden" name="intent" value="voucherRedeemManual" />
                             <input type="hidden" name="code" value={v.code} />
                             <button type="submit" disabled={saving} className="text-muted hover:text-accent">Mark redeemed</button>
@@ -513,6 +526,12 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             className="inline-block rounded-[10px] border border-accent px-5 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
           >
             + Stay package
+          </Link>
+          <Link
+            to="/admin/vouchers?new=1&kind=experience"
+            className="inline-block rounded-[10px] border border-accent px-5 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
+          >
+            + Experience
           </Link>
         </div>
       )}
@@ -578,12 +597,13 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             <select
               name="kind"
               value={kind}
-              onChange={(e) => setKind(e.target.value === "package" ? "package" : "gift")}
+              onChange={(e) => setKind(e.target.value === "package" ? "package" : e.target.value === "experience" ? "experience" : "gift")}
               disabled={!!editing}
               className={FIELD_INPUT}
             >
               <option value="gift">Gift voucher — a value to spend on any booking</option>
               <option value="package">Stay package — a specific stay, booked online later</option>
+              <option value="experience">Experience — Day Pass, Spa, Dinner… redeemed in person</option>
             </select>
             {editing ? (
               <input type="hidden" name="kind" value={editing.kind} />
@@ -601,7 +621,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               <input
                 name="title"
                 defaultValue={editing?.title ?? ""}
-                placeholder={kind === "package" ? "Weekend Getaway" : "£100 Gift Voucher"}
+                placeholder={kind === "package" ? "Weekend Getaway" : kind === "experience" ? "Dinner for Two" : "£100 Gift Voucher"}
                 className={FIELD_INPUT}
               />
             </label>
@@ -613,7 +633,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                 min={0}
                 step="0.01"
                 defaultValue={editing ? String(editing.price) : ""}
-                placeholder={kind === "package" ? "249" : "100"}
+                placeholder={kind === "package" ? "249" : kind === "experience" ? "75" : "100"}
                 className={FIELD_INPUT}
               />
             </label>
@@ -635,6 +655,20 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             </label>
           )}
 
+          {kind === "experience" && (
+            <label className="block text-[13px] font-semibold text-secondary sm:max-w-[240px]">
+              Guests <span className="font-normal text-faint">(optional — e.g. 2 for "Dinner for Two")</span>
+              <input
+                name="guests"
+                type="number"
+                min={1}
+                max={50}
+                defaultValue={editing?.guests != null ? String(editing.guests) : ""}
+                className={FIELD_INPUT}
+              />
+            </label>
+          )}
+
           <label className="block text-[13px] font-semibold text-secondary">
             Description <span className="font-normal text-faint">(shown in the shop)</span>
             <textarea
@@ -644,7 +678,9 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               placeholder={
                 kind === "package"
                   ? "Two nights for two in a Garden Suite, any off-season weekend. Breakfast included."
-                  : "The perfect gift — they choose the dates, you cover the stay."
+                  : kind === "experience"
+                    ? "A three-course dinner for two in our restaurant, wine included."
+                    : "The perfect gift — they choose the dates, you cover the stay."
               }
               className={`${FIELD_INPUT} resize-y`}
             />
@@ -832,7 +868,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   <div className="flex items-center gap-2.5">
                     <span className="font-semibold">{p.title}</span>
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
-                      {p.kind === "gift" ? "Gift voucher" : "Stay package"}
+                      {p.kind === "gift" ? "Gift voucher" : p.kind === "package" ? "Stay package" : "Experience"}
                     </span>
                     {p.active ? (
                       <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">On sale</span>

@@ -85,7 +85,7 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
   text(hotelName, { size: 20, font: bold, color: rgb(1, 1, 1), center: true });
 
   y = PAGE_H - 150;
-  text(v.kind === "gift" ? "GIFT VOUCHER" : "STAY PACKAGE", { size: 12, color: MUTED, center: true });
+  text(v.kind === "gift" ? "GIFT VOUCHER" : v.kind === "package" ? "STAY PACKAGE" : "EXPERIENCE VOUCHER", { size: 12, color: MUTED, center: true });
   y -= 30;
   text(v.product.title, { size: 24, font: bold, center: true });
 
@@ -142,6 +142,15 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
     }
     y -= 24;
     text("Book your stay online — no phone call needed:", { size: 10.5, color: MUTED, center: true });
+    y -= 15;
+    text(input.voucherUrl, { size: 10.5, color: accent, center: true });
+  } else if (v.kind === "experience") {
+    y -= 56;
+    if (v.product.guests != null) {
+      text(`For ${v.product.guests} guest${v.product.guests === 1 ? "" : "s"}`, { size: 13, font: bold, center: true });
+      y -= 20;
+    }
+    text("Present this code at the hotel to redeem:", { size: 10.5, color: MUTED, center: true });
     y -= 15;
     text(input.voucherUrl, { size: 10.5, color: accent, center: true });
   } else {

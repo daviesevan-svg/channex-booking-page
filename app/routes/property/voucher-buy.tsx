@@ -31,7 +31,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   // Rooms feed the gallery + "where you'll stay" cards: a package shows its
   // allowed room types, a gift voucher shows the hotel's rooms in general.
-  const rooms = await getRooms(pid).catch(() => []);
+  const rooms = product.kind === "experience" ? [] : await getRooms(pid).catch(() => []);
   const relevant = product.package ? rooms.filter((r) => product.package!.roomIds.includes(r.id)) : rooms;
   const roomTitles = product.package ? relevant.map((r) => r.title) : [];
 
@@ -52,6 +52,7 @@ export async function loader({ params }: Route.LoaderArgs) {
       expiresMonths: product.expiresMonths,
       terms: product.terms,
       included: product.included ?? [],
+      guests: product.guests,
       package: product.package
         ? {
             nights: product.package.nights,
@@ -127,6 +128,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       value: product.kind === "gift" ? (product.value ?? product.price) : undefined,
       terms: product.terms,
       included: product.included,
+      guests: product.guests,
       package: product.package,
       roomTitles,
     },
@@ -285,29 +287,42 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           value: pkg.window?.from || pkg.window?.to ? `${pkg.window.from ?? "…"} – ${pkg.window.to ?? "…"}` : tr.t("voucherAllYear"),
         },
       ]
-    : [
-        { label: tr.t("voucherFactValue"), value: money(p.value ?? p.price) },
-        { label: tr.t("voucherFactValidity"), value: tr.t("voucherMonthsShort", { n: String(p.expiresMonths) }) },
-        { label: tr.t("voucherFactDelivery"), value: tr.t("voucherInstantEmail") },
-      ];
+    : p.kind === "experience"
+      ? [
+          ...(p.guests ? [{ label: tr.t("voucherFactGuests"), value: tr.p("voucherGuests", p.guests) }] : []),
+          { label: tr.t("voucherFactValidity"), value: tr.t("voucherMonthsShort", { n: String(p.expiresMonths) }) },
+          { label: tr.t("voucherFactDelivery"), value: tr.t("voucherInstantEmail") },
+          { label: tr.t("voucherFactRedeem"), value: tr.t("voucherAtHotel") },
+        ]
+      : [
+          { label: tr.t("voucherFactValue"), value: money(p.value ?? p.price) },
+          { label: tr.t("voucherFactValidity"), value: tr.t("voucherMonthsShort", { n: String(p.expiresMonths) }) },
+          { label: tr.t("voucherFactDelivery"), value: tr.t("voucherInstantEmail") },
+        ];
 
   const faqs: { q: string; a: string }[] = [
     { q: tr.t("voucherFaqDeliveryQ"), a: tr.t("voucherFaqDeliveryA") },
     pkg
       ? { q: tr.t("voucherFaqBookQ"), a: tr.t("voucherFaqBookA") }
-      : { q: tr.t("voucherFaqUseQ"), a: tr.t("voucherFaqUseA") },
+      : p.kind === "experience"
+        ? { q: tr.t("voucherFaqRedeemQ"), a: tr.t("voucherFaqRedeemA") }
+        : { q: tr.t("voucherFaqUseQ"), a: tr.t("voucherFaqUseA") },
     { q: tr.t("voucherFaqExpiryQ"), a: tr.t("voucherFaqExpiryA", { n: String(p.expiresMonths) }) },
     ...(p.terms ? [{ q: tr.t("voucherFaqTermsQ"), a: p.terms }] : []),
   ];
 
   const panelPoints = [
     tr.t("voucherPointDelivered"),
-    pkg ? tr.t("voucherPointDates") : tr.t("voucherPointSpend"),
+    pkg ? tr.t("voucherPointDates") : p.kind === "experience" ? tr.t("voucherPointRedeem") : tr.t("voucherPointSpend"),
     tr.t("voucherPointMessage"),
   ];
   const priceSub = pkg
     ? tr.t("voucherPriceForStay", { guests: tr.p("voucherGuests", pkgGuests), nights: tr.p("night", pkg.nights) })
-    : tr.t("voucherValue", { amount: money(p.value ?? p.price) });
+    : p.kind === "experience"
+      ? p.guests
+        ? tr.t("voucherPriceForGuests", { guests: tr.p("voucherGuests", p.guests) })
+        : tr.t("voucherValidFor", { n: String(p.expiresMonths) })
+      : tr.t("voucherValue", { amount: money(p.value ?? p.price) });
 
   const galleryPhotos = gallery.map((url) => ({ url }));
   const openForm = (gift: boolean) => {
@@ -366,12 +381,16 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
         <div>
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-[13px] py-1.5 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-accent-deep">
             <Diamond size={7} />
-            {p.kind === "gift" ? tr.t("voucherKindGift") : tr.t("voucherKindPackage")}
+            {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
           </div>
           <h1 className="m-0 mb-2.5 font-serif text-[clamp(30px,4.6vw,46px)] font-semibold leading-[1.06] tracking-[-0.02em]">
             {p.title}
           </h1>
-          {pkg && <p className="mb-3.5 text-[16px] text-secondary">{tr.t("voucherForGuests", { n: String(pkgGuests) })}</p>}
+          {(pkg || (p.kind === "experience" && p.guests)) && (
+            <p className="mb-3.5 text-[16px] text-secondary">
+              {tr.t("voucherForGuests", { n: String(pkg ? pkgGuests : p.guests) })}
+            </p>
+          )}
           {p.description && (
             <p className="mb-7 max-w-[60ch] text-[17px] leading-[1.6] text-secondary">{p.description}</p>
           )}
@@ -544,7 +563,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
             </div>
             <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-[13.5px] text-secondary">
               <Diamond size={7} />
-              {pkg ? tr.t("voucherStripDates") : tr.t("voucherStripBalance")}
+              {pkg ? tr.t("voucherStripDates") : p.kind === "experience" ? tr.t("voucherStripExperience") : tr.t("voucherStripBalance")}
             </div>
           </div>
         </aside>

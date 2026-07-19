@@ -53,6 +53,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         price: v.product.price,
         value: v.product.value,
         terms: v.product.terms,
+        guests: v.product.guests,
         roomTitles: v.product.roomTitles ?? [],
         package: v.product.package
           ? {
@@ -119,7 +120,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
         <div className="p-7">
           <div className="mb-2 flex flex-wrap items-center gap-2.5">
             <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11.5px] font-semibold text-muted">
-              {v.kind === "gift" ? tr.t("voucherKindGift") : tr.t("voucherKindPackage")}
+              {v.kind === "gift" ? tr.t("voucherKindGift") : v.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
             </span>
             <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${STATUS_STYLE[v.status]}`}>
               {statusLabel}
@@ -164,6 +165,12 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
             )
           )}
 
+          {v.kind === "experience" && v.product.guests != null && (
+            <div className="mb-5 text-center text-[15px] font-semibold text-secondary">
+              {tr.t("voucherForGuests", { n: String(v.product.guests) })}
+            </div>
+          )}
+
           <p className="mb-6 text-center text-[13px] text-muted">
             {tr.t("voucherValidUntil", { date: fmtDate(v.expiresAt, "d MMM yyyy") })}
           </p>
@@ -186,6 +193,9 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           </div>
           {v.kind === "gift" && v.status === "active" && (
             <p className="mt-5 text-center text-[13.5px] leading-[1.6] text-muted">{tr.t("voucherGiftHow")}</p>
+          )}
+          {v.kind === "experience" && v.status === "active" && (
+            <p className="mt-5 text-center text-[13.5px] leading-[1.6] text-muted">{tr.t("voucherExperienceHow")}</p>
           )}
 
           {v.product.terms && (
