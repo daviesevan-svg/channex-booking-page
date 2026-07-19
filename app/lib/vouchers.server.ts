@@ -10,10 +10,12 @@
 //   (redemptions, balance) go through an optimistic CAS on the exact old JSON
 //   so concurrent redemptions can't double-spend.
 import { getConfigKV, getDB } from "./config.server";
+import { clientKey, overLimit, rateLimit } from "./rate-limit.server";
 import { createRefund } from "./stripe.server";
 import {
   displayStatus,
   giftBalance,
+  normalizeVoucherCode,
   selfCancelDisallowedReason,
   type VoucherProduct,
   type VoucherRecord,
@@ -128,6 +130,26 @@ export async function claimVoucher(
     .run();
   if (res.meta.changes === 1) return { won: true };
   return { won: false, existing: (await getVoucherByCode(pid, record.code)) ?? undefined };
+}
+
+/** Voucher-code lookup with a per-IP brute-force throttle. The code is a
+ *  bearer credential, so guessing must stay expensive: once a client racks up
+ *  `LOOKUP_MISS_LIMIT` misses inside the window, further lookups from that IP
+ *  are refused before touching D1. Successful lookups never count against the
+ *  limit, so legitimate holders are unaffected until an attacker on the same
+ *  IP exhausts it. Returns "limited" when throttled. */
+const LOOKUP_MISS_LIMIT = 10;
+const LOOKUP_WINDOW_SEC = 600;
+export async function lookupVoucherGuarded(
+  pid: string,
+  rawCode: string,
+  request: Request,
+): Promise<VoucherRecord | null | "limited"> {
+  const bucket = `vprobe:${pid}:${clientKey(request)}`;
+  if (await overLimit(bucket, LOOKUP_MISS_LIMIT)) return "limited";
+  const v = await getVoucherByCode(pid, normalizeVoucherCode(rawCode));
+  if (!v) await rateLimit(bucket, LOOKUP_MISS_LIMIT, LOOKUP_WINDOW_SEC);
+  return v;
 }
 
 export async function getVoucherByCode(pid: string, code: string): Promise<VoucherRecord | null> {

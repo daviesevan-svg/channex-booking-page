@@ -9,7 +9,7 @@ import { z } from "zod";
 import type { Route } from "./+types/checkout";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
-import { getVoucherByCode, holdGiftAmount, releaseGiftHold } from "~/lib/vouchers.server";
+import { holdGiftAmount, lookupVoucherGuarded, releaseGiftHold } from "~/lib/vouchers.server";
 import { useProperty } from "~/lib/booking-context";
 import {
   cartCoverage,
@@ -276,7 +276,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (intent === "applyVoucher") {
     const raw = String(form.get("voucherCode") || "").trim();
     if (!raw) return { appliedVoucher: null };
-    const gv = await getVoucherByCode(stay.channelId, normalizeVoucherCode(raw)).catch(() => null);
+    const looked = await lookupVoucherGuarded(stay.channelId, raw, request).catch(() => null);
+    const gv = looked === "limited" ? null : looked;
     const balance = gv && gv.kind === "gift" && displayStatus(gv) === "active" ? giftBalance(gv) : 0;
     return gv && balance > 0
       ? { appliedVoucher: { code: gv.code, balance } }
@@ -348,7 +349,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   const voucherCodeInput = String(form.get("voucherCode") || "").trim();
   let voucherHold: { code: string; amount: number } | undefined;
   if (voucherCodeInput) {
-    const gv = await getVoucherByCode(stay.channelId, normalizeVoucherCode(voucherCodeInput)).catch(() => null);
+    const looked = await lookupVoucherGuarded(stay.channelId, voucherCodeInput, request).catch(() => null);
+    const gv = looked === "limited" ? null : looked;
     const balance = gv && gv.kind === "gift" && displayStatus(gv) === "active" ? giftBalance(gv) : 0;
     if (!gv || balance <= 0) {
       return { voucherError: true as const, voucherCode: normalizeVoucherCode(voucherCodeInput) };

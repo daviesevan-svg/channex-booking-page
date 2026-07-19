@@ -9,13 +9,14 @@ import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { fmtDate } from "~/lib/dates";
 import { resolvePropertyId } from "~/lib/properties.server";
-import { getVoucherByCode } from "~/lib/vouchers.server";
+import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { getBooking } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
-  const v = await getVoucherByCode(pid, normalizeVoucherCode(params.code));
+  const v = await lookupVoucherGuarded(pid, params.code, request);
+  if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!v) throw new Response("Voucher not found", { status: 404 });
   const issued = new URL(request.url).searchParams.get("issued") === "1";
   const justBooked = new URL(request.url).searchParams.get("booked") === "1";
@@ -70,7 +71,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }];
+  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }, { name: "robots", content: "noindex" }];
 }
 
 const STATUS_STYLE: Record<string, string> = {

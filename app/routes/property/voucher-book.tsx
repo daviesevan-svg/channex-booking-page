@@ -11,7 +11,7 @@ import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { resolvePropertyId } from "~/lib/properties.server";
-import { getVoucherByCode } from "~/lib/vouchers.server";
+import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { displayStatus, normalizeVoucherCode } from "~/lib/vouchers";
 import { packageCheckinOptions, redeemPackageVoucher } from "~/lib/voucher-redeem.server";
 import { getRooms } from "~/lib/catalog.server";
@@ -19,7 +19,8 @@ import { getRooms } from "~/lib/catalog.server";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
   const code = normalizeVoucherCode(params.code);
-  const v = await getVoucherByCode(pid, code);
+  const v = await lookupVoucherGuarded(pid, code, request);
+  if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!v || v.kind !== "package" || !v.product.package) throw redirect(`/${params.channelId}/voucher/${params.code}`);
   if (displayStatus(v) !== "active") throw redirect(`/${params.channelId}/voucher/${params.code}`);
 
@@ -45,7 +46,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const pid = await resolvePropertyId(params.channelId);
-  const v = await getVoucherByCode(pid, normalizeVoucherCode(params.code));
+  const v = await lookupVoucherGuarded(pid, params.code, request);
+  if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!v) return { error: "Voucher not found." };
 
   const form = await request.formData();
@@ -86,7 +88,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 }
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Book — ${loaderData.title}` : "Book your stay" }];
+  return [{ title: loaderData ? `Book — ${loaderData.title}` : "Book your stay" }, { name: "robots", content: "noindex" }];
 }
 
 export default function VoucherBook({ loaderData, actionData, params }: Route.ComponentProps) {
