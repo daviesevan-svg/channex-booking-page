@@ -10,13 +10,15 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
-import { WEEKDAY_LABELS, type VoucherKind, type VoucherProduct } from "~/lib/vouchers";
+import { displayStatus, giftBalance, WEEKDAY_LABELS, type VoucherKind, type VoucherProduct } from "~/lib/vouchers";
 import {
   deleteVoucherProduct,
   getVoucherProducts,
+  listVouchers,
   saveVoucherProduct,
   toggleVoucherProduct,
 } from "~/lib/vouchers.server";
+import { fmtDate } from "~/lib/dates";
 import { uploadVoucherImage } from "~/lib/images.server";
 import { getRooms } from "~/lib/catalog.server";
 
@@ -50,9 +52,26 @@ export async function loader({ request }: Route.LoaderArgs) {
   ]);
   const url = new URL(request.url);
   const editId = url.searchParams.get("edit");
+  const tab = url.searchParams.get("tab") === "sold" ? ("sold" as const) : ("products" as const);
+  const sold = tab === "sold" ? await listVouchers(propertyId).catch(() => []) : [];
   return {
     configured: true as const,
+    tab,
     products,
+    sold: sold.map((v) => ({
+      code: v.code,
+      kind: v.kind,
+      title: v.product.title,
+      buyerName: v.buyer.name,
+      buyerEmail: v.buyer.email,
+      recipientName: v.gift?.recipientName,
+      status: displayStatus(v),
+      balance: v.kind === "gift" ? giftBalance(v) : undefined,
+      purchasedAt: v.purchasedAt,
+      expiresAt: v.expiresAt,
+      simulated: v.simulated ?? false,
+      comp: v.comp ?? false,
+    })),
     currency: settings.currency || "GBP",
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
     editing: products.find((p) => p.id === editId) ?? null,
@@ -197,9 +216,9 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, currency, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, currency, rooms, editing, creating } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
-  const showForm = !!editing || creating || products.length === 0;
+  const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
   // from the record being edited (or ?kind= for a fresh form).
   const [kind, setKind] = useState<VoucherKind>(editing?.kind ?? (searchParams.get("kind") === "package" ? "package" : "gift"));
@@ -215,6 +234,66 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         check-in days.
       </p>
 
+      <div className="mb-6 flex gap-1 rounded-[10px] border border-line bg-surface p-1" style={{ width: "fit-content" }}>
+        {([["products", "For sale"], ["sold", `Sold (${tab === "sold" ? sold.length : "…"})`]] as const).map(([t, label]) => (
+          <Link
+            key={t}
+            to={t === "products" ? "/admin/vouchers" : "/admin/vouchers?tab=sold"}
+            className={`rounded-[8px] px-4 py-2 text-[13.5px] font-semibold ${tab === t ? "bg-accent text-white" : "text-muted hover:text-ink"}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </div>
+
+      {tab === "sold" ? (
+        sold.length === 0 ? (
+          <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
+            No vouchers sold yet. When guests buy from your voucher shop they appear here.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
+            <table className="w-full text-[13.5px]">
+              <thead>
+                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-muted-2">
+                  <th className="px-4 py-3">Code</th>
+                  <th className="px-4 py-3">Voucher</th>
+                  <th className="px-4 py-3">Buyer</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Balance</th>
+                  <th className="px-4 py-3">Bought</th>
+                  <th className="px-4 py-3">Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sold.map((v) => (
+                  <tr key={v.code} className="border-b border-divider last:border-0">
+                    <td className="px-4 py-3 font-mono text-[12.5px] font-semibold text-accent-deep">{v.code}</td>
+                    <td className="px-4 py-3">
+                      {v.title}
+                      {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">test</span>}
+                      {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10.5px] font-semibold text-muted">comp</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>{v.buyerName}{v.recipientName ? ` → ${v.recipientName}` : ""}</div>
+                      <div className="text-[12px] text-muted-2">{v.buyerEmail}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${v.status === "active" ? "bg-[#e8f0e6] text-[#3f7a52]" : v.status === "redeemed" ? "bg-chip text-muted" : "bg-[#fbe9e7] text-[#c0392b]"}`}>
+                        {v.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{v.balance != null ? formatMoney(v.balance, currency) : "—"}</td>
+                    <td className="px-4 py-3 text-muted">{fmtDate(v.purchasedAt, "d MMM yyyy")}</td>
+                    <td className="px-4 py-3 text-muted">{fmtDate(v.expiresAt, "d MMM yyyy")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+      <>
       {!showForm && (
         <div className="mb-7 flex gap-3">
           <Link
@@ -532,6 +611,8 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

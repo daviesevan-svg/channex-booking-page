@@ -2,6 +2,7 @@ import type { Route } from "./+types/api.stripe-webhook";
 import { getConfig } from "~/lib/config.server";
 import { verifyWebhook } from "~/lib/stripe.server";
 import { finalizeFromStripeSession } from "~/lib/booking-finalize.server";
+import { finalizeVoucherFromStripeSession } from "~/lib/voucher-purchase.server";
 
 interface StripeEvent {
   type?: string;
@@ -27,9 +28,15 @@ export async function action({ request }: Route.ActionArgs) {
     const s = event.data?.object ?? {};
     const ref = typeof s.client_reference_id === "string" ? s.client_reference_id : "";
     const sessionId = typeof s.id === "string" ? s.id : "";
+    const meta = (s.metadata ?? {}) as Record<string, unknown>;
     // Re-fetch the session on the connected account for authoritative status +
     // card details. Idempotent finalize handles a race with the return URL.
-    if (ref && sessionId) await finalizeFromStripeSession(ref, sessionId);
+    // Voucher purchases and bookings share this webhook — session metadata
+    // says which finalize path owns the reference.
+    if (ref && sessionId) {
+      if (meta.kind === "voucher") await finalizeVoucherFromStripeSession(ref, sessionId);
+      else await finalizeFromStripeSession(ref, sessionId);
+    }
   }
   return Response.json({ received: true });
 }
