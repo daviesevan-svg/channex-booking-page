@@ -91,6 +91,14 @@ export interface BookingRecord {
   inventoryHeld?: boolean;
   /** Review-request emails sent so far (max 3; stops once a review exists). */
   reviewRequests?: { count: number; lastAt: string };
+  /** Admin edits to guest details, oldest first — an audit trail, so the record
+   *  as consented at checkout stays reconstructible (dispute defence). */
+  edits?: {
+    at: string;
+    /** Admin email who made the edit. */
+    by?: string;
+    changes: { field: string; from: string; to: string }[];
+  }[];
   createdAt: string;
   /** Guest's language at booking time — drives confirmation/cancellation email
    *  language. Absent on legacy bookings (falls back to the default). */
