@@ -208,6 +208,10 @@ export async function action({ request }: Route.ActionArgs) {
   const expiresMonths = Math.round(Number(String(form.get("expiresMonths") ?? "12").trim()));
   const capRaw = String(form.get("cap") ?? "").trim();
   const terms = String(form.get("terms") ?? "").trim() || undefined;
+  const included = String(form.get("included") ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   const active = form.get("active") != null;
 
   if (!title) return { error: "Enter a name for the voucher." };
@@ -282,6 +286,7 @@ export async function action({ request }: Route.ActionArgs) {
     expiresMonths,
     cap,
     terms,
+    included: included.length ? included : undefined,
     package: pkg,
   };
   await saveVoucherProduct(propertyId, product);
@@ -719,6 +724,17 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               <input name="cap" type="number" min={1} defaultValue={editing?.cap ?? ""} placeholder="unlimited" className={FIELD_INPUT} />
             </label>
           </div>
+
+          <label className="block text-[13px] font-semibold text-secondary">
+            What&#39;s included <span className="font-normal text-faint">(optional — one per line, shown as bullet points on the gift page)</span>
+            <textarea
+              name="included"
+              rows={4}
+              defaultValue={(editing?.included ?? []).join("\n")}
+              placeholder={"Two nights in a Sea-View room\nBreakfast each morning\nLate checkout on departure"}
+              className={`${FIELD_INPUT} resize-y`}
+            />
+          </label>
 
           <label className="block text-[13px] font-semibold text-secondary">
             Terms <span className="font-normal text-faint">(optional — shown on the voucher and at purchase)</span>
