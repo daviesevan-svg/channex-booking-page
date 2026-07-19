@@ -44,6 +44,8 @@ export interface VoucherProduct {
   /** Max sellable (STAAH "sale counter"); unset = unlimited. */
   cap?: number;
   terms?: string;
+  /** "What's included" bullet points shown on the gift page, one per entry. */
+  included?: string[];
   /** Package rules; present iff kind === "package". */
   package?: PackageRules;
 }
@@ -57,6 +59,7 @@ export interface VoucherProductSnapshot {
   price: number;
   value?: number;
   terms?: string;
+  included?: string[];
   package?: PackageRules;
   /** Display names of the package's allowed room types, resolved at purchase. */
   roomTitles?: string[];
