@@ -214,8 +214,10 @@ export function serializeBooking(b: BookingRecord) {
       info: x.infoLine ?? null,
     })),
     cancellation: b.cancellation ? { refundable: b.cancellation.refundable, cancel_by: b.cancellation.cancelByISO } : null,
+    voucher: b.voucher ? { code: b.voucher.code, title: b.voucher.title } : null,
     payment: b.payment
       ? {
+          provider: b.payment.provider ?? "stripe",
           mode: b.payment.mode, // "payment" | "setup"
           amount: b.payment.amount ?? null,
           currency: b.payment.currency ?? null,

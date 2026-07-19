@@ -26,7 +26,8 @@ export type BookingLifecycle = "active" | "cancelled";
 /** Stripe payment outcome stored on a booking. `mode:"payment"` = a charge was
  *  taken (deposit/prepay); `mode:"setup"` = a guarantee card saved on file. */
 export interface PaymentInfo {
-  provider: "stripe";
+  /** "voucher" = the stay was prepaid by redeeming a package voucher. */
+  provider: "stripe" | "voucher";
   mode: "payment" | "setup";
   /** Connected Stripe account the charge/setup ran on. */
   accountId: string;
@@ -91,6 +92,8 @@ export interface BookingRecord {
   inventoryHeld?: boolean;
   /** Review-request emails sent so far (max 3; stops once a review exists). */
   reviewRequests?: { count: number; lastAt: string };
+  /** Present when the stay was booked by redeeming a package voucher. */
+  voucher?: { code: string; title: string };
   /** Admin edits to guest details, oldest first — an audit trail, so the record
    *  as consented at checkout stays reconstructible (dispute defence). */
   edits?: {

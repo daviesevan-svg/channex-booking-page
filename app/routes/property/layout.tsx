@@ -12,6 +12,7 @@ import {
 } from "~/lib/content";
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getProperty, resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 
@@ -38,6 +39,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     hotelName: overrides.hotelName || "Your hotel",
     logoImage: settings.logoImage || null,
     logoHideName: settings.logoHideName ?? false,
+    // Auto-discovery: the "Gift vouchers" header link appears whenever the
+    // property has something on sale (fail-open: a KV hiccup hides it).
+    hasVouchers: await getActiveVoucherProducts(pid)
+      .then((v) => v.length > 0)
+      .catch(() => false),
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
@@ -109,7 +115,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, logoImage, logoHideName, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -199,6 +205,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           <div className="flex items-center gap-5 text-sm text-muted">
             {languages.length > 1 && (
               <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
+            )}
+            {isHome && hasVouchers && (
+              <Link to={`${base}/vouchers`} className="hover:text-accent">
+                {tr.t("vouchersTitle")}
+              </Link>
             )}
             {isHome && (
               <Link to={`${base}/manage`} className="hover:text-accent">

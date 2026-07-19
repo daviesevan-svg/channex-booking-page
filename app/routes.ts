@@ -104,6 +104,7 @@ export default [
     route("vouchers/:productId", "routes/property/voucher-buy.tsx"),
     route("voucher/:code", "routes/property/voucher.tsx"),
     route("voucher/:code/pdf", "routes/property/voucher-pdf.tsx"),
+    route("voucher/:code/book", "routes/property/voucher-book.tsx"),
     route("checkout", "routes/property/checkout.tsx"),
     route("checkout/complete", "routes/property/checkout.complete.tsx"),
     route("confirmation/:ref", "routes/property/confirmation.tsx"),
