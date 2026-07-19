@@ -58,6 +58,8 @@ export interface VoucherProductSnapshot {
   value?: number;
   terms?: string;
   package?: PackageRules;
+  /** Display names of the package's allowed room types, resolved at purchase. */
+  roomTitles?: string[];
 }
 
 export type VoucherStatus = "active" | "redeemed" | "cancelled";
