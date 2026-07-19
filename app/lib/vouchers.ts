@@ -107,6 +107,9 @@ export interface VoucherRecord {
     paymentIntentId?: string;
     amount?: number;
     currency?: string;
+    /** Set once the charge has been refunded. `by` is the admin who issued it,
+     *  or a "buyer …" marker for cooling-off self-cancellations. */
+    refund?: { id: string; amount: number; currency?: string; at: string; by?: string };
   };
   /** Complimentary — issued free by the hotel. */
   comp?: boolean;
@@ -193,6 +196,33 @@ export function displayStatus(v: VoucherRecord, now = Date.now()): VoucherStatus
   if (v.status !== "active") return v.status;
   if (isExpired(v, now)) return "expired";
   return "active";
+}
+
+// ---------- buyer self-service (cooling-off cancellation) ----------
+
+/** Default cancel-for-refund window after purchase (EU distance-selling norm).
+ *  Properties can override per-property; 0 disables self-cancel entirely. */
+export const DEFAULT_COOLING_OFF_DAYS = 14;
+
+/** End of the cooling-off window, as epoch ms. */
+export function coolingOffEndsAt(v: VoucherRecord, coolingOffDays: number): number {
+  return Date.parse(v.purchasedAt) + coolingOffDays * 86_400_000;
+}
+
+/** Why the BUYER may not self-cancel for a refund right now — or null when the
+ *  cancel is allowed. "status" = not active any more; "spent" = some value was
+ *  already redeemed or is held by a checkout in flight; "window" = self-cancel
+ *  is disabled or the cooling-off period has passed. */
+export function selfCancelDisallowedReason(
+  v: VoucherRecord,
+  coolingOffDays: number,
+  now = Date.now(),
+): "status" | "spent" | "window" | null {
+  if (displayStatus(v, now) !== "active") return "status";
+  if (v.redemptions.some((r) => r.bookingId)) return "spent";
+  if (v.kind === "gift" && giftBalance(v, now) < (v.product.value ?? v.product.price)) return "spent";
+  if (coolingOffDays <= 0 || now > coolingOffEndsAt(v, coolingOffDays)) return "window";
+  return null;
 }
 
 export const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;

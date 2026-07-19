@@ -10,7 +10,14 @@
 //   (redemptions, balance) go through an optimistic CAS on the exact old JSON
 //   so concurrent redemptions can't double-spend.
 import { getConfigKV, getDB } from "./config.server";
-import { displayStatus, giftBalance, type VoucherProduct, type VoucherRecord } from "./vouchers";
+import { createRefund } from "./stripe.server";
+import {
+  displayStatus,
+  giftBalance,
+  selfCancelDisallowedReason,
+  type VoucherProduct,
+  type VoucherRecord,
+} from "./vouchers";
 
 export type { VoucherProduct, VoucherRecord } from "./vouchers";
 
@@ -142,6 +149,13 @@ export async function listVouchers(pid: string): Promise<VoucherRecord[]> {
   return (results ?? []).map((r) => JSON.parse(r.json) as VoucherRecord);
 }
 
+/** Every voucher bought with this email — powers the guest self-service list.
+ *  Filters in code (per-property voucher counts are small; no email column). */
+export async function listVouchersByEmail(pid: string, email: string): Promise<VoucherRecord[]> {
+  const norm = email.trim().toLowerCase();
+  return (await listVouchers(pid)).filter((v) => v.buyer.email.trim().toLowerCase() === norm);
+}
+
 /** How many vouchers of a product have been sold (for the sale cap). Counts
  *  every non-cancelled voucher — a redeemed voucher still consumed a unit. */
 export async function soldCount(pid: string, productId: string): Promise<number> {
@@ -240,6 +254,79 @@ export async function releaseGiftHold(pid: string, code: string, ref: string): P
     if (next.length === v.redemptions.length) return null;
     return { ...v, redemptions: next };
   });
+}
+
+// ---------- buyer self-service: cooling-off cancel + refund ----------
+
+/** Cancel by the buyer inside the cooling-off window. The eligibility rules are
+ *  re-checked inside the CAS loop, so a redemption that lands concurrently
+ *  can't be cancelled away. */
+export async function selfCancelVoucher(
+  pid: string,
+  code: string,
+  coolingOffDays: number,
+  by: string,
+): Promise<{ ok: true; voucher: VoucherRecord } | { ok: false; reason: "status" | "spent" | "window" | "conflict" }> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const v = await getVoucherByCode(pid, code);
+    if (!v) return { ok: false, reason: "status" };
+    const reason = selfCancelDisallowedReason(v, coolingOffDays);
+    if (reason) return { ok: false, reason };
+    const next: VoucherRecord = {
+      ...v,
+      status: "cancelled",
+      redemptions: [...v.redemptions, { at: new Date().toISOString(), by, note: "cooling-off cancel" }],
+    };
+    const written = await casUpdateVoucher(pid, v, next);
+    if (written) return { ok: true, voucher: written };
+  }
+  return { ok: false, reason: "conflict" };
+}
+
+/** Refund a voucher's Stripe charge (full). Idempotent per voucher code; a
+ *  no-op for simulated/comp vouchers (no charge) or already-refunded ones.
+ *  Never throws — a failed refund is logged and reported so the hotel can
+ *  handle it manually. */
+export async function refundVoucherCharge(
+  pid: string,
+  v: VoucherRecord,
+  by: string,
+): Promise<{ ok: true; amount: number } | { ok: false; reason: "no_charge" | "already_refunded" | "error" }> {
+  const p = v.payment;
+  if (!p || !p.paymentIntentId || !p.accountId) return { ok: false, reason: "no_charge" };
+  if (p.refund) return { ok: false, reason: "already_refunded" };
+  try {
+    const refund = await createRefund(p.accountId, p.paymentIntentId, undefined, `refund_v_${v.code}`);
+    const amount = (refund.amount ?? Math.round((p.amount ?? v.product.price) * 100)) / 100;
+    await casMutate(pid, v.code, (cur) =>
+      cur.payment && !cur.payment.refund
+        ? {
+            ...cur,
+            payment: {
+              ...cur.payment,
+              refund: {
+                id: refund.id,
+                amount,
+                currency: refund.currency?.toUpperCase() ?? p.currency,
+                at: new Date().toISOString(),
+                by,
+              },
+            },
+          }
+        : null,
+    );
+    return { ok: true, amount };
+  } catch (e) {
+    console.log(`[vouchers] refund failed for ${v.code} pi=${p.paymentIntentId}: ${e instanceof Error ? e.message : e}`);
+    return { ok: false, reason: "error" };
+  }
+}
+
+/** Set/replace the gift recipient's email (buyer adding it later so the
+ *  voucher — or a reminder — can be emailed to them directly). */
+export async function setGiftRecipientEmail(pid: string, code: string, email: string): Promise<VoucherRecord | null> {
+  const r = await casMutate(pid, code, (v) => (v.gift ? { ...v, gift: { ...v.gift, recipientEmail: email } } : null));
+  return r.ok ? r.voucher : null;
 }
 
 // ---------- admin management ----------

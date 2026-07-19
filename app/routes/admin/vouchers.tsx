@@ -8,10 +8,11 @@ import type { Route } from "./+types/vouchers";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
-import { getSettings } from "~/lib/overrides.server";
+import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {
   computeExpiry,
+  DEFAULT_COOLING_OFF_DAYS,
   displayStatus,
   giftBalance,
   voucherCode,
@@ -89,6 +90,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       comp: v.comp ?? false,
     })),
     currency: settings.currency || "GBP",
+    coolingOffDays: settings.voucherCoolingOffDays ?? DEFAULT_COOLING_OFF_DAYS,
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
     editing: products.find((p) => p.id === editId) ?? null,
     creating: url.searchParams.get("new") != null,
@@ -103,6 +105,15 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
 
+  if (intent === "selfService") {
+    const raw = String(form.get("coolingOffDays") ?? "").trim();
+    const days = raw === "" ? DEFAULT_COOLING_OFF_DAYS : Math.round(Number(raw));
+    if (!Number.isFinite(days) || days < 0 || days > 365) {
+      return { error: "The cooling-off window must be between 0 and 365 days." };
+    }
+    await patchSettings(propertyId, { voucherCoolingOffDays: days });
+    return redirect("/admin/vouchers");
+  }
   if (intent === "delete") {
     await deleteVoucherProduct(propertyId, String(form.get("id")));
     return redirect("/admin/vouchers");
@@ -323,7 +334,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, sold, tab, currency, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, currency, coolingOffDays, rooms, editing, creating } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
@@ -504,6 +515,41 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             + Stay package
           </Link>
         </div>
+      )}
+
+      {tab === "products" && !showForm && (
+        <Form
+          method="post"
+          className="mb-7 flex flex-wrap items-end gap-4 rounded-[14px] border border-line bg-surface p-6"
+        >
+          <input type="hidden" name="intent" value="selfService" />
+          <div className="min-w-[260px] flex-1">
+            <h2 className="m-0 mb-1 font-serif text-[18px] font-semibold">Buyer self-service</h2>
+            <p className="m-0 text-[13px] leading-[1.55] text-secondary">
+              Buyers manage their vouchers on your booking page (Manage booking → sign in with the voucher
+              code + email): check redemption, nudge the recipient, and cancel for an automatic full refund
+              inside this window. Many countries mandate a 14-day cooling-off period for online purchases.
+            </p>
+          </div>
+          <label className="block text-[13px] font-semibold text-secondary">
+            Cooling-off window (days, 0 disables)
+            <input
+              name="coolingOffDays"
+              type="number"
+              min={0}
+              max={365}
+              defaultValue={coolingOffDays}
+              className={`${FIELD_INPUT} w-[130px]`}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-[10px] border border-line-alt px-5 py-[11px] text-[14px] font-semibold text-secondary hover:bg-chip disabled:opacity-60"
+          >
+            Save
+          </button>
+        </Form>
       )}
 
       {showForm && (

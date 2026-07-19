@@ -7,6 +7,8 @@ import {
   findBookingByRefAndEmail,
   getBookingsByEmail,
 } from "~/lib/bookings.server";
+import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
+import { getVoucherByCode, listVouchersByEmail } from "~/lib/vouchers.server";
 import { createGuestSession, getGuestEmail, guestLogout } from "~/lib/guest-auth.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
@@ -17,7 +19,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const email = await getGuestEmail(request);
   if (!email) return { authed: false as const };
   // :channelId may be a slug — resolve to the real id for booking lookups.
-  const bookings = await getBookingsByEmail(await resolvePropertyId(params.channelId), email);
+  const pid = await resolvePropertyId(params.channelId);
+  const [bookings, vouchers] = await Promise.all([
+    getBookingsByEmail(pid, email),
+    listVouchersByEmail(pid, email).catch(() => []),
+  ]);
   return {
     authed: true as const,
     email,
@@ -29,6 +35,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       total: b.total,
       currency: b.currency,
       rooms: b.rooms.length,
+    })),
+    // Strict projection — the buyer's own vouchers (status derived, no payment ids).
+    vouchers: vouchers.map((v) => ({
+      code: v.code,
+      kind: v.kind,
+      status: displayStatus(v),
+      title: v.product.title,
+      balance: v.kind === "gift" ? giftBalance(v) : undefined,
+      expiresAt: v.expiresAt,
+      recipientName: v.gift?.recipientName,
     })),
   };
 }
@@ -49,8 +65,15 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!reference || !email) return { notFound: true };
 
   const booking = await findBookingByRefAndEmail(pid, reference, email);
-  if (!booking) return { notFound: true };
-  return createGuestSession(email, `/${params.channelId}/manage`);
+  if (booking) return createGuestSession(email, `/${params.channelId}/manage`);
+
+  // Not a booking reference — maybe a voucher code (buyers of vouchers have no
+  // booking). Same rule: the code must match together with the buyer's email.
+  const voucher = await getVoucherByCode(pid, normalizeVoucherCode(reference)).catch(() => null);
+  if (voucher && voucher.buyer.email.trim().toLowerCase() === email.toLowerCase()) {
+    return createGuestSession(email, `/${params.channelId}/manage`);
+  }
+  return { notFound: true };
 }
 
 export function meta() {
@@ -74,7 +97,13 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
     );
   }
 
-  const { bookings } = loaderData;
+  const { bookings, vouchers } = loaderData;
+  const statusChip: Record<string, string> = {
+    active: "bg-[#e8f0e6] text-[#3f7a52]",
+    redeemed: "bg-chip text-muted",
+    cancelled: "bg-[#fbe9e7] text-[#c0392b]",
+    expired: "bg-[#fbe9e7] text-[#c0392b]",
+  };
 
   return (
     <main className="mx-auto max-w-[760px] px-7 pb-20 pt-12">
@@ -126,6 +155,42 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
           ))}
         </div>
       )}
+
+      {vouchers.length > 0 && (
+        <>
+          <h2 className="mb-4 mt-10 font-serif text-[24px] font-semibold tracking-[-0.01em]">
+            {tr.t("manageVouchersTitle")}
+          </h2>
+          <div className="overflow-hidden rounded-[16px] border border-line bg-surface">
+            {vouchers.map((v, i) => (
+              <Link
+                key={v.code}
+                to={`/${params.channelId}/manage/voucher/${v.code}`}
+                className={`flex items-center justify-between gap-4 px-6 py-5 hover:bg-field-hover ${
+                  i > 0 ? "border-t border-divider" : ""
+                }`}
+              >
+                <div className="min-w-0">
+                  <div className="font-serif text-[19px] font-semibold">{v.title}</div>
+                  <div className="mt-1 text-[13px] text-muted-2">
+                    {v.code}
+                    {v.recipientName ? ` · ${tr.t("manageVoucherFor", { name: v.recipientName })}` : ""}
+                    {v.balance != null ? ` · ${tr.t("voucherBalance")}: ${formatMoney(v.balance, currency)}` : ""}
+                  </div>
+                </div>
+                <div className="flex flex-none items-center gap-4">
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${statusChip[v.status] ?? "bg-chip text-muted"}`}
+                  >
+                    {tr.t(`voucherStatus_${v.status}`)}
+                  </span>
+                  <span className="text-[13px] font-semibold text-accent">{tr.t("view")} →</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </main>
   );
 }
@@ -156,8 +221,8 @@ function ManageLogin({
         className="flex flex-col gap-4 rounded-[16px] border border-line bg-surface p-6"
       >
         <label className="block text-[13px] font-semibold text-secondary">
-          {tr.t("bookingReference")}
-          <input name="reference" placeholder="ABC123" className={inputCls} autoComplete="off" />
+          {tr.t("manageRefOrCode")}
+          <input name="reference" placeholder="ABC123 / RP-XXXX-XXXX" className={inputCls} autoComplete="off" />
         </label>
         <label className="block text-[13px] font-semibold text-secondary">
           {tr.t("emailAddress")}
