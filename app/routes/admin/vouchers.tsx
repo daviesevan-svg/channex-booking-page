@@ -70,10 +70,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const editId = url.searchParams.get("edit");
   const tab = url.searchParams.get("tab") === "sold" ? ("sold" as const) : ("products" as const);
+  const compIssued = url.searchParams.get("comp");
   const sold = tab === "sold" ? await listVouchers(propertyId).catch(() => []) : [];
   return {
     configured: true as const,
     tab,
+    compIssued,
     products,
     sold: sold.map((v) => ({
       code: v.code,
@@ -207,7 +209,7 @@ export async function action({ request }: Route.ActionArgs) {
     await claimVoucher(propertyId, record);
     const prop = await getProperty(propertyId);
     await sendVoucherEmails(propertyId, record, new URL(request.url).origin, prop?.slug || propertyId);
-    return redirect(soldTab);
+    return redirect(`${soldTab}&comp=${record.code}`);
   }
 
   // intent === "save"
@@ -345,7 +347,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, sold, tab, currency, coolingOffDays, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, compIssued, currency, coolingOffDays, rooms, editing, creating } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
@@ -380,8 +382,13 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
       {tab === "sold" ? (
         <>
         {/* Issue a free voucher (loyalty gesture, competition prize, service recovery). */}
+        {compIssued && (
+          <p className="mb-4 rounded-[10px] border border-[#cfe3d2] bg-[#eef6ef] px-4 py-2.5 text-[13px] font-semibold text-[#3f7a52]">
+            Complimentary voucher {compIssued} issued — it appears in the list below.
+          </p>
+        )}
         {products.length > 0 && (
-          <details className="mb-5 rounded-[14px] border border-line bg-surface p-5">
+          <details key={compIssued ?? "comp"} className="mb-5 rounded-[14px] border border-line bg-surface p-5">
             <summary className="cursor-pointer text-[14px] font-semibold text-secondary hover:text-accent">
               Issue a complimentary voucher
             </summary>
@@ -435,38 +442,40 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-muted-2">
-                  <th className="px-4 py-3">Code</th>
-                  <th className="px-4 py-3">Voucher</th>
-                  <th className="px-4 py-3">Buyer</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Balance</th>
-                  <th className="px-4 py-3">Bought</th>
-                  <th className="px-4 py-3">Expires</th>
-                  <th className="px-4 py-3">Actions</th>
+                  <th className="px-3 py-3">Code</th>
+                  <th className="px-3 py-3">Voucher</th>
+                  <th className="px-3 py-3">Buyer</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Dates</th>
+                  <th className="px-3 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {sold.map((v) => (
                   <tr key={v.code} className="border-b border-divider last:border-0">
-                    <td className="px-4 py-3 font-mono text-[12.5px] font-semibold text-accent-deep">{v.code}</td>
-                    <td className="px-4 py-3">
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-[12.5px] font-semibold text-accent-deep">{v.code}</td>
+                    <td className="px-3 py-3">
                       {v.title}
                       {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">test</span>}
                       {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10.5px] font-semibold text-muted">comp</span>}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <div>{v.buyerName}{v.recipientName ? ` → ${v.recipientName}` : ""}</div>
                       <div className="text-[12px] text-muted-2">{v.buyerEmail}</div>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${v.status === "active" ? "bg-[#e8f0e6] text-[#3f7a52]" : v.status === "redeemed" ? "bg-chip text-muted" : "bg-[#fbe9e7] text-[#c0392b]"}`}>
                         {v.status}
                       </span>
+                      {v.balance != null && (
+                        <div className="mt-1 text-[12px] text-muted">{formatMoney(v.balance, currency)} left</div>
+                      )}
                     </td>
-                    <td className="px-4 py-3">{v.balance != null ? formatMoney(v.balance, currency) : "—"}</td>
-                    <td className="px-4 py-3 text-muted">{fmtDate(v.purchasedAt, "d MMM yyyy")}</td>
-                    <td className="px-4 py-3 text-muted">{fmtDate(v.expiresAt, "d MMM yyyy")}</td>
-                    <td className="px-4 py-3">
+                    <td className="whitespace-nowrap px-3 py-3 text-[12.5px] text-muted">
+                      <div>{fmtDate(v.purchasedAt, "d MMM yyyy")}</div>
+                      <div className="text-muted-2">→ {fmtDate(v.expiresAt, "d MMM yyyy")}</div>
+                    </td>
+                    <td className="px-3 py-3">
                       <div className="flex flex-wrap items-center gap-2.5 text-[12.5px] font-semibold">
                         <Form method="post">
                           <input type="hidden" name="intent" value="voucherResend" />
