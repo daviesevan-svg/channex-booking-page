@@ -74,6 +74,7 @@ export default [
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
     route("extras", "routes/admin/extras.tsx"),
+    route("vouchers", "routes/admin/vouchers.tsx"),
     route("emails", "routes/admin/emails.tsx"),
     route("emails/:template", "routes/admin/email.tsx"),
     route("bookings", "routes/admin/bookings.tsx"),
