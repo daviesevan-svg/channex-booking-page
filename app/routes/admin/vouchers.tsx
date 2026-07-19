@@ -6,18 +6,34 @@ import { useState } from "react";
 
 import type { Route } from "./+types/vouchers";
 import { FIELD_INPUT } from "~/components/admin-form";
-import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
+import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
-import { displayStatus, giftBalance, WEEKDAY_LABELS, type VoucherKind, type VoucherProduct } from "~/lib/vouchers";
 import {
+  computeExpiry,
+  displayStatus,
+  giftBalance,
+  voucherCode,
+  WEEKDAY_LABELS,
+  type VoucherKind,
+  type VoucherProduct,
+  type VoucherRecord,
+} from "~/lib/vouchers";
+import {
+  cancelVoucher,
+  claimVoucher,
+  deductGift,
   deleteVoucherProduct,
+  getVoucherByCode,
+  getVoucherProduct,
   getVoucherProducts,
   listVouchers,
+  manualRedeemPackage,
   saveVoucherProduct,
   toggleVoucherProduct,
 } from "~/lib/vouchers.server";
+import { sendVoucherEmails } from "~/lib/voucher-purchase.server";
 import { fmtDate } from "~/lib/dates";
 import { uploadVoucherImage } from "~/lib/images.server";
 import { getRooms } from "~/lib/catalog.server";
@@ -94,6 +110,92 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "toggle") {
     await toggleVoucherProduct(propertyId, String(form.get("id")));
     return redirect("/admin/vouchers");
+  }
+
+  // ---- sold-voucher management ----
+  const code = String(form.get("code") ?? "");
+  const soldTab = "/admin/vouchers?tab=sold";
+  const ownerGate = async () =>
+    (await isOwnerOrSuper(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
+
+  if (intent === "voucherResend") {
+    const v = await getVoucherByCode(propertyId, code);
+    if (!v) return { error: "Voucher not found." };
+    const prop = await getProperty(propertyId);
+    await sendVoucherEmails(propertyId, v, new URL(request.url).origin, prop?.slug || propertyId);
+    return redirect(soldTab);
+  }
+  if (intent === "voucherCancel") {
+    const gate = await ownerGate();
+    if (gate) return gate;
+    if (!(await cancelVoucher(propertyId, code))) return { error: "Only an active voucher can be cancelled." };
+    return redirect(soldTab);
+  }
+  if (intent === "voucherRedeemManual") {
+    const gate = await ownerGate();
+    if (gate) return gate;
+    const by = (await getAdminEmail(request)) ?? "admin";
+    if (!(await manualRedeemPackage(propertyId, code, by))) return { error: "Only an active package voucher can be marked redeemed." };
+    return redirect(soldTab);
+  }
+  if (intent === "voucherDeduct") {
+    const gate = await ownerGate();
+    if (gate) return gate;
+    const amount = Math.round(Number(String(form.get("amount") ?? "")) * 100) / 100;
+    if (!Number.isFinite(amount) || amount <= 0) return { error: "Enter the amount to deduct." };
+    const by = (await getAdminEmail(request)) ?? "admin";
+    if (!(await deductGift(propertyId, code, amount, by))) {
+      return { error: "Couldn't deduct — check the voucher is active and has enough balance." };
+    }
+    return redirect(soldTab);
+  }
+  if (intent === "voucherComp") {
+    const gate = await ownerGate();
+    if (gate) return gate;
+    const product = await getVoucherProduct(propertyId, String(form.get("productId")));
+    if (!product) return { error: "Pick a voucher to issue." };
+    const recipientName = String(form.get("recipientName") ?? "").trim();
+    const recipientEmail = String(form.get("recipientEmail") ?? "").trim();
+    const message = String(form.get("message") ?? "").trim();
+    if (!recipientName) return { error: "Enter the recipient's name." };
+    if (recipientEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail)) return { error: "The recipient's email doesn't look valid." };
+    const by = (await getAdminEmail(request)) ?? "the hotel";
+    let roomTitles: string[] | undefined;
+    if (product.package) {
+      const rooms = await getRooms(propertyId).catch(() => []);
+      roomTitles = product.package.roomIds
+        .map((id) => rooms.find((r) => r.id === id)?.title)
+        .filter((t): t is string => Boolean(t));
+    }
+    const now = new Date().toISOString();
+    const record: VoucherRecord = {
+      id: crypto.randomUUID(),
+      code: voucherCode(),
+      kind: product.kind,
+      productId: product.id,
+      product: {
+        title: product.title,
+        description: product.description,
+        image: product.image,
+        price: product.price,
+        value: product.kind === "gift" ? (product.value ?? product.price) : undefined,
+        terms: product.terms,
+        package: product.package,
+        roomTitles,
+      },
+      buyer: { name: "Compliments of the hotel", email: by },
+      gift: { recipientName, recipientEmail: recipientEmail || undefined, message: message || undefined },
+      purchasedAt: now,
+      expiresAt: computeExpiry(now, product.expiresMonths),
+      status: "active",
+      balance: product.kind === "gift" ? (product.value ?? product.price) : undefined,
+      redemptions: [],
+      comp: true,
+    };
+    await claimVoucher(propertyId, record);
+    const prop = await getProperty(propertyId);
+    await sendVoucherEmails(propertyId, record, new URL(request.url).origin, prop?.slug || propertyId);
+    return redirect(soldTab);
   }
 
   // intent === "save"
@@ -247,7 +349,55 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
       </div>
 
       {tab === "sold" ? (
-        sold.length === 0 ? (
+        <>
+        {/* Issue a free voucher (loyalty gesture, competition prize, service recovery). */}
+        {products.length > 0 && (
+          <details className="mb-5 rounded-[14px] border border-line bg-surface p-5">
+            <summary className="cursor-pointer text-[14px] font-semibold text-secondary hover:text-accent">
+              Issue a complimentary voucher
+            </summary>
+            <Form method="post" className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <input type="hidden" name="intent" value="voucherComp" />
+              <label className="block text-[13px] font-semibold text-secondary">
+                Voucher
+                <select name="productId" className={FIELD_INPUT}>
+                  {products.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} ({p.kind === "gift" ? "gift" : "package"})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-[13px] font-semibold text-secondary">
+                Recipient's name
+                <input name="recipientName" className={FIELD_INPUT} />
+              </label>
+              <label className="block text-[13px] font-semibold text-secondary">
+                Recipient's email <span className="font-normal text-faint">(optional — we'll email them the voucher)</span>
+                <input name="recipientEmail" type="email" className={FIELD_INPUT} />
+              </label>
+              <label className="block text-[13px] font-semibold text-secondary">
+                Message <span className="font-normal text-faint">(optional)</span>
+                <input name="message" className={FIELD_INPUT} />
+              </label>
+              <div className="sm:col-span-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                >
+                  Issue voucher (free)
+                </button>
+              </div>
+            </Form>
+          </details>
+        )}
+        {actionData?.error && (
+          <p className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
+            {actionData.error}
+          </p>
+        )}
+        {sold.length === 0 ? (
           <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
             No vouchers sold yet. When guests buy from your voucher shop they appear here.
           </div>
@@ -263,6 +413,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   <th className="px-4 py-3">Balance</th>
                   <th className="px-4 py-3">Bought</th>
                   <th className="px-4 py-3">Expires</th>
+                  <th className="px-4 py-3">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -286,12 +437,51 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                     <td className="px-4 py-3">{v.balance != null ? formatMoney(v.balance, currency) : "—"}</td>
                     <td className="px-4 py-3 text-muted">{fmtDate(v.purchasedAt, "d MMM yyyy")}</td>
                     <td className="px-4 py-3 text-muted">{fmtDate(v.expiresAt, "d MMM yyyy")}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2.5 text-[12.5px] font-semibold">
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="voucherResend" />
+                          <input type="hidden" name="code" value={v.code} />
+                          <button type="submit" disabled={saving} className="text-muted hover:text-accent">Resend</button>
+                        </Form>
+                        {v.status === "active" && v.kind === "package" && (
+                          <Form method="post" onSubmit={(e) => { if (!confirm("Mark this package voucher as redeemed (booked by phone/at the desk)?")) e.preventDefault(); }}>
+                            <input type="hidden" name="intent" value="voucherRedeemManual" />
+                            <input type="hidden" name="code" value={v.code} />
+                            <button type="submit" disabled={saving} className="text-muted hover:text-accent">Mark redeemed</button>
+                          </Form>
+                        )}
+                        {v.status === "active" && v.kind === "gift" && (
+                          <Form method="post" className="flex items-center gap-1.5">
+                            <input type="hidden" name="intent" value="voucherDeduct" />
+                            <input type="hidden" name="code" value={v.code} />
+                            <input
+                              name="amount"
+                              type="number"
+                              min={0.01}
+                              step="0.01"
+                              placeholder="0.00"
+                              className="w-[76px] rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[12.5px] font-normal outline-none focus:border-accent"
+                            />
+                            <button type="submit" disabled={saving} className="text-muted hover:text-accent">Deduct</button>
+                          </Form>
+                        )}
+                        {v.status === "active" && (
+                          <Form method="post" onSubmit={(e) => { if (!confirm("Cancel this voucher? It can no longer be used. Refund any payment separately in Stripe.")) e.preventDefault(); }}>
+                            <input type="hidden" name="intent" value="voucherCancel" />
+                            <input type="hidden" name="code" value={v.code} />
+                            <button type="submit" disabled={saving} className="text-[#c0392b] hover:underline">Cancel</button>
+                          </Form>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        )
+        )}
+        </>
       ) : (
       <>
       {!showForm && (

@@ -16,6 +16,7 @@ import { getConfig } from "./config.server";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
+import { releaseGiftHold, settleGiftHold } from "./vouchers.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
 import { dispatchWebhook } from "./webhooks.server";
 import { serializeBooking } from "./api-serialize";
@@ -142,6 +143,15 @@ export async function finalizeBooking(
     payment,
   };
   let record: BookingRecord = (await updateBooking(pid, draft.id, patch)) ?? { ...provisional, ...patch };
+
+  // Gift voucher applied at checkout: the hold placed at session creation is
+  // settled onto the voucher (balance spent) when the booking stands, released
+  // when it failed. Best-effort — the hold's TTL is the backstop either way.
+  if (pending.voucherRedemption) {
+    const { code } = pending.voucherRedemption;
+    if (status !== "failed") await settleGiftHold(pid, code, draft.reference, record.id);
+    else await releaseGiftHold(pid, code, draft.reference);
+  }
 
   if (status !== "failed") {
     await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));
