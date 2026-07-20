@@ -39,6 +39,17 @@ import { getRooms } from "~/lib/catalog.server";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
+/** Starter terms for a NEW voucher (edit or replace freely). Kept honest:
+ *  they must not contradict the built-in cooling-off refund, so "no cash
+ *  value" rather than "non-refundable". */
+const DEFAULT_TERMS: Record<VoucherKind, string> = {
+  gift: "Redeemable against stays booked on our website. Any remaining balance stays on the voucher for a future stay. No cash value. Valid until the expiry date shown on the voucher.",
+  package:
+    "Subject to availability within the package's allowed dates. Covers the stay described — extras and incidentals are payable at the hotel. No cash value. Valid until the expiry date shown on the voucher.",
+  experience:
+    "Valid for one visit. Please contact us ahead to arrange a date or time. No cash value and non-transferable once redeemed. Valid until the expiry date shown on the voucher.",
+};
+
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -749,10 +760,10 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
           <label className="block text-[13px] font-semibold text-secondary">
             Terms <span className="font-normal text-faint">(optional — shown on the voucher and at purchase)</span>
             <textarea
+              key={editing ? editing.id : `terms-${kind}`}
               name="terms"
-              rows={2}
-              defaultValue={editing?.terms ?? ""}
-              placeholder="Subject to availability. Non-transferable. No cash value."
+              rows={3}
+              defaultValue={editing ? (editing.terms ?? "") : DEFAULT_TERMS[kind]}
               className={`${FIELD_INPUT} resize-y`}
             />
           </label>
