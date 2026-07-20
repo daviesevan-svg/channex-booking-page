@@ -9,6 +9,7 @@ import { retrieveCheckoutSession } from "./stripe.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { sendEmail } from "./email.server";
 import { accentHex, renderSimpleEmail } from "./email-render.server";
+import { composeVoucherEmail } from "./voucher-email.server";
 import { formatMoney } from "./money";
 import type { PaymentInfo } from "./bookings.server";
 
@@ -52,10 +53,11 @@ export async function finalizeVoucherFromStripeSession(ref: string, sessionId: s
   return record;
 }
 
-/** Purchase emails (fixed English copy v1): a receipt to the buyer, and — when
- *  bought as a gift with a recipient email — the voucher itself to the
- *  recipient with the buyer's message. When there's no recipient email the
- *  buyer's mail carries the code (they hand it over themselves). */
+/** Purchase emails (fixed English copy v1, design-handoff layout): a receipt
+ *  to the buyer, and — when bought as a gift with a recipient email — the
+ *  voucher itself to the recipient with the buyer's message. When there's no
+ *  recipient email the buyer's mail carries the code (they hand it over
+ *  themselves). */
 export async function sendVoucherEmails(
   pid: string,
   v: VoucherRecord,
@@ -64,58 +66,32 @@ export async function sendVoucherEmails(
 ): Promise<void> {
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
-    const hotelName = ov.hotelName || "Your hotel";
-    const accent = accentHex(settings);
-    const currency = settings.currency || "GBP";
-    const voucherUrl = `${origin.replace(/\/+$/, "")}/${channel}/voucher/${v.code}`;
-    const money = (n: number) => formatMoney(n, currency);
-    const what =
-      v.kind === "gift"
-        ? `a ${money(v.product.value ?? v.product.price)} gift voucher`
-        : `"${v.product.title}"`;
-    const expiry = `Valid until ${v.expiresAt.slice(0, 10)}.`;
-    const sentToRecipient = Boolean(v.gift?.recipientEmail);
+    const base = origin.replace(/\/+$/, "");
+    const ctx = {
+      v,
+      hotelName: ov.hotelName || "Your hotel",
+      accent: accentHex(settings),
+      currency: settings.currency || "GBP",
+      voucherUrl: `${base}/${channel}/voucher/${v.code}`,
+      shopUrl: `${base}/${channel}/vouchers`,
+    };
 
     // Buyer receipt.
+    const receipt = composeVoucherEmail({ variant: "receipt", ...ctx });
     await sendEmail({
       to: v.buyer.email,
-      subject: `Your ${hotelName} voucher — ${v.product.title}`,
-      html: renderSimpleEmail({
-        hotelName,
-        accent,
-        heading: sentToRecipient ? "Your gift is on its way!" : "Here's your voucher",
-        body:
-          `Thanks, ${v.buyer.name} — you've bought ${what} for ${money(v.product.price)}.\n\n` +
-          (sentToRecipient
-            ? `We've emailed the voucher to ${v.gift!.recipientName} (${v.gift!.recipientEmail}).`
-            : `Your voucher code is ${v.code}. Keep it safe — whoever holds the code can use it.`) +
-          `\n\n${expiry}`,
-        cta: { label: "View the voucher", url: voucherUrl },
-      }),
+      subject: receipt.subject,
+      html: receipt.html,
       replyTo: settings.emailReplyTo,
     });
 
     // Gift delivery to the recipient.
-    if (sentToRecipient) {
+    if (v.gift?.recipientEmail) {
+      const delivery = composeVoucherEmail({ variant: "gift", ...ctx });
       await sendEmail({
-        to: v.gift!.recipientEmail!,
-        subject: `${v.buyer.name} sent you a gift from ${hotelName} 🎁`,
-        html: renderSimpleEmail({
-          hotelName,
-          accent,
-          heading: `A gift for you, ${v.gift!.recipientName}!`,
-          body:
-            `${v.buyer.name} has bought you ${what} at ${hotelName}.` +
-            (v.gift?.message ? `\n\n“${v.gift.message}”` : "") +
-            `\n\nYour voucher code is ${v.code}.` +
-            (v.kind === "package"
-              ? `\n\nYou can book your stay online — pick your dates on the voucher page below.`
-              : v.kind === "experience"
-                ? `\n\nSimply present the code at ${hotelName} to redeem it.`
-                : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`) +
-            `\n\n${expiry}`,
-          cta: { label: v.kind === "package" ? "View & book your stay" : "View your voucher", url: voucherUrl },
-        }),
+        to: v.gift.recipientEmail,
+        subject: delivery.subject,
+        html: delivery.html,
         replyTo: settings.emailReplyTo,
       });
     }
@@ -137,31 +113,20 @@ export async function sendVoucherReminderEmail(
   if (!v.gift?.recipientEmail) return false;
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
-    const hotelName = ov.hotelName || "Your hotel";
-    const currency = settings.currency || "GBP";
-    const voucherUrl = `${origin.replace(/\/+$/, "")}/${channel}/voucher/${v.code}`;
-    const what =
-      v.kind === "gift"
-        ? `a ${formatMoney(v.product.value ?? v.product.price, currency)} gift voucher`
-        : `"${v.product.title}"`;
+    const base = origin.replace(/\/+$/, "");
+    const reminder = composeVoucherEmail({
+      variant: "reminder",
+      v,
+      hotelName: ov.hotelName || "Your hotel",
+      accent: accentHex(settings),
+      currency: settings.currency || "GBP",
+      voucherUrl: `${base}/${channel}/voucher/${v.code}`,
+      shopUrl: `${base}/${channel}/vouchers`,
+    });
     const r = await sendEmail({
       to: v.gift.recipientEmail,
-      subject: `A little reminder — your ${hotelName} gift is waiting 🎁`,
-      html: renderSimpleEmail({
-        hotelName,
-        accent: accentHex(settings),
-        heading: `Your gift is still waiting, ${v.gift.recipientName}!`,
-        body:
-          `Just a friendly nudge from ${v.buyer.name}: you have ${what} at ${hotelName}.` +
-          (v.gift.message ? `\n\n“${v.gift.message}”` : "") +
-          `\n\nYour voucher code is ${v.code}. Valid until ${v.expiresAt.slice(0, 10)}.` +
-          (v.kind === "package"
-            ? `\n\nYou can book your stay online — pick your dates on the voucher page below.`
-            : v.kind === "experience"
-              ? `\n\nSimply present the code at ${hotelName} to redeem it.`
-              : `\n\nUse the code at checkout on ${hotelName}'s booking page to pay with your voucher.`),
-        cta: { label: v.kind === "package" ? "View & book your stay" : "View your voucher", url: voucherUrl },
-      }),
+      subject: reminder.subject,
+      html: reminder.html,
       replyTo: settings.emailReplyTo,
     });
     return r.sent;
