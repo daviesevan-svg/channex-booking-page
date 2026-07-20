@@ -9,7 +9,7 @@ import { FIELD_INPUT } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
-import { getSettings, patchSettings } from "~/lib/overrides.server";
+import { getOverrides, getSettings, patchSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {
   computeExpiry,
@@ -51,14 +51,81 @@ const DEFAULT_TERMS: Record<VoucherKind, string> = {
 };
 
 
+/** The ready-to-paste AI image brief, built from the live form values. Returns
+ *  the missing key fields instead when the offer isn't described yet — the
+ *  brief is only as good as the details it carries. */
+function buildImageBrief(
+  form: HTMLFormElement,
+  kind: VoucherKind,
+  hotelName: string,
+  currency: string,
+): { brief: string } | { missing: string[] } {
+  const val = (n: string) => {
+    const el = form.elements.namedItem(n);
+    return el && "value" in el ? String((el as { value: string }).value).trim() : "";
+  };
+  const title = val("title");
+  const price = val("price");
+  const description = val("description");
+  const missing = [
+    !title && "Name",
+    !price && "Sale price",
+    !description && "Description",
+    kind === "package" && !val("nights") && "Nights",
+  ].filter((x): x is string => Boolean(x));
+  if (missing.length) return { missing };
+
+  const offerLines = [
+    `- Hotel: ${hotelName}`,
+    `- Voucher: "${title}" (${kind === "gift" ? "gift voucher" : kind === "package" ? "stay package" : "experience voucher"})`,
+    `- Description: ${description}`,
+    `- Price: ${price} ${currency}`,
+  ];
+  if (kind === "package") {
+    const kids = val("children");
+    offerLines.push(`- The stay: ${val("nights")} night(s) for ${val("adults") || "2"} adult(s)${kids ? ` + ${kids} child(ren)` : ""}`);
+  }
+  if (kind === "experience" && val("guests")) offerLines.push(`- For ${val("guests")} guest(s)`);
+  if (kind === "gift" && val("value")) offerLines.push(`- Gift value: ${val("value")} ${currency}`);
+
+  const subject =
+    kind === "gift"
+      ? "a warm, inviting scene of the hotel at its best — golden-hour exterior, a beautifully made bed, or breakfast in soft morning light"
+      : kind === "package"
+        ? "the feeling of this exact getaway — the room, the setting and the season it's meant for, with a relaxed, romantic weekend mood"
+        : "the experience itself — for example a candlelit dinner table for two, a serene spa, or a sunlit poolside, matching the description above";
+
+  const brief = `Create ONE marketing photo for a hotel voucher sold online.
+
+THE OFFER
+${offerLines.join("\n")}
+
+WHAT TO SHOW
+A photorealistic, editorial-style hotel image that sells this offer: ${subject}.
+
+STYLE RULES
+- Natural light; warm, premium, believable hotel photography — not an illustration or 3D render.
+- Absolutely NO text, logos, watermarks, borders or badges in the image.
+- No recognizable faces.
+- Main subject slightly off-centre with gentle negative space, so the photo still works cropped wide (2:1) and square.
+
+OUTPUT
+- Landscape 3:2, at least 1600 × 1067 px.
+- JPEG or PNG, under 8 MB.
+
+When you have the image, upload it in the voucher editor's Photo field.`;
+  return { brief };
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const [products, settings, rooms] = await Promise.all([
+  const [products, settings, rooms, ov] = await Promise.all([
     getVoucherProducts(propertyId),
     getSettings(propertyId),
     getRooms(propertyId),
+    getOverrides(propertyId),
   ]);
   const url = new URL(request.url);
   const editId = url.searchParams.get("edit");
@@ -85,6 +152,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       comp: v.comp ?? false,
     })),
     currency: settings.currency || "GBP",
+    hotelName: ov.hotelName || "the hotel",
     coolingOffDays: settings.voucherCoolingOffDays ?? DEFAULT_COOLING_OFF_DAYS,
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
     editing: products.find((p) => p.id === editId) ?? null,
@@ -308,7 +376,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, sold, tab, compIssued, currency, coolingOffDays, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, compIssued, currency, hotelName, coolingOffDays, rooms, editing, creating } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
@@ -320,6 +388,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
   const seedKind: VoucherKind =
     editing?.kind ?? (kindParam === "package" ? "package" : kindParam === "experience" ? "experience" : "gift");
   const [kind, setKind] = useState<VoucherKind>(seedKind);
+  const [briefMsg, setBriefMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => setKind(seedKind), [seedKind, editing?.id]);
 
   return (
@@ -646,12 +715,43 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   </label>
                 </div>
               )}
-              <input
-                type="file"
-                name="image"
-                accept="image/*"
-                className="block w-full text-[13px] font-normal text-muted file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent-soft file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-accent-deep hover:file:bg-accent-soft-strong"
-              />
+              <div className="w-full">
+                <input
+                  type="file"
+                  name="image"
+                  accept="image/*"
+                  className="block w-full text-[13px] font-normal text-muted file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent-soft file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-accent-deep hover:file:bg-accent-soft-strong"
+                />
+                <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      const r = buildImageBrief(e.currentTarget.form!, kind, hotelName, currency);
+                      if ("missing" in r) {
+                        setBriefMsg({ ok: false, text: `Fill in ${r.missing.join(", ")} first — the brief is built from those details.` });
+                        return;
+                      }
+                      try {
+                        await navigator.clipboard.writeText(r.brief);
+                        setBriefMsg({ ok: true, text: "Brief copied — paste it into ChatGPT, Gemini or any AI image tool, then upload the result here." });
+                      } catch {
+                        setBriefMsg({ ok: false, text: "Couldn't reach the clipboard — allow clipboard access and try again." });
+                      }
+                    }}
+                    className="rounded-[9px] border border-line-alt px-3.5 py-2 text-[12.5px] font-semibold text-secondary hover:bg-chip"
+                  >
+                    ✨ Copy brief for AI
+                  </button>
+                  <span className="text-[11.5px] font-normal text-faint">
+                    No photo handy? Let an AI make one from your offer's details.
+                  </span>
+                </div>
+                {briefMsg && (
+                  <p className={`mb-0 mt-1.5 text-[12.5px] font-normal ${briefMsg.ok ? "text-[#3f7a52]" : "text-red-600"}`}>
+                    {briefMsg.text}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
