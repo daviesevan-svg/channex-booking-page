@@ -10,6 +10,7 @@ import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getOverrides, getSettings, patchSettings } from "~/lib/overrides.server";
+import { accentHex } from "~/lib/email-render.server";
 import { formatMoney } from "~/lib/money";
 import {
   computeExpiry,
@@ -51,14 +52,19 @@ const DEFAULT_TERMS: Record<VoucherKind, string> = {
 };
 
 
-/** The ready-to-paste AI image brief, built from the live form values. Returns
- *  the missing key fields instead when the offer isn't described yet — the
- *  brief is only as good as the details it carries. */
+/** The ready-to-paste AI image brief, built from the live form values —
+ *  a DESIGNED card (text + flat illustration, YouTube-thumbnail readable),
+ *  not a photo: photorealistic prompts just invent someone else's hotel.
+ *  Wording tested by Evan against real image models before shipping.
+ *  Returns the missing key fields instead when the offer isn't described
+ *  yet — the brief is only as good as the details it carries. */
 function buildImageBrief(
   form: HTMLFormElement,
   kind: VoucherKind,
   hotelName: string,
   currency: string,
+  accent: string,
+  bg: string,
 ): { brief: string } | { missing: string[] } {
   const val = (n: string) => {
     const el = form.elements.namedItem(n);
@@ -75,43 +81,53 @@ function buildImageBrief(
   ].filter((x): x is string => Boolean(x));
   if (missing.length) return { missing };
 
-  const offerLines = [
-    `- Hotel: ${hotelName}`,
-    `- Voucher: "${title}" (${kind === "gift" ? "gift voucher" : kind === "package" ? "stay package" : "experience voucher"})`,
-    `- Description: ${description}`,
-    `- Price: ${price} ${currency}`,
-  ];
+  const kindLabel = kind === "gift" ? "gift voucher" : kind === "package" ? "a bookable stay package" : "an experience voucher";
+
+  let subline: string;
   if (kind === "package") {
-    const kids = val("children");
-    offerLines.push(`- The stay: ${val("nights")} night(s) for ${val("adults") || "2"} adult(s)${kids ? ` + ${kids} child(ren)` : ""}`);
+    const nights = Number(val("nights"));
+    const guests = Number(val("adults") || "2") + Number(val("children") || "0");
+    subline = `${nights} night${nights === 1 ? "" : "s"} · ${guests} guest${guests === 1 ? "" : "s"}`;
+  } else if (kind === "experience") {
+    const g = Number(val("guests") || "0");
+    subline = g > 0 ? `For ${g} guest${g === 1 ? "" : "s"}` : hotelName;
+  } else {
+    subline = hotelName;
   }
-  if (kind === "experience" && val("guests")) offerLines.push(`- For ${val("guests")} guest(s)`);
-  if (kind === "gift" && val("value")) offerLines.push(`- Gift value: ${val("value")} ${currency}`);
 
-  const subject =
+  const illustration =
     kind === "gift"
-      ? "a warm, inviting scene of the hotel at its best — golden-hour exterior, a beautifully made bed, or breakfast in soft morning light"
+      ? "a gift box with ribbon and a small nod to the hotel — a room key, a bed, an awning"
       : kind === "package"
-        ? "the feeling of this exact getaway — the room, the setting and the season it's meant for, with a relaxed, romantic weekend mood"
-        : "the experience itself — for example a candlelit dinner table for two, a serene spa, or a sunlit poolside, matching the description above";
+        ? "a cosy suite or the getaway's setting — a bed, a fireplace, a coastline at dusk"
+        : "the experience itself, matching the description — e.g. a candlelit table for two, spa stones and towels, a sun lounger by a pool";
 
-  const brief = `Create ONE marketing photo for a hotel voucher sold online.
+  const brief = `Create ONE promotional graphic for a hotel voucher sold online — a designed card,
+not a photograph. Think YouTube thumbnail or premium gift card: the offer should
+be understood at a glance, without reading anything else on the page.
 
 THE OFFER
-${offerLines.join("\n")}
+- Hotel: ${hotelName}
+- Voucher: "${title}" (${kindLabel})
+- What it is: ${description}
+- Price: ${price} ${currency}
 
-WHAT TO SHOW
-A photorealistic, editorial-style hotel image that sells this offer: ${subject}.
+TEXT ON THE IMAGE — exactly this and nothing else:
+- Headline (large): ${title}
+- Subline (small): ${subline}
+Spell the text exactly as written. Elegant serif for the headline. No other
+words, numbers, logos or watermarks anywhere.
 
-STYLE RULES
-- Natural light; warm, premium, believable hotel photography — not an illustration or 3D render.
-- Absolutely NO text, logos, watermarks, borders or badges in the image.
-- No recognizable faces.
-- Main subject slightly off-centre with gentle negative space, so the photo still works cropped wide (2:1) and square.
+STYLE
+- Modern flat illustration with a warm, premium feel — NOT a photo, NOT
+  photorealistic, no 3D render.
+- Palette: ${accent} on ${bg}, plus 2–3 muted supporting tones.
+- Illustrate the offer around the text: ${illustration}. Simple shapes, no faces.
+- Bold and readable at thumbnail size; generous margins — keep all text well
+  clear of the edges.
 
-OUTPUT
-- Landscape 3:2, at least 1600 × 1067 px.
-- JPEG or PNG, under 8 MB.
+FORMAT
+- Landscape 3:2, at least 1600 × 1067 px. JPEG or PNG, under 8 MB.
 
 When you have the image, upload it in the voucher editor's Photo field.`;
   return { brief };
@@ -153,6 +169,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     })),
     currency: settings.currency || "GBP",
     hotelName: ov.hotelName || "the hotel",
+    brandAccent: accentHex(settings),
+    brandBg: settings.customBg || "#F6F1E7",
     coolingOffDays: settings.voucherCoolingOffDays ?? DEFAULT_COOLING_OFF_DAYS,
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
     editing: products.find((p) => p.id === editId) ?? null,
@@ -376,7 +394,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, sold, tab, compIssued, currency, hotelName, coolingOffDays, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, compIssued, currency, hotelName, brandAccent, brandBg, coolingOffDays, rooms, editing, creating } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
@@ -726,7 +744,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   <button
                     type="button"
                     onClick={async (e) => {
-                      const r = buildImageBrief(e.currentTarget.form!, kind, hotelName, currency);
+                      const r = buildImageBrief(e.currentTarget.form!, kind, hotelName, currency, brandAccent, brandBg);
                       if ("missing" in r) {
                         setBriefMsg({ ok: false, text: `Fill in ${r.missing.join(", ")} first — the brief is built from those details.` });
                         return;
