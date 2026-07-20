@@ -22,15 +22,11 @@ import {
   type VoucherRecord,
 } from "~/lib/vouchers";
 import {
-  cancelVoucher,
   claimVoucher,
-  deductGift,
   deleteVoucherProduct,
-  getVoucherByCode,
   getVoucherProduct,
   getVoucherProducts,
   listVouchers,
-  manualRedeemVoucher,
   saveVoucherProduct,
   toggleVoucherProduct,
 } from "~/lib/vouchers.server";
@@ -125,43 +121,11 @@ export async function action({ request }: Route.ActionArgs) {
     return redirect("/admin/vouchers");
   }
 
-  // ---- sold-voucher management ----
-  const code = String(form.get("code") ?? "");
+  // ---- sold-voucher management (per-voucher actions live on /admin/vouchers/:code) ----
   const soldTab = "/admin/vouchers?tab=sold";
   const ownerGate = async () =>
     (await isOwnerOrSuper(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
 
-  if (intent === "voucherResend") {
-    const v = await getVoucherByCode(propertyId, code);
-    if (!v) return { error: "Voucher not found." };
-    const prop = await getProperty(propertyId);
-    await sendVoucherEmails(propertyId, v, new URL(request.url).origin, prop?.slug || propertyId);
-    return redirect(soldTab);
-  }
-  if (intent === "voucherCancel") {
-    const gate = await ownerGate();
-    if (gate) return gate;
-    if (!(await cancelVoucher(propertyId, code))) return { error: "Only an active voucher can be cancelled." };
-    return redirect(soldTab);
-  }
-  if (intent === "voucherRedeemManual") {
-    const gate = await ownerGate();
-    if (gate) return gate;
-    const by = (await getAdminEmail(request)) ?? "admin";
-    if (!(await manualRedeemVoucher(propertyId, code, by))) return { error: "Only an active package or experience voucher can be marked redeemed." };
-    return redirect(soldTab);
-  }
-  if (intent === "voucherDeduct") {
-    const gate = await ownerGate();
-    if (gate) return gate;
-    const amount = Math.round(Number(String(form.get("amount") ?? "")) * 100) / 100;
-    if (!Number.isFinite(amount) || amount <= 0) return { error: "Enter the amount to deduct." };
-    const by = (await getAdminEmail(request)) ?? "admin";
-    if (!(await deductGift(propertyId, code, amount, by))) {
-      return { error: "Couldn't deduct — check the voucher is active and has enough balance." };
-    }
-    return redirect(soldTab);
-  }
   if (intent === "voucherComp") {
     const gate = await ownerGate();
     if (gate) return gate;
@@ -384,7 +348,11 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         {/* Issue a free voucher (loyalty gesture, competition prize, service recovery). */}
         {compIssued && (
           <p className="mb-4 rounded-[10px] border border-[#cfe3d2] bg-[#eef6ef] px-4 py-2.5 text-[13px] font-semibold text-[#3f7a52]">
-            Complimentary voucher {compIssued} issued — it appears in the list below.
+            Complimentary voucher{" "}
+            <Link to={`/admin/vouchers/${compIssued}`} className="underline">
+              {compIssued}
+            </Link>{" "}
+            issued — open it to manage or resend.
           </p>
         )}
         {products.length > 0 && (
@@ -447,13 +415,15 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   <th className="px-3 py-3">Buyer</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Dates</th>
-                  <th className="px-3 py-3">Actions</th>
+                  <th className="px-3 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {sold.map((v) => (
                   <tr key={v.code} className="border-b border-divider last:border-0">
-                    <td className="whitespace-nowrap px-3 py-3 font-mono text-[12.5px] font-semibold text-accent-deep">{v.code}</td>
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-[12.5px] font-semibold">
+                      <Link to={`/admin/vouchers/${v.code}`} className="text-accent-deep hover:underline">{v.code}</Link>
+                    </td>
                     <td className="px-3 py-3">
                       {v.title}
                       {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">test</span>}
@@ -475,43 +445,10 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                       <div>{fmtDate(v.purchasedAt, "d MMM yyyy")}</div>
                       <div className="text-muted-2">→ {fmtDate(v.expiresAt, "d MMM yyyy")}</div>
                     </td>
-                    <td className="px-3 py-3">
-                      <div className="flex flex-wrap items-center gap-2.5 text-[12.5px] font-semibold">
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="voucherResend" />
-                          <input type="hidden" name="code" value={v.code} />
-                          <button type="submit" disabled={saving} className="text-muted hover:text-accent">Resend</button>
-                        </Form>
-                        {v.status === "active" && v.kind !== "gift" && (
-                          <Form method="post" onSubmit={(e) => { if (!confirm(v.kind === "package" ? "Mark this package voucher as redeemed (booked by phone/at the desk)?" : "Mark this experience voucher as redeemed (the guest used it)?")) e.preventDefault(); }}>
-                            <input type="hidden" name="intent" value="voucherRedeemManual" />
-                            <input type="hidden" name="code" value={v.code} />
-                            <button type="submit" disabled={saving} className="text-muted hover:text-accent">Mark redeemed</button>
-                          </Form>
-                        )}
-                        {v.status === "active" && v.kind === "gift" && (
-                          <Form method="post" className="flex items-center gap-1.5">
-                            <input type="hidden" name="intent" value="voucherDeduct" />
-                            <input type="hidden" name="code" value={v.code} />
-                            <input
-                              name="amount"
-                              type="number"
-                              min={0.01}
-                              step="0.01"
-                              placeholder="0.00"
-                              className="w-[76px] rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[12.5px] font-normal outline-none focus:border-accent"
-                            />
-                            <button type="submit" disabled={saving} className="text-muted hover:text-accent">Deduct</button>
-                          </Form>
-                        )}
-                        {v.status === "active" && (
-                          <Form method="post" onSubmit={(e) => { if (!confirm("Cancel this voucher? It can no longer be used. Refund any payment separately in Stripe.")) e.preventDefault(); }}>
-                            <input type="hidden" name="intent" value="voucherCancel" />
-                            <input type="hidden" name="code" value={v.code} />
-                            <button type="submit" disabled={saving} className="text-[#c0392b] hover:underline">Cancel</button>
-                          </Form>
-                        )}
-                      </div>
+                    <td className="whitespace-nowrap px-3 py-3 text-right">
+                      <Link to={`/admin/vouchers/${v.code}`} className="text-[12.5px] font-semibold text-accent hover:text-accent-deep">
+                        View →
+                      </Link>
                     </td>
                   </tr>
                 ))}
