@@ -6,6 +6,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/voucher";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { fmtDate } from "~/lib/dates";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
@@ -468,15 +469,14 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
               )}
             </div>
             {pkg && (
-              <label className="block text-[13px] font-semibold text-secondary">
-                Blocked dates <span className="font-normal text-faint">(one per line — 2026-12-24 or 2026-12-20..2027-01-05)</span>
-                <textarea
+              <div className="block text-[13px] font-semibold text-secondary">
+                Blocked dates
+                <BlockedRangesEditor
+                  key={blockedRangesToText(pkg.blockedRanges)}
                   name="blockedRanges"
-                  rows={3}
-                  defaultValue={blockedRangesToText(pkg.blockedRanges)}
-                  className={`${FIELD_INPUT} resize-y`}
+                  initial={pkg.blockedRanges}
                 />
-              </label>
+              </div>
             )}
             <div>
               <button type="submit" disabled={busy} className={actionBtn}>
