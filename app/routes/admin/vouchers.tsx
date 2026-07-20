@@ -6,12 +6,12 @@ import { useState } from "react";
 
 import type { Route } from "./+types/vouchers";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {
-  blockedRangesToText,
   computeExpiry,
   DEFAULT_COOLING_OFF_DAYS,
   displayStatus,
@@ -39,7 +39,6 @@ import { getRooms } from "~/lib/catalog.server";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-const rangesToText = (p: VoucherProduct | null): string => blockedRangesToText(p?.package?.blockedRanges);
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -713,19 +712,10 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                 </span>
               </div>
 
-              <label className="block text-[13px] font-semibold text-secondary">
-                Blocked dates <span className="font-normal text-faint">(one range per line — e.g. peak season)</span>
-                <textarea
-                  name="blockedRanges"
-                  rows={2}
-                  defaultValue={rangesToText(editing)}
-                  placeholder={"2026-12-20..2027-01-05\n2027-04-02..2027-04-05"}
-                  className={`${FIELD_INPUT} resize-y font-mono text-[13px]`}
-                />
-                <span className="mt-1 block text-[11px] font-normal text-faint">
-                  Format: <code>YYYY-MM-DD..YYYY-MM-DD</code> (a single date blocks just that check-in day).
-                </span>
-              </label>
+              <div className="block text-[13px] font-semibold text-secondary">
+                Blocked dates <span className="font-normal text-faint">(optional — e.g. peak season)</span>
+                <BlockedRangesEditor name="blockedRanges" initial={editing?.package?.blockedRanges ?? []} />
+              </div>
             </fieldset>
           )}
 
