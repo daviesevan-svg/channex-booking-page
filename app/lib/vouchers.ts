@@ -115,11 +115,36 @@ export interface VoucherRecord {
      *  or a "buyer …" marker for cooling-off self-cancellations. */
     refund?: { id: string; amount: number; currency?: string; at: string; by?: string };
   };
+  /** Admin edits to the redemption terms (expiry, stay window, blocked
+   *  dates) — sold vouchers snapshot their product, so deliberate amendments
+   *  are logged here rather than silently mutating. */
+  edits?: { at: string; by?: string; changes: { field: string; from: string; to: string }[] }[];
   /** Complimentary — issued free by the hotel. */
   comp?: boolean;
   /** Test-mode purchase (no real payment). */
   simulated?: boolean;
 }
+
+// ---------- blocked-range text format (admin editors) ----------
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Parse blocked ranges, one per line: "2026-12-20..2027-01-05" (a single date
+ *  = a one-day range). Returns the first malformed line on failure. */
+export function parseBlockedRanges(text: string): { ranges: { from: string; to: string }[] } | { bad: string } {
+  const ranges: { from: string; to: string }[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    const [from, to = from] = line.split("..").map((s) => s.trim());
+    if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) return { bad: line };
+    ranges.push({ from, to });
+  }
+  return { ranges };
+}
+
+export const blockedRangesToText = (ranges: { from: string; to: string }[] | undefined): string =>
+  (ranges ?? []).map((r) => (r.from === r.to ? r.from : `${r.from}..${r.to}`)).join("\n");
 
 // ---------- codes ----------
 

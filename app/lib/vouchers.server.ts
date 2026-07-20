@@ -201,8 +201,8 @@ export async function casUpdateVoucher(
 ): Promise<VoucherRecord | null> {
   await ensureSchema();
   const res = await db()
-    .prepare(`UPDATE voucher SET status = ?, json = ? WHERE pid = ? AND code = ? AND json = ?`)
-    .bind(next.status, JSON.stringify(next), pid, next.code, JSON.stringify(prev))
+    .prepare(`UPDATE voucher SET status = ?, expires_at = ?, json = ? WHERE pid = ? AND code = ? AND json = ?`)
+    .bind(next.status, next.expiresAt, JSON.stringify(next), pid, next.code, JSON.stringify(prev))
     .run();
   return res.meta.changes === 1 ? next : null;
 }
@@ -352,6 +352,60 @@ export async function setGiftRecipientEmail(pid: string, code: string, email: st
 }
 
 // ---------- admin management ----------
+
+/** Amend a sold voucher's redemption terms — expiry, and for packages the
+ *  stay window + blocked dates. The snapshot is deliberate (catalog edits
+ *  must never touch sold vouchers), so this is the explicit, audited path:
+ *  every change lands in `edits[]` with who/when and the before/after.
+ *  Extending the expiry of a lapsed-but-active voucher revives it, since
+ *  "expired" is derived from the date at read time. */
+export async function updateVoucherTerms(
+  pid: string,
+  code: string,
+  next: {
+    expiresAt?: string;
+    window?: { from?: string; to?: string };
+    blockedRanges?: { from: string; to: string }[];
+  },
+  by: string,
+): Promise<{ ok: true; voucher: VoucherRecord; changed: number } | { ok: false }> {
+  let changed = 0;
+  const r = await casMutate(pid, code, (v) => {
+    if (v.status !== "active") return null; // redeemed/cancelled terms are history
+    const changes: { field: string; from: string; to: string }[] = [];
+    const out: VoucherRecord = { ...v, product: { ...v.product } };
+
+    if (next.expiresAt && next.expiresAt !== v.expiresAt) {
+      changes.push({ field: "expires", from: v.expiresAt.slice(0, 10), to: next.expiresAt.slice(0, 10) });
+      out.expiresAt = next.expiresAt;
+    }
+    if (v.product.package) {
+      const pkg = { ...v.product.package };
+      if (next.window !== undefined) {
+        const fmt = (w?: { from?: string; to?: string }) => `${w?.from ?? "…"} – ${w?.to ?? "…"}`;
+        if (fmt(next.window) !== fmt(pkg.window)) {
+          changes.push({ field: "stay window", from: fmt(pkg.window), to: fmt(next.window) });
+          pkg.window = next.window.from || next.window.to ? next.window : undefined;
+        }
+      }
+      if (next.blockedRanges !== undefined) {
+        const fmt = (rs: { from: string; to: string }[]) =>
+          rs.length ? rs.map((x) => (x.from === x.to ? x.from : `${x.from}..${x.to}`)).join(", ") : "none";
+        if (fmt(next.blockedRanges) !== fmt(pkg.blockedRanges)) {
+          changes.push({ field: "blocked dates", from: fmt(pkg.blockedRanges), to: fmt(next.blockedRanges) });
+          pkg.blockedRanges = next.blockedRanges;
+        }
+      }
+      out.product.package = pkg;
+    }
+
+    if (changes.length === 0) return null; // nothing to write
+    changed = changes.length;
+    out.edits = [...(v.edits ?? []), { at: new Date().toISOString(), by, changes }];
+    return out;
+  });
+  return r.ok ? { ok: true, voucher: r.voucher, changed } : { ok: false };
+}
 
 export async function cancelVoucher(pid: string, code: string): Promise<boolean> {
   return (await casMutate(pid, code, (v) => (v.status === "active" ? { ...v, status: "cancelled" } : null))).ok;
