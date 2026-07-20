@@ -11,10 +11,12 @@ import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties
 import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
 import {
+  blockedRangesToText,
   computeExpiry,
   DEFAULT_COOLING_OFF_DAYS,
   displayStatus,
   giftBalance,
+  parseBlockedRanges,
   voucherCode,
   WEEKDAY_LABELS,
   type VoucherKind,
@@ -37,22 +39,7 @@ import { getRooms } from "~/lib/catalog.server";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-/** Parse blocked ranges, one per line: "2026-12-20..2027-01-05" (single date =
- *  one-day range). Returns null on the first malformed line (with its text). */
-function parseBlockedRanges(text: string): { ranges: { from: string; to: string }[] } | { bad: string } {
-  const ranges: { from: string; to: string }[] = [];
-  for (const raw of text.split("\n")) {
-    const line = raw.trim();
-    if (!line) continue;
-    const [from, to = from] = line.split("..").map((s) => s.trim());
-    if (!ISO_DATE.test(from) || !ISO_DATE.test(to) || from > to) return { bad: line };
-    ranges.push({ from, to });
-  }
-  return { ranges };
-}
-
-const rangesToText = (p: VoucherProduct | null): string =>
-  (p?.package?.blockedRanges ?? []).map((r) => (r.from === r.to ? r.from : `${r.from}..${r.to}`)).join("\n");
+const rangesToText = (p: VoucherProduct | null): string => blockedRangesToText(p?.package?.blockedRanges);
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);

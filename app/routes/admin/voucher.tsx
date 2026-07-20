@@ -5,19 +5,21 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/voucher";
+import { FIELD_INPUT } from "~/components/admin-form";
 import { fmtDate } from "~/lib/dates";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getBooking } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
-import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
+import { blockedRangesToText, displayStatus, giftBalance, normalizeVoucherCode, parseBlockedRanges, WEEKDAY_LABELS } from "~/lib/vouchers";
 import {
   cancelVoucher,
   deductGift,
   getVoucherByCode,
   manualRedeemVoucher,
   refundVoucherCharge,
+  updateVoucherTerms,
 } from "~/lib/vouchers.server";
 import { sendVoucherEmails } from "~/lib/voucher-purchase.server";
 
@@ -61,6 +63,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       code: v.code,
       kind: v.kind,
       status: displayStatus(v, now),
+      /** Stored status (ignores expiry) — an expired-but-active voucher can
+       *  still have its terms edited, which is exactly how it gets revived. */
+      storedActive: v.status === "active",
       comp: v.comp ?? false,
       simulated: v.simulated ?? false,
       purchasedAt: v.purchasedAt,
@@ -98,6 +103,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           : null,
       },
       activity,
+      edits: v.edits ?? [],
     },
   };
 }
@@ -149,6 +155,34 @@ export async function action({ params, request }: Route.ActionArgs) {
     if (gate) return gate;
     if (!(await cancelVoucher(propertyId, code))) return { error: "Only an active voucher can be cancelled." };
     return { cancelled: true as const };
+  }
+
+  if (intent === "editTerms") {
+    const gate = await ownerGate();
+    if (gate) return gate;
+    const ISO = /^\d{4}-\d{2}-\d{2}$/;
+    const expires = String(form.get("expires") ?? "").trim();
+    if (!ISO.test(expires)) return { error: "Pick a valid expiry date." };
+
+    let window: { from?: string; to?: string } | undefined;
+    let blockedRanges: { from: string; to: string }[] | undefined;
+    if (v.product.package) {
+      const from = String(form.get("windowFrom") ?? "").trim();
+      const to = String(form.get("windowTo") ?? "").trim();
+      if (from && !ISO.test(from)) return { error: "The stay window 'from' date is invalid." };
+      if (to && !ISO.test(to)) return { error: "The stay window 'to' date is invalid." };
+      if (from && to && from > to) return { error: "The stay window ends before it starts." };
+      window = { from: from || undefined, to: to || undefined };
+      const parsed = parseBlockedRanges(String(form.get("blockedRanges") ?? ""));
+      if ("bad" in parsed) return { error: `Can't read blocked date line: "${parsed.bad}" — use YYYY-MM-DD..YYYY-MM-DD.` };
+      blockedRanges = parsed.ranges;
+    }
+
+    const by = (await getAdminEmail(request)) ?? "admin";
+    // End-of-day expiry so "valid until 31 Jan" includes the 31st.
+    const r = await updateVoucherTerms(propertyId, code, { expiresAt: `${expires}T23:59:59.000Z`, window, blockedRanges }, by);
+    if (!r.ok) return { error: "Nothing changed — or the voucher is redeemed/cancelled." };
+    return { termsUpdated: r.changed };
   }
 
   if (intent === "refund") {
@@ -258,6 +292,11 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
       {actionData && "cancelled" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
           Voucher cancelled. Refund the payment below if one was taken.
+        </div>
+      )}
+      {actionData && "termsUpdated" in actionData && (
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+          ✓ Redemption terms updated — the change applies to this voucher immediately.
         </div>
       )}
       {actionData && "refunded" in actionData && typeof actionData.refunded === "number" && (
@@ -397,6 +436,68 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
           </div>
         )}
       </section>
+
+      {/* Redemption terms — the deliberate way to amend a sold voucher */}
+      {canManage && v.storedActive && (
+        <section className={`${section} mt-5`}>
+          <h2 className="mb-1 font-serif text-[18px] font-semibold">Redemption terms</h2>
+          <p className="mb-4 mt-0 text-[13px] leading-[1.55] text-secondary">
+            Sold vouchers keep the terms they were bought with — catalog edits never touch them. Amend this
+            voucher here instead: extend the expiry (an expired voucher becomes usable again), widen the stay
+            window, or add a blocked date you forgot. Every change is logged below
+            {v.gift ? " — resend the voucher email afterwards so the recipient sees the new dates" : ""}.
+          </p>
+          <Form method="post" className="flex flex-col gap-4">
+            <input type="hidden" name="intent" value="editTerms" />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="block text-[13px] font-semibold text-secondary">
+                Expires
+                <input name="expires" type="date" defaultValue={v.expiresAt.slice(0, 10)} className={FIELD_INPUT} />
+              </label>
+              {pkg && (
+                <>
+                  <label className="block text-[13px] font-semibold text-secondary">
+                    Stay window from <span className="font-normal text-faint">(blank = open)</span>
+                    <input name="windowFrom" type="date" defaultValue={pkg.window?.from ?? ""} className={FIELD_INPUT} />
+                  </label>
+                  <label className="block text-[13px] font-semibold text-secondary">
+                    Stay window to <span className="font-normal text-faint">(blank = open)</span>
+                    <input name="windowTo" type="date" defaultValue={pkg.window?.to ?? ""} className={FIELD_INPUT} />
+                  </label>
+                </>
+              )}
+            </div>
+            {pkg && (
+              <label className="block text-[13px] font-semibold text-secondary">
+                Blocked dates <span className="font-normal text-faint">(one per line — 2026-12-24 or 2026-12-20..2027-01-05)</span>
+                <textarea
+                  name="blockedRanges"
+                  rows={3}
+                  defaultValue={blockedRangesToText(pkg.blockedRanges)}
+                  className={`${FIELD_INPUT} resize-y`}
+                />
+              </label>
+            )}
+            <div>
+              <button type="submit" disabled={busy} className={actionBtn}>
+                Save terms
+              </button>
+            </div>
+          </Form>
+          {v.edits.length > 0 && (
+            <div className="mt-4 border-t border-divider pt-3">
+              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-2">Edit history</div>
+              {v.edits.map((e, i) => (
+                <div key={i} className="py-1 text-[13px] text-secondary">
+                  <span className="text-muted-2">{dt(e.at)}</span>
+                  {e.by ? ` · ${e.by}` : ""} —{" "}
+                  {e.changes.map((c) => `${c.field}: ${c.from} → ${c.to}`).join("; ")}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Actions */}
       <section className={`${section} mt-5`}>
