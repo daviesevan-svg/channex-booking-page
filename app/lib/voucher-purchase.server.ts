@@ -37,7 +37,45 @@ export async function finalizeVoucher(
   const claim = await claimVoucher(pending.pid, record);
   if (!claim.won) return claim.existing ?? record;
   await sendVoucherEmails(pending.pid, record, pending.origin, pending.channel);
+  await sendVoucherSaleHostEmail(pending.pid, record, pending.origin);
   return record;
+}
+
+/** Host notification for a finalized sale — mirrors the booking notification:
+ *  plain shell, sent to hostNotifyEmail (fallback: the property contact),
+ *  honouring the same "notify me of new bookings" toggle. Called from
+ *  finalizeVoucher only, so admin "resend" and comp issuance don't re-notify
+ *  the hotel about its own actions. Never throws. */
+async function sendVoucherSaleHostEmail(pid: string, v: VoucherRecord, origin: string): Promise<void> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+    const hostTo = settings.hostNotifyEmail || ov.email;
+    if (settings.notifyHostOnBooking === false || !hostTo) return;
+    const currency = settings.currency || "GBP";
+    const kindLabel = v.kind === "gift" ? "gift voucher" : v.kind === "package" ? "stay package" : "experience";
+    const paid = v.simulated
+      ? "Test purchase — no payment was taken."
+      : `Paid ${formatMoney(v.payment?.amount ?? v.product.price, currency)} online.`;
+    await sendEmail({
+      to: hostTo,
+      subject: `Voucher sold — ${v.product.title} (${v.code})`,
+      html: renderSimpleEmail({
+        hotelName: ov.hotelName || "Your hotel",
+        accent: accentHex(settings),
+        heading: "You sold a voucher 🎉",
+        body:
+          `${v.buyer.name} (${v.buyer.email}) bought "${v.product.title}" — a ${kindLabel}. ${paid}\n\n` +
+          `Code ${v.code} · valid until ${v.expiresAt.slice(0, 10)}.` +
+          (v.gift
+            ? `\n\nBought as a gift for ${v.gift.recipientName}${v.gift.recipientEmail ? ` (${v.gift.recipientEmail})` : ""}.`
+            : ""),
+        cta: { label: "View in admin", url: `${origin.replace(/\/+$/, "")}/admin/vouchers/${v.code}` },
+      }),
+      replyTo: v.buyer.email,
+    });
+  } catch (e) {
+    console.log(`[vouchers] sale host email failed for ${v.code}: ${e instanceof Error ? e.message : e}`);
+  }
 }
 
 /** Webhook backstop: look up the pending purchase, confirm the session paid,
