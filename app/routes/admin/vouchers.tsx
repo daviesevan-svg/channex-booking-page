@@ -2,7 +2,7 @@
 // monetary gift vouchers and bookable stay packages ("Weekend Getaway"). This
 // page manages the PRODUCTS; sold vouchers get their own tab once sales exist.
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { Route } from "./+types/vouchers";
 import { FIELD_INPUT } from "~/components/admin-form";
@@ -301,10 +301,15 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
-  // from the record being edited (or ?kind= for a fresh form).
-  const [kind, setKind] = useState<VoucherKind>(
-    editing?.kind ?? (searchParams.get("kind") === "package" ? "package" : searchParams.get("kind") === "experience" ? "experience" : "gift"),
-  );
+  // from the record being edited (or ?kind= for a fresh form). Navigating
+  // between "+ Gift voucher" / "+ Experience" / an edit link doesn't remount
+  // this component, so re-seed whenever the source changes — otherwise the
+  // selector keeps showing the previously opened kind.
+  const kindParam = searchParams.get("kind");
+  const seedKind: VoucherKind =
+    editing?.kind ?? (kindParam === "package" ? "package" : kindParam === "experience" ? "experience" : "gift");
+  const [kind, setKind] = useState<VoucherKind>(seedKind);
+  useEffect(() => setKind(seedKind), [seedKind, editing?.id]);
 
   return (
     <div>
@@ -507,7 +512,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         <Form
           method="post"
           encType="multipart/form-data"
-          key={editing?.id ?? "new"}
+          key={editing?.id ?? `new-${kindParam ?? "gift"}`}
           className="mb-7 flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6"
         >
           <input type="hidden" name="intent" value="save" />
