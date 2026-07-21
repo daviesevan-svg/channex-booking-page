@@ -42,6 +42,7 @@ export default [
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/verify", "routes/admin/verify.tsx"),
   route("admin/logout", "routes/admin/logout.tsx"),
+  route("admin/lang", "routes/admin/lang.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),

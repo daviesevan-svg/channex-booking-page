@@ -12,6 +12,7 @@ import {
 } from "~/lib/overrides.server";
 import { uploadHomeImage } from "~/lib/images.server";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -74,6 +75,7 @@ export function meta() {
 export default function AdminHome({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const saving = nav.state === "submitting";
+  const t = useAdminT();
 
   if (!loaderData.configured) {
     return (
@@ -93,16 +95,14 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Home page</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("homeTitle")}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
-      <p className="mb-6 text-[14px] text-muted">
-        The text guests see on the landing page. Empty fields use the defaults shown.
-      </p>
+      <p className="mb-6 text-[14px] text-muted">{t("homeIntro")}</p>
 
       <Form
         method="post"
@@ -111,34 +111,34 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="eyebrow" label="Eyebrow (small label above the heading)" value={content.eyebrow} placeholder="Carmarthen" />
-        <Field name="heading" label="Heading" value={content.heading} placeholder={DEFAULT_SEARCH.heading} />
-        <Field name="intro" label="Intro paragraph" value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />
+        <Field name="eyebrow" label={t("homeEyebrow")} value={content.eyebrow} placeholder="Carmarthen" />
+        <Field name="heading" label={t("homeHeading")} value={content.heading} placeholder={DEFAULT_SEARCH.heading} />
+        <Field name="intro" label={t("homeIntroField")} value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="searchButton" label="Search button label" value={content.searchButton} placeholder={DEFAULT_SEARCH.searchButton} />
+          <Field name="searchButton" label={t("homeSearchButton")} value={content.searchButton} placeholder={DEFAULT_SEARCH.searchButton} />
           <Field
             name="promoText"
-            label="Promo code link text"
+            label={t("homePromoText")}
             value={content.promoText}
             placeholder={DEFAULT_SEARCH.promoText}
-            hint="The collapsible “add a promo code” link shown above the search button."
+            hint={t("homePromoTextHint")}
           />
           <Field
             name="promoPlaceholder"
-            label="Promo code box placeholder"
+            label={t("homePromoPlaceholder")}
             value={content.promoPlaceholder}
             placeholder={DEFAULT_PROMO_PLACEHOLDER}
-            hint="The faint example text inside the promo-code box (e.g. SUMMER10)."
+            hint={t("homePromoPlaceholderHint")}
           />
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-3 font-serif text-[18px] font-semibold">Highlights</div>
+          <div className="mb-3 font-serif text-[18px] font-semibold">{t("homeHighlights")}</div>
           <div className="flex flex-col gap-4">
             {[0, 1, 2].map((i) => (
               <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.6fr]">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Highlight {i + 1} title
+                  {t("homeHighlightTitle", { n: i + 1 })}
                   <input
                     name="highlightTitle"
                     defaultValue={content.highlights?.[i]?.title}
@@ -147,7 +147,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   />
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Description
+                  {t("homeHighlightDesc")}
                   <input
                     name="highlightDesc"
                     defaultValue={content.highlights?.[i]?.description}
@@ -161,10 +161,8 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-1 font-serif text-[18px] font-semibold">Feature image</div>
-          <p className="mb-3 text-[13px] text-muted">
-            The large image near the bottom of the landing page. Shared across all languages.
-          </p>
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("homeFeatureImage")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("homeFeatureImageHint")}</p>
           <div className="flex flex-wrap items-start gap-4">
             <div className="h-[120px] w-[200px] flex-none overflow-hidden rounded-[12px] border border-line-alt bg-surface-alt">
               {currentHero ? (
@@ -186,11 +184,11 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                 accept="image/*"
                 className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border-0 file:bg-chip file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-ink hover:file:bg-field-hover"
               />
-              <p className="text-[12px] text-faint">JPG or PNG, up to 8MB.</p>
+              <p className="text-[12px] text-faint">{t("homeImageFormats")}</p>
               {heroImage && (
                 <label className="flex items-center gap-2 text-[13px] text-secondary">
                   <input type="checkbox" name="removeHero" value="1" />
-                  Remove custom image
+                  {t("homeRemoveImage")}
                 </label>
               )}
             </div>
@@ -204,7 +202,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("saving") : t("saveChanges")}
           </button>
         </div>
       </Form>
