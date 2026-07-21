@@ -40,11 +40,16 @@ export function adminT(lang: AdminLang): AdminT {
   };
 }
 
-/** t() for components under the admin layout — reads the language the layout
- *  loader resolved, so pages don't each need loader plumbing. */
-export function useAdminT(): AdminT {
+/** The admin language for components under the admin layout — from the layout
+ *  loader, so pages don't each need loader plumbing. */
+export function useAdminLang(): AdminLang {
   const data = useRouteLoaderData("routes/admin/layout") as { adminLang?: AdminLang } | undefined;
-  return adminT(data?.adminLang ?? DEFAULT_ADMIN_LANG);
+  return data?.adminLang ?? DEFAULT_ADMIN_LANG;
+}
+
+/** t() for components under the admin layout. */
+export function useAdminT(): AdminT {
+  return adminT(useAdminLang());
 }
 
 // ===== dictionaries =====
@@ -128,6 +133,8 @@ const EN: Record<string, string> = {
   saveChanges: "Save changes",
   saving: "Saving…",
   saved: "✓ Saved",
+  chooseFile: "Choose file",
+  noFileChosen: "No file chosen",
 
   // -- home page editor --
   homeTitle: "Home page",
@@ -531,6 +538,8 @@ const DE: Record<string, string> = {
   saveChanges: "Änderungen speichern",
   saving: "Speichern…",
   saved: "✓ Gespeichert",
+  chooseFile: "Datei auswählen",
+  noFileChosen: "Keine Datei ausgewählt",
 
   // -- home page editor --
   homeTitle: "Startseite",
