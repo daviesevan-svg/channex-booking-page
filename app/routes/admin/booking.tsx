@@ -5,7 +5,7 @@ import { BookingStatusBadge } from "~/components/booking-status";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminLang, useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
@@ -189,10 +189,13 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const editingGuest = nav.state !== "idle" && intent === "editGuest";
   const active = (b.lifecycle ?? "active") === "active";
   const t = useAdminT();
-  const en = makeTranslator("en"); // admin UI is English
+  const dl = useAdminDateLocale();
+  // The policy wording lives in the GUEST dictionary — render it in the admin's
+  // language (both "en" and "de" exist there).
+  const gt = makeTranslator(useAdminLang());
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
-    ? en.t(msg.key, "iso" in msg ? { date: fmtDate(msg.iso, "EEE d MMM yyyy") } : undefined)
+    ? gt.t(msg.key, "iso" in msg ? { date: fmtDate(msg.iso, "EEE d MMM yyyy", dl) } : undefined)
     : "";
 
   return (
@@ -221,8 +224,8 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
           {b.cancelledBy
-            ? t("bkdCancelledByOn", { by: b.cancelledBy, date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm") })
-            : t("bkdCancelledByGuestOn", { date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm") })}
+            ? t("bkdCancelledByOn", { by: b.cancelledBy, date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm", dl) })
+            : t("bkdCancelledByGuestOn", { date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm", dl) })}
         </div>
       )}
 
@@ -288,10 +291,10 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               value={<span className="font-mono text-[13px]">{b.channexId}</span>}
             />
           )}
-          <Row label={t("bkdCheckin")} value={fmtDate(b.checkin, "EEE d MMM yyyy")} />
-          <Row label={t("bkdCheckout")} value={fmtDate(b.checkout, "EEE d MMM yyyy")} />
+          <Row label={t("bkdCheckin")} value={fmtDate(b.checkin, "EEE d MMM yyyy", dl)} />
+          <Row label={t("bkdCheckout")} value={fmtDate(b.checkout, "EEE d MMM yyyy", dl)} />
           <Row label={t("bkdNights")} value={String(b.nights)} />
-          <Row label={t("bkdBooked")} value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm")} />
+          <Row label={t("bkdBooked")} value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm", dl)} />
           {b.payment?.mode === "payment" && (
             <Row
               label={t("bkdPaymentLabel")}
@@ -376,7 +379,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               {b.edits!.map((e, i) => (
                 <div key={i} className="mb-1.5 text-[12px] text-muted">
                   <span className="text-muted-2">
-                    {fmtDate(e.at, "d MMM yyyy, HH:mm")}
+                    {fmtDate(e.at, "d MMM yyyy, HH:mm", dl)}
                     {e.by ? ` · ${e.by}` : ""}
                   </span>
                   {e.changes.map((c) => (
@@ -394,7 +397,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {b.consent && (
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
           <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdConsentSection")}</h2>
-          <Row label={t("bkdAcceptedAt")} value={fmtDate(b.consent.acceptedAt, "d MMM yyyy, HH:mm")} />
+          <Row label={t("bkdAcceptedAt")} value={fmtDate(b.consent.acceptedAt, "d MMM yyyy, HH:mm", dl)} />
           {b.consent.nonRefundableAck != null && (
             <Row label={t("bkdNonRefundableAck")} value={b.consent.nonRefundableAck ? t("bkdYes") : t("bkdNo")} />
           )}
@@ -515,7 +518,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                     <dd className="font-semibold text-[#9a6a1e]">
                       {t("bkdRefundAmountOn", {
                         amount: formatMoney(b.payment.refund.amount, b.payment.refund.currency || b.payment.currency || b.currency),
-                        date: fmtDate(b.payment.refund.at, "d MMM yyyy"),
+                        date: fmtDate(b.payment.refund.at, "d MMM yyyy", dl),
                       })}
                       {b.payment.refund.by && <span className="font-normal text-muted"> {t("bkdRefundBy", { by: b.payment.refund.by })}</span>}
                     </dd>

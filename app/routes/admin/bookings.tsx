@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getBookings } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -22,6 +22,7 @@ export function meta() {
 
 export default function AdminBookings({ loaderData }: Route.ComponentProps) {
   const t = useAdminT();
+  const dl = useAdminDateLocale();
 
   if (!loaderData.configured) {
     return (
@@ -73,14 +74,14 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {b.reference} · {fmtDate(b.checkin, "d MMM")} —{" "}
-                  {fmtDate(b.checkout, "d MMM yyyy")} ·{" "}
+                  {b.reference} · {fmtDate(b.checkin, "d MMM", dl)} —{" "}
+                  {fmtDate(b.checkout, "d MMM yyyy", dl)} ·{" "}
                   {b.rooms.length === 1
                     ? t("bkRoomsOne", { n: b.rooms.length })
                     : t("bkRoomsMany", { n: b.rooms.length })}
                 </div>
                 <div className="mt-0.5 text-[11px] text-faint">
-                  {fmtDate(b.createdAt, "d MMM yyyy, HH:mm")}
+                  {fmtDate(b.createdAt, "d MMM yyyy, HH:mm", dl)}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">

@@ -3,7 +3,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
@@ -244,6 +244,7 @@ function Toggle({
 
 export default function AdminInventory({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
+  const dl = useAdminDateLocale();
   const nav = useNavigation();
   const navigate = useNavigate();
   const saving = nav.state === "submitting";
@@ -324,7 +325,8 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           </button>
           <button type="button" onClick={() => go(prevStart)} aria-label={t("invPrevDates")} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">←</button>
           <span className="text-muted-2">
-            {format(parseISO(shown[0]), "d MMM")} – {format(parseISO(shown[shown.length - 1]), "d MMM yyyy")}
+            {format(parseISO(shown[0]), "d MMM", { locale: dl })} –{" "}
+            {format(parseISO(shown[shown.length - 1]), "d MMM yyyy", { locale: dl })}
           </span>
           <button type="button" onClick={() => go(nextStart)} aria-label={t("invNextDates")} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</button>
         </div>
@@ -519,9 +521,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                       <th className={`${labelCell} ${headCell}`} />
                       {shown.map((d) => (
                         <th key={d} className={`${headCell} ${isWeekend(d) ? "text-accent" : "text-muted-2"}`}>
-                          <div>{format(parseISO(d), "EEE")}</div>
+                          <div>{format(parseISO(d), "EEE", { locale: dl })}</div>
                           <div className="text-[13px] font-bold text-ink">{format(parseISO(d), "d")}</div>
-                          <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM")}</div>
+                          <div className="text-[10px] font-normal text-faint">{format(parseISO(d), "MMM", { locale: dl })}</div>
                         </th>
                       ))}
                     </tr>
