@@ -3,6 +3,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
@@ -17,13 +18,13 @@ const DEFAULT_COLS = 14;
 
 // Day-of-week chips for bulk update. Values are getUTCDay() codes (0 = Sunday).
 const DOW = [
-  { v: 1, label: "Mon" },
-  { v: 2, label: "Tue" },
-  { v: 3, label: "Wed" },
-  { v: 4, label: "Thu" },
-  { v: 5, label: "Fri" },
-  { v: 6, label: "Sat" },
-  { v: 0, label: "Sun" },
+  { v: 1, labelKey: "invDowMon" },
+  { v: 2, labelKey: "invDowTue" },
+  { v: 3, labelKey: "invDowWed" },
+  { v: 4, labelKey: "invDowThu" },
+  { v: 5, labelKey: "invDowFri" },
+  { v: 6, labelKey: "invDowSat" },
+  { v: 0, labelKey: "invDowSun" },
 ];
 
 const MAX_BULK_DAYS = 366;
@@ -242,6 +243,7 @@ function Toggle({
 }
 
 export default function AdminInventory({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const nav = useNavigation();
   const navigate = useNavigate();
   const saving = nav.state === "submitting";
@@ -272,10 +274,10 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Inventory</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("invTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to manage
-          inventory.
+          {t("invConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("invConfigureSuffix")}
         </p>
       </div>
     );
@@ -293,10 +295,10 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   if (rooms.length === 0) {
     return (
       <div>
-        <h1 className="mb-1 font-serif text-[26px] font-semibold">Inventory</h1>
+        <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("invTitle")}</h1>
         <div className="mt-4 rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          Create a <Link to="/admin/rooms/new" className="font-semibold text-accent">room</Link> and a
-          rate first, then set availability and prices here.
+          {t("invCreateRoomPrefix")} <Link to="/admin/rooms/new" className="font-semibold text-accent">{t("invCreateRoomLink")}</Link>{" "}
+          {t("invCreateRoomSuffix")}
         </div>
       </div>
     );
@@ -308,31 +310,30 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   return (
     <div>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-serif text-[26px] font-semibold">Inventory</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("invTitle")}</h1>
         <div className="flex items-center gap-2 text-[13px] font-semibold">
           <input
             type="date"
             value={start}
             onChange={(e) => e.target.value && go(e.target.value)}
-            aria-label="Jump to date"
+            aria-label={t("invJumpToDate")}
             className="rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-ink outline-none focus:border-accent"
           />
           <button type="button" onClick={() => go(today)} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">
-            Today
+            {t("invToday")}
           </button>
-          <button type="button" onClick={() => go(prevStart)} aria-label="Previous dates" className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">←</button>
+          <button type="button" onClick={() => go(prevStart)} aria-label={t("invPrevDates")} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">←</button>
           <span className="text-muted-2">
             {format(parseISO(shown[0]), "d MMM")} – {format(parseISO(shown[shown.length - 1]), "d MMM yyyy")}
           </span>
-          <button type="button" onClick={() => go(nextStart)} aria-label="Next dates" className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</button>
+          <button type="button" onClick={() => go(nextStart)} aria-label={t("invNextDates")} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</button>
         </div>
       </div>
       <p className="mb-5 text-[14px] text-muted">
-        Availability per room, and price + restrictions per rate, for each date. Empty price uses the
-        rate&rsquo;s base nightly price. Prices in {currency}. Per cell: minimum stay,{" "}
-        <span className="font-semibold text-[#c0392b]">✕</span> closed,{" "}
-        <span className="font-semibold text-accent">A</span> no arrival,{" "}
-        <span className="font-semibold text-accent">D</span> no departure.
+        {t("invIntroLead", { currency })}{" "}
+        <span className="font-semibold text-[#c0392b]">✕</span> {t("invIntroClosed")}{" "}
+        <span className="font-semibold text-accent">A</span> {t("invIntroNoArrival")}{" "}
+        <span className="font-semibold text-accent">D</span> {t("invIntroNoDeparture")}
       </p>
 
       <div className="mb-5 rounded-[14px] border border-line bg-surface">
@@ -342,9 +343,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           aria-expanded={bulkOpen}
           className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
-          <span className="font-serif text-[16px] font-semibold">Bulk update</span>
+          <span className="font-serif text-[16px] font-semibold">{t("invBulkUpdate")}</span>
           <span className="text-[13px] font-semibold text-muted-2">
-            {bulkOpen ? "Hide ▲" : "Set a range of dates ▼"}
+            {bulkOpen ? t("invBulkHide") : t("invBulkShow")}
           </span>
         </button>
         {bulkOpen && (
@@ -353,11 +354,11 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <label className="block">
-                <span className={bulkLabel}>From</span>
+                <span className={bulkLabel}>{t("invFrom")}</span>
                 <input type="date" name="from" defaultValue={start} required className={`${bulkField} w-full`} />
               </label>
               <label className="block">
-                <span className={bulkLabel}>To</span>
+                <span className={bulkLabel}>{t("invTo")}</span>
                 <input
                   type="date"
                   name="to"
@@ -367,18 +368,18 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                 />
               </label>
               <label className="block">
-                <span className={bulkLabel}>Room</span>
+                <span className={bulkLabel}>{t("invRoom")}</span>
                 <select name="room" defaultValue="all" className={`${bulkField} w-full cursor-pointer`}>
-                  <option value="all">All rooms</option>
+                  <option value="all">{t("invAllRooms")}</option>
                   {rooms.map((r) => (
                     <option key={r.id} value={r.id}>{r.title}</option>
                   ))}
                 </select>
               </label>
               <label className="block">
-                <span className={bulkLabel}>Rate</span>
+                <span className={bulkLabel}>{t("invRate")}</span>
                 <select name="rate" defaultValue="all" className={`${bulkField} w-full cursor-pointer`}>
-                  <option value="all">All rates</option>
+                  <option value="all">{t("invAllRates")}</option>
                   {rates.map((r) => (
                     <option key={r.id} value={r.id}>{r.title}</option>
                   ))}
@@ -387,13 +388,13 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             </div>
 
             <div>
-              <span className={bulkLabel}>Days of week</span>
+              <span className={bulkLabel}>{t("invDaysOfWeek")}</span>
               <div className="flex flex-wrap gap-1.5">
                 {DOW.map((d) => (
                   <label key={d.v} className="cursor-pointer">
                     <input type="checkbox" name="dow" value={d.v} defaultChecked className="peer sr-only" />
                     <span className="inline-block rounded-[8px] border border-line-alt px-3 py-1.5 text-[12px] font-semibold text-muted-2 peer-checked:border-accent peer-checked:bg-accent-soft peer-checked:text-accent-deep">
-                      {d.label}
+                      {t(d.labelKey)}
                     </span>
                   </label>
                 ))}
@@ -402,39 +403,39 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <label className="block">
-                <span className={bulkLabel}>Availability</span>
-                <input type="number" name="avail" min={0} placeholder="Leave blank" className={`${bulkField} w-full`} />
+                <span className={bulkLabel}>{t("invAvailability")}</span>
+                <input type="number" name="avail" min={0} placeholder={t("invLeaveBlank")} className={`${bulkField} w-full`} />
               </label>
               <label className="block">
-                <span className={bulkLabel}>Price ({currency})</span>
-                <input type="number" name="price" min={0} step="0.01" placeholder="Leave blank" className={`${bulkField} w-full`} />
+                <span className={bulkLabel}>{t("invPriceCurrency", { currency })}</span>
+                <input type="number" name="price" min={0} step="0.01" placeholder={t("invLeaveBlank")} className={`${bulkField} w-full`} />
               </label>
               <label className="block">
-                <span className={bulkLabel}>Min stay</span>
-                <input type="number" name="minStay" min={0} placeholder="Leave blank" className={`${bulkField} w-full`} />
+                <span className={bulkLabel}>{t("invMinStay")}</span>
+                <input type="number" name="minStay" min={0} placeholder={t("invLeaveBlank")} className={`${bulkField} w-full`} />
               </label>
               <label className="block">
-                <span className={bulkLabel}>Closed / stop sell</span>
+                <span className={bulkLabel}>{t("invClosedStopSell")}</span>
                 <select name="stopSell" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
-                  <option value="">Leave unchanged</option>
-                  <option value="on">Close (stop sell)</option>
-                  <option value="off">Open</option>
+                  <option value="">{t("invLeaveUnchanged")}</option>
+                  <option value="on">{t("invCloseStopSell")}</option>
+                  <option value="off">{t("invOpen")}</option>
                 </select>
               </label>
               <label className="block">
-                <span className={bulkLabel}>No arrival (CTA)</span>
+                <span className={bulkLabel}>{t("invNoArrivalCta")}</span>
                 <select name="cta" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
-                  <option value="">Leave unchanged</option>
-                  <option value="on">No check-in</option>
-                  <option value="off">Allow check-in</option>
+                  <option value="">{t("invLeaveUnchanged")}</option>
+                  <option value="on">{t("invNoCheckIn")}</option>
+                  <option value="off">{t("invAllowCheckIn")}</option>
                 </select>
               </label>
               <label className="block">
-                <span className={bulkLabel}>No departure (CTD)</span>
+                <span className={bulkLabel}>{t("invNoDepartureCtd")}</span>
                 <select name="ctd" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
-                  <option value="">Leave unchanged</option>
-                  <option value="on">No check-out</option>
-                  <option value="off">Allow check-out</option>
+                  <option value="">{t("invLeaveUnchanged")}</option>
+                  <option value="on">{t("invNoCheckOut")}</option>
+                  <option value="off">{t("invAllowCheckOut")}</option>
                 </select>
               </label>
             </div>
@@ -445,11 +446,10 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                 disabled={saving}
                 className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
               >
-                {saving ? "Applying…" : "Apply to range"}
+                {saving ? t("invApplying") : t("invApplyToRange")}
               </button>
               <p className="text-[12px] text-muted-2">
-                Blank fields are left untouched. Availability applies per room; price and restrictions
-                apply per selected rate.
+                {t("invBulkHint")}
               </p>
             </div>
           </Form>
@@ -466,23 +466,23 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             disabled={saving}
             className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("saving") : t("saveChanges")}
           </button>
           {actionData?.ok && (
             <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-              ✓ {actionData.message ?? "Saved"}
+              ✓ {actionData.message ?? t("invSaved")}
             </span>
           )}
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
           <div className="ml-auto flex items-center gap-2 text-[13px] font-semibold">
-            <label htmlFor="roomFilter" className="text-muted-2">Show</label>
+            <label htmlFor="roomFilter" className="text-muted-2">{t("invShow")}</label>
             <select
               id="roomFilter"
               value={roomFilter}
               onChange={(e) => setRoomFilter(e.target.value)}
               className="cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-ink outline-none focus:border-accent"
             >
-              <option value="all">All rooms</option>
+              <option value="all">{t("invAllRooms")}</option>
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>{r.title}</option>
               ))}
@@ -504,7 +504,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                 <div className="flex items-center justify-between gap-3 border-b border-divider bg-surface-alt/50 px-4 py-3">
                   <div className="font-serif text-[16px] font-semibold">{room.title}</div>
                   <div className="text-[12px] text-muted-2">
-                    {roomRates.length} rate{roomRates.length === 1 ? "" : "s"}
+                    {t(roomRates.length === 1 ? "invRatesCount_one" : "invRatesCount_other", { n: roomRates.length })}
                   </div>
                 </div>
                 <table className="w-full table-fixed border-collapse text-[13px]">
@@ -530,7 +530,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                     {/* Room availability row */}
                     <tr className="border-t border-divider bg-surface-alt/40">
                       <td className={`${labelCell} bg-surface-alt/40 font-semibold`}>
-                        Availability
+                        {t("invAvailability")}
                       </td>
                       {shown.map((d) => (
                         <td key={d} className={`px-1.5 py-1.5 ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
@@ -550,7 +550,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                       <tr key={rate.id} className="border-t border-divider/60">
                         <td className={labelCell}>
                           <div className="font-medium">{rate.title}</div>
-                          <div className="text-[11px] text-muted-2">Price · min stay · ✕ A D</div>
+                          <div className="text-[11px] text-muted-2">{t("invCellLegend")}</div>
                         </td>
                         {shown.map((d) => {
                           const key = `${room.id}|${rate.id}|${d}`;
@@ -573,13 +573,13 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                   type="number"
                                   min={0}
                                   defaultValue={restr?.minStay || ""}
-                                  title="Minimum stay"
+                                  title={t("invMinimumStay")}
                                   placeholder="0"
                                   className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
                                 />
-                                <Toggle name={`s:${suffix}`} label="✕" title="Closed / stop sell" checked={restr?.stopSell} danger />
-                                <Toggle name={`ca:${suffix}`} label="A" title="Closed to arrival (no check-in)" checked={restr?.cta} />
-                                <Toggle name={`cd:${suffix}`} label="D" title="Closed to departure (no check-out)" checked={restr?.ctd} />
+                                <Toggle name={`s:${suffix}`} label="✕" title={t("invClosedStopSell")} checked={restr?.stopSell} danger />
+                                <Toggle name={`ca:${suffix}`} label="A" title={t("invClosedToArrival")} checked={restr?.cta} />
+                                <Toggle name={`cd:${suffix}`} label="D" title={t("invClosedToDeparture")} checked={restr?.ctd} />
                               </div>
                             </td>
                           );
@@ -590,7 +590,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                       <tr className="border-t border-divider/60">
                         <td className={labelCell} colSpan={shown.length + 1}>
                           <span className="text-[12px] text-muted-2">
-                            No rates priced for this room yet.
+                            {t("invNoRatesForRoom")}
                           </span>
                         </td>
                       </tr>

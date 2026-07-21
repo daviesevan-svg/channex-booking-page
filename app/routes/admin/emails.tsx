@@ -6,6 +6,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { EMAIL_TEMPLATES } from "~/lib/content";
 import { getOverrides, getSettings, saveEmailSettings } from "~/lib/overrides.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -39,9 +40,21 @@ export function meta() {
 
 const toggleRow = "flex items-center justify-between gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3";
 
+// Template names already exist in the admin dictionary as nav keys — reuse them
+// at the display point so the list and the sidebar always match.
+const TEMPLATE_NAME_KEYS: Record<string, string> = {
+  booking_confirmation: "navEmailBookingConfirmation",
+  host_notification: "navEmailHostNotification",
+  booking_cancellation: "navEmailBookingCancellation",
+  cancellation_notification: "navEmailCancellationNotification",
+  booking_failed: "navEmailBookingFailed",
+  review_request: "navEmailReviewRequest",
+};
+
 export default function AdminEmails({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const saving = nav.state === "submitting";
+  const t = useAdminT();
 
   if (!loaderData.configured) {
     return (
@@ -59,64 +72,66 @@ export default function AdminEmails({ loaderData, actionData }: Route.ComponentP
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Emails</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("emTitle")}</h1>
         {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
+          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        Transactional emails sent to guests and to you. Edit each template's wording below; set who they come from here.
+        {t("emIntro")}
       </p>
 
       <Form method="post" className="mb-8 flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="text-[15px] font-semibold text-ink">Sender &amp; notifications</h2>
+        <h2 className="text-[15px] font-semibold text-ink">{t("emSenderHeading")}</h2>
         <label className="block text-[13px] font-semibold text-secondary">
-          From name
-          <input name="emailFromName" defaultValue={settings.emailFromName} placeholder="Your hotel" className={FIELD_INPUT} />
+          {t("emFromName")}
+          <input name="emailFromName" defaultValue={settings.emailFromName} placeholder={t("emFromNamePlaceholder")} className={FIELD_INPUT} />
           <span className="mt-1 block text-[12px] font-normal text-faint">
-            Shown as the sender name. The sending domain is configured globally (EMAIL_FROM).
+            {t("emFromNameHint")}
           </span>
         </label>
         <label className="block text-[13px] font-semibold text-secondary">
-          Reply-to address
+          {t("emReplyTo")}
           <input name="emailReplyTo" type="email" defaultValue={settings.emailReplyTo} placeholder={contactEmail || "you@hotel.com"} className={FIELD_INPUT} />
-          <span className="mt-1 block text-[12px] font-normal text-faint">Where guest replies go.</span>
+          <span className="mt-1 block text-[12px] font-normal text-faint">{t("emReplyToHint")}</span>
         </label>
         <label className="block text-[13px] font-semibold text-secondary">
-          Host notification address
+          {t("emHostNotify")}
           <input name="hostNotifyEmail" type="email" defaultValue={settings.hostNotifyEmail} placeholder={contactEmail || "front-desk@hotel.com"} className={FIELD_INPUT} />
           <span className="mt-1 block text-[12px] font-normal text-faint">
-            Where new-booking and cancellation alerts are sent{contactEmail ? "" : " (defaults to your property contact email)"}.
+            {contactEmail ? t("emHostNotifyHint") : t("emHostNotifyHintDefault")}
           </span>
         </label>
 
         <label className={toggleRow}>
-          <span className="text-[13px] font-semibold text-secondary">Notify me of new bookings</span>
+          <span className="text-[13px] font-semibold text-secondary">{t("emNotifyBookings")}</span>
           <input type="checkbox" name="notifyHostOnBooking" defaultChecked={settings.notifyHostOnBooking} className="h-4 w-4 accent-[#bf5a3c]" />
         </label>
         <label className={toggleRow}>
-          <span className="text-[13px] font-semibold text-secondary">Notify me of cancellations</span>
+          <span className="text-[13px] font-semibold text-secondary">{t("emNotifyCancels")}</span>
           <input type="checkbox" name="notifyHostOnCancel" defaultChecked={settings.notifyHostOnCancel} className="h-4 w-4 accent-[#bf5a3c]" />
         </label>
 
         <div>
           <button type="submit" disabled={saving} className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60">
-            {saving ? "Saving…" : "Save settings"}
+            {saving ? t("saving") : t("emSaveSettings")}
           </button>
         </div>
       </Form>
 
-      <h2 className="mb-3 text-[15px] font-semibold text-ink">Templates</h2>
+      <h2 className="mb-3 text-[15px] font-semibold text-ink">{t("emTemplates")}</h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {EMAIL_TEMPLATES.map((t) => (
+        {EMAIL_TEMPLATES.map((tpl) => (
           <Link
-            key={t.id}
-            to={`/admin/emails/${t.id}`}
+            key={tpl.id}
+            to={`/admin/emails/${tpl.id}`}
             className="flex items-center justify-between rounded-[12px] border border-line bg-surface px-4 py-4 hover:border-accent"
           >
             <span>
-              <span className="block text-[14px] font-semibold text-ink">{t.label}</span>
-              <span className="text-[12px] text-muted">{t.recipient === "guest" ? "Sent to the guest" : "Sent to you"}</span>
+              <span className="block text-[14px] font-semibold text-ink">
+                {TEMPLATE_NAME_KEYS[tpl.id] ? t(TEMPLATE_NAME_KEYS[tpl.id]) : tpl.label}
+              </span>
+              <span className="text-[12px] text-muted">{tpl.recipient === "guest" ? t("emSentToGuest") : t("emSentToYou")}</span>
             </span>
             <span className="text-muted-2">›</span>
           </Link>

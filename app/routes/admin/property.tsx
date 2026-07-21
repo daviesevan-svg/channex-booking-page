@@ -5,6 +5,7 @@ import type { Route } from "./+types/property";
 import { geocodeAddress } from "~/lib/google-maps-client";
 import { getConfig } from "~/lib/config.server";
 import { Field, FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
@@ -113,19 +114,20 @@ export function meta() {
 }
 
 export default function AdminProperty({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const nav = useNavigation();
   const saving = nav.state === "submitting";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Property details</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("propTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Add a property on the{" "}
+          {t("propNotConfiguredBefore")}{" "}
           <a href="/admin/properties" className="font-semibold text-accent hover:underline">
-            Properties
+            {t("propNotConfiguredLink")}
           </a>{" "}
-          page to get started.
+          {t("propNotConfiguredAfter")}
         </p>
       </div>
     );
@@ -145,36 +147,36 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       .map(val)
       .filter(Boolean);
     if (parts.length === 0) {
-      setGeoStatus({ kind: "error", text: "Fill in the address first." });
+      setGeoStatus({ kind: "error", text: t("propGeoFillAddress") });
       return;
     }
-    setGeoStatus({ kind: "busy", text: "Looking up…" });
+    setGeoStatus({ kind: "busy", text: t("propGeoLooking") });
     try {
       const hit = await geocodeAddress(mapKey, parts.join(", "));
       if (!hit) {
-        setGeoStatus({ kind: "error", text: "No match found — check the address." });
+        setGeoStatus({ kind: "error", text: t("propGeoNoMatch") });
         return;
       }
       (form.elements.namedItem("latitude") as HTMLInputElement).value = hit.lat.toFixed(6);
       (form.elements.namedItem("longitude") as HTMLInputElement).value = hit.lng.toFixed(6);
-      setGeoStatus({ kind: "ok", text: `✓ ${hit.formatted} — remember to save.` });
+      setGeoStatus({ kind: "ok", text: t("propGeoFound", { place: hit.formatted }) });
     } catch {
-      setGeoStatus({ kind: "error", text: "Lookup failed — check the Maps key (Geocoding API enabled?)." });
+      setGeoStatus({ kind: "error", text: t("propGeoFailed") });
     }
   }
 
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Property details</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("propTitle")}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        The hotel details guests see across the booking engine.
+        {t("propIntro")}
       </p>
 
       {actionData && "error" in actionData && actionData.error && (
@@ -190,17 +192,16 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="hotelName" label="Hotel name" value={overrides.hotelName} placeholder="Spilman Hotel" />
+        <Field name="hotelName" label={t("propHotelNameLabel")} value={overrides.hotelName} placeholder="Spilman Hotel" />
 
         {/* Public listing (registry flag, global — not per-language). Same
             control as the Properties page, surfaced here where it's edited. */}
         <label className="flex items-start gap-2.5 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
           <input type="checkbox" name="public" defaultChecked={isPublic} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
           <span className="text-[13.5px]">
-            <span className="font-semibold text-ink">Listed publicly</span>
+            <span className="font-semibold text-ink">{t("propListedPublicly")}</span>
             <span className="mt-0.5 block text-[12.5px] text-muted">
-              Shows on the home directory and makes the property eligible for Google Hotels. Turn off
-              to keep it bookable by direct link only.
+              {t("propListedPubliclyHint")}
             </span>
           </span>
         </label>
@@ -209,19 +210,19 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             mark. The hotel name stays beside it unless "Hide name" is ticked.
             Global (not per-language). */}
         <div>
-          <div className="mb-1.5 text-[13px] font-semibold text-secondary">Logo</div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("propLogoLabel")}</div>
           {settings.logoImage ? (
             <div className="mb-2 flex items-center gap-3">
               <div className="flex h-16 w-44 flex-none items-center justify-center rounded-[10px] border border-line-alt bg-chip px-3">
-                <img src={settings.logoImage} alt="Property logo" className="max-h-12 max-w-full object-contain" />
+                <img src={settings.logoImage} alt={t("propLogoAlt")} className="max-h-12 max-w-full object-contain" />
               </div>
               <label className="flex items-center gap-2 text-[13px] text-secondary">
-                <input type="checkbox" name="removeLogo" value="1" /> Remove
+                <input type="checkbox" name="removeLogo" value="1" /> {t("propRemove")}
               </label>
             </div>
           ) : (
             <p className="mb-2 text-[12.5px] text-muted">
-              No logo set — the booking pages show your hotel name as text. Upload one to show it alongside the name.
+              {t("propLogoEmpty")}
             </p>
           )}
           <input
@@ -231,12 +232,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
           />
           <p className="mt-1 text-[11px] text-faint">
-            Shown ~40px tall in the booking header — a wide wordmark on a transparent background (PNG/WebP) works best.
+            {t("propLogoHint")}
           </p>
           {settings.logoImage && (
             <label className="mt-2.5 flex items-center gap-2 text-[13px] text-secondary">
               <input type="checkbox" name="logoHideName" value="1" defaultChecked={settings.logoHideName ?? false} />
-              Hide the hotel name text — my logo already includes the name
+              {t("propLogoHideName")}
             </label>
           )}
         </div>
@@ -244,21 +245,21 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         {/* Cover photo — the property's image on Collections cards. Global (not
             per-language). */}
         <div>
-          <div className="mb-1.5 text-[13px] font-semibold text-secondary">Cover photo</div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("propCoverLabel")}</div>
           {settings.coverImage ? (
             <div className="mb-2 flex items-center gap-3">
               <img
                 src={settings.coverImage}
-                alt="Property cover"
+                alt={t("propCoverAlt")}
                 className="h-20 w-32 flex-none rounded-[10px] border border-line-alt object-cover"
               />
               <label className="flex items-center gap-2 text-[13px] text-secondary">
-                <input type="checkbox" name="removeCover" value="1" /> Remove
+                <input type="checkbox" name="removeCover" value="1" /> {t("propRemove")}
               </label>
             </div>
           ) : (
             <p className="mb-2 text-[12.5px] text-muted">
-              No cover set — collection cards fall back to a room photo. Upload one for a reliable image.
+              {t("propCoverEmpty")}
             </p>
           )}
           <input
@@ -267,29 +268,28 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             accept="image/*"
             className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
           />
-          <p className="mt-1 text-[11px] text-faint">JPG/PNG/WebP, up to 8MB. Uploaded to your R2 bucket.</p>
+          <p className="mt-1 text-[11px] text-faint">{t("propCoverHint")}</p>
         </div>
         <Field
           name="propertyType"
-          label="Property type"
+          label={t("propTypeLabel")}
           value={overrides.propertyType}
           placeholder="Boutique hotel, Apartment, Guesthouse…"
-          hint="Short label shown on collection pages. Leave blank to auto-label (Apartment for single-unit, otherwise Hotel)."
+          hint={t("propTypeHint")}
         />
-        <Field name="description" label="Description" value={overrides.description} textarea rows={4} />
+        <Field name="description" label={t("propDescriptionLabel")} value={overrides.description} textarea rows={4} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="phone" label="Phone" value={overrides.phone} placeholder="+44 …" />
-          <Field name="email" label="Email" value={overrides.email} placeholder="stay@hotel.com" />
+          <Field name="phone" label={t("propPhoneLabel")} value={overrides.phone} placeholder="+44 …" />
+          <Field name="email" label={t("propEmailLabel")} value={overrides.email} placeholder="stay@hotel.com" />
         </div>
 
         {/* Amenities (global; shown to guests + sent to Google, which only
             accepts its fixed vocabulary — free-text room facilities stay
             guest-display-only). */}
         <section className="border-t border-divider pt-5">
-          <div className="mb-1 text-[15px] font-semibold">Amenities</div>
+          <div className="mb-1 text-[15px] font-semibold">{t("propAmenitiesTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            What the property offers. Shown to guests in their language and used to build your
-            Google listing. Room-specific amenities are set per room type on the Rooms page.
+            {t("propAmenitiesIntro")}
           </p>
           <AmenitiesPicker selected={settings.vrAmenities ?? []} />
           <div className="mt-4 flex flex-wrap gap-4">
@@ -297,7 +297,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               <label key={def.key} className="block text-[13px] font-semibold text-secondary">
                 {def.label}
                 <select name={`enum_${def.key}`} defaultValue={settings.vrAmenityOptions?.[def.key] ?? ""} className={`${FIELD_INPUT} cursor-pointer`}>
-                  <option value="">Not specified</option>
+                  <option value="">{t("propNotSpecified")}</option>
                   {def.options.map((o) => (
                     <option key={o} value={o}>
                       {o}
@@ -313,22 +313,22 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           {settings.singleUnit && (
             <div className="mt-5">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                <span className="text-[13px] font-semibold text-secondary">Property size</span>
+                <span className="text-[13px] font-semibold text-secondary">{t("propSizeLabel")}</span>
                 {settings.vrBedrooms == null || settings.vrBathrooms == null || settings.vrBeds == null ? (
                   <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[12px] font-semibold text-amber-800">
-                    Required for Google Vacation Rentals
+                    {t("propSizeRequiredBadge")}
                   </span>
                 ) : (
                   <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[12px] font-semibold text-[#3f7a52]">
-                    ✓ Complete
+                    {t("propSizeCompleteBadge")}
                   </span>
                 )}
               </div>
               <div className="flex flex-wrap gap-4">
                 {[
-                  { name: "vrBedrooms", label: "Bedrooms", value: settings.vrBedrooms, step: "1", hint: "0 for a studio" },
-                  { name: "vrBathrooms", label: "Bathrooms", value: settings.vrBathrooms, step: "0.5", hint: "Half counts — e.g. 1.5" },
-                  { name: "vrBeds", label: "Beds", value: settings.vrBeds, step: "1", hint: "Physical beds, not guests — one double bed = 1" },
+                  { name: "vrBedrooms", label: t("propBedroomsLabel"), value: settings.vrBedrooms, step: "1", hint: t("propBedroomsHint") },
+                  { name: "vrBathrooms", label: t("propBathroomsLabel"), value: settings.vrBathrooms, step: "0.5", hint: t("propBathroomsHint") },
+                  { name: "vrBeds", label: t("propBedsLabel"), value: settings.vrBeds, step: "1", hint: t("propBedsHint") },
                 ].map((f) => (
                   <label key={f.name} className="block text-[13px] font-semibold text-secondary">
                     {f.label}
@@ -343,17 +343,17 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
 
         {/* Check-in / check-out times (global; shown to guests + Google). */}
         <section className="border-t border-divider pt-5">
-          <div className="mb-1 text-[15px] font-semibold">Check-in &amp; check-out</div>
+          <div className="mb-1 text-[15px] font-semibold">{t("propCheckinTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            Shown to guests and used in Google structured data. Defaults to 3:00 PM / 11:00 AM.
+            {t("propCheckinIntro")}
           </p>
           <div className="flex flex-wrap gap-4">
             <label className="block text-[13px] font-semibold text-secondary">
-              Check-in from
+              {t("propCheckinFrom")}
               <input type="time" name="checkinTime" defaultValue={settings.checkinTime || "15:00"} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Check-out by
+              {t("propCheckoutBy")}
               <input type="time" name="checkoutTime" defaultValue={settings.checkoutTime || "11:00"} className={FIELD_INPUT} />
             </label>
           </div>
@@ -361,32 +361,31 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
 
         {/* Structured location (global; powers Google matching). */}
         <section className="border-t border-divider pt-5">
-          <div className="mb-1 text-[15px] font-semibold">Location</div>
+          <div className="mb-1 text-[15px] font-semibold">{t("propLocationTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            The address guests see and the map coordinates used to match this property in the Google
-            Hotel List Feed.
+            {t("propLocationIntro")}
           </p>
           <label className="mb-3 block text-[13px] font-semibold text-secondary">
-            Street
+            {t("propStreetLabel")}
             <input name="address" defaultValue={overrides.address} placeholder="123 High Street" className={FIELD_INPUT} />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
-              City
+              {t("propCityLabel")}
               <input name="addressCity" defaultValue={settings.addressCity} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Region / state
+              {t("propRegionLabel")}
               <input name="addressRegion" defaultValue={settings.addressRegion} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Postal code
+              {t("propPostalCodeLabel")}
               <input name="addressPostalCode" defaultValue={settings.addressPostalCode} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Country
+              {t("propCountryLabel")}
               <select name="addressCountry" defaultValue={settings.addressCountry ?? ""} className={`${FIELD_INPUT} cursor-pointer`}>
-                <option value="">Select a country…</option>
+                <option value="">{t("propCountrySelect")}</option>
                 {COUNTRIES.map((c) => (
                   <option key={c.code} value={c.code}>
                     {c.name}
@@ -395,11 +394,11 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Latitude
+              {t("propLatitudeLabel")}
               <input name="latitude" defaultValue={settings.latitude} placeholder="51.8576" className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Longitude
+              {t("propLongitudeLabel")}
               <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={FIELD_INPUT} />
             </label>
           </div>
@@ -411,7 +410,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
                 disabled={geoStatus?.kind === "busy"}
                 className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
               >
-                {geoStatus?.kind === "busy" ? "Looking up…" : "Find coordinates from address"}
+                {geoStatus?.kind === "busy" ? t("propGeoLooking") : t("propGeoButton")}
               </button>
               {geoStatus && geoStatus.kind !== "busy" && (
                 <span className={`text-[12.5px] ${geoStatus.kind === "ok" ? "text-[#3f7a52]" : "text-[#c0392b]"}`}>
@@ -424,13 +423,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
 
         {/* Google Hotels (global). */}
         <section className="border-t border-divider pt-5">
-          <div className="mb-1 text-[15px] font-semibold">Google Hotels</div>
+          <div className="mb-1 text-[15px] font-semibold">{t("propGoogleTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            Emit Google Hotel price structured data on your room, results and checkout pages so your
-            direct rates can appear in Google's Free Booking Links.
+            {t("propGoogleIntro")}
           </p>
           <p className="mb-3 text-[12.5px] text-muted">
-            Hotel List Feed (give this URL to Google Hotel Center):{" "}
+            {t("propGoogleFeedLabel")}{" "}
             <code className="rounded bg-chip px-1.5 py-0.5">
               {host ? `https://${host}` : ""}/feeds/google-hotels.xml
             </code>
@@ -439,8 +437,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           {/* Feed readiness — Google rejects/drops listings with missing content. */}
           {googleReadiness.missingRequired.length > 0 ? (
             <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#9a3b27]">
-              <strong>Not in the Google feed yet</strong> — add the required content above (Google
-              won't process a listing that's missing these):
+              <strong>{t("propGoogleMissingTitle")}</strong> {t("propGoogleMissingBody")}
               <ul className="mt-1.5 list-disc pl-5">
                 {googleReadiness.missingRequired.map((m) => (
                   <li key={m.field}>{m.label}</li>
@@ -449,12 +446,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             </div>
           ) : (
             <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12.5px] font-medium text-[#3f7a52]">
-              ✓ Required content complete — this property is included in the Google feed.
+              {t("propGoogleReady")}
             </div>
           )}
           {googleReadiness.missingRecommended.length > 0 && (
             <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a6a23]">
-              <strong>Recommended</strong> — improves matching &amp; quality, but won't block the feed:
+              <strong>{t("propGoogleRecommendedTitle")}</strong> {t("propGoogleRecommendedBody")}
               <ul className="mt-1.5 list-disc pl-5">
                 {googleReadiness.missingRecommended.map((m) => (
                   <li key={m.field}>{m.label}</li>
@@ -471,7 +468,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("saving") : t("saveChanges")}
           </button>
         </div>
       </Form>
