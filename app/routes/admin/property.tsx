@@ -4,7 +4,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/property";
 import { geocodeAddress } from "~/lib/google-maps-client";
 import { getConfig } from "~/lib/config.server";
-import { Field, FIELD_INPUT } from "~/components/admin-form";
+import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
@@ -225,12 +225,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               {t("propLogoEmpty")}
             </p>
           )}
-          <input
-            type="file"
-            name="logoUpload"
-            accept="image/*"
-            className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
-          />
+          <FilePicker name="logoUpload" accept="image/*" />
           <p className="mt-1 text-[11px] text-faint">
             {t("propLogoHint")}
           </p>
@@ -262,12 +257,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               {t("propCoverEmpty")}
             </p>
           )}
-          <input
-            type="file"
-            name="coverUpload"
-            accept="image/*"
-            className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border file:border-line-alt file:bg-surface file:px-3 file:py-1.5 file:text-[13px] file:font-semibold file:text-secondary hover:file:border-accent"
-          />
+          <FilePicker name="coverUpload" accept="image/*" />
           <p className="mt-1 text-[11px] text-faint">{t("propCoverHint")}</p>
         </div>
         <Field

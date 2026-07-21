@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/home";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langParam, pickLang, type SearchContent } from "~/lib/content";
+import { DEFAULT_PROMO_PLACEHOLDER, langParam, pickLang, searchDefaults, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,
   getSearchContentRaw,
@@ -11,8 +11,8 @@ import {
   saveSearchContent,
 } from "~/lib/overrides.server";
 import { uploadHomeImage } from "~/lib/images.server";
-import { Field, FIELD_INPUT } from "~/components/admin-form";
-import { useAdminT } from "~/lib/admin-i18n";
+import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -76,6 +76,9 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const t = useAdminT();
+  // Example placeholders in the admin's language. They're only samples — what
+  // guests actually see when a field is empty is searchDefaults(guest lang).
+  const d = searchDefaults(useAdminLang());
 
   if (!loaderData.configured) {
     return (
@@ -112,15 +115,15 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
       >
         <input type="hidden" name="lang" value={lang} />
         <Field name="eyebrow" label={t("homeEyebrow")} value={content.eyebrow} placeholder="Carmarthen" />
-        <Field name="heading" label={t("homeHeading")} value={content.heading} placeholder={DEFAULT_SEARCH.heading} />
-        <Field name="intro" label={t("homeIntroField")} value={content.intro} placeholder={DEFAULT_SEARCH.intro} textarea />
+        <Field name="heading" label={t("homeHeading")} value={content.heading} placeholder={d.heading} />
+        <Field name="intro" label={t("homeIntroField")} value={content.intro} placeholder={d.intro} textarea />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="searchButton" label={t("homeSearchButton")} value={content.searchButton} placeholder={DEFAULT_SEARCH.searchButton} />
+          <Field name="searchButton" label={t("homeSearchButton")} value={content.searchButton} placeholder={d.searchButton} />
           <Field
             name="promoText"
             label={t("homePromoText")}
             value={content.promoText}
-            placeholder={DEFAULT_SEARCH.promoText}
+            placeholder={d.promoText}
             hint={t("homePromoTextHint")}
           />
           <Field
@@ -142,7 +145,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightTitle"
                     defaultValue={content.highlights?.[i]?.title}
-                    placeholder={DEFAULT_SEARCH.highlights[i].title}
+                    placeholder={d.highlights[i].title}
                     className={FIELD_INPUT}
                   />
                 </label>
@@ -151,7 +154,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightDesc"
                     defaultValue={content.highlights?.[i]?.description}
-                    placeholder={DEFAULT_SEARCH.highlights[i].description}
+                    placeholder={d.highlights[i].description}
                     className={FIELD_INPUT}
                   />
                 </label>
@@ -178,12 +181,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
               )}
             </div>
             <div className="flex min-w-[220px] flex-1 flex-col gap-2.5">
-              <input
-                type="file"
-                name="heroUpload"
-                accept="image/*"
-                className="block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border-0 file:bg-chip file:px-3 file:py-2 file:text-[13px] file:font-semibold file:text-ink hover:file:bg-field-hover"
-              />
+              <FilePicker name="heroUpload" accept="image/*" />
               <p className="text-[12px] text-faint">{t("homeImageFormats")}</p>
               {heroImage && (
                 <label className="flex items-center gap-2 text-[13px] text-secondary">

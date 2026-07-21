@@ -1,4 +1,7 @@
 // Shared building blocks for the admin editor forms.
+import { useState } from "react";
+
+import { useAdminT } from "~/lib/admin-i18n";
 
 /** Standard text-input styling used across the admin editors. */
 export const FIELD_INPUT =
@@ -47,6 +50,29 @@ export function Field({
       ) : hint ? (
         <span className="mt-1 block text-[11px] font-normal text-faint">{hint}</span>
       ) : null}
+    </label>
+  );
+}
+
+/** File upload control with translatable labels — the native input renders
+ *  browser-chrome text ("Choose file / No file chosen") in the BROWSER's
+ *  language, so it's visually hidden behind a styled button. */
+export function FilePicker({ name, accept }: { name: string; accept?: string }) {
+  const t = useAdminT();
+  const [fileName, setFileName] = useState<string | null>(null);
+  return (
+    <label className="flex cursor-pointer flex-wrap items-center gap-3 text-[13px]">
+      <span className="rounded-[8px] border border-line-alt bg-surface px-3 py-1.5 text-[13px] font-semibold text-secondary hover:border-accent">
+        {t("chooseFile")}
+      </span>
+      <span className="min-w-0 truncate text-muted">{fileName ?? t("noFileChosen")}</span>
+      <input
+        type="file"
+        name={name}
+        accept={accept}
+        className="sr-only"
+        onChange={(e) => setFileName(e.currentTarget.files?.[0]?.name ?? null)}
+      />
     </label>
   );
 }
