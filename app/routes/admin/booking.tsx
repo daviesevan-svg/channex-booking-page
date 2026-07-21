@@ -5,6 +5,7 @@ import { BookingStatusBadge } from "~/components/booking-status";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
+import { useAdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
@@ -169,11 +170,12 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-const FIELD_LABELS: Record<string, string> = {
-  firstName: "First name",
-  lastName: "Last name",
-  email: "Email",
-  phone: "Phone",
+// Maps audit-trail field names to dictionary keys (display only).
+const FIELD_LABEL_KEYS: Record<string, string> = {
+  firstName: "bkdFirstName",
+  lastName: "bkdLastName",
+  email: "bkdEmail",
+  phone: "bkdPhone",
 };
 
 export default function AdminBooking({ loaderData, actionData }: Route.ComponentProps) {
@@ -186,6 +188,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const cancelling = nav.state !== "idle" && intent === "cancel";
   const editingGuest = nav.state !== "idle" && intent === "editGuest";
   const active = (b.lifecycle ?? "active") === "active";
+  const t = useAdminT();
   const en = makeTranslator("en"); // admin UI is English
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
@@ -198,7 +201,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         to="/admin/bookings"
         className="mb-4 inline-block text-[13px] font-semibold text-muted hover:text-accent"
       >
-        ← All bookings
+        {t("bkdBackAll")}
       </Link>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -208,7 +211,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         <div className="flex items-center gap-2.5">
           {(b.lifecycle ?? "active") === "cancelled" && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-2.5 py-1 text-[12px] font-semibold text-[#c0392b]">
-              ✕ Cancelled
+              {t("bkdCancelledBadge")}
             </span>
           )}
           <BookingStatusBadge status={b.status} />
@@ -217,29 +220,30 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
 
       {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
-          Cancelled {b.cancelledBy ? `by ${b.cancelledBy}` : "by the guest"} on{" "}
-          {fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm")}.
+          {b.cancelledBy
+            ? t("bkdCancelledByOn", { by: b.cancelledBy, date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm") })
+            : t("bkdCancelledByGuestOn", { date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm") })}
         </div>
       )}
 
       {actionData?.retried && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Sent to Channex — the booking is now confirmed.
+          {t("bkdRetriedOk")}
         </div>
       )}
       {actionData?.cancelled && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
-          Booking cancelled. A cancellation email has been sent to the guest.
+          {t("bkdCancelledMsg")}
         </div>
       )}
       {actionData?.emailResent && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Confirmation email re-sent to {b.guest.email}.
+          {t("bkdEmailResent", { email: b.guest.email })}
         </div>
       )}
       {actionData?.guestEdited && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Guest details updated.
+          {t("bkdGuestUpdated")}
         </div>
       )}
       {actionData?.pushWarning && (
@@ -251,11 +255,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       {b.status === "failed" && (
         <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
           <p>
-            <span className="font-semibold">Not confirmed:</span>{" "}
-            {b.error ?? "This booking wasn't sent to Channex."}
+            <span className="font-semibold">{t("bkdNotConfirmed")}</span>{" "}
+            {b.error ?? t("bkdNotSentChannex")}
           </p>
           {b.payment?.refund && (
-            <p className="mt-1 font-medium">The payment was automatically refunded to the guest.</p>
+            <p className="mt-1 font-medium">{t("bkdAutoRefunded")}</p>
           )}
           {/* Retry only makes sense for a (possibly transient) push failure that
               still has its payload — not when the rooms sold out. */}
@@ -267,7 +271,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 disabled={retrying}
                 className="rounded-[10px] border border-red-300 bg-white px-4 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
               >
-                {retrying ? "Retrying…" : "Retry sending to Channex"}
+                {retrying ? t("bkdRetrying") : t("bkdRetryButton")}
               </button>
             </Form>
           )}
@@ -276,87 +280,90 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
 
       <div className="grid gap-5 sm:grid-cols-2">
         <section className="rounded-[14px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Booking</h2>
-          <Row label="Reference" value={<span className="font-mono text-[13px]">{b.reference}</span>} />
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdBookingSection")}</h2>
+          <Row label={t("bkdReference")} value={<span className="font-mono text-[13px]">{b.reference}</span>} />
           {b.channexId && (
             <Row
-              label="Channex ID"
+              label={t("bkdChannexId")}
               value={<span className="font-mono text-[13px]">{b.channexId}</span>}
             />
           )}
-          <Row label="Check-in" value={fmtDate(b.checkin, "EEE d MMM yyyy")} />
-          <Row label="Check-out" value={fmtDate(b.checkout, "EEE d MMM yyyy")} />
-          <Row label="Nights" value={String(b.nights)} />
-          <Row label="Booked" value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm")} />
+          <Row label={t("bkdCheckin")} value={fmtDate(b.checkin, "EEE d MMM yyyy")} />
+          <Row label={t("bkdCheckout")} value={fmtDate(b.checkout, "EEE d MMM yyyy")} />
+          <Row label={t("bkdNights")} value={String(b.nights)} />
+          <Row label={t("bkdBooked")} value={fmtDate(b.createdAt, "d MMM yyyy, HH:mm")} />
           {b.payment?.mode === "payment" && (
             <Row
-              label="Payment"
-              value={`Paid ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} ${
-                b.payment.provider === "voucher" ? "with a voucher" : "via Stripe"
-              }`}
+              label={t("bkdPaymentLabel")}
+              value={t(b.payment.provider === "voucher" ? "bkdPaidWithVoucher" : "bkdPaidViaStripe", {
+                amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency),
+              })}
             />
           )}
-          {b.voucher && <Row label="Voucher" value={`${b.voucher.code} — ${b.voucher.title}`} />}
+          {/* Checkout gift redemptions store no product title — show just the code then. */}
+          {b.voucher && (
+            <Row label={t("bkdVoucher")} value={b.voucher.title ? `${b.voucher.code} — ${b.voucher.title}` : b.voucher.code} />
+          )}
           {b.payment?.mode === "setup" && (
             <Row
-              label="Guarantee card"
-              value={b.payment.cardLast4 ? `On file ····${b.payment.cardLast4}` : "On file"}
+              label={t("bkdGuaranteeCard")}
+              value={b.payment.cardLast4 ? t("bkdOnFileCard", { last4: b.payment.cardLast4 }) : t("bkdOnFile")}
             />
           )}
         </section>
 
         <section className="rounded-[14px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Guest</h2>
-          <Row label="Name" value={`${b.guest.firstName} ${b.guest.lastName}`} />
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdGuestSection")}</h2>
+          <Row label={t("bkdName")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
           <Row
-            label="Email"
+            label={t("bkdEmail")}
             value={
               <a href={`mailto:${b.guest.email}`} className="text-accent hover:underline">
                 {b.guest.email}
               </a>
             }
           />
-          <Row label="Phone" value={b.guest.phone} />
-          {b.guest.arrival && <Row label="Arrival time" value={b.guest.arrival} />}
-          {b.guest.requests && <Row label="Requests" value={b.guest.requests} />}
+          <Row label={t("bkdPhone")} value={b.guest.phone} />
+          {b.guest.arrival && <Row label={t("bkdArrivalTime")} value={b.guest.arrival} />}
+          {b.guest.requests && <Row label={t("bkdRequests")} value={b.guest.requests} />}
 
           {/* Contact-detail fixes (typo'd email = no confirmation, no portal,
               no review request). Contact only — never the stay or the money. */}
           {active && (
             <details className="mt-3 border-t border-divider pt-3">
               <summary className="cursor-pointer text-[13px] font-semibold text-secondary hover:text-accent">
-                Edit guest details
+                {t("bkdEditGuestDetails")}
               </summary>
               <Form method="post" className="mt-3 space-y-3">
                 <input type="hidden" name="intent" value="editGuest" />
                 <div className="grid grid-cols-2 gap-3">
                   <label className="block text-[12.5px] font-semibold text-secondary">
-                    First name
+                    {t("bkdFirstName")}
                     <input name="firstName" defaultValue={b.guest.firstName} required className={FIELD_INPUT} />
                   </label>
                   <label className="block text-[12.5px] font-semibold text-secondary">
-                    Last name
+                    {t("bkdLastName")}
                     <input name="lastName" defaultValue={b.guest.lastName} required className={FIELD_INPUT} />
                   </label>
                 </div>
                 <label className="block text-[12.5px] font-semibold text-secondary">
-                  Email
+                  {t("bkdEmail")}
                   <input name="email" type="email" defaultValue={b.guest.email} required className={FIELD_INPUT} />
                 </label>
                 <label className="block text-[12.5px] font-semibold text-secondary">
-                  Phone
+                  {t("bkdPhone")}
                   <input name="phone" defaultValue={b.guest.phone} className={FIELD_INPUT} />
                 </label>
                 <label className="flex items-center gap-2 text-[13px] text-secondary">
                   <input type="checkbox" name="resend" value="1" defaultChecked />
-                  Email the confirmation to the corrected address (when the email changed)
+                  {t("bkdResendCheckbox")}
                 </label>
                 <button
                   type="submit"
                   disabled={editingGuest}
                   className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
                 >
-                  {editingGuest ? "Saving…" : "Save guest details"}
+                  {editingGuest ? t("saving") : t("bkdSaveGuest")}
                 </button>
               </Form>
             </details>
@@ -365,7 +372,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           {/* Audit trail — the record as consented at checkout stays reconstructible. */}
           {(b.edits?.length ?? 0) > 0 && (
             <div className="mt-3 border-t border-divider pt-3">
-              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-2">Edit history</div>
+              <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdEditHistory")}</div>
               {b.edits!.map((e, i) => (
                 <div key={i} className="mb-1.5 text-[12px] text-muted">
                   <span className="text-muted-2">
@@ -374,7 +381,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                   </span>
                   {e.changes.map((c) => (
                     <div key={c.field}>
-                      {FIELD_LABELS[c.field] ?? c.field}: <s>{c.from || "—"}</s> → {c.to || "—"}
+                      {FIELD_LABEL_KEYS[c.field] ? t(FIELD_LABEL_KEYS[c.field]) : c.field}: <s>{c.from || "—"}</s> → {c.to || "—"}
                     </div>
                   ))}
                 </div>
@@ -386,17 +393,17 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
 
       {b.consent && (
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Consent</h2>
-          <Row label="Accepted at" value={fmtDate(b.consent.acceptedAt, "d MMM yyyy, HH:mm")} />
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdConsentSection")}</h2>
+          <Row label={t("bkdAcceptedAt")} value={fmtDate(b.consent.acceptedAt, "d MMM yyyy, HH:mm")} />
           {b.consent.nonRefundableAck != null && (
-            <Row label="Non-refundable acknowledged" value={b.consent.nonRefundableAck ? "Yes" : "No"} />
+            <Row label={t("bkdNonRefundableAck")} value={b.consent.nonRefundableAck ? t("bkdYes") : t("bkdNo")} />
           )}
-          <Row label="Marketing opt-in" value={b.consent.marketingOptIn ? "Yes" : "No"} />
-          {b.consent.ip && <Row label="IP address" value={b.consent.ip} />}
-          {b.consent.userAgent && <Row label="Device" value={b.consent.userAgent} />}
+          <Row label={t("bkdMarketingOptIn")} value={b.consent.marketingOptIn ? t("bkdYes") : t("bkdNo")} />
+          {b.consent.ip && <Row label={t("bkdIpAddress")} value={b.consent.ip} />}
+          {b.consent.userAgent && <Row label={t("bkdDevice")} value={b.consent.userAgent} />}
           {b.consent.policyText.length > 0 && (
             <div className="mt-3 border-t border-divider pt-3">
-              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">Policy shown to guest</div>
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdPolicyShown")}</div>
               <ul className="flex flex-col gap-0.5 text-[13px] text-secondary">
                 {b.consent.policyText.map((t, i) => (
                   <li key={i}>{t}</li>
@@ -408,15 +415,15 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       )}
 
       <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Rooms</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdRoomsSection")}</h2>
         <div className="flex flex-col divide-y divide-divider">
           {b.rooms.map((r, i) => (
             <div key={i} className="flex items-start justify-between gap-4 py-3 first:pt-0">
               <div className="min-w-0">
                 <div className="font-semibold">{r.roomTitle}</div>
                 <div className="text-[13px] text-muted-2">
-                  {r.rateTitle} · {r.adults} adult{r.adults === 1 ? "" : "s"}
-                  {r.children ? `, ${r.children} child${r.children === 1 ? "" : "ren"}` : ""}
+                  {r.rateTitle} · {t(r.adults === 1 ? "bkdAdults_one" : "bkdAdults_other", { n: r.adults })}
+                  {r.children ? `, ${t(r.children === 1 ? "bkdChildren_one" : "bkdChildren_other", { n: r.children })}` : ""}
                 </div>
               </div>
               <span className="whitespace-nowrap font-semibold">
@@ -427,10 +434,10 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         </div>
         {b.extras && b.extras.length > 0 && (
           <div className="mt-3 flex flex-col gap-2 border-t border-divider pt-3">
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">Extras</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdExtras")}</div>
             {groupExtrasByRoom(b.extras).map((g, gi) => (
               <div key={gi} className="flex flex-col gap-1.5">
-                <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? "For your stay"}</div>
+                <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? t("bkdForYourStay")}</div>
                 {g.lines.map((x, i) => (
                   <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[13.5px]">
                     <div className="min-w-0">
@@ -451,7 +458,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             booking time; absent on legacy bookings). */}
         {b.pricing && (b.pricing.charges.length > 0 || b.pricing.taxLines.length > 0) && (
           <div className="mt-3 flex flex-col gap-1.5 border-t border-divider pt-3">
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">Taxes &amp; fees</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdTaxesFees")}</div>
             {[...b.pricing.charges, ...b.pricing.taxLines].map((c, i) => (
               <div key={i} className="flex justify-between text-[13.5px]">
                 <span>{c.label}</span>
@@ -462,69 +469,70 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         )}
         {b.offer && (
           <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
-            <span>{b.offer.name || "Offer"} (−{b.offer.value}%)</span>
+            <span>{b.offer.name || t("bkdOffer")} (−{b.offer.value}%)</span>
             <span className="font-semibold">−{formatMoney(b.offer.discount, b.currency)}</span>
           </div>
         )}
         {b.promo && (
           <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
-            <span>Promo ({b.promo.code})</span>
+            <span>{t("bkdPromo", { code: b.promo.code ?? "" })}</span>
             <span className="font-semibold">−{formatMoney(b.promo.discount, b.currency)}</span>
           </div>
         )}
         <div className="mt-4 flex items-baseline justify-between border-t border-divider pt-4">
-          <span className="text-[15px] font-semibold">Total</span>
+          <span className="text-[15px] font-semibold">{t("bkdTotal")}</span>
           <span className="font-serif text-[24px] font-semibold">
             {formatMoney(b.total, b.currency)}
           </span>
         </div>
         {b.pricing && b.pricing.taxIncluded > 0 && (
           <div className="mt-1 text-right text-[12px] text-muted-2">
-            Includes {formatMoney(b.pricing.taxIncluded, b.currency)} VAT
+            {t("bkdIncludesVat", { amount: formatMoney(b.pricing.taxIncluded, b.currency) })}
           </div>
         )}
       </section>
 
       {cancellationText && (
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-          <h2 className="mb-2 font-serif text-[18px] font-semibold">Cancellation policy</h2>
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("bkdCancellationPolicy")}</h2>
           <p className="text-[14px] text-secondary">{cancellationText}</p>
         </section>
       )}
 
       <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Payment</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdPaymentSection")}</h2>
         {b.payment ? (
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[14px]">
             {b.payment.mode === "payment" ? (
               <>
-                <dt className="text-muted">Status</dt>
+                <dt className="text-muted">{t("bkdStatus")}</dt>
                 <dd className={b.payment.refund ? "font-semibold text-ink" : "font-semibold text-[#3f7a52]"}>
-                  Paid {formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)} via Stripe
+                  {t("bkdPaidViaStripe", { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) })}
                 </dd>
                 {b.payment.refund && (
                   <>
-                    <dt className="text-muted">Refunded</dt>
+                    <dt className="text-muted">{t("bkdRefunded")}</dt>
                     <dd className="font-semibold text-[#9a6a1e]">
-                      {formatMoney(b.payment.refund.amount, b.payment.refund.currency || b.payment.currency || b.currency)}
-                      {" on "}
-                      {fmtDate(b.payment.refund.at, "d MMM yyyy")}
-                      {b.payment.refund.by && <span className="font-normal text-muted"> · by {b.payment.refund.by}</span>}
+                      {t("bkdRefundAmountOn", {
+                        amount: formatMoney(b.payment.refund.amount, b.payment.refund.currency || b.payment.currency || b.currency),
+                        date: fmtDate(b.payment.refund.at, "d MMM yyyy"),
+                      })}
+                      {b.payment.refund.by && <span className="font-normal text-muted"> {t("bkdRefundBy", { by: b.payment.refund.by })}</span>}
                     </dd>
                   </>
                 )}
                 {b.payment.paymentIntentId && (
                   <>
-                    <dt className="text-muted">Payment intent</dt>
+                    <dt className="text-muted">{t("bkdPaymentIntent")}</dt>
                     <dd className="font-mono text-[12px] text-ink">{b.payment.paymentIntentId}</dd>
                   </>
                 )}
               </>
             ) : (
               <>
-                <dt className="text-muted">Status</dt>
+                <dt className="text-muted">{t("bkdStatus")}</dt>
                 <dd className="font-semibold text-ink">
-                  Guarantee card on file{" "}
+                  {t("bkdGuaranteeOnFile")}{" "}
                   {b.payment.cardBrand || b.payment.cardLast4 ? (
                     <span className="font-normal text-secondary">
                       ({[b.payment.cardBrand, b.payment.cardLast4 && `····${b.payment.cardLast4}`]
@@ -534,17 +542,17 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                     </span>
                   ) : null}
                 </dd>
-                <dt className="text-muted">No charge taken</dt>
-                <dd className="text-secondary">Payment is collected at the hotel.</dd>
+                <dt className="text-muted">{t("bkdNoChargeTaken")}</dt>
+                <dd className="text-secondary">{t("bkdPayAtHotel")}</dd>
               </>
             )}
-            <dt className="text-muted">Stripe account</dt>
+            <dt className="text-muted">{t("bkdStripeAccount")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.accountId}</dd>
-            <dt className="text-muted">Checkout session</dt>
+            <dt className="text-muted">{t("bkdCheckoutSession")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.sessionId}</dd>
           </dl>
         ) : (
-          <p className="text-[14px] text-muted-2">No payment information captured yet.</p>
+          <p className="text-[14px] text-muted-2">{t("bkdNoPaymentInfo")}</p>
         )}
 
         {b.payment?.mode === "payment" && !b.payment.refund && canRefund && (
@@ -552,7 +560,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             method="post"
             className="mt-4 border-t border-divider pt-4"
             onSubmit={(e) => {
-              if (!confirm(`Refund ${formatMoney(b.payment!.amount ?? 0, b.payment!.currency || b.currency)} to the guest? This can't be undone.`))
+              if (!confirm(t("bkdRefundConfirm", { amount: formatMoney(b.payment!.amount ?? 0, b.payment!.currency || b.currency) })))
                 e.preventDefault();
             }}
           >
@@ -562,9 +570,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               disabled={refunding}
               className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
             >
-              {refunding ? "Refunding…" : `Refund ${formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency)}`}
+              {refunding
+                ? t("bkdRefunding")
+                : t("bkdRefundButton", { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) })}
             </button>
-            <p className="mt-2 text-[12.5px] text-muted">Issues a full refund via Stripe to the original card.</p>
+            <p className="mt-2 text-[12.5px] text-muted">{t("bkdRefundHint")}</p>
           </Form>
         )}
         {actionData?.error && (
@@ -574,14 +584,14 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         )}
         {actionData?.refunded && (
           <p className="mt-3 rounded-[10px] border border-[#cfe3d0] bg-[#eef5ec] px-3.5 py-2.5 text-[13px] text-[#3f7a52]">
-            ✓ Refund issued.
+            {t("bkdRefundIssued")}
           </p>
         )}
       </section>
 
       {active && (
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Manage booking</h2>
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("bkdManageSection")}</h2>
           <div className="flex flex-wrap items-start gap-6">
             {/* Re-send the guest confirmation — e.g. after fixing email content
                 or a delivery hiccup. Not for failed bookings (retry the push). */}
@@ -593,10 +603,10 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                   disabled={resending}
                   className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
                 >
-                  {resending ? "Sending…" : "Resend confirmation email"}
+                  {resending ? t("bkdSending") : t("bkdResendEmail")}
                 </button>
                 <p className="mt-2 text-[12.5px] text-muted">
-                  Re-sends the booking confirmation to {b.guest.email}.
+                  {t("bkdResendHint", { email: b.guest.email })}
                 </p>
               </Form>
             )}
@@ -607,17 +617,17 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                   href={`/admin/bookings/${b.id}/pdf`}
                   className="inline-block rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent"
                 >
-                  Download confirmation (PDF)
+                  {t("bkdDownloadPdf")}
                 </a>
                 <p className="mt-2 text-[12.5px] text-muted">
-                  Print it or send it to the guest yourself if the email didn't arrive.
+                  {t("bkdDownloadHint")}
                 </p>
               </div>
             )}
             <Form
               method="post"
               onSubmit={(e) => {
-                if (!confirm("Cancel this booking? The guest will be emailed and the nights returned to inventory. This can't be undone.")) {
+                if (!confirm(t("bkdCancelConfirm"))) {
                   e.preventDefault();
                 }
               }}
@@ -628,11 +638,10 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 disabled={cancelling}
                 className="rounded-[10px] border border-[#e0b4ab] bg-surface px-4 py-2.5 text-[14px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
               >
-                {cancelling ? "Cancelling…" : "Cancel booking"}
+                {cancelling ? t("bkdCancelling") : t("bkdCancelBooking")}
               </button>
               <p className="mt-2 text-[12.5px] text-muted">
-                Marks the booking cancelled, emails the guest, and frees the inventory. Issue a refund
-                separately (Payment section above) if one is due.
+                {t("bkdCancelHint")}
               </p>
             </Form>
           </div>

@@ -7,6 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getBookings } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -20,6 +21,8 @@ export function meta() {
 }
 
 export default function AdminBookings({ loaderData }: Route.ComponentProps) {
+  const t = useAdminT();
+
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
@@ -36,15 +39,16 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Bookings</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("bkTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        {bookings.length} booking{bookings.length === 1 ? "" : "s"} recorded. Click one to see the
-        full details.
+        {bookings.length === 1
+          ? t("bkCountOne", { n: bookings.length })
+          : t("bkCountMany", { n: bookings.length })}
       </p>
 
       {bookings.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No bookings yet. Completed checkouts will appear here.
+          {t("bkEmpty")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -64,14 +68,16 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                   <BookingStatusBadge status={b.status} />
                   {(b.lifecycle ?? "active") === "cancelled" && (
                     <span className="rounded-full bg-[#fbe9e7] px-2 py-0.5 text-[11px] font-semibold text-[#c0392b]">
-                      Cancelled
+                      {t("bkCancelled")}
                     </span>
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
                   {b.reference} · {fmtDate(b.checkin, "d MMM")} —{" "}
                   {fmtDate(b.checkout, "d MMM yyyy")} ·{" "}
-                  {b.rooms.length} room{b.rooms.length === 1 ? "" : "s"}
+                  {b.rooms.length === 1
+                    ? t("bkRoomsOne", { n: b.rooms.length })
+                    : t("bkRoomsMany", { n: b.rooms.length })}
                 </div>
                 <div className="mt-0.5 text-[11px] text-faint">
                   {fmtDate(b.createdAt, "d MMM yyyy, HH:mm")}
@@ -81,7 +87,7 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                 <span className="font-serif text-[18px] font-semibold">
                   {formatMoney(b.total, b.currency)}
                 </span>
-                <span className="text-[13px] font-semibold text-accent">View →</span>
+                <span className="text-[13px] font-semibold text-accent">{t("bkView")}</span>
               </div>
             </Link>
           ))}
