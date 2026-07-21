@@ -132,7 +132,9 @@ export async function saveSearchContent(
   search: SearchContent,
 ): Promise<void> {
   const m = await contentMap(pid);
-  m[lang] = { ...(m[lang] ?? {}), search };
+  // heroImage rides on the same entry but is owned by saveHeroImage — carry it
+  // over so a text-only save can't wipe a previously uploaded image.
+  m[lang] = { ...(m[lang] ?? {}), search: { ...search, heroImage: m[lang]?.search?.heroImage } };
   await writeJson(contentKey(pid), m);
 }
 

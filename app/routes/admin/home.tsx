@@ -48,8 +48,8 @@ export async function action({ request }: Route.ActionArgs) {
     searchButton: s(form.get("searchButton")) || undefined,
     highlights: highlights.length ? highlights : undefined,
   };
-  // Save text first; saveHeroImage merges onto the base entry afterwards so the
-  // image survives even when the default language's text is rewritten here.
+  // saveSearchContent never touches heroImage (saveHeroImage owns it), so a
+  // text-only save keeps the previously uploaded image.
   await saveSearchContent(propertyId, pickLang(s(form.get("lang"))), content);
 
   const upload = form.get("heroUpload");
