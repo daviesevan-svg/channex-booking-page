@@ -7,12 +7,13 @@ import {
   getAdminEmail,
   sendMagicLink,
 } from "~/lib/auth.server";
+import { adminLangFromRequest, adminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   if (await getAdminEmail(request)) throw redirect("/admin");
   // A team invite links here with ?email= so the invitee's address is pre-filled.
   const email = new URL(request.url).searchParams.get("email") ?? "";
-  return { email };
+  return { email, adminLang: adminLangFromRequest(request) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -37,6 +38,7 @@ export function meta() {
 export default function Login({ actionData, loaderData }: Route.ComponentProps) {
   const nav = useNavigation();
   const sending = nav.state === "submitting";
+  const t = adminT(loaderData.adminLang);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
@@ -50,21 +52,15 @@ export default function Login({ actionData, loaderData }: Route.ComponentProps) 
 
       {actionData?.ok ? (
         <div className="rounded-[14px] border border-line bg-surface p-6">
-          <h1 className="mb-2 font-serif text-[22px] font-semibold">Check your email</h1>
-          <p className="text-[15px] text-secondary">
-            We've emailed you a sign-in link. It expires in 15 minutes. If this is your first time,
-            the link sets up your account.
-          </p>
+          <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("loginCheckEmail")}</h1>
+          <p className="text-[15px] text-secondary">{t("loginLinkSent")}</p>
         </div>
       ) : (
         <Form method="post" className="rounded-[14px] border border-line bg-surface p-6">
-          <h1 className="mb-1 font-serif text-[24px] font-semibold">Sign in or sign up</h1>
-          <p className="mb-5 text-[14px] text-muted">
-            New here? Enter your email to create your account — no password, no sign-up form. We'll
-            email you a magic link.
-          </p>
+          <h1 className="mb-1 font-serif text-[24px] font-semibold">{t("loginTitle")}</h1>
+          <p className="mb-5 text-[14px] text-muted">{t("loginIntro")}</p>
           <label className="block text-[13px] font-semibold text-secondary">
-            Email
+            {t("loginEmail")}
             <input
               name="email"
               type="email"
@@ -83,7 +79,7 @@ export default function Login({ actionData, loaderData }: Route.ComponentProps) 
             disabled={sending}
             className="mt-5 w-full rounded-[10px] bg-accent py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {sending ? "Sending…" : "Send magic link"}
+            {sending ? t("loginSending") : t("loginSend")}
           </button>
         </Form>
       )}
