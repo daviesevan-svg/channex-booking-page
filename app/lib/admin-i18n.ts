@@ -4,6 +4,8 @@
 // picker, defaulting to the browser's Accept-Language. English is the
 // fallback for any missing key, so partially translated pages degrade
 // gracefully rather than breaking.
+import { de as deDateLocale } from "date-fns/locale";
+import type { Locale } from "date-fns";
 import { useRouteLoaderData } from "react-router";
 
 export type AdminLang = "en" | "de";
@@ -50,6 +52,16 @@ export function useAdminLang(): AdminLang {
 /** t() for components under the admin layout. */
 export function useAdminT(): AdminT {
   return adminT(useAdminLang());
+}
+
+/** date-fns locale matching the admin language (undefined = date-fns' English
+ *  default). Pass to fmtDate/format for weekday/month names in the UI. */
+export function adminDateLocale(lang: AdminLang): Locale | undefined {
+  return lang === "de" ? deDateLocale : undefined;
+}
+
+export function useAdminDateLocale(): Locale | undefined {
+  return adminDateLocale(useAdminLang());
 }
 
 // ===== dictionaries =====
