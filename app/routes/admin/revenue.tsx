@@ -2,6 +2,7 @@
 // account (personal user-api-key); we import the property's full booking
 // history (all channels, incl. OTAs) into the per-night D1 store and keep it
 // fresh via cron. The analytics dashboards build on top of this data.
+import { useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/revenue";
@@ -11,7 +12,8 @@ import { requireAdmin } from "~/lib/auth.server";
 import { fmtDate, todayISODate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getRevmanKpis, type Kpi, type RevmanKpis } from "~/lib/revman-analytics.server";
+import { getPaceCalendar, getRevmanKpis, type Kpi, type PaceDay, type RevmanKpis } from "~/lib/revman-analytics.server";
+import type { SalesScore } from "~/lib/revman-pace";
 import {
   connectRevman,
   disconnectRevman,
@@ -28,8 +30,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   const state = await getRevmanState(pid);
   const summary = state ? await getRevmanSummary(pid) : undefined;
   const today = todayISODate();
-  const kpis = state && summary && summary.nights > 0 ? await getRevmanKpis(pid, today, state.roomCount) : undefined;
-  return { configured: true as const, state, summary, kpis, today };
+  const hasData = Boolean(state && summary && summary.nights > 0);
+  const kpis = state && hasData ? await getRevmanKpis(pid, today, state.roomCount) : undefined;
+
+  // Pace calendar month (?month=YYYY-MM, defaults to the current month).
+  const monthParam = new URL(request.url).searchParams.get("month");
+  const paceMonth = monthParam && /^\d{4}-(0[1-9]|1[0-2])$/.test(monthParam) ? monthParam : today.slice(0, 7);
+  const paceFrom = `${paceMonth}-01`;
+  const paceTo = new Date(Date.UTC(Number(paceMonth.slice(0, 4)), Number(paceMonth.slice(5, 7)), 0))
+    .toISOString()
+    .slice(0, 10);
+  const paceDays = state && hasData ? await getPaceCalendar(pid, paceFrom, paceTo, today, state.roomCount) : undefined;
+
+  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays };
 }
 
 export function meta() {
@@ -98,6 +111,169 @@ function KpiTile({ label, value, kpi, t }: { label: string; value: string; kpi: 
 
 const pctText = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
+const SCORE_STYLE: Record<SalesScore, string> = {
+  high_demand: "bg-emerald-100 border-emerald-200 text-emerald-900",
+  steady_sales: "bg-sky-100 border-sky-200 text-sky-900",
+  slow_sales: "bg-amber-100 border-amber-200 text-amber-900",
+  needs_attention: "bg-rose-100 border-rose-200 text-rose-900",
+};
+const SCORE_DOT: Record<SalesScore, string> = {
+  high_demand: "bg-emerald-400",
+  steady_sales: "bg-sky-400",
+  slow_sales: "bg-amber-400",
+  needs_attention: "bg-rose-400",
+};
+const SCORE_KEY: Record<SalesScore, string> = {
+  high_demand: "revScoreHigh",
+  steady_sales: "revScoreSteady",
+  slow_sales: "revScoreSlow",
+  needs_attention: "revScoreAttention",
+};
+
+const shiftMonth = (ym: string, by: number): string => {
+  const d = new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(5, 7)) - 1 + by, 1));
+  return d.toISOString().slice(0, 7);
+};
+
+function PaceCalendar({
+  days,
+  month,
+  today,
+  roomCount,
+}: {
+  days: PaceDay[];
+  month: string;
+  today: string;
+  roomCount: number;
+}) {
+  const t = useAdminT();
+  const dl = useAdminDateLocale();
+  const [selected, setSelected] = useState<PaceDay | null>(null);
+  // Monday-first grid offset; 2026-07-20 is a Monday, used to label columns.
+  const firstDow = (new Date(`${month}-01T00:00:00Z`).getUTCDay() + 6) % 7;
+  const mondayRef = "2026-07-20";
+  const scores: SalesScore[] = ["high_demand", "steady_sales", "slow_sales", "needs_attention"];
+
+  return (
+    <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="font-serif text-[18px] font-semibold">{t("revPaceTitle")}</div>
+          <p className="mb-0 mt-1 max-w-[560px] text-[13px] text-muted">{t("revPaceSub")}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          <Link
+            to={`/admin/revenue?month=${shiftMonth(month, -1)}`}
+            preventScrollReset
+            className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[14px] text-secondary hover:bg-chip"
+          >
+            ←
+          </Link>
+          <span className="inline-block w-40 text-center text-[13.5px] font-semibold">
+            {fmtDate(`${month}-01`, "LLLL yyyy", dl)}
+          </span>
+          <Link
+            to={`/admin/revenue?month=${shiftMonth(month, 1)}`}
+            preventScrollReset
+            className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[14px] text-secondary hover:bg-chip"
+          >
+            →
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-4">
+        {scores.map((s) => (
+          <span key={s} className="inline-flex items-center gap-1.5 text-[12px] text-secondary">
+            <span className={`inline-block h-3 w-3 rounded-[4px] ${SCORE_DOT[s]}`} /> {t(SCORE_KEY[s])}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 grid grid-cols-7 gap-1.5">
+        {Array.from({ length: 7 }, (_, i) => (
+          <div key={i} className="text-center text-[11px] font-semibold uppercase tracking-[0.06em] text-muted">
+            {fmtDate(new Date(Date.parse(`${mondayRef}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10), "EEE", dl)}
+          </div>
+        ))}
+        {Array.from({ length: firstDow }, (_, i) => (
+          <div key={`o${i}`} />
+        ))}
+        {days.map((d) => (
+          <button
+            key={d.date}
+            type="button"
+            onClick={() => setSelected(selected?.date === d.date ? null : d)}
+            className={`min-h-[76px] rounded-[10px] border p-2 text-left ${SCORE_STYLE[d.score]} ${d.date < today ? "opacity-50" : ""} ${selected?.date === d.date ? "ring-2 ring-accent" : ""}`}
+          >
+            <div className="flex items-baseline justify-between text-[12.5px] font-semibold">
+              <span>{Number(d.date.slice(8))}</span>
+              <span>{d.occupancyPct}%</span>
+            </div>
+            <div className="mt-1.5 text-[11px] leading-tight opacity-80">
+              {d.occupancy}/{roomCount}
+              <br />
+              {d.salesAbs >= 0 ? `+${d.salesAbs}` : d.salesAbs} {t("revPaceVsLy")}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {selected && (
+        <div className="mt-4 rounded-[12px] border border-line-alt bg-surface-alt p-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-[14px] font-semibold">
+              {fmtDate(selected.date, "EEEE, d MMMM yyyy", dl)}
+              <span
+                className={`ml-2 rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold ${SCORE_STYLE[selected.score]}`}
+              >
+                {t(SCORE_KEY[selected.score])}
+              </span>
+            </div>
+            <button type="button" onClick={() => setSelected(null)} className="text-[13px] text-muted hover:text-ink">
+              ✕
+            </button>
+          </div>
+          <dl className="mt-3 grid gap-x-8 gap-y-2 text-[13px] sm:grid-cols-2">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPaceOnBooks")}</dt>
+              <dd className="font-semibold">
+                {selected.paceCur} {t("revPaceVsLyLong", { count: String(selected.paceLy) })}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPacePickup")}</dt>
+              <dd className="font-semibold">
+                {selected.pickupCur} {t("revPaceVsLyLong", { count: String(selected.pickupLy) })}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPaceOccupancy")}</dt>
+              <dd className="font-semibold">
+                {selected.occupancy}/{roomCount} ({selected.occupancyPct}%)
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPaceDba")}</dt>
+              <dd className="font-semibold">{selected.dba < 0 ? t("revPacePast") : selected.dba}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPaceWeights")}</dt>
+              <dd className="font-semibold">
+                {Math.round(selected.wPace * 100)}% / {Math.round(selected.wPickup * 100)}%
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">{t("revPaceScore")}</dt>
+              <dd className="font-semibold">{selected.scoreRaw}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Current-month occupancy column chart — hand-rolled like the analytics page. */
 function OccupancyChart({ kpis, roomCount, today }: { kpis: RevmanKpis; roomCount: number; today: string }) {
   const byDate = new Map(kpis.monthOccupancy.map((r) => [r.date, r.nights]));
@@ -154,7 +330,7 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { state, summary, kpis } = loaderData;
+  const { state, summary, kpis, paceDays, paceMonth } = loaderData;
   const pick = actionData && "pick" in actionData && actionData.pick ? { pick: actionData.pick, apiKey: actionData.apiKey } : undefined;
   const money = (minor: number, currency?: string) => formatMoney(minor / 100, currency ?? "EUR");
 
@@ -261,6 +437,10 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                 <p className="mb-4 mt-1 text-[13px] text-muted">{t("revOccChartSub", { count: String(state.roomCount) })}</p>
                 <OccupancyChart kpis={kpis} roomCount={state.roomCount} today={loaderData.today} />
               </section>
+
+              {paceDays && (
+                <PaceCalendar days={paceDays} month={paceMonth} today={loaderData.today} roomCount={state.roomCount} />
+              )}
             </>
           ) : (
             <section className="rounded-[14px] border border-line bg-surface p-6">
