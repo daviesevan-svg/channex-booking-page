@@ -3,6 +3,7 @@
 // every metric returned with week-over-week and year-over-year deltas. YoY is
 // 364 days back (52 whole weeks) so weekdays stay aligned.
 import { getDB } from "./config.server";
+import { paceSnapshot, type PaceSnapshot } from "./revman-pace";
 
 function db(): D1Database {
   const d = getDB();
@@ -146,4 +147,59 @@ export async function getRevmanKpis(pid: string, todayISO: string, roomCount: nu
     })),
     currency: (cur.results[0] as { currency?: string } | undefined)?.currency ?? undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Sales pace calendar
+
+export interface PaceDay extends PaceSnapshot {
+  /** Active room nights on the books for the date (occupancy numerator). */
+  occupancy: number;
+  occupancyPct: number;
+}
+
+function leadTimeStmt(pid: string, from: string, to: string, bookedBy: string) {
+  return db()
+    .prepare(
+      `SELECT stay_date, lead_time FROM rev_night
+       WHERE pid = ? AND is_cancelled = 0 AND stay_date >= ? AND stay_date <= ? AND booking_date <= ?`,
+    )
+    .bind(pid, from, to, bookedBy);
+}
+
+/** Pace/pickup/sales-score snapshots for every date in [from, to], compared
+ *  against the weekday-aligned range one year (364 days) earlier — last year's
+ *  bookings trimmed to the aligned as-of date so both years are observed at
+ *  the same days-before-arrival. */
+export async function getPaceCalendar(
+  pid: string,
+  from: string,
+  to: string,
+  asOf: string,
+  roomCount: number,
+): Promise<PaceDay[]> {
+  const [cur, ly] = await db().batch([
+    leadTimeStmt(pid, from, to, asOf),
+    leadTimeStmt(pid, shiftISO(from, -364), shiftISO(to, -364), shiftISO(asOf, -364)),
+  ]);
+  const group = (rows: { stay_date: string; lead_time: number }[]) => {
+    const m = new Map<string, number[]>();
+    for (const r of rows) {
+      const arr = m.get(r.stay_date) ?? [];
+      arr.push(Number(r.lead_time));
+      m.set(r.stay_date, arr);
+    }
+    return m;
+  };
+  const curByDate = group(cur.results as { stay_date: string; lead_time: number }[]);
+  const lyByDate = group(ly.results as { stay_date: string; lead_time: number }[]);
+
+  const days: PaceDay[] = [];
+  const cap = Math.max(1, roomCount);
+  for (let d = from; d <= to; d = shiftISO(d, 1)) {
+    const snapshot = paceSnapshot(d, asOf, curByDate.get(d) ?? [], lyByDate.get(shiftISO(d, -364)) ?? []);
+    const occupancy = (curByDate.get(d) ?? []).length;
+    days.push({ ...snapshot, occupancy, occupancyPct: Math.round((occupancy / cap) * 1000) / 10 });
+  }
+  return days;
 }
