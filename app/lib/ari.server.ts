@@ -84,9 +84,10 @@ export async function ensureSchema(): Promise<void> {
   schemaReady = true;
 }
 
-/** Who made an ARI change — a signed-in admin (their email) or Channex. */
+/** Who made an ARI change — a signed-in admin (their email), Channex, or the
+ *  revenue manager's price suggestions (applied by an admin). */
 export interface AriActor {
-  source: "user" | "channex";
+  source: "user" | "channex" | "revman";
   /** Display label: the user's email, or "Channex". */
   actor: string;
 }

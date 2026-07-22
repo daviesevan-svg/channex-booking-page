@@ -202,9 +202,9 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
                         : "bg-[#e8f0e6] text-[#3f7a52]"
                     }`}
                   >
-                    {r.source === "channex" ? "Channex" : t("alSourceUser")}
+                    {r.source === "channex" ? "Channex" : r.source === "revman" ? t("alSourceRevman") : t("alSourceUser")}
                   </span>
-                  {r.source === "user" ? r.actor : ""}
+                  {r.source === "channex" ? "" : r.actor}
                 </td>
                 <td className="px-4 py-3">{r.roomLabel}</td>
                 <td className="px-4 py-3 text-secondary">{r.rateLabel ?? "—"}</td>
