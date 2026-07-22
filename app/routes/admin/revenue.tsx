@@ -12,14 +12,25 @@ import { requireAdmin } from "~/lib/auth.server";
 import { fmtDate, todayISODate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getForecast, getPaceCalendar, getRevmanKpis, type Kpi, type PaceDay } from "~/lib/revman-analytics.server";
+import {
+  applyPriceSuggestions,
+  getForecast,
+  getPaceCalendar,
+  getPriceSuggestions,
+  getRevmanKpis,
+  type Kpi,
+  type PaceDay,
+  type PriceSuggestionRow,
+} from "~/lib/revman-analytics.server";
 import type { SalesScore } from "~/lib/revman-pace";
+import { guardsReady } from "~/lib/revman-price";
 import {
   connectRevman,
   disconnectRevman,
   getRevmanState,
   getRevmanSummary,
   importRevmanBookings,
+  setRevmanPriceGuards,
   setRevmanRoomCount,
 } from "~/lib/revman.server";
 
@@ -47,7 +58,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const forecastTo = new Date(Date.parse(`${today}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
   const forecast = state && hasData ? await getForecast(pid, monthFrom, forecastTo, state.roomCount) : undefined;
 
-  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast };
+  const guards = { minPrice: state?.minPrice, maxPrice: state?.maxPrice };
+  const suggestions =
+    state && hasData ? await getPriceSuggestions(pid, today, state.roomCount, guards) : undefined;
+
+  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast, suggestions };
 }
 
 export function meta() {
@@ -73,6 +88,31 @@ export async function action({ request }: Route.ActionArgs) {
     if (intent === "refresh" || intent === "refreshFull") {
       const imported = await importRevmanBookings(pid, { full: intent === "refreshFull" });
       return { okKey: "revRefreshed" as const, imported };
+    }
+    if (intent === "priceGuards") {
+      const min = Number(form.get("minPrice"));
+      const max = Number(form.get("maxPrice"));
+      if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max < min) {
+        return { errorKey: "revErrGuards" as const };
+      }
+      await setRevmanPriceGuards(pid, min, max);
+      return { okKey: "revSaved" as const };
+    }
+    if (intent === "applyPrice" || intent === "applyPriceAll") {
+      const state = await getRevmanState(pid);
+      if (!state) return { error: "Revenue management is not connected." };
+      const email = await requireAdmin(request);
+      const today = todayISODate();
+      const dates =
+        intent === "applyPrice"
+          ? [String(form.get("date"))]
+          : (await getPriceSuggestions(pid, today, state.roomCount, state)).filter((s) => s.pct !== 0).map((s) => s.date);
+      const result = await applyPriceSuggestions(pid, dates, today, state.roomCount, state, {
+        source: "revman",
+        actor: email,
+      });
+      if (result.cells === 0) return { okKey: "revSugNothing" as const };
+      return { okKey: "revSugApplied" as const, applied: result };
     }
     if (intent === "roomCount") {
       const n = Number(form.get("roomCount"));
@@ -349,8 +389,9 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { state, summary, kpis, paceDays, paceMonth, forecast } = loaderData;
+  const { state, summary, kpis, paceDays, paceMonth, forecast, suggestions } = loaderData;
   const forecastByDate = new Map((forecast ?? []).map((f) => [f.date, f]));
+  const ready = state ? guardsReady(state) : false;
   const pick = actionData && "pick" in actionData && actionData.pick ? { pick: actionData.pick, apiKey: actionData.apiKey } : undefined;
   const money = (minor: number, currency?: string) => formatMoney(minor / 100, currency ?? "EUR");
 
@@ -373,7 +414,12 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
           {actionData.okKey === "revRefreshed"
             ? t("revRefreshed", { count: String(actionData.imported ?? 0) })
-            : t(actionData.okKey)}
+            : actionData.okKey === "revSugApplied" && "applied" in actionData && actionData.applied
+              ? t("revSugApplied", {
+                  dates: String(actionData.applied.dates),
+                  cells: String(actionData.applied.cells),
+                })
+              : t(actionData.okKey)}
         </p>
       )}
 
@@ -492,6 +538,125 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
 
               {paceDays && (
                 <PaceCalendar days={paceDays} month={paceMonth} today={loaderData.today} roomCount={state.roomCount} />
+              )}
+
+              {suggestions && (
+                <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
+                  <div className="font-serif text-[18px] font-semibold">{t("revSugTitle")}</div>
+                  <p className="mb-4 mt-1 max-w-[620px] text-[13px] text-muted">{t("revSugSub")}</p>
+
+                  <Form method="post" className="flex flex-wrap items-end gap-3">
+                    <input type="hidden" name="intent" value="priceGuards" />
+                    <label className="block text-[13px] font-semibold text-secondary">
+                      {t("revSugGuardMin")}
+                      <input
+                        name="minPrice"
+                        type="number"
+                        min={1}
+                        step="1"
+                        defaultValue={state.minPrice}
+                        className={`${FIELD_INPUT} w-28`}
+                      />
+                    </label>
+                    <label className="block text-[13px] font-semibold text-secondary">
+                      {t("revSugGuardMax")}
+                      <input
+                        name="maxPrice"
+                        type="number"
+                        min={1}
+                        step="1"
+                        defaultValue={state.maxPrice}
+                        className={`${FIELD_INPUT} w-28`}
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="rounded-[10px] border border-line-alt px-4 py-[11px] text-[13.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-60"
+                    >
+                      {t("revSaveCta")}
+                    </button>
+                    {!ready && <span className="pb-3 text-[12.5px] text-amber-700">{t("revSugGuardsHint")}</span>}
+                  </Form>
+
+                  <div className="mt-4 max-h-[430px] overflow-y-auto rounded-[10px] border border-line-alt">
+                    <table className="w-full text-[13px]">
+                      <thead className="sticky top-0 bg-surface-alt text-left text-[11.5px] uppercase tracking-[0.06em] text-muted">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColDate")}</th>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColPace")}</th>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColForecast")}</th>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColCurrent")}</th>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColSuggested")}</th>
+                          <th className="px-3 py-2" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {suggestions.map((s) => (
+                          <tr key={s.date} className="border-t border-line-alt">
+                            <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(s.date, "EEE d MMM", dl)}</td>
+                            <td className="px-3 py-2">
+                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]">
+                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${SCORE_DOT[s.score]}`} />
+                                {t(SCORE_KEY[s.score])}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">{pctText(s.forecastPercent)}</td>
+                            <td className="px-3 py-2">{s.fromPrice !== undefined ? money(s.fromPrice * 100, kpis?.currency) : "—"}</td>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              {s.pct === 0 || s.fromPrice === undefined ? (
+                                <span className="text-muted">{t("revSugHold")}</span>
+                              ) : (
+                                <>
+                                  <span
+                                    className={`mr-2 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${s.pct > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
+                                  >
+                                    {s.pct > 0 ? `+${s.pct}%` : `${s.pct}%`}
+                                  </span>
+                                  {ready && s.fromPriceNudged !== undefined && (
+                                    <span className="font-semibold">{money(s.fromPriceNudged * 100, kpis?.currency)}</span>
+                                  )}
+                                </>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              {s.pct !== 0 && s.fromPrice !== undefined && (
+                                <Form method="post" className="inline">
+                                  <input type="hidden" name="intent" value="applyPrice" />
+                                  <input type="hidden" name="date" value={s.date} />
+                                  <button
+                                    type="submit"
+                                    disabled={busy || !ready}
+                                    title={ready ? undefined : t("revSugGuardsHint")}
+                                    className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
+                                  >
+                                    {t("revSugApply")}
+                                  </button>
+                                </Form>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-3">
+                    <span className="text-[12.5px] text-faint">
+                      {t("revSugCount", { count: String(suggestions.filter((s) => s.pct !== 0 && s.fromPrice !== undefined).length) })}
+                    </span>
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="applyPriceAll" />
+                      <button
+                        type="submit"
+                        disabled={busy || !ready || suggestions.every((s) => s.pct === 0 || s.fromPrice === undefined)}
+                        className="rounded-[10px] bg-accent px-4 py-2 text-[13.5px] font-semibold text-white disabled:opacity-60"
+                      >
+                        {busyIntent === "applyPriceAll" ? t("revSugApplying") : t("revSugApplyAll")}
+                      </button>
+                    </Form>
+                  </div>
+                </section>
               )}
             </>
           ) : (

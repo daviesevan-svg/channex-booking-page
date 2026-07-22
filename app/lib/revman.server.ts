@@ -62,6 +62,9 @@ export interface RevmanState {
   lastImportCount?: number;
   importStatus: "idle" | "running" | "error";
   error?: string;
+  /** Safety rails for price suggestions (major units); Apply needs both. */
+  minPrice?: number;
+  maxPrice?: number;
 }
 
 /** State without the key material — safe shape for loaders/UI. */
@@ -119,6 +122,12 @@ export async function setRevmanRoomCount(pid: string, roomCount: number): Promis
   const s = await readState(pid);
   if (!s) return;
   await writeState(pid, { ...s, roomCount: Math.max(1, Math.round(roomCount)) });
+}
+
+export async function setRevmanPriceGuards(pid: string, minPrice: number, maxPrice: number): Promise<void> {
+  const s = await readState(pid);
+  if (!s) return;
+  await writeState(pid, { ...s, minPrice, maxPrice });
 }
 
 /** Removes the stored key and every imported night for the property. */

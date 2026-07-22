@@ -2,9 +2,12 @@
 // KPI semantics follow the RevPanda reference: cancelled bookings excluded,
 // every metric returned with week-over-week and year-over-year deltas. YoY is
 // 364 days back (52 whole weeks) so weekdays stay aligned.
+import { getInventory, saveInventory, type AriActor, type InventoryEdits } from "./ari.server";
 import { getDB } from "./config.server";
+import { getSettings } from "./overrides.server";
 import { buildForecast, type ForecastDay } from "./revman-forecast";
 import { paceSnapshot, type PaceSnapshot } from "./revman-pace";
+import { applyNudge, guardsReady, suggestFor, type PriceGuards, type Suggestion } from "./revman-price";
 
 function db(): D1Database {
   const d = getDB();
@@ -183,6 +186,112 @@ export async function getForecast(
     }),
   );
   return buildForecast(nights, from, to, roomCount);
+}
+
+// ---------------------------------------------------------------------------
+// Price suggestions
+
+export interface PriceSuggestionRow extends Suggestion {
+  score: PaceDay["score"];
+  forecastPercent: number;
+  occupancyPct: number;
+  /** Lowest current price across the date's room|rate cells (major units);
+   *  undefined when no price is loaded for the date. */
+  fromPrice?: number;
+  /** fromPrice with the nudge + guards applied (display only; the action
+   *  recomputes per cell). */
+  fromPriceNudged?: number;
+}
+
+const SUGGESTION_DAYS = 60;
+
+/** One suggestion per date for the next 60 days: pace score + forecast →
+ *  percentage nudge, plus the date's lowest current price for display. */
+export async function getPriceSuggestions(
+  pid: string,
+  today: string,
+  roomCount: number,
+  guards: PriceGuards,
+): Promise<PriceSuggestionRow[]> {
+  const to = shiftISO(today, SUGGESTION_DAYS - 1);
+  const [pace, forecast, inventory] = await Promise.all([
+    getPaceCalendar(pid, today, to, today, roomCount),
+    getForecast(pid, today, to, roomCount),
+    getInventory(pid, today, to),
+  ]);
+  const fcByDate = new Map(forecast.map((f) => [f.date, f]));
+
+  const minPriceByDate = new Map<string, number>();
+  for (const [key, price] of Object.entries(inventory.prices)) {
+    const date = key.split("|")[2];
+    if (price > 0 && (minPriceByDate.get(date) ?? Infinity) > price) minPriceByDate.set(date, price);
+  }
+
+  return pace.map((day) => {
+    const fc = fcByDate.get(day.date);
+    const suggestion = suggestFor({
+      date: day.date,
+      score: day.score,
+      forecastPercent: fc?.forecastPercent ?? 0,
+      dba: day.dba,
+    });
+    const fromPrice = minPriceByDate.get(day.date);
+    const fromPriceNudged =
+      fromPrice !== undefined && guardsReady(guards)
+        ? (applyNudge(fromPrice, suggestion.pct, guards) ?? fromPrice)
+        : undefined;
+    return {
+      ...suggestion,
+      score: day.score,
+      forecastPercent: fc?.forecastPercent ?? 0,
+      occupancyPct: day.occupancyPct,
+      fromPrice,
+      fromPriceNudged,
+    };
+  });
+}
+
+/** Apply the CURRENT server-side suggestions to the given dates: every priced
+ *  room|rate cell gets the date's percentage nudge, clamped to the guards, and
+ *  written through the audited ARI path (so the change flows to Google ARI and
+ *  the change log like any manual edit). Dates whose suggestion is 0% are
+ *  skipped. */
+export async function applyPriceSuggestions(
+  pid: string,
+  dates: string[],
+  today: string,
+  roomCount: number,
+  guards: PriceGuards,
+  actor: AriActor,
+): Promise<{ dates: number; cells: number }> {
+  if (!guardsReady(guards)) throw new Error("Set the minimum and maximum price guards first.");
+  const suggestions = await getPriceSuggestions(pid, today, roomCount, guards);
+  const byDate = new Map(suggestions.map((s) => [s.date, s]));
+  const wanted = new Set(dates);
+
+  const to = shiftISO(today, SUGGESTION_DAYS - 1);
+  const inventory = await getInventory(pid, today, to);
+  const settings = await getSettings(pid);
+
+  const edits: InventoryEdits = {
+    currency: settings.currency || "GBP",
+    availability: [],
+    prices: [],
+    restrictions: [],
+  };
+  const touchedDates = new Set<string>();
+  for (const [key, price] of Object.entries(inventory.prices)) {
+    const [roomId, rateId, date] = key.split("|");
+    if (!wanted.has(date)) continue;
+    const s = byDate.get(date);
+    if (!s || s.pct === 0) continue;
+    const next = applyNudge(price, s.pct, guards);
+    if (next === undefined) continue;
+    edits.prices.push({ roomId, rateId, date, price: next });
+    touchedDates.add(date);
+  }
+  if (edits.prices.length > 0) await saveInventory(pid, edits, actor);
+  return { dates: touchedDates.size, cells: edits.prices.length };
 }
 
 function leadTimeStmt(pid: string, from: string, to: string, bookedBy: string) {
