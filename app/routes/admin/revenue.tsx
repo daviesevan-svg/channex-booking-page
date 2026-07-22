@@ -31,6 +31,7 @@ import {
   getRevmanState,
   getRevmanSummary,
   importRevmanBookings,
+  nudgeRevmanImport,
   setRevmanPriceGuards,
   setRevmanRoomCount,
 } from "~/lib/revman.server";
@@ -64,6 +65,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     state && hasData ? await getPriceSuggestions(pid, today, state.roomCount, guards) : undefined;
 
   const stalled = state ? importLooksStalled(state) : false;
+
+  // Backup driver for the chunked import: while the page polls, each load
+  // nudges the chain along if the self-fetch continuation died (drive-by mode
+  // skips when another chunk runner looks alive).
+  if (state?.importStatus === "running" && state.cursor) nudgeRevmanImport(pid);
 
   return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast, suggestions, stalled };
 }

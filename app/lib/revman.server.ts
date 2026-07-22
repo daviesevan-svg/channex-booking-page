@@ -68,6 +68,16 @@ export interface RevmanState {
    *  A "running" status with a stale heartbeat means the run died. */
   progressCount?: number;
   progressAt?: string;
+  /** Resumable position of the running import — chunks pick up from here, and
+   *  a stalled run resumes instead of restarting from page 1. */
+  cursor?: {
+    full: boolean;
+    /** filter[inserted_at][gte] for incremental runs. */
+    since?: string;
+    page: number;
+    imported: number;
+    startedAt: string;
+  };
   /** Safety rails for price suggestions (major units); Apply needs both. */
   minPrice?: number;
   maxPrice?: number;
@@ -177,12 +187,10 @@ export async function connectRevman(
     channexPropertyId: target.id,
     roomCount: Math.max(1, roomCount),
     connectedAt: new Date().toISOString(),
-    importStatus: "running",
-    progressCount: 0,
-    progressAt: new Date().toISOString(),
+    importStatus: "idle",
   };
   await writeState(pid, state);
-  startBackgroundImport(pid, state, { full: true });
+  await importRevmanBookings(pid, { full: true });
   return {};
 }
 
@@ -192,19 +200,47 @@ const MAX_PAGES = 500; // 50k bookings per run — runaway guard, logged when hi
 // painfully slow on real properties (1,868 bookings = 1,868 round-trips) and
 // close to the limit.
 const BATCH_STMTS = 90;
+// Pages processed per invocation. Background work started from a request is
+// time-capped in production (~30s after the response), which killed large
+// imports mid-run — a property "finished" at whatever page the cap hit and a
+// restart began from page 1, so big properties could never complete. Each
+// invocation now processes a small chunk, persists the cursor, and chains the
+// next invocation (signed self-fetch, with the admin page's poll as backup).
+const CHUNK_PAGES = 5;
+/** Another chunk runner is considered active while its heartbeat is fresher
+ *  than this — page heartbeats land every ~1-2s, so 12s ≈ dead chain. */
+const CHUNK_ACTIVE_MS = 12_000;
 
-async function runImport(pid: string, state: RevmanState, opts: { full: boolean }): Promise<number> {
+async function completeImport(pid: string, state: RevmanState, cursor: NonNullable<RevmanState["cursor"]>): Promise<void> {
+  await writeState(pid, {
+    ...state,
+    importStatus: "idle",
+    error: undefined,
+    lastImportAt: cursor.startedAt,
+    lastImportCount: cursor.imported,
+    progressCount: undefined,
+    progressAt: undefined,
+    cursor: undefined,
+  });
+  // Freeze today's total-demand picture (online + inferred offline) right
+  // after the books changed — the daily snapshots are what let pace be
+  // reconstructed for offline bookings we never see.
+  try {
+    const { snapshotDemand } = await import("./revman-analytics.server");
+    await snapshotDemand(pid, new Date().toISOString().slice(0, 10), state.roomCount);
+  } catch (err) {
+    console.log(`[revman] demand snapshot failed for ${pid}: ${err}`);
+  }
+}
+
+/** Process up to CHUNK_PAGES pages from the persisted cursor. Returns whether
+ *  the import finished, has more to do, or wasn't running at all. */
+async function runImportChunk(pid: string): Promise<"done" | "more" | "idle"> {
   await ensureSchema();
+  let state = await readState(pid);
+  if (!state || state.importStatus !== "running" || !state.cursor) return "idle";
   const apiKey = await decryptApiKey(state);
-  const startedAt = new Date().toISOString();
-  // Incremental: everything whose latest revision landed after the previous
-  // import (minus a day of overlap for clock skew; upserts make replays free).
-  const since =
-    !opts.full && state.lastImportAt
-      ? new Date(Date.parse(state.lastImportAt) - 86_400_000).toISOString()
-      : undefined;
 
-  let imported = 0;
   let pending: D1PreparedStatement[] = [];
   const flush = async () => {
     if (pending.length === 0) return;
@@ -214,8 +250,19 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
   };
 
   try {
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const { bookings, pageSize } = await getChannexBookingsPage(apiKey, state.channexPropertyId, page, since);
+    for (let i = 0; i < CHUNK_PAGES; i++) {
+      const cursor: NonNullable<RevmanState["cursor"]> = state.cursor!;
+      if (cursor.page > MAX_PAGES) {
+        console.log(`[revman] ${pid}: hit the ${MAX_PAGES}-page import guard, stopping early`);
+        await completeImport(pid, state, cursor);
+        return "done";
+      }
+      const { bookings, pageSize } = await getChannexBookingsPage(
+        apiKey,
+        state.channexPropertyId,
+        cursor.page,
+        cursor.since,
+      );
       for (const b of bookings) {
         const { bookingDate, isCancelled, rows } = bookingToNights(b);
         // Delete-then-insert stays ordered within the accumulated batch.
@@ -237,7 +284,7 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
                 r.rateMinor,
                 b.currency ?? null,
                 bookingDate,
-                isCancelled ? startedAt.slice(0, 10) : null,
+                isCancelled ? cursor.startedAt.slice(0, 10) : null,
                 isCancelled,
                 r.leadTime,
                 r.los,
@@ -248,16 +295,28 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
           );
         }
         if (pending.length >= BATCH_STMTS) await flush();
-        imported++;
       }
-      // Heartbeat once per page so the admin page can show progress and a
-      // dead run is detectable.
-      state = { ...state, progressCount: imported, progressAt: new Date().toISOString() };
+      // Commit the page's rows BEFORE persisting the cursor past it, so a
+      // killed invocation never skips uncommitted bookings on resume.
+      await flush();
+      const advanced: NonNullable<RevmanState["cursor"]> = {
+        ...cursor,
+        page: cursor.page + 1,
+        imported: cursor.imported + bookings.length,
+      };
+      if (pageSize < 100) {
+        await completeImport(pid, state, advanced);
+        return "done";
+      }
+      state = {
+        ...state,
+        progressCount: advanced.imported,
+        progressAt: new Date().toISOString(),
+        cursor: advanced,
+      };
       await writeState(pid, state);
-      if (page === MAX_PAGES) console.log(`[revman] ${pid}: hit the ${MAX_PAGES}-page import guard, stopping early`);
-      if (pageSize < 100) break;
     }
-    await flush();
+    return "more";
   } catch (err) {
     await writeState(pid, {
       ...state,
@@ -265,36 +324,27 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
       error: err instanceof Error ? err.message : "Import failed.",
       progressCount: undefined,
       progressAt: undefined,
+      cursor: undefined,
     });
     throw err;
   }
-  await writeState(pid, {
-    ...state,
-    importStatus: "idle",
-    error: undefined,
-    lastImportAt: startedAt,
-    lastImportCount: imported,
-    progressCount: undefined,
-    progressAt: undefined,
-  });
-  // Freeze today's total-demand picture (online + inferred offline) right
-  // after the books changed — the daily snapshots are what let pace be
-  // reconstructed for offline bookings we never see.
-  try {
-    const { snapshotDemand } = await import("./revman-analytics.server");
-    await snapshotDemand(pid, new Date().toISOString().slice(0, 10), state.roomCount);
-  } catch (err) {
-    console.log(`[revman] demand snapshot failed for ${pid}: ${err}`);
-  }
-  return imported;
 }
 
-/** Kick an import without blocking the current request; kept alive past the
- *  response via waitUntil (floating promise outside a request context). */
-function startBackgroundImport(pid: string, state: RevmanState, opts: { full: boolean }): void {
-  const work = runImport(pid, state, opts).catch((err) => {
-    console.log(`[revman] import failed for ${pid}: ${err}`);
-  });
+/** Fire-and-forget request to our own /api/revman-continue so the NEXT chunk
+ *  runs in a fresh invocation with fresh limits. Signed with the session
+ *  secret; if the self-fetch can't get through (misconfigured APP_URL), the
+ *  admin page's 4s poll drives continuation instead. */
+function kickContinuation(pid: string): void {
+  const work = (async () => {
+    const { hmacSha256Hex } = await import("./hmac.server");
+    const sig = await hmacSha256Hex(getConfig().sessionSecret, `revman-continue:${pid}`);
+    const base = getConfig().appUrl.replace(/\/+$/, "");
+    await fetch(`${base}/api/revman-continue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pid, sig }),
+    });
+  })().catch((err) => console.log(`[revman] continuation kick failed for ${pid}: ${err}`));
   try {
     waitUntil(work);
   } catch {
@@ -302,23 +352,70 @@ function startBackgroundImport(pid: string, state: RevmanState, opts: { full: bo
   }
 }
 
-/** Admin-triggered refresh: starts a background import and returns right away.
- *  `full` re-pulls the whole history (drift recovery); otherwise only revisions
- *  since the last import. Refuses only while a run is genuinely alive. */
+/** Run one chunk of a pending import and chain the next. `onlyIfStale` is the
+ *  drive-by mode used by the admin page's poll: it skips when another chunk
+ *  runner looks alive, so polls don't duplicate the self-fetch chain. */
+export async function continueRevmanImport(pid: string, opts: { onlyIfStale?: boolean } = {}): Promise<void> {
+  const state = await readState(pid);
+  if (!state || state.importStatus !== "running" || !state.cursor) return;
+  if (opts.onlyIfStale && state.progressAt && Date.now() - Date.parse(state.progressAt) < CHUNK_ACTIVE_MS) return;
+  const result = await runImportChunk(pid).catch((err) => {
+    console.log(`[revman] import chunk failed for ${pid}: ${err}`);
+    return "idle" as const;
+  });
+  if (result === "more") kickContinuation(pid);
+}
+
+/** Drive-by nudge from the admin page's poll: fire-and-forget, skips when a
+ *  chunk runner is already alive. Keeps the chain moving even if the signed
+ *  self-fetch can't reach the Worker (misconfigured APP_URL). */
+export function nudgeRevmanImport(pid: string): void {
+  const work = continueRevmanImport(pid, { onlyIfStale: true }).catch(() => {});
+  try {
+    waitUntil(work);
+  } catch {
+    void work;
+  }
+}
+
+/** Start (or resume) an import and return right away; chunks run across
+ *  follow-up invocations. `full` re-pulls the whole history (drift recovery);
+ *  otherwise only revisions since the last import. Refuses while a run is
+ *  genuinely alive; a stalled run RESUMES from its cursor instead of starting
+ *  over — that's what lets very large properties finish. */
 export async function importRevmanBookings(pid: string, opts: { full: boolean }): Promise<void> {
   const state = await readState(pid);
   if (!state) throw new Error("Revenue management is not connected.");
   if (state.importStatus === "running" && !importLooksStalled(state)) {
     throw new Error("An import is already running.");
   }
+  const resume = state.cursor !== undefined && importLooksStalled(state);
+  const cursor: NonNullable<RevmanState["cursor"]> = resume
+    ? state.cursor!
+    : {
+        full: opts.full,
+        since:
+          !opts.full && state.lastImportAt
+            ? new Date(Date.parse(state.lastImportAt) - 86_400_000).toISOString()
+            : undefined,
+        page: 1,
+        imported: 0,
+        startedAt: new Date().toISOString(),
+      };
   const next: RevmanState = {
     ...state,
     importStatus: "running",
-    progressCount: 0,
+    progressCount: cursor.imported,
     progressAt: new Date().toISOString(),
+    cursor,
   };
   await writeState(pid, next);
-  startBackgroundImport(pid, next, opts);
+  const work = continueRevmanImport(pid).catch((err) => console.log(`[revman] import failed for ${pid}: ${err}`));
+  try {
+    waitUntil(work);
+  } catch {
+    void work;
+  }
 }
 
 /** Cron: incremental import for every connected property; each successful
@@ -335,7 +432,9 @@ export async function scheduledRevmanImport(): Promise<void> {
       try {
         const state = await readState(pid);
         if (!state) continue;
-        await runImport(pid, state, { full: false });
+        // Starts (or resumes) a chunked import; the chain of self-invocations
+        // does the actual work. Throws when a run is already alive — fine.
+        await importRevmanBookings(pid, { full: false });
       } catch (err) {
         console.log(`[cron] revman import failed for ${pid}: ${err}`);
       }
