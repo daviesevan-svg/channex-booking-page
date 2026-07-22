@@ -2,8 +2,8 @@
 // account (personal user-api-key); we import the property's full booking
 // history (all channels, incl. OTAs) into the per-night D1 store and keep it
 // fresh via cron. The analytics dashboards build on top of this data.
-import { useState } from "react";
-import { Form, Link, useNavigation } from "react-router";
+import { useEffect, useState } from "react";
+import { Form, Link, useNavigation, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/revenue";
 import { FIELD_INPUT } from "~/components/admin-form";
@@ -24,6 +24,7 @@ import {
 } from "~/lib/revman-analytics.server";
 import type { SalesScore } from "~/lib/revman-pace";
 import { guardsReady } from "~/lib/revman-price";
+import { importLooksStalled } from "~/lib/revman";
 import {
   connectRevman,
   disconnectRevman,
@@ -62,7 +63,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const suggestions =
     state && hasData ? await getPriceSuggestions(pid, today, state.roomCount, guards) : undefined;
 
-  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast, suggestions };
+  const stalled = state ? importLooksStalled(state) : false;
+
+  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast, suggestions, stalled };
 }
 
 export function meta() {
@@ -86,8 +89,8 @@ export async function action({ request }: Route.ActionArgs) {
       return { okKey: "revConnected" as const };
     }
     if (intent === "refresh" || intent === "refreshFull") {
-      const imported = await importRevmanBookings(pid, { full: intent === "refreshFull" });
-      return { okKey: "revRefreshed" as const, imported };
+      await importRevmanBookings(pid, { full: intent === "refreshFull" });
+      return { okKey: "revImportStarted" as const };
     }
     if (intent === "priceGuards") {
       const min = Number(form.get("minPrice"));
@@ -392,6 +395,18 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
   const { state, summary, kpis, paceDays, paceMonth, forecast, suggestions } = loaderData;
   const forecastByDate = new Map((forecast ?? []).map((f) => [f.date, f]));
   const ready = state ? guardsReady(state) : false;
+  const importing = state?.importStatus === "running" && !loaderData.stalled;
+
+  // While an import runs in the background, re-fetch every few seconds so the
+  // progress line and (eventually) the dashboard fill in without a manual reload.
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    if (!importing) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [importing, revalidator]);
   const pick = actionData && "pick" in actionData && actionData.pick ? { pick: actionData.pick, apiKey: actionData.apiKey } : undefined;
   const money = (minor: number, currency?: string) => formatMoney(minor / 100, currency ?? "EUR");
 
@@ -412,14 +427,12 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
       )}
       {actionData && "okKey" in actionData && actionData.okKey && (
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
-          {actionData.okKey === "revRefreshed"
-            ? t("revRefreshed", { count: String(actionData.imported ?? 0) })
-            : actionData.okKey === "revSugApplied" && "applied" in actionData && actionData.applied
-              ? t("revSugApplied", {
-                  dates: String(actionData.applied.dates),
-                  cells: String(actionData.applied.cells),
-                })
-              : t(actionData.okKey)}
+          {actionData.okKey === "revSugApplied" && "applied" in actionData && actionData.applied
+            ? t("revSugApplied", {
+                dates: String(actionData.applied.dates),
+                cells: String(actionData.applied.cells),
+              })
+            : t(actionData.okKey)}
         </p>
       )}
 
@@ -474,6 +487,17 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
         </section>
       ) : (
         <>
+          {importing && (
+            <div className="mb-4 flex items-center gap-3 rounded-[10px] border border-line-alt bg-surface px-4 py-3 text-[13.5px] text-secondary">
+              <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              {t("revImportProgress", { count: String(state.progressCount ?? 0) })}
+            </div>
+          )}
+          {loaderData.stalled && (
+            <p className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">
+              {t("revImportStalled")}
+            </p>
+          )}
           {kpis ? (
             <>
               <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("revTodayTitle")}</h2>
@@ -704,17 +728,17 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                 <input type="hidden" name="intent" value="refresh" />
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || importing}
                   className="rounded-[10px] bg-accent px-4 py-2 text-[13.5px] font-semibold text-white disabled:opacity-60"
                 >
-                  {busyIntent === "refresh" ? t("revImporting") : t("revRefreshCta")}
+                  {busyIntent === "refresh" || importing ? t("revImporting") : t("revRefreshCta")}
                 </button>
               </Form>
               <Form method="post">
                 <input type="hidden" name="intent" value="refreshFull" />
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || importing}
                   className="rounded-[10px] border border-line-alt px-4 py-2 text-[13.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-60"
                 >
                   {busyIntent === "refreshFull" ? t("revImporting") : t("revRefreshFullCta")}

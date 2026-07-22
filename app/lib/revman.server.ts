@@ -7,9 +7,11 @@
 // re-imports new/changed bookings. Every imported booking room is exploded into
 // one `rev_night` row per stay night; that per-night table is what all the
 // analytics (KPIs, pace, forecast) query.
+import { waitUntil } from "cloudflare:workers";
+
 import { getConfig, getConfigKV, getDB } from "./config.server";
 import { getChannexBookingsPage, getChannexRoomCount, listChannexProperties } from "./channex/pms.server";
-import { bookingToNights } from "./revman";
+import { bookingToNights, importLooksStalled } from "./revman";
 
 function db(): D1Database {
   const d = getDB();
@@ -62,6 +64,10 @@ export interface RevmanState {
   lastImportCount?: number;
   importStatus: "idle" | "running" | "error";
   error?: string;
+  /** Heartbeat while an import runs: bookings processed so far + timestamp.
+   *  A "running" status with a stale heartbeat means the run died. */
+  progressCount?: number;
+  progressAt?: string;
   /** Safety rails for price suggestions (major units); Apply needs both. */
   minPrice?: number;
   maxPrice?: number;
@@ -166,13 +172,20 @@ export async function connectRevman(
     roomCount: Math.max(1, roomCount),
     connectedAt: new Date().toISOString(),
     importStatus: "running",
+    progressCount: 0,
+    progressAt: new Date().toISOString(),
   };
   await writeState(pid, state);
-  await runImport(pid, state, { full: true });
+  startBackgroundImport(pid, state, { full: true });
   return {};
 }
 
 const MAX_PAGES = 500; // 50k bookings per run — runaway guard, logged when hit
+// One D1 batch per ~90 statements, NOT per booking: a Worker invocation allows
+// ~1,000 subrequests and every batch counts as one — per-booking batching was
+// painfully slow on real properties (1,868 bookings = 1,868 round-trips) and
+// close to the limit.
+const BATCH_STMTS = 90;
 
 async function runImport(pid: string, state: RevmanState, opts: { full: boolean }): Promise<number> {
   await ensureSchema();
@@ -186,14 +199,23 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
       : undefined;
 
   let imported = 0;
+  let pending: D1PreparedStatement[] = [];
+  const flush = async () => {
+    if (pending.length === 0) return;
+    const stmts = pending;
+    pending = [];
+    await db().batch(stmts);
+  };
+
   try {
     for (let page = 1; page <= MAX_PAGES; page++) {
       const { bookings, pageSize } = await getChannexBookingsPage(apiKey, state.channexPropertyId, page, since);
       for (const b of bookings) {
         const { bookingDate, isCancelled, rows } = bookingToNights(b);
-        const stmts = [db().prepare(`DELETE FROM rev_night WHERE pid = ? AND booking_id = ?`).bind(pid, b.id)];
+        // Delete-then-insert stays ordered within the accumulated batch.
+        pending.push(db().prepare(`DELETE FROM rev_night WHERE pid = ? AND booking_id = ?`).bind(pid, b.id));
         for (const r of rows) {
-          stmts.push(
+          pending.push(
             db()
               .prepare(
                 `INSERT INTO rev_night
@@ -219,17 +241,24 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
               ),
           );
         }
-        await db().batch(stmts);
+        if (pending.length >= BATCH_STMTS) await flush();
         imported++;
       }
+      // Heartbeat once per page so the admin page can show progress and a
+      // dead run is detectable.
+      state = { ...state, progressCount: imported, progressAt: new Date().toISOString() };
+      await writeState(pid, state);
       if (page === MAX_PAGES) console.log(`[revman] ${pid}: hit the ${MAX_PAGES}-page import guard, stopping early`);
       if (pageSize < 100) break;
     }
+    await flush();
   } catch (err) {
     await writeState(pid, {
       ...state,
       importStatus: "error",
       error: err instanceof Error ? err.message : "Import failed.",
+      progressCount: undefined,
+      progressAt: undefined,
     });
     throw err;
   }
@@ -239,17 +268,42 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
     error: undefined,
     lastImportAt: startedAt,
     lastImportCount: imported,
+    progressCount: undefined,
+    progressAt: undefined,
   });
   return imported;
 }
 
-/** Admin-triggered refresh. `full` re-pulls the whole history (drift recovery);
- *  otherwise only revisions since the last import. */
-export async function importRevmanBookings(pid: string, opts: { full: boolean }): Promise<number> {
+/** Kick an import without blocking the current request; kept alive past the
+ *  response via waitUntil (floating promise outside a request context). */
+function startBackgroundImport(pid: string, state: RevmanState, opts: { full: boolean }): void {
+  const work = runImport(pid, state, opts).catch((err) => {
+    console.log(`[revman] import failed for ${pid}: ${err}`);
+  });
+  try {
+    waitUntil(work);
+  } catch {
+    void work;
+  }
+}
+
+/** Admin-triggered refresh: starts a background import and returns right away.
+ *  `full` re-pulls the whole history (drift recovery); otherwise only revisions
+ *  since the last import. Refuses only while a run is genuinely alive. */
+export async function importRevmanBookings(pid: string, opts: { full: boolean }): Promise<void> {
   const state = await readState(pid);
   if (!state) throw new Error("Revenue management is not connected.");
-  await writeState(pid, { ...state, importStatus: "running" });
-  return runImport(pid, state, opts);
+  if (state.importStatus === "running" && !importLooksStalled(state)) {
+    throw new Error("An import is already running.");
+  }
+  const next: RevmanState = {
+    ...state,
+    importStatus: "running",
+    progressCount: 0,
+    progressAt: new Date().toISOString(),
+  };
+  await writeState(pid, next);
+  startBackgroundImport(pid, next, opts);
 }
 
 /** Cron: incremental import for every connected property. Failures are
