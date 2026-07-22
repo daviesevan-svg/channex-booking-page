@@ -30,8 +30,10 @@ export interface ForecastDay {
   /** Forecast occupancy % before the on-the-books floor was applied. */
   rawPercent: number;
   forecast: number;
-  /** Active nights already on the books for the date. */
+  /** Active ONLINE nights already on the books for the date. */
   onBooks: number;
+  /** Inferred offline nights on the books (0 when not inferable). */
+  offlineOnBooks: number;
 }
 
 const COEF = {
@@ -82,12 +84,16 @@ function trailingMean(series: number[], i: number, n: number): number {
 }
 
 /** Occupancy forecast for every date in [startDate, endDate]. `nights` should
- *  cover ~2 years before startDate for the long features to be meaningful. */
+ *  cover ~2 years before startDate for the long features to be meaningful.
+ *  `offlineOnBooks` (inferred offline nights per date) does NOT feed the
+ *  regression — the coefficients were trained on booking data — it only lifts
+ *  the on-the-books floor so the forecast never sits below TOTAL demand. */
 export function buildForecast(
   nights: ForecastNight[],
   startDate: string,
   endDate: string,
   roomCount: number,
+  offlineOnBooks?: Record<string, number>,
 ): ForecastDay[] {
   const rooms = Math.max(1, roomCount);
 
@@ -173,14 +179,18 @@ export function buildForecast(
       COEF.pickup7Share * (pickup7 / (pickup30 + 1e-6));
 
     const rawPercent = clip01(Math.round(raw * 10000) / 10000);
-    // Never forecast below what's already on the books.
-    const forecastPercent = Math.max(f.occ, rawPercent);
+    // Never forecast below what's already on the books — online AND inferred
+    // offline together.
+    const offline = offlineOnBooks?.[d] ?? 0;
+    const totalOcc = clip01((f.active + offline) / rooms);
+    const forecastPercent = Math.max(totalOcc, rawPercent);
     out.push({
       date: d,
       rawPercent,
       forecastPercent: Math.round(forecastPercent * 10000) / 10000,
       forecast: Math.round(forecastPercent * rooms),
       onBooks: f.active,
+      offlineOnBooks: offline,
     });
   }
   return out;

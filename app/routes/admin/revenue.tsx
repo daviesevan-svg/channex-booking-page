@@ -329,21 +329,32 @@ function OccupancyChart({
   roomCount,
   today,
   forecastLabel,
+  offlineLabel,
 }: {
-  days: { date: string; nights: number; forecast?: number }[];
+  days: { date: string; nights: number; forecast?: number; offline?: number }[];
   roomCount: number;
   today: string;
   forecastLabel: string;
+  offlineLabel: string;
 }) {
   const cap = Math.max(1, roomCount);
   return (
     <div className="flex h-[160px] gap-[3px]">
       {days.map((d) => {
         const h = Math.min(1, d.nights / cap);
+        const offline = d.offline ?? 0;
+        const hTotal = Math.min(1, (d.nights + offline) / cap);
         const past = d.date < today;
         const fc = d.forecast === undefined ? undefined : Math.min(1, d.forecast / cap);
         return (
           <div key={d.date} className="group relative flex-1">
+            {/* Inferred offline demand stacked under the online bar (lighter). */}
+            {offline > 0 && !past && (
+              <div
+                className="absolute bottom-0 w-full rounded-t-[3px] bg-accent/35"
+                style={{ height: `${Math.max(2, hTotal * 152)}px` }}
+              />
+            )}
             <div
               className={`absolute bottom-0 w-full rounded-t-[3px] ${past ? "bg-chip-border" : "bg-accent"} ${d.date === today ? "ring-2 ring-accent/40" : ""}`}
               style={{ height: `${Math.max(2, h * 152)}px` }}
@@ -356,6 +367,12 @@ function OccupancyChart({
             )}
             <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-secondary shadow-sm group-hover:block">
               {d.date.slice(8)}.{d.date.slice(5, 7)} · {d.nights}/{cap} · {pctText(d.nights / cap)}
+              {offline > 0 && !past && (
+                <>
+                  <br />
+                  {offlineLabel}: {offline} · {pctText((d.nights + offline) / cap)}
+                </>
+              )}
               {d.forecast !== undefined && !past && (
                 <>
                   <br />
@@ -531,17 +548,23 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                   days={(() => {
                     const byDate = new Map(kpis.monthOccupancy.map((r) => [r.date, r.nights]));
                     const monthFrom = `${loaderData.today.slice(0, 8)}01`;
-                    const out: { date: string; nights: number; forecast?: number }[] = [];
+                    const out: { date: string; nights: number; forecast?: number; offline?: number }[] = [];
                     for (let i = 0; i < 31; i++) {
                       const iso = new Date(Date.parse(`${monthFrom}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10);
                       if (iso.slice(0, 7) !== loaderData.today.slice(0, 7)) break;
-                      out.push({ date: iso, nights: byDate.get(iso) ?? 0, forecast: forecastByDate.get(iso)?.forecast });
+                      out.push({
+                        date: iso,
+                        nights: byDate.get(iso) ?? 0,
+                        forecast: forecastByDate.get(iso)?.forecast,
+                        offline: forecastByDate.get(iso)?.offlineOnBooks,
+                      });
                     }
                     return out;
                   })()}
                   roomCount={state.roomCount}
                   today={loaderData.today}
                   forecastLabel={t("revForecast")}
+                  offlineLabel={t("revOffline")}
                 />
               </section>
 
@@ -552,11 +575,15 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                   <OccupancyChart
                     days={forecast
                       .filter((f) => f.date >= loaderData.today)
-                      .map((f) => ({ date: f.date, nights: f.onBooks, forecast: f.forecast }))}
+                      .map((f) => ({ date: f.date, nights: f.onBooks, forecast: f.forecast, offline: f.offlineOnBooks }))}
                     roomCount={state.roomCount}
                     today={loaderData.today}
                     forecastLabel={t("revForecast")}
+                    offlineLabel={t("revOffline")}
                   />
+                  {forecast.some((f) => f.offlineOnBooks > 0) && (
+                    <p className="mb-0 mt-3 text-[12px] text-faint">{t("revOfflineLegend")}</p>
+                  )}
                 </section>
               )}
 

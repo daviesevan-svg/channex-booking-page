@@ -165,6 +165,9 @@ const EN: Record<string, string> = {
   revSugNothing: "Nothing to apply — prices are already within the suggested levels.",
   revErrGuards: "Enter valid price guards (minimum above 0, maximum not below the minimum).",
   revForecast: "Forecast",
+  revOffline: "+ offline (inferred)",
+  revOfflineLegend:
+    "Lighter bar segments are offline/PMS bookings inferred from availability (rooms taken out of inventory that no online booking explains). Shown for occupancy only — revenue figures never include them.",
   revForecastLegend: "The dashed tick is the forecast occupancy for that date.",
   revForecastTitle: "Occupancy forecast — next 30 days",
   revForecastSub:
@@ -1680,6 +1683,9 @@ const DE: Record<string, string> = {
   revSugNothing: "Nichts anzuwenden — die Preise liegen bereits auf den empfohlenen Niveaus.",
   revErrGuards: "Geben Sie gültige Preis-Leitplanken ein (Minimum über 0, Maximum nicht unter dem Minimum).",
   revForecast: "Prognose",
+  revOffline: "+ offline (abgeleitet)",
+  revOfflineLegend:
+    "Hellere Balkenabschnitte sind Offline-/PMS-Buchungen, abgeleitet aus der Verfügbarkeit (aus dem Bestand genommene Zimmer, die keine Online-Buchung erklärt). Nur für die Auslastung — Umsatzzahlen enthalten sie nie.",
   revForecastLegend: "Der gestrichelte Strich ist die prognostizierte Auslastung für das Datum.",
   revForecastTitle: "Auslastungsprognose — nächste 30 Tage",
   revForecastSub:

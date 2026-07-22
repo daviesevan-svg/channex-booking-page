@@ -170,13 +170,16 @@ export async function getForecast(
   to: string,
   roomCount: number,
 ): Promise<ForecastDay[]> {
-  const rows = await db()
-    .prepare(
-      `SELECT stay_date, is_cancelled, rate_minor, lead_time FROM rev_night
-       WHERE pid = ? AND stay_date >= ? AND stay_date <= ?`,
-    )
-    .bind(pid, shiftISO(from, -730), to)
-    .all();
+  const [rows, inferred] = await Promise.all([
+    db()
+      .prepare(
+        `SELECT stay_date, is_cancelled, rate_minor, lead_time FROM rev_night
+         WHERE pid = ? AND stay_date >= ? AND stay_date <= ?`,
+      )
+      .bind(pid, shiftISO(from, -730), to)
+      .all(),
+    getInferredDemand(pid, from, to, roomCount),
+  ]);
   const nights = (rows.results as { stay_date: string; is_cancelled: number; rate_minor: number; lead_time: number }[]).map(
     (r) => ({
       stayDate: r.stay_date,
@@ -185,7 +188,131 @@ export async function getForecast(
       leadTime: Number(r.lead_time),
     }),
   );
-  return buildForecast(nights, from, to, roomCount);
+  const offlineByDate = Object.fromEntries(
+    inferred.filter((d) => d.offline !== undefined && d.offline > 0).map((d) => [d.date, d.offline as number]),
+  );
+  return buildForecast(nights, from, to, roomCount, offlineByDate);
+}
+
+// ---------------------------------------------------------------------------
+// Inferred offline demand
+//
+// Channex only carries ONLINE bookings — walk-ins, phone and PMS-direct
+// bookings never appear. But they consume inventory, and Channex pushes us the
+// property's availability. So for any future date:
+//
+//   offline nights on the books = capacity − available − online on the books
+//
+// This is net inventory consumption: rooms blocked for maintenance or manual
+// inventory cuts read as offline demand too, which is why the UI shows the
+// inferred series visibly separate and revenue metrics never use it. Dates
+// with no availability data (not pushed / past dates, which are pruned) get
+// `offline: undefined` rather than a bogus number.
+
+export interface InferredDemandDay {
+  date: string;
+  capacity: number;
+  /** Units still open across all rooms; undefined when no availability data. */
+  available?: number;
+  online: number;
+  /** Inferred offline on-the-books nights; undefined when not inferable. */
+  offline?: number;
+}
+
+export async function getInferredDemand(
+  pid: string,
+  from: string,
+  to: string,
+  roomCount: number,
+): Promise<InferredDemandDay[]> {
+  const capacity = Math.max(1, roomCount);
+  const [avail, online] = await db().batch([
+    db()
+      .prepare(
+        `SELECT date, SUM(avail) AS avail FROM availability
+         WHERE hotel_code = ? AND date >= ? AND date <= ? GROUP BY date`,
+      )
+      .bind(pid, from, to),
+    db()
+      .prepare(
+        `SELECT stay_date AS date, COUNT(*) AS nights FROM rev_night
+         WHERE pid = ? AND is_cancelled = 0 AND stay_date >= ? AND stay_date <= ?
+         GROUP BY stay_date`,
+      )
+      .bind(pid, from, to),
+  ]);
+  const availByDate = new Map(
+    (avail.results as { date: string; avail: number }[]).map((r) => [r.date, Number(r.avail)]),
+  );
+  const onlineByDate = new Map(
+    (online.results as { date: string; nights: number }[]).map((r) => [r.date, Number(r.nights)]),
+  );
+
+  const out: InferredDemandDay[] = [];
+  for (let d = from; d <= to; d = shiftISO(d, 1)) {
+    const available = availByDate.get(d);
+    const onlineNights = onlineByDate.get(d) ?? 0;
+    out.push({
+      date: d,
+      capacity,
+      available,
+      online: onlineNights,
+      offline: available === undefined ? undefined : Math.max(0, capacity - available - onlineNights),
+    });
+  }
+  return out;
+}
+
+/** Daily snapshot of the inferred demand for the next year. Each row freezes
+ *  what was on the books (online + inferred offline) for a stay date as seen
+ *  on `snap_date` — over time this builds lead-time curves for TOTAL demand,
+ *  reconstructing pace for the offline bookings we never see. */
+export const SNAPSHOT_HORIZON_DAYS = 365;
+
+let snapshotSchemaReady = false;
+async function ensureSnapshotSchema(): Promise<void> {
+  if (snapshotSchemaReady) return;
+  await db().batch([
+    db().prepare(
+      `CREATE TABLE IF NOT EXISTS rev_demand_snapshot (
+        pid TEXT NOT NULL,
+        snap_date TEXT NOT NULL,
+        stay_date TEXT NOT NULL,
+        capacity INTEGER NOT NULL,
+        available INTEGER,
+        online INTEGER NOT NULL,
+        offline INTEGER,
+        PRIMARY KEY (pid, snap_date, stay_date)
+      )`,
+    ),
+    db().prepare(
+      `CREATE INDEX IF NOT EXISTS rev_demand_snapshot_stay ON rev_demand_snapshot (pid, stay_date, snap_date)`,
+    ),
+  ]);
+  snapshotSchemaReady = true;
+}
+
+/** Upserts today's snapshot (the cron fires several times a day; the last
+ *  write of the day wins) and prunes snapshots older than ~2 years. */
+export async function snapshotDemand(pid: string, todayISO: string, roomCount: number): Promise<number> {
+  await ensureSnapshotSchema();
+  const days = await getInferredDemand(pid, todayISO, shiftISO(todayISO, SNAPSHOT_HORIZON_DAYS - 1), roomCount);
+  const rows = days.filter((d) => d.available !== undefined);
+  const stmt = db().prepare(
+    `INSERT INTO rev_demand_snapshot (pid, snap_date, stay_date, capacity, available, online, offline)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (pid, snap_date, stay_date) DO UPDATE SET
+       capacity = excluded.capacity, available = excluded.available,
+       online = excluded.online, offline = excluded.offline`,
+  );
+  const stmts = rows.map((d) =>
+    stmt.bind(pid, todayISO, d.date, d.capacity, d.available, d.online, d.offline ?? null),
+  );
+  stmts.push(
+    db().prepare(`DELETE FROM rev_demand_snapshot WHERE pid = ? AND snap_date < ?`).bind(pid, shiftISO(todayISO, -800)),
+  );
+  for (let i = 0; i < stmts.length; i += 90) await db().batch(stmts.slice(i, i + 90));
+  return rows.length;
 }
 
 // ---------------------------------------------------------------------------
