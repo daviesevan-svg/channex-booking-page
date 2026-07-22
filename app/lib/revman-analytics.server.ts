@@ -3,6 +3,7 @@
 // every metric returned with week-over-week and year-over-year deltas. YoY is
 // 364 days back (52 whole weeks) so weekdays stay aligned.
 import { getDB } from "./config.server";
+import { buildForecast, type ForecastDay } from "./revman-forecast";
 import { paceSnapshot, type PaceSnapshot } from "./revman-pace";
 
 function db(): D1Database {
@@ -156,6 +157,32 @@ export interface PaceDay extends PaceSnapshot {
   /** Active room nights on the books for the date (occupancy numerator). */
   occupancy: number;
   occupancyPct: number;
+}
+
+/** Occupancy forecast for [from, to], fed with two years of prior history so
+ *  the trailing/lag features have data. */
+export async function getForecast(
+  pid: string,
+  from: string,
+  to: string,
+  roomCount: number,
+): Promise<ForecastDay[]> {
+  const rows = await db()
+    .prepare(
+      `SELECT stay_date, is_cancelled, rate_minor, lead_time FROM rev_night
+       WHERE pid = ? AND stay_date >= ? AND stay_date <= ?`,
+    )
+    .bind(pid, shiftISO(from, -730), to)
+    .all();
+  const nights = (rows.results as { stay_date: string; is_cancelled: number; rate_minor: number; lead_time: number }[]).map(
+    (r) => ({
+      stayDate: r.stay_date,
+      isCancelled: (r.is_cancelled ? 1 : 0) as 0 | 1,
+      rateMajor: Number(r.rate_minor) / 100,
+      leadTime: Number(r.lead_time),
+    }),
+  );
+  return buildForecast(nights, from, to, roomCount);
 }
 
 function leadTimeStmt(pid: string, from: string, to: string, bookedBy: string) {

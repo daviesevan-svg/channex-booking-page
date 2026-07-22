@@ -143,6 +143,11 @@ const EN: Record<string, string> = {
   revNoDataYet: "No booking data yet — run an import above, or wait for the first bookings to arrive.",
   revImportedLabel: "Imported",
   revImportedSummary: "{nights} nights from {bookings} bookings ({cancelled} cancelled)",
+  revForecast: "Forecast",
+  revForecastLegend: "The dashed tick is the forecast occupancy for that date.",
+  revForecastTitle: "Occupancy forecast — next 30 days",
+  revForecastSub:
+    "Solid bars are nights already on the books; the dashed tick is where the model expects the date to end up, based on your booking pace, weekday patterns and recent trend. It never predicts below what's already booked.",
   revPaceTitle: "Sales pace",
   revPaceSub:
     "How each date is selling compared to the same point last year. Close to arrival the score follows recent pickup; further out it follows cumulative demand.",
@@ -1631,6 +1636,11 @@ const DE: Record<string, string> = {
   revNoDataYet: "Noch keine Buchungsdaten — starten Sie oben einen Import oder warten Sie auf die ersten Buchungen.",
   revImportedLabel: "Importiert",
   revImportedSummary: "{nights} Nächte aus {bookings} Buchungen ({cancelled} storniert)",
+  revForecast: "Prognose",
+  revForecastLegend: "Der gestrichelte Strich ist die prognostizierte Auslastung für das Datum.",
+  revForecastTitle: "Auslastungsprognose — nächste 30 Tage",
+  revForecastSub:
+    "Volle Balken sind bereits gebuchte Nächte; der gestrichelte Strich zeigt, wo das Modell das Datum am Ende erwartet — auf Basis Ihres Buchungstempos, der Wochentagsmuster und des jüngsten Trends. Es prognostiziert nie weniger als bereits gebucht ist.",
   revPaceTitle: "Verkaufstempo",
   revPaceSub:
     "Wie sich jedes Datum im Vergleich zum selben Zeitpunkt des Vorjahres verkauft. Kurz vor Anreise zählt der jüngste Zulauf, weiter im Voraus die aufgelaufene Nachfrage.",
