@@ -136,11 +136,17 @@ export async function setRevmanPriceGuards(pid: string, minPrice: number, maxPri
   await writeState(pid, { ...s, minPrice, maxPrice });
 }
 
-/** Removes the stored key and every imported night for the property. */
+/** Removes the stored key, every imported night and all demand snapshots. */
 export async function disconnectRevman(pid: string): Promise<void> {
   await getConfigKV()?.delete(stateKey(pid));
   await ensureSchema();
   await db().prepare(`DELETE FROM rev_night WHERE pid = ?`).bind(pid).run();
+  // Snapshot table is created lazily by the cron — may not exist yet.
+  await db()
+    .prepare(`DELETE FROM rev_demand_snapshot WHERE pid = ?`)
+    .bind(pid)
+    .run()
+    .catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
@@ -271,6 +277,15 @@ async function runImport(pid: string, state: RevmanState, opts: { full: boolean 
     progressCount: undefined,
     progressAt: undefined,
   });
+  // Freeze today's total-demand picture (online + inferred offline) right
+  // after the books changed — the daily snapshots are what let pace be
+  // reconstructed for offline bookings we never see.
+  try {
+    const { snapshotDemand } = await import("./revman-analytics.server");
+    await snapshotDemand(pid, new Date().toISOString().slice(0, 10), state.roomCount);
+  } catch (err) {
+    console.log(`[revman] demand snapshot failed for ${pid}: ${err}`);
+  }
   return imported;
 }
 
@@ -306,7 +321,8 @@ export async function importRevmanBookings(pid: string, opts: { full: boolean })
   startBackgroundImport(pid, next, opts);
 }
 
-/** Cron: incremental import for every connected property. Failures are
+/** Cron: incremental import for every connected property; each successful
+ *  import also freezes the day's total-demand snapshot. Failures are
  *  per-property (logged + stored on the connection) and never abort the rest. */
 export async function scheduledRevmanImport(): Promise<void> {
   const kv = getConfigKV();
