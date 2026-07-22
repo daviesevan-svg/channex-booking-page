@@ -107,6 +107,96 @@ const num = (v: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+export interface ChannexBookingRoom {
+  checkinDate?: string;
+  checkoutDate?: string;
+  /** Per-night prices keyed by stay date ("2026-07-21" → "120.00"). The keys are
+   *  the authoritative stay dates. */
+  days: Record<string, string | number>;
+  amount?: string;
+  occupancy?: { adults?: number; children?: number; infants?: number };
+  roomTypeId?: string | null;
+  ratePlanId?: string | null;
+}
+
+export interface ChannexBooking {
+  id: string;
+  propertyId: string;
+  /** "new" | "modified" | "cancelled" */
+  status: string;
+  otaName?: string;
+  arrivalDate: string;
+  departureDate: string;
+  insertedAt?: string;
+  amount?: string;
+  currency?: string;
+  occupancy?: { adults?: number; children?: number; infants?: number };
+  rooms: ChannexBookingRoom[];
+}
+
+function parseBooking(r: JsonApiRecord): ChannexBooking | null {
+  const a = r.attributes ?? {};
+  const propertyId = str(a.propertyId);
+  const arrival = str(a.arrivalDate);
+  const departure = str(a.departureDate);
+  if (!propertyId || !arrival || !departure) return null;
+  const rooms = (Array.isArray(a.rooms) ? (a.rooms as Record<string, unknown>[]) : []).map((room) => ({
+    checkinDate: str(room.checkinDate),
+    checkoutDate: str(room.checkoutDate),
+    days: (room.days && typeof room.days === "object" ? room.days : {}) as Record<string, string | number>,
+    amount: str(room.amount),
+    occupancy: (room.occupancy ?? undefined) as ChannexBookingRoom["occupancy"],
+    roomTypeId: str(room.roomTypeId) ?? null,
+    ratePlanId: str(room.ratePlanId) ?? null,
+  }));
+  return {
+    id: r.id,
+    propertyId,
+    status: str(a.status) ?? "new",
+    otaName: str(a.otaName),
+    arrivalDate: arrival,
+    departureDate: departure,
+    insertedAt: str(a.insertedAt),
+    amount: str(a.amount),
+    currency: str(a.currency),
+    occupancy: (a.occupancy ?? undefined) as ChannexBooking["occupancy"],
+    rooms,
+  };
+}
+
+/** One page of the account's bookings (latest revision each), scoped to a
+ *  property. `filter[property_id]` is sent, but because its support on the list
+ *  endpoint isn't documented we also filter client-side — other properties'
+ *  bookings are dropped, never imported. `insertedAtGte` (ISO timestamp) makes
+ *  the fetch incremental: only bookings whose latest revision arrived at Channex
+ *  after that moment (covers modifications and cancellations too). */
+export async function getChannexBookingsPage(
+  apiKey: string,
+  propertyId: string,
+  page: number,
+  insertedAtGte?: string,
+): Promise<{ bookings: ChannexBooking[]; pageSize: number; total: number }> {
+  const params = new URLSearchParams();
+  params.set("filter[property_id]", propertyId);
+  if (insertedAtGte) params.set("filter[inserted_at][gte]", insertedAtGte);
+  params.set("pagination[page]", String(page));
+  params.set("pagination[limit]", "100");
+  const { data, meta } = await pmsFetch(`/bookings?${params}`, apiKey);
+  const total = typeof meta?.total === "number" ? meta.total : data.length;
+  return {
+    bookings: data.map(parseBooking).filter((b): b is ChannexBooking => b !== null && b.propertyId === propertyId),
+    pageSize: data.length,
+    total,
+  };
+}
+
+/** Total physical rooms of a property (sum of each room type's count), used as
+ *  the occupancy denominator in revenue analytics. */
+export async function getChannexRoomCount(apiKey: string, propertyId: string): Promise<number> {
+  const rows = await pmsGetAll(`/room_types?filter[property_id]=${encodeURIComponent(propertyId)}`, apiKey);
+  return rows.reduce((sum, r) => sum + (num((r.attributes ?? {}).countOfRooms) ?? 0), 0);
+}
+
 /** Every property the api key can see. */
 export async function listChannexProperties(apiKey: string): Promise<ChannexProperty[]> {
   const rows = await pmsGetAll("/properties", apiKey);

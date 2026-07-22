@@ -71,6 +71,7 @@ export default [
     route("inventory", "routes/admin/inventory.tsx"),
     route("reviews", "routes/admin/reviews.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
+    route("revenue", "routes/admin/revenue.tsx"),
     route("ari-log", "routes/admin/ari-log.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
