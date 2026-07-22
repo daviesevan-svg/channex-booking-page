@@ -10,6 +10,7 @@ import {
   getVisibleCollections,
 } from "~/lib/collections.server";
 import { getConfig } from "~/lib/config.server";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -48,19 +49,16 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const host = appUrl.replace(/^https?:\/\//, "");
+  const t = useAdminT();
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Collections</h1>
-      <p className="mb-6 max-w-[640px] text-[14px] text-muted">
-        A collection is a branded landing page that lists several of your properties on one map —
-        perfect for apartments or guesthouses in different locations. Guests pick dates, browse every
-        stay, and book direct. Each property keeps its own rooms, rates and booking flow.
-      </p>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("coTitle")}</h1>
+      <p className="mb-6 max-w-[640px] text-[14px] text-muted">{t("coIntro")}</p>
 
       {collections.length === 0 && (
         <div className="mb-7 rounded-[14px] border border-dashed border-line bg-surface px-5 py-6 text-[14px] text-muted">
-          You don’t have any collections yet. Create one below, then add your properties to it.
+          {t("coEmpty")}
         </div>
       )}
 
@@ -79,28 +77,29 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
                   {host}/c/{c.slug}
                 </div>
                 <div className="mt-0.5 text-[12px] text-muted">
-                  {c.propertyIds.length} propert{c.propertyIds.length === 1 ? "y" : "ies"}
+                  {t(c.propertyIds.length === 1 ? "coProperties_one" : "coProperties_other", {
+                    n: c.propertyIds.length,
+                  })}
                   {c.destination ? ` · ${c.destination}` : ""}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4 text-[13px] font-semibold">
                 <Link to={`/c/${c.slug}`} target="_blank" className="text-muted hover:text-accent">
-                  View ↗
+                  {t("coView")}
                 </Link>
                 <Link to={`/admin/collections/${c.slug}`} className="text-accent hover:underline">
-                  Edit
+                  {t("coEdit")}
                 </Link>
                 <Form
                   method="post"
                   onSubmit={(e) => {
-                    if (!confirm(`Delete “${c.name}”? The properties themselves are kept.`))
-                      e.preventDefault();
+                    if (!confirm(t("coDeleteConfirm", { name: c.name }))) e.preventDefault();
                   }}
                 >
                   <input type="hidden" name="intent" value="delete" />
                   <input type="hidden" name="slug" value={c.slug} />
                   <button type="submit" className="text-[#c0392b] hover:underline">
-                    Delete
+                    {t("coDelete")}
                   </button>
                 </Form>
               </div>
@@ -111,13 +110,12 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
 
       <Form method="post" className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
         <input type="hidden" name="intent" value="add" />
-        <h2 className="font-serif text-[18px] font-semibold">New collection</h2>
+        <h2 className="font-serif text-[18px] font-semibold">{t("coNewCollection")}</h2>
         <label className="block max-w-md text-[13px] font-semibold text-secondary">
-          Name
+          {t("coName")}
           <input name="name" placeholder="The Laurel Collection" className={FIELD_INPUT} />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            A link (e.g. {host}/c/the-laurel-collection) is generated automatically — you can change
-            it after.
+            {t("coNameHint", { host })}
           </span>
         </label>
         {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
@@ -127,7 +125,7 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Creating…" : "Create collection"}
+            {saving ? t("coCreating") : t("coCreate")}
           </button>
         </div>
       </Form>

@@ -3,6 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/promotions";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
@@ -141,32 +142,35 @@ export function meta() {
   return [{ title: "Admin · Promotions" }];
 }
 
-function discountSummary(p: Promotion, currency: string): string {
-  return p.type === "percent" ? `${p.value}% off` : `${formatMoney(p.value, currency)} off`;
+function discountSummary(p: Promotion, currency: string, t: AdminT): string {
+  return p.type === "percent"
+    ? t("pmPercentSummary", { value: p.value })
+    : t("pmFixedSummary", { value: formatMoney(p.value, currency) });
 }
 
 /** Human-readable list of an automatic offer's conditions. */
-function conditionSummary(c?: PromoConditions): string {
-  if (!c) return "Always on";
+function conditionSummary(t: AdminT, c?: PromoConditions): string {
+  if (!c) return t("pmAlwaysOn");
   const parts: string[] = [];
-  if (c.minDaysAhead != null) parts.push(`book ${c.minDaysAhead}+ days ahead`);
-  if (c.maxDaysAhead != null) parts.push(`book within ${c.maxDaysAhead} days`);
-  if (c.minNights != null) parts.push(`${c.minNights}+ nights`);
-  if (c.stayFrom || c.stayTo) parts.push(`stay ${c.stayFrom ?? "…"} → ${c.stayTo ?? "…"}`);
-  return parts.length ? parts.join(" · ") : "Always on";
+  if (c.minDaysAhead != null) parts.push(t("pmCondMinDays", { n: c.minDaysAhead }));
+  if (c.maxDaysAhead != null) parts.push(t("pmCondMaxDays", { n: c.maxDaysAhead }));
+  if (c.minNights != null) parts.push(t("pmCondMinNights", { n: c.minNights }));
+  if (c.stayFrom || c.stayTo) parts.push(t("pmCondStay", { from: c.stayFrom ?? "…", to: c.stayTo ?? "…" }));
+  return parts.length ? parts.join(" · ") : t("pmAlwaysOn");
 }
 
 export default function AdminPromotions({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const nav = useNavigation();
   const saving = nav.state === "submitting";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Promotions</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("pmTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to create
-          promotions.
+          {t("pmConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("pmConfigureSuffix")}
         </p>
       </div>
     );
@@ -188,11 +192,10 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Promotions</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("pmTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        Two kinds: a <strong>code</strong> guests type at checkout, or an <strong>automatic offer</strong>{" "}
-        that applies with no code when its rules match (e.g. an early-bird discount). Automatic
-        offers show their discounted price as guests browse.
+        {t("pmIntroBefore")} <strong>{t("pmIntroCode")}</strong> {t("pmIntroMid")}{" "}
+        <strong>{t("pmIntroAuto")}</strong> {t("pmIntroAfter")}
       </p>
 
       {!showForm && (
@@ -201,7 +204,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
             to="/admin/promotions?new=1"
             className="inline-block rounded-[10px] bg-accent px-5 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
           >
-            + New promotion
+            {t("pmAddNew")}
           </Link>
         </div>
       )}
@@ -218,33 +221,33 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
 
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-[18px] font-semibold">
-            {editing ? "Edit promotion" : "New promotion"}
+            {editing ? t("pmEditHeading") : t("pmNewHeading")}
           </h2>
           {(editing || creating) && (
             <Link to="/admin/promotions" className="text-[13px] font-semibold text-muted hover:text-accent">
-              Cancel
+              {t("pmCancel")}
             </Link>
           )}
         </div>
 
         {/* trigger */}
         <div className="flex flex-wrap gap-2">
-          {(["code", "auto"] as PromoTrigger[]).map((t) => (
+          {(["code", "auto"] as PromoTrigger[]).map((tr) => (
             <label
-              key={t}
+              key={tr}
               className={`cursor-pointer rounded-[10px] border px-4 py-2.5 text-[13.5px] font-semibold ${
-                trigger === t ? "border-accent bg-accent-soft text-accent-deep" : "border-line-alt text-muted"
+                trigger === tr ? "border-accent bg-accent-soft text-accent-deep" : "border-line-alt text-muted"
               }`}
             >
               <input
                 type="radio"
                 name="trigger"
-                value={t}
-                checked={trigger === t}
-                onChange={() => setTrigger(t)}
+                value={tr}
+                checked={trigger === tr}
+                onChange={() => setTrigger(tr)}
                 className="sr-only"
               />
-              {t === "code" ? "Promo code" : "Automatic offer"}
+              {tr === "code" ? t("pmTriggerCode") : t("pmTriggerAuto")}
             </label>
           ))}
         </div>
@@ -252,25 +255,25 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {!isAuto && (
             <label className="block text-[13px] font-semibold text-secondary">
-              Promo code
+              {t("pmTriggerCode")}
               <input
                 name="code"
                 defaultValue={editing?.code ?? cur("code")}
-                placeholder="SUMMER10"
+                placeholder={t("pmCodePlaceholder")}
                 autoComplete="off"
                 className={`${FIELD_INPUT} uppercase`}
               />
             </label>
           )}
           <label className="block text-[13px] font-semibold text-secondary">
-            Name{" "}
+            {t("pmName")}{" "}
             <span className="font-normal text-faint">
-              {isAuto ? "(shown to guests)" : "(optional, internal)"}
+              {isAuto ? t("pmNameShownToGuests") : t("pmNameInternal")}
             </span>
             <input
               name="name"
               defaultValue={editing?.name ?? cur("name")}
-              placeholder={isAuto ? "Early Bird" : "Summer sale"}
+              placeholder={isAuto ? t("pmNamePlaceholderAuto") : t("pmNamePlaceholderCode")}
               className={FIELD_INPUT}
             />
           </label>
@@ -279,20 +282,20 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {!isAuto && (
             <label className="block text-[13px] font-semibold text-secondary">
-              Discount type
+              {t("pmDiscountType")}
               <select
                 name="type"
                 value={type}
                 onChange={(e) => setType(e.target.value as DiscountType)}
                 className={FIELD_INPUT}
               >
-                <option value="percent">Percentage off</option>
-                <option value="fixed">Fixed amount off</option>
+                <option value="percent">{t("pmPercentOff")}</option>
+                <option value="fixed">{t("pmFixedOff")}</option>
               </select>
             </label>
           )}
           <label className="block text-[13px] font-semibold text-secondary">
-            {isAuto || type === "percent" ? "Percentage off" : "Amount off"}
+            {isAuto || type === "percent" ? t("pmPercentOff") : t("pmAmountOff")}
             <input
               name="value"
               type="number"
@@ -303,20 +306,18 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
               className={FIELD_INPUT}
             />
             <span className="mt-1 block text-[11px] font-normal text-faint">
-              {isAuto || type === "percent" ? "1–100." : `Fixed amount in ${currency}.`}
+              {isAuto || type === "percent" ? t("pmPercentHint") : t("pmFixedHint", { currency })}
             </span>
           </label>
         </div>
 
         {isAuto && (
           <div className="rounded-[12px] border border-line bg-surface-alt/40 p-4">
-            <div className="mb-1 text-[13px] font-semibold text-secondary">Rules</div>
-            <p className="mb-3 text-[12px] text-faint">
-              The offer applies when every rule you set is met. Leave a field blank to ignore it.
-            </p>
+            <div className="mb-1 text-[13px] font-semibold text-secondary">{t("pmRules")}</div>
+            <p className="mb-3 text-[12px] text-faint">{t("pmRulesIntro")}</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label className="block text-[12.5px] font-semibold text-secondary">
-                Book at least … days ahead
+                {t("pmMinDaysAhead")}
                 <input
                   name="minDaysAhead"
                   type="number"
@@ -325,10 +326,10 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   placeholder="60"
                   className={FIELD_INPUT}
                 />
-                <span className="mt-1 block text-[11px] font-normal text-faint">Early bird</span>
+                <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmEarlyBird")}</span>
               </label>
               <label className="block text-[12.5px] font-semibold text-secondary">
-                …or at most … days ahead
+                {t("pmMaxDaysAhead")}
                 <input
                   name="maxDaysAhead"
                   type="number"
@@ -337,10 +338,10 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   placeholder="7"
                   className={FIELD_INPUT}
                 />
-                <span className="mt-1 block text-[11px] font-normal text-faint">Last minute</span>
+                <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmLastMinute")}</span>
               </label>
               <label className="block text-[12.5px] font-semibold text-secondary">
-                Stay of at least … nights
+                {t("pmMinNights")}
                 <input
                   name="minNights"
                   type="number"
@@ -349,12 +350,12 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   placeholder="7"
                   className={FIELD_INPUT}
                 />
-                <span className="mt-1 block text-[11px] font-normal text-faint">Length of stay</span>
+                <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmLengthOfStay")}</span>
               </label>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block text-[12.5px] font-semibold text-secondary">
-                Check-in on or after
+                {t("pmStayFrom")}
                 <input
                   name="stayFrom"
                   type="date"
@@ -363,7 +364,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                 />
               </label>
               <label className="block text-[12.5px] font-semibold text-secondary">
-                Check-out on or before
+                {t("pmStayTo")}
                 <input
                   name="stayTo"
                   type="date"
@@ -371,7 +372,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   className={FIELD_INPUT}
                 />
                 <span className="mt-1 block text-[11px] font-normal text-faint">
-                  Date window — e.g. a low-season sale
+                  {t("pmDateWindowHint")}
                 </span>
               </label>
             </div>
@@ -385,7 +386,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
             defaultChecked={editing ? editing.enabled : true}
             className={checkbox}
           />
-          Active
+          {t("pmActive")}
         </label>
 
         {actionData && "error" in actionData && actionData.error && (
@@ -397,7 +398,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : editing ? "Save promotion" : "Add promotion"}
+            {saving ? t("saving") : editing ? t("pmSavePromotion") : t("pmAddPromotion")}
           </button>
         </div>
       </Form>
@@ -406,7 +407,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
       {/* list */}
       {promotions.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No promotions yet. Create one above.
+          {t("pmEmpty")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -422,27 +423,27 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   {p.trigger === "code" ? (
                     <span className="font-mono text-[14px] font-semibold">{p.code}</span>
                   ) : (
-                    <span className="text-[14px] font-semibold">{p.name || "Offer"}</span>
+                    <span className="text-[14px] font-semibold">{p.name || t("pmOffer")}</span>
                   )}
                   {p.trigger === "auto" && (
                     <span className="rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
-                      Automatic
+                      {t("pmAutomaticBadge")}
                     </span>
                   )}
                   {p.enabled ? (
                     <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
-                      Active
+                      {t("pmActive")}
                     </span>
                   ) : (
                     <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">
-                      Disabled
+                      {t("pmDisabledBadge")}
                     </span>
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {discountSummary(p, currency)}
+                  {discountSummary(p, currency, t)}
                   {p.trigger === "auto"
-                    ? ` · ${conditionSummary(p.conditions)}`
+                    ? ` · ${conditionSummary(t, p.conditions)}`
                     : p.name
                       ? ` · ${p.name}`
                       : ""}
@@ -457,19 +458,25 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                     value="toggle"
                     className="text-[13px] font-semibold text-muted hover:text-accent"
                   >
-                    {p.enabled ? "Disable" : "Enable"}
+                    {p.enabled ? t("pmDisable") : t("pmEnable")}
                   </button>
                 </Form>
                 <Link
                   to={`/admin/promotions?edit=${p.id}`}
                   className="text-[13px] font-semibold text-accent hover:underline"
                 >
-                  Edit
+                  {t("pmEdit")}
                 </Link>
                 <Form
                   method="post"
                   onSubmit={(e) => {
-                    if (!confirm(`Delete ${p.trigger === "code" ? `promo code ${p.code}` : p.name || "this offer"}?`))
+                    if (
+                      !confirm(
+                        p.trigger === "code"
+                          ? t("pmDeleteConfirmCode", { code: p.code })
+                          : t("pmDeleteConfirmOffer", { name: p.name || t("pmThisOffer") }),
+                      )
+                    )
                       e.preventDefault();
                   }}
                 >
@@ -480,7 +487,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                     value="delete"
                     className="text-[13px] font-semibold text-[#c0392b] hover:underline"
                   >
-                    Delete
+                    {t("pmDelete")}
                   </button>
                 </Form>
               </div>

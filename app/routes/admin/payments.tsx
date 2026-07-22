@@ -8,6 +8,7 @@ import { getSettings, savePaymentSettings } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { redirect } from "react-router";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -72,12 +73,13 @@ export function meta() {
 export default function AdminPayments({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const busy = nav.state !== "idle";
+  const t = useAdminT();
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Payments</h1>
-        <p className="text-[15px] text-secondary">Add a property first to connect payments.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("payTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("payNotConfigured")}</p>
       </div>
     );
   }
@@ -86,16 +88,10 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
   const connected = Boolean(accountId);
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
-    connected: { ok: true, text: "Stripe connected." },
-    denied: { ok: false, text: "Stripe connection was cancelled." },
-    mismatch: {
-      ok: false,
-      text: "Couldn't match this to the selected property — make sure the right property is selected, then try again.",
-    },
-    error: {
-      ok: false,
-      text: "Couldn't complete the Stripe connection. Check that the Stripe secret key is set on the server, then try again (details in the server logs).",
-    },
+    connected: { ok: true, text: t("payNoticeConnected") },
+    denied: { ok: false, text: t("payNoticeDenied") },
+    mismatch: { ok: false, text: t("payNoticeMismatch") },
+    error: { ok: false, text: t("payNoticeError") },
   };
   const banner = notice ? NOTICES[notice] : undefined;
 
@@ -103,22 +99,19 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     <div>
       <div className="mb-5 flex items-center justify-between">
         <div>
-          <h1 className="font-serif text-[26px] font-semibold">Payments</h1>
+          <h1 className="font-serif text-[26px] font-semibold">{t("payTitle")}</h1>
           {propertyName && (
             <p className="mt-0.5 text-[13px] text-muted">
-              Connecting for <span className="font-semibold text-secondary">{propertyName}</span>
+              {t("payConnectingFor")} <span className="font-semibold text-secondary">{propertyName}</span>
             </p>
           )}
         </div>
         {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
+          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
         )}
       </div>
 
-      <p className="mb-5 max-w-2xl text-[14px] text-secondary">
-        Connect this property's Stripe account to take deposits and prepayments at checkout. Payments
-        go directly to your Stripe account — guests pay on Stripe's secure hosted page.
-      </p>
+      <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("payIntro")}</p>
 
       {banner && (
         <p
@@ -133,9 +126,9 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
 
       {platformReady && !secretReady && (
         <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-800">
-          The Stripe secret key isn't set on this environment, so connecting can't complete. Set
-          <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>in the Worker's
-          variables, then try again.
+          {t("paySecretMissingBefore")}
+          <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>
+          {t("paySecretMissingAfter")}
         </p>
       )}
 
@@ -149,7 +142,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-serif text-[18px] font-semibold">Stripe</div>
-            <div className="text-[12.5px] text-muted">Card payments &amp; more, via Stripe Checkout</div>
+            <div className="text-[12.5px] text-muted">{t("payStripeDesc")}</div>
           </div>
           {connected && (
             <span
@@ -157,7 +150,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 chargesEnabled ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-[#fbeede] text-[#9a6a1e]"
               }`}
             >
-              {chargesEnabled ? "Connected" : "Connected · finish setup"}
+              {chargesEnabled ? t("payConnected") : t("payConnectedFinishSetup")}
             </span>
           )}
         </div>
@@ -166,41 +159,38 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
           <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
             {account?.name && (
               <>
-                <dt className="text-muted">Account</dt>
+                <dt className="text-muted">{t("payAccount")}</dt>
                 <dd className="font-semibold text-ink">{account.name}</dd>
               </>
             )}
-            <dt className="text-muted">Account ID</dt>
+            <dt className="text-muted">{t("payAccountId")}</dt>
             <dd className="font-mono text-[12px] text-ink">{accountId}</dd>
             {account?.email && (
               <>
-                <dt className="text-muted">Email</dt>
+                <dt className="text-muted">{t("payEmail")}</dt>
                 <dd className="text-ink">{account.email}</dd>
               </>
             )}
             {(account?.country || account?.currency) && (
               <>
-                <dt className="text-muted">Country / currency</dt>
+                <dt className="text-muted">{t("payCountryCurrency")}</dt>
                 <dd className="text-ink">{[account?.country, account?.currency].filter(Boolean).join(" · ")}</dd>
               </>
             )}
-            <dt className="text-muted">Charges</dt>
+            <dt className="text-muted">{t("payCharges")}</dt>
             <dd className={chargesEnabled ? "font-semibold text-[#3f7a52]" : "font-semibold text-[#9a6a1e]"}>
-              {chargesEnabled ? "Enabled" : "Not enabled yet"}
+              {chargesEnabled ? t("payEnabled") : t("payNotEnabledYet")}
             </dd>
           </dl>
         )}
 
         {connected && !chargesEnabled && (
-          <p className="mt-3 text-[13px] text-secondary">
-            This Stripe account isn't able to accept charges yet — finish onboarding in your Stripe
-            dashboard, then reconnect to refresh the status.
-          </p>
+          <p className="mt-3 text-[13px] text-secondary">{t("payFinishOnboarding")}</p>
         )}
 
         {!platformReady && (
           <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12.5px] text-amber-800">
-            Stripe Connect isn't configured on the platform yet (missing STRIPE_CONNECT_CLIENT_ID).
+            {t("payPlatformMissing")}
           </p>
         )}
 
@@ -213,7 +203,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 disabled={busy}
                 className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
               >
-                Disconnect
+                {t("payDisconnect")}
               </button>
             </Form>
           ) : (
@@ -224,7 +214,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 disabled={busy || !platformReady}
                 className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
               >
-                Connect with Stripe
+                {t("payConnectWithStripe")}
               </button>
             </Form>
           )}

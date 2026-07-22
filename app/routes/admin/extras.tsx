@@ -1,7 +1,8 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/extras";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
@@ -181,10 +182,11 @@ export function meta() {
   return [{ title: "Admin · Extras" }];
 }
 
-function priceSummary(e: Extra, currency: string): string {
+function priceSummary(e: Extra, currency: string, t: AdminT): string {
   if (isConfigurable(e)) {
     const from = Math.min(...e.options!.map((o) => o.price));
-    return `${e.options!.length} options · from ${formatMoney(from, currency)} ${UNIT_LABEL[e.unit]}`;
+    const key = e.options!.length === 1 ? "exOptionsFrom_one" : "exOptionsFrom_other";
+    return t(key, { n: e.options!.length, price: formatMoney(from, currency), unit: UNIT_LABEL[e.unit] });
   }
   return `${formatMoney(e.price ?? 0, currency)} ${UNIT_LABEL[e.unit]}`;
 }
@@ -203,13 +205,14 @@ function fieldsToText(e: Extra | null): string {
 
 export default function AdminExtras({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
+  const t = useAdminT();
   const saving = nav.state === "submitting";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Extras</h1>
-        <p className="text-[15px] text-secondary">Add a property first to manage its extras.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("exTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("exAddPropertyFirst")}</p>
       </div>
     );
   }
@@ -224,11 +227,11 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Extras</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("exTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        Add-ons guests can buy on the “Enhance your stay” step — breakfast, airport pickup, spa, and
-        so on. A <strong>simple</strong> extra has one price; add <strong>options</strong> to let
-        guests choose (e.g. vehicle type), and <strong>info fields</strong> to collect details.
+        {t("exIntro1")} <strong>{t("exIntroSimple")}</strong> {t("exIntro2")}{" "}
+        <strong>{t("exIntroOptions")}</strong> {t("exIntro3")}{" "}
+        <strong>{t("exIntroFields")}</strong> {t("exIntro4")}
       </p>
 
       {!showForm && (
@@ -237,7 +240,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
             to="/admin/extras?new=1"
             className="inline-block rounded-[10px] bg-accent px-5 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
           >
-            + New extra
+            {t("exNewExtraCta")}
           </Link>
         </div>
       )}
@@ -253,21 +256,21 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         <input type="hidden" name="id" defaultValue={editing?.id ?? cur("id")} />
 
         <div className="flex items-center justify-between">
-          <h2 className="font-serif text-[18px] font-semibold">{editing ? "Edit extra" : "New extra"}</h2>
+          <h2 className="font-serif text-[18px] font-semibold">{editing ? t("exEditExtra") : t("exNewExtra")}</h2>
           {(editing || creating) && (
             <Link to="/admin/extras" className="text-[13px] font-semibold text-muted hover:text-accent">
-              Cancel
+              {t("exCancel")}
             </Link>
           )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
-            Name
-            <input name="name" defaultValue={editing?.name ?? cur("name")} placeholder="Airport pickup" className={FIELD_INPUT} />
+            {t("exName")}
+            <input name="name" defaultValue={editing?.name ?? cur("name")} placeholder={t("exNamePlaceholder")} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
-            Charged
+            {t("exCharged")}
             <select name="unit" defaultValue={editing?.unit ?? cur("unit", "stay")} className={FIELD_INPUT}>
               {UNITS.map((u) => (
                 <option key={u} value={u}>{UNIT_LABEL[u]}</option>
@@ -277,18 +280,18 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Description <span className="font-normal text-faint">(optional)</span>
+          {t("exDescription")} <span className="font-normal text-faint">{t("exOptional")}</span>
           <textarea
             name="desc"
             rows={2}
             defaultValue={editing?.desc ?? cur("desc")}
-            placeholder="Private door-to-door transfer with meet & greet."
+            placeholder={t("exDescPlaceholder")}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
 
         <div className="text-[13px] font-semibold text-secondary">
-          Photo <span className="font-normal text-faint">(optional — shown on the extra's card)</span>
+          {t("exPhoto")} <span className="font-normal text-faint">{t("exPhotoHint")}</span>
           <div className="mt-1.5 flex items-start gap-4">
             {editing?.image && (
               <div className="flex flex-none flex-col items-center gap-1.5">
@@ -299,24 +302,19 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                 />
                 <label className="flex items-center gap-1.5 text-[12px] font-medium text-muted">
                   <input type="checkbox" name="removeImage" className={checkbox} />
-                  Remove
+                  {t("exRemove")}
                 </label>
               </div>
             )}
-            <input
-              type="file"
-              name="image"
-              accept="image/*"
-              className="block w-full text-[13px] font-normal text-muted file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent-soft file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-accent-deep hover:file:bg-accent-soft-strong"
-            />
+            <FilePicker name="image" accept="image/*" />
           </div>
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            {editing?.image ? "Upload a new file to replace it." : "JPG or PNG, up to 8MB."}
+            {editing?.image ? t("exReplaceHint") : t("exImageFormats")}
           </span>
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Price <span className="font-normal text-faint">(for a simple extra — leave blank if using options)</span>
+          {t("exPrice")} <span className="font-normal text-faint">{t("exPriceHint")}</span>
           <input
             name="price"
             type="number"
@@ -329,51 +327,50 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Options <span className="font-normal text-faint">(one per line — guests choose one)</span>
+          {t("exOptions")} <span className="font-normal text-faint">{t("exOptionsSubtitle")}</span>
           <textarea
             name="options"
             rows={3}
             defaultValue={cur("options", optionsToText(editing))}
-            placeholder={"Private car | 65 | Saloon, room for luggage\nPrivate van | 95 | Ideal for groups\nLuxury sedan | 120 | person | Premium Mercedes"}
+            placeholder={t("exOptionsPlaceholder")}
             className={`${FIELD_INPUT} resize-y font-mono text-[13px]`}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            Format: <code>Name | price | unit | description</code>. Unit and description are optional;
-            omit unit to use “{UNIT_LABEL[editing?.unit ?? "stay"]}”. Adding options makes the extra a
-            choose-one popup and ignores the single price above.
+            {t("exFormat")} <code>Name | price | unit | description</code>
+            {t("exOptionsFormatSuffix", { unit: UNIT_LABEL[editing?.unit ?? "stay"] })}
           </span>
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Info to collect <span className="font-normal text-faint">(one field per line, optional)</span>
+          {t("exInfoToCollect")} <span className="font-normal text-faint">{t("exFieldsSubtitle")}</span>
           <textarea
             name="fields"
             rows={2}
             defaultValue={cur("fields", fieldsToText(editing))}
-            placeholder={"*Flight number | e.g. EI 462\nExpected arrival time | e.g. 14:30"}
+            placeholder={t("exFieldsPlaceholder")}
             className={`${FIELD_INPUT} resize-y font-mono text-[13px]`}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            Format: <code>Label | placeholder</code>. Prefix with <code>*</code> to make it required.
+            {t("exFormat")} <code>Label | placeholder</code>
+            {t("exFieldsFormatMid")} <code>*</code> {t("exFieldsFormatSuffix")}
           </span>
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Info section heading <span className="font-normal text-faint">(optional)</span>
-          <input name="infoTitle" defaultValue={editing?.infoTitle ?? cur("infoTitle")} placeholder="Flight details" className={FIELD_INPUT} />
+          {t("exInfoHeading")} <span className="font-normal text-faint">{t("exOptional")}</span>
+          <input name="infoTitle" defaultValue={editing?.infoTitle ?? cur("infoTitle")} placeholder={t("exInfoHeadingPlaceholder")} className={FIELD_INPUT} />
         </label>
 
         <fieldset className="rounded-[12px] border border-line bg-surface-alt/40 p-4">
-          <legend className="px-1 text-[13px] font-semibold text-secondary">Where it’s offered</legend>
+          <legend className="px-1 text-[13px] font-semibold text-secondary">{t("exWhereOffered")}</legend>
           <label className="block text-[13px] font-semibold text-secondary">
-            Offered
+            {t("exOffered")}
             <select name="scope" defaultValue={editing ? scopeOf(editing) : "room"} className={FIELD_INPUT}>
-              <option value="room">Per room — guest picks it for each room</option>
-              <option value="booking">Per booking — offered once for the whole stay</option>
+              <option value="room">{t("exScopeRoom")}</option>
+              <option value="booking">{t("exScopeBooking")}</option>
             </select>
             <span className="mt-1 block text-[11px] font-normal text-faint">
-              “Per room” extras appear on each room’s enhance step (breakfast, parking). “Per booking”
-              extras (airport pickup, late checkout) are offered once, with the first room.
+              {t("exScopeHint")}
             </span>
           </label>
 
@@ -382,7 +379,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
               {rooms.length > 0 && (
                 <div>
                   <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
-                    Hide for rooms
+                    {t("exHideForRooms")}
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {rooms.map((r) => (
@@ -403,7 +400,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
               {rates.length > 0 && (
                 <div>
                   <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
-                    Hide for rate plans
+                    {t("exHideForRates")}
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {rates.map((r) => (
@@ -422,7 +419,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                 </div>
               )}
               <span className="text-[11px] font-normal text-faint sm:col-span-2">
-                Leave unticked to offer everywhere. Exclusions apply to “per room” extras only.
+                {t("exExclusionsHint")}
               </span>
             </div>
           )}
@@ -430,12 +427,12 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="taxable" defaultChecked={editing ? editing.taxable !== false : true} className={checkbox} />
-          VAT applies <span className="font-normal text-faint">(taxed at the property’s VAT rate, like the room — untick to exempt, e.g. a transfer)</span>
+          {t("exVatApplies")} <span className="font-normal text-faint">{t("exVatHint")}</span>
         </label>
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="active" defaultChecked={editing ? editing.active : true} className={checkbox} />
-          Active (shown to guests)
+          {t("exActiveShown")}
         </label>
 
         {actionData && "error" in actionData && actionData.error && (
@@ -447,7 +444,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : editing ? "Save extra" : "Add extra"}
+            {saving ? t("saving") : editing ? t("exSaveExtra") : t("exAddExtra")}
           </button>
         </div>
       </Form>
@@ -455,7 +452,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
 
       {extras.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No extras yet. Create one above.
+          {t("exNoExtras")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -474,39 +471,39 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                 <div className="flex items-center gap-2.5">
                   <span className="font-semibold">{e.name}</span>
                   {e.active ? (
-                    <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">Active</span>
+                    <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">{t("exActive")}</span>
                   ) : (
-                    <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">Hidden</span>
+                    <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">{t("exHidden")}</span>
                   )}
                   {e.fields?.length ? (
-                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">collects info</span>
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exCollectsInfo")}</span>
                   ) : null}
                   {scopeOf(e) === "booking" ? (
-                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">per booking</span>
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exPerBooking")}</span>
                   ) : (e.excludeRooms?.length || e.excludeRates?.length) ? (
-                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">limited rooms/rates</span>
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exLimitedRoomsRates")}</span>
                   ) : null}
                   {e.taxable === false ? (
-                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">VAT exempt</span>
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exVatExempt")}</span>
                   ) : null}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency)}</div>
+                <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency, t)}</div>
                 </div>
               </div>
               <div className="flex flex-none items-center gap-3">
                 <Form method="post">
                   <input type="hidden" name="id" value={e.id} />
                   <button type="submit" name="intent" value="toggle" className="text-[13px] font-semibold text-muted hover:text-accent">
-                    {e.active ? "Hide" : "Show"}
+                    {e.active ? t("exHideAction") : t("exShowAction")}
                   </button>
                 </Form>
                 <Link to={`/admin/extras?edit=${e.id}`} className="text-[13px] font-semibold text-accent hover:underline">
-                  Edit
+                  {t("exEdit")}
                 </Link>
-                <Form method="post" onSubmit={(ev) => { if (!confirm(`Delete “${e.name}”?`)) ev.preventDefault(); }}>
+                <Form method="post" onSubmit={(ev) => { if (!confirm(t("exDeleteConfirm", { name: e.name }))) ev.preventDefault(); }}>
                   <input type="hidden" name="id" value={e.id} />
                   <button type="submit" name="intent" value="delete" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
-                    Delete
+                    {t("exDelete")}
                   </button>
                 </Form>
               </div>

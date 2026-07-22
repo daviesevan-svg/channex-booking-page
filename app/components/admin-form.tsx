@@ -29,6 +29,7 @@ export function Field({
   channexHint?: boolean;
   hint?: string;
 }) {
+  const t = useAdminT();
   return (
     <label className="block text-[13px] font-semibold text-secondary">
       {label}
@@ -45,7 +46,7 @@ export function Field({
       )}
       {channexHint && placeholder ? (
         <span className="mt-1 block text-[11px] font-normal text-faint">
-          From Channex: {placeholder} — leave blank to use this.
+          {t("afChannexHint", { value: placeholder })}
         </span>
       ) : hint ? (
         <span className="mt-1 block text-[11px] font-normal text-faint">{hint}</span>
@@ -57,7 +58,7 @@ export function Field({
 /** File upload control with translatable labels — the native input renders
  *  browser-chrome text ("Choose file / No file chosen") in the BROWSER's
  *  language, so it's visually hidden behind a styled button. */
-export function FilePicker({ name, accept }: { name: string; accept?: string }) {
+export function FilePicker({ name, accept, multiple }: { name: string; accept?: string; multiple?: boolean }) {
   const t = useAdminT();
   const [fileName, setFileName] = useState<string | null>(null);
   return (
@@ -70,8 +71,12 @@ export function FilePicker({ name, accept }: { name: string; accept?: string }) 
         type="file"
         name={name}
         accept={accept}
+        multiple={multiple}
         className="sr-only"
-        onChange={(e) => setFileName(e.currentTarget.files?.[0]?.name ?? null)}
+        onChange={(e) => {
+          const names = Array.from(e.currentTarget.files ?? []).map((f) => f.name);
+          setFileName(names.length ? names.join(", ") : null);
+        }}
       />
     </label>
   );

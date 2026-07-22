@@ -9,6 +9,7 @@ import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, save
 import { accentHex, bookingVars, composeEmail, composeReviewEmail, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail } from "~/lib/email.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -99,13 +100,15 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
   const saving = nav.state === "submitting";
   const formRef = useRef<HTMLFormElement>(null);
   const [copied, setCopied] = useState(false);
+  const t = useAdminT();
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
         <h1 className="mb-2 font-serif text-[22px] font-semibold">{loaderData.label}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to edit email templates.
+          {t("emtConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("emtConfigureSuffix")}
         </p>
       </div>
     );
@@ -153,7 +156,7 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
   return (
     <div>
       <div className="mb-1 flex items-center justify-between gap-3">
-        <h1 className="font-serif text-[26px] font-semibold">{label} email</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("emtTitle", { label })}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
             ✓ {actionData.message}
@@ -161,11 +164,9 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
         )}
       </div>
       <p className="mb-5 text-[14px] text-muted">
-        Edit the wording guests {recipient === "host" ? "and you" : ""} see.{" "}
-        {template === "review_request"
-          ? "The star-rating buttons and review link are added automatically"
-          : "The booking details block is added automatically"}{" "}
-        — you only write the surrounding text. Empty fields use the defaults shown.
+        {recipient === "host" ? t("emtIntroLeadHost") : t("emtIntroLead")}{" "}
+        {template === "review_request" ? t("emtAutoReview") : t("emtAutoBooking")}{" "}
+        {t("emtIntroTail")}
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -191,10 +192,10 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
             {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
             <div className="flex flex-wrap items-center gap-3">
               <button type="submit" disabled={saving} className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60">
-                {saving ? "Saving…" : "Save changes"}
+                {saving ? t("saving") : t("saveChanges")}
               </button>
               <button type="button" onClick={copyBrief} className="rounded-[10px] border border-line-alt px-4 py-3 text-[14px] font-semibold text-ink hover:border-accent hover:text-accent">
-                {copied ? "Copied ✓" : "Copy AI editing brief"}
+                {copied ? t("emtCopied") : t("emtCopyBrief")}
               </button>
             </div>
           </Form>
@@ -204,16 +205,14 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
             <input type="hidden" name="lang" value={lang} />
             <input type="hidden" name="intent" value="test" />
             <button type="submit" disabled={saving} className="rounded-[10px] border border-line-alt px-4 py-2.5 text-[13px] font-semibold text-muted hover:border-accent hover:text-accent disabled:opacity-60">
-              Send test to me
+              {t("emtSendTest")}
             </button>
-            <span className="text-[12px] text-faint">Sends the saved version with sample booking data.</span>
+            <span className="text-[12px] text-faint">{t("emtSendTestHint")}</span>
           </Form>
 
           <div className="mt-5 rounded-[14px] border border-line bg-surface p-5">
-            <h2 className="mb-1 text-[14px] font-semibold text-ink">Variables you can use</h2>
-            <p className="mb-3 text-[12px] text-muted">
-              Type these anywhere in the fields. They're swapped for the real booking values when the email sends.
-            </p>
+            <h2 className="mb-1 text-[14px] font-semibold text-ink">{t("emtVariablesTitle")}</h2>
+            <p className="mb-3 text-[12px] text-muted">{t("emtVariablesIntro")}</p>
             <table className="w-full text-[13px]">
               <tbody>
                 {tokens.map((t) => (
@@ -229,13 +228,13 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
         </div>
 
         <div>
-          <div className="mb-2 text-[13px] font-semibold text-secondary">Preview (saved version)</div>
+          <div className="mb-2 text-[13px] font-semibold text-secondary">{t("emtPreview")}</div>
           <div className="mb-2 rounded-[10px] border border-line bg-surface-alt px-3 py-2 text-[13px]">
-            <span className="text-faint">Subject: </span>
+            <span className="text-faint">{t("emtSubjectLabel")} </span>
             <span className="font-semibold text-ink">{previewSubject}</span>
           </div>
           <iframe
-            title="Email preview"
+            title={t("emtPreviewFrame")}
             srcDoc={previewHtml}
             sandbox=""
             className="h-[640px] w-full rounded-[12px] border border-line bg-white"

@@ -2,6 +2,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/onboard-channex";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin, setSessionProperty } from "~/lib/auth.server";
 import {
   getChannexRatePlans,
@@ -172,6 +173,7 @@ export function meta() {
 export default function OnboardChannex({ actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const busy = nav.state !== "idle";
+  const t = useAdminT();
   const step = actionData && "step" in actionData ? actionData.step : "key";
   const apiKey = actionData && "apiKey" in actionData ? actionData.apiKey : "";
   const properties = (actionData && "properties" in actionData ? actionData.properties : []) ?? [];
@@ -205,14 +207,13 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
     <div className="max-w-[720px]">
       <div className="mb-4">
         <Link to="/admin/properties" className="text-[13px] font-semibold text-muted hover:text-accent">
-          ← All properties
+          {t("obBack")}
         </Link>
       </div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Onboard from Channex</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("obTitle")}</h1>
       <p className="mb-6 max-w-[620px] text-[14px] text-muted">
-        Import a property’s details, room types and rate plans straight from your Channex account.
-        Paste your Channex <strong>API key</strong> (Channex → Applications → API keys). It’s used
-        only for this import and never stored.
+        {t("obIntroPre")} <strong>{t("obApiKey")}</strong>
+        {t("obIntroPost")}
       </p>
 
       {/* Step 1: API key + connect. Also carries the key on later steps. */}
@@ -220,19 +221,19 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
         <input type="hidden" name="intent" value="connect" />
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <label className="block text-[13px] font-semibold text-secondary">
-            Channex API key
+            {t("obApiKeyLabel")}
             {step === "key" ? (
               <input
                 name="apiKey"
                 type="password"
                 autoComplete="off"
-                placeholder="Paste your user-api-key"
+                placeholder={t("obApiKeyPlaceholder")}
                 className={`${FIELD_INPUT} font-mono`}
               />
             ) : (
               <div className="mt-1.5 flex items-center gap-3">
                 <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[12px] font-semibold text-[#3f7a52]">
-                  Connected
+                  {t("obConnected")}
                 </span>
                 <input type="hidden" name="apiKey" value={apiKey} />
               </div>
@@ -242,7 +243,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
           {/* Property picker (once connected). Changing it re-fetches its catalogue. */}
           {step !== "key" && properties.length > 0 && (
             <label className="mt-4 block text-[13px] font-semibold text-secondary">
-              Property
+              {t("obPropertyLabel")}
               <select
                 name="channexPropertyId"
                 defaultValue={property?.id ?? ""}
@@ -250,7 +251,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                 className={FIELD_INPUT}
               >
                 <option value="" disabled>
-                  Choose a property…
+                  {t("obChooseProperty")}
                 </option>
                 {properties.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -270,7 +271,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
               disabled={busy}
               className="mt-4 rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
             >
-              {busy ? "Connecting…" : "Connect"}
+              {busy ? t("obConnecting") : t("obConnect")}
             </button>
           )}
         </section>
@@ -286,17 +287,17 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
           <section className="rounded-[14px] border border-line bg-surface p-6">
             <div className="mb-1 font-serif text-[18px] font-semibold">{property.title}</div>
             <div className="text-[13px] text-muted">
-              {[property.address, property.city, property.country].filter(Boolean).join(", ") || "No address on file"}
+              {[property.address, property.city, property.country].filter(Boolean).join(", ") || t("obNoAddress")}
               {property.currency ? ` · ${property.currency}` : ""}
             </div>
           </section>
 
           <section className="rounded-[14px] border border-line bg-surface p-6">
             <div className="mb-3 font-serif text-[18px] font-semibold">
-              Room types <span className="font-sans text-[13px] font-normal text-muted">({rooms.length})</span>
+              {t("obRoomTypes")} <span className="font-sans text-[13px] font-normal text-muted">({rooms.length})</span>
             </div>
             {rooms.length === 0 ? (
-              <p className="text-[13.5px] text-muted">No room types found for this property.</p>
+              <p className="text-[13.5px] text-muted">{t("obNoRooms")}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {rooms.map((r) => (
@@ -308,7 +309,10 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                     <span className="flex-1">
                       <span className="block text-[14px] font-semibold text-ink">{r.title}</span>
                       <span className="block text-[12.5px] text-muted">
-                        Sleeps {r.maxGuests} · {r.maxAdults} adult{r.maxAdults === 1 ? "" : "s"}
+                        {t(r.maxAdults === 1 ? "obSleepsAdults_one" : "obSleepsAdults_other", {
+                          guests: r.maxGuests,
+                          adults: r.maxAdults,
+                        })}
                         {r.facilities.length ? ` · ${r.facilities.slice(0, 3).join(", ")}` : ""}
                       </span>
                     </span>
@@ -320,14 +324,13 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
 
           <section className="rounded-[14px] border border-line bg-surface p-6">
             <div className="mb-1 font-serif text-[18px] font-semibold">
-              Rate plans <span className="font-sans text-[13px] font-normal text-muted">({rateGroups.length})</span>
+              {t("obRatePlans")} <span className="font-sans text-[13px] font-normal text-muted">({rateGroups.length})</span>
             </div>
             <p className="mb-3 text-[12.5px] text-muted">
-              A rate only imports if its room type is also selected. Live nightly rates flow from
-              Channex after import.
+              {t("obRatesHint")}
             </p>
             {rateGroups.length === 0 ? (
-              <p className="text-[13.5px] text-muted">No rate plans found for this property.</p>
+              <p className="text-[13.5px] text-muted">{t("obNoRates")}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {directGroups.map((g) => (
@@ -339,7 +342,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                     <span className="flex-1">
                       <span className="block text-[14px] font-semibold text-ink">{g.title}</span>
                       <span className="block text-[12.5px] text-muted">
-                        {g.mealPlan ?? "Room only"} · {g.count} room type{g.count === 1 ? "" : "s"}
+                        {g.mealPlan ?? t("obRoomOnly")} · {t(g.count === 1 ? "obRoomTypesCount_one" : "obRoomTypesCount_other", { n: g.count })}
                       </span>
                     </span>
                   </label>
@@ -348,12 +351,10 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                 {otaGroups.length > 0 && (
                   <>
                     <div className="mt-4 mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
-                      Distributed to OTAs
+                      {t("obOtaHeading")}
                     </div>
                     <p className="mb-2 text-[12.5px] text-muted">
-                      These rate plans are already sold on channels like Booking.com or Expedia.
-                      They’re left unticked — a direct booking engine usually sells your own direct
-                      rates. Tick any you also want to offer here.
+                      {t("obOtaHint")}
                     </p>
                     {otaGroups.map((g) => (
                       <label
@@ -374,7 +375,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                             ))}
                           </span>
                           <span className="block text-[12.5px] text-muted">
-                            {g.mealPlan ?? "Room only"} · {g.count} room type{g.count === 1 ? "" : "s"}
+                            {g.mealPlan ?? t("obRoomOnly")} · {t(g.count === 1 ? "obRoomTypesCount_one" : "obRoomTypesCount_other", { n: g.count })}
                           </span>
                         </span>
                       </label>
@@ -393,7 +394,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
               disabled={busy}
               className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
             >
-              {busy ? "Importing…" : "Import & create property"}
+              {busy ? t("obImporting") : t("obImport")}
             </button>
           </div>
         </Form>

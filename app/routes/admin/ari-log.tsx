@@ -6,6 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, rateChannexId } from "~/lib/catalog.server";
 import { queryAriLog } from "~/lib/ari.server";
+import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -61,17 +62,17 @@ export function meta() {
 }
 
 const FIELD_LABEL: Record<string, string> = {
-  avail: "Availability",
-  price: "Price",
-  stop_sell: "Stop sell",
-  min_stay: "Min stay",
-  cta: "Closed to arrival",
-  ctd: "Closed to departure",
+  avail: "alFieldAvail",
+  price: "alFieldPrice",
+  stop_sell: "alFieldStopSell",
+  min_stay: "alFieldMinStay",
+  cta: "alFieldCta",
+  ctd: "alFieldCtd",
 };
 
-function fmtValue(field: string, v: string | null): string {
+function fmtValue(field: string, v: string | null, t: AdminT): string {
   if (v == null || v === "") return "—";
-  if (field === "stop_sell" || field === "cta" || field === "ctd") return v === "true" ? "Yes" : "No";
+  if (field === "stop_sell" || field === "cta" || field === "ctd") return v === "true" ? t("alYes") : t("alNo");
   return v;
 }
 
@@ -86,12 +87,13 @@ function When({ ts }: { ts: number }) {
 
 export default function AriLog({ loaderData }: Route.ComponentProps) {
   const [, setSearchParams] = useSearchParams();
+  const t = useAdminT();
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Change log</h1>
-        <p className="text-[15px] text-secondary">Add a property first to see its change history.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("alTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("alNotConfigured")}</p>
       </div>
     );
   }
@@ -102,19 +104,16 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Change log</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("alTitle")}</h1>
       </div>
-      <p className="mb-5 max-w-2xl text-[14px] text-secondary">
-        Every change to availability, price and restrictions — who made it (a user or Channex) and
-        when. Search by affected date, room or rate plan.
-      </p>
+      <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("alIntro")}</p>
 
       <Form
         method="get"
         className="mb-5 flex flex-wrap items-end gap-3 rounded-[12px] border border-line bg-surface p-4"
       >
         <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
-          Affected date
+          {t("alAffectedDate")}
           <input
             type="date"
             name="date"
@@ -123,13 +122,13 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
           />
         </label>
         <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
-          Room
+          {t("alRoom")}
           <select
             name="room"
             defaultValue={filters.room}
             className="min-w-[160px] rounded-[9px] border border-line-alt bg-surface px-3 py-2 text-[14px] font-normal text-ink outline-none focus:border-accent"
           >
-            <option value="">All rooms</option>
+            <option value="">{t("alAllRooms")}</option>
             {rooms.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.title}
@@ -138,13 +137,13 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
           </select>
         </label>
         <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
-          Rate plan
+          {t("alRatePlan")}
           <select
             name="rate"
             defaultValue={filters.rate}
             className="min-w-[160px] rounded-[9px] border border-line-alt bg-surface px-3 py-2 text-[14px] font-normal text-ink outline-none focus:border-accent"
           >
-            <option value="">All rates</option>
+            <option value="">{t("alAllRates")}</option>
             {rates.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.title}
@@ -156,7 +155,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
           type="submit"
           className="rounded-[9px] bg-accent px-5 py-2 text-[14px] font-semibold text-white hover:bg-accent-deep"
         >
-          Search
+          {t("alSearch")}
         </button>
         {hasFilter && (
           <button
@@ -164,7 +163,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
             onClick={() => setSearchParams({})}
             className="rounded-[9px] border border-line-alt bg-surface px-4 py-2 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent"
           >
-            Clear
+            {t("alClear")}
           </button>
         )}
       </Form>
@@ -173,20 +172,20 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
         <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
           <thead>
             <tr className="border-b border-divider text-left text-[11.5px] font-semibold uppercase tracking-wider text-faint">
-              <th className="px-4 py-3">When</th>
-              <th className="px-4 py-3">Who</th>
-              <th className="px-4 py-3">Room</th>
-              <th className="px-4 py-3">Rate</th>
-              <th className="px-4 py-3">Affected date</th>
-              <th className="px-4 py-3">What</th>
-              <th className="px-4 py-3">Change</th>
+              <th className="px-4 py-3">{t("alColWhen")}</th>
+              <th className="px-4 py-3">{t("alColWho")}</th>
+              <th className="px-4 py-3">{t("alRoom")}</th>
+              <th className="px-4 py-3">{t("alColRate")}</th>
+              <th className="px-4 py-3">{t("alAffectedDate")}</th>
+              <th className="px-4 py-3">{t("alColWhat")}</th>
+              <th className="px-4 py-3">{t("alColChange")}</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-10 text-center text-[14px] text-muted">
-                  No changes recorded{hasFilter ? " for this search" : " yet"}.
+                  {t(hasFilter ? "alNoChangesFilter" : "alNoChangesYet")}
                 </td>
               </tr>
             )}
@@ -203,18 +202,18 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
                         : "bg-[#e8f0e6] text-[#3f7a52]"
                     }`}
                   >
-                    {r.source === "channex" ? "Channex" : "User"}
+                    {r.source === "channex" ? "Channex" : t("alSourceUser")}
                   </span>
                   {r.source === "user" ? r.actor : ""}
                 </td>
                 <td className="px-4 py-3">{r.roomLabel}</td>
                 <td className="px-4 py-3 text-secondary">{r.rateLabel ?? "—"}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-secondary">{r.date}</td>
-                <td className="whitespace-nowrap px-4 py-3 font-semibold">{FIELD_LABEL[r.field] ?? r.field}</td>
+                <td className="whitespace-nowrap px-4 py-3 font-semibold">{FIELD_LABEL[r.field] ? t(FIELD_LABEL[r.field]) : r.field}</td>
                 <td className="whitespace-nowrap px-4 py-3">
-                  <span className="text-muted line-through">{fmtValue(r.field, r.oldValue)}</span>
+                  <span className="text-muted line-through">{fmtValue(r.field, r.oldValue, t)}</span>
                   <span className="mx-1.5 text-faint">→</span>
-                  <span className="font-semibold text-ink">{fmtValue(r.field, r.newValue)}</span>
+                  <span className="font-semibold text-ink">{fmtValue(r.field, r.newValue, t)}</span>
                 </td>
               </tr>
             ))}
@@ -222,9 +221,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
         </table>
       </div>
       {rows.length >= 300 && (
-        <p className="mt-3 text-[12.5px] text-muted">
-          Showing the 300 most recent matching changes. Narrow the search to see older ones.
-        </p>
+        <p className="mt-3 text-[12.5px] text-muted">{t("alShowingLimit")}</p>
       )}
     </div>
   );

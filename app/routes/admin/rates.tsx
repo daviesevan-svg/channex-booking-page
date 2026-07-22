@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/rates";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
@@ -33,12 +34,14 @@ export function meta() {
 }
 
 export default function AdminRates({ loaderData }: Route.ComponentProps) {
+  const t = useAdminT();
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Rates</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("rtTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to add rates.
+          {t("rtConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("rtConfigureSuffix")}
         </p>
       </div>
     );
@@ -49,29 +52,28 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Rates</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("rtTitle")}</h1>
         {hasRooms && (
           <Link
             to="/admin/rates/new"
             className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep"
           >
-            + New rate
+            {t("rtNew")}
           </Link>
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        A rate is a bookable plan — meal plan, cancellation policy and a nightly price per room. It
-        applies to every room you give it a price. Occupancy comes from each room.
+        {t("rtIntro")}
       </p>
 
       {!hasRooms ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          Create a <Link to="/admin/rooms/new" className="font-semibold text-accent">room</Link> first,
-          then add rates to it.
+          {t("rtCreateRoomPrefix")} <Link to="/admin/rooms/new" className="font-semibold text-accent">{t("rtCreateRoomLink")}</Link>{" "}
+          {t("rtCreateRoomSuffix")}
         </div>
       ) : rates.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No rates yet. Create your first one.
+          {t("rtEmpty")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -88,22 +90,22 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
                   <span className="truncate font-semibold">{rate.title}</span>
                   {!rate.active && (
                     <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">
-                      Inactive
+                      {t("rtInactive")}
                     </span>
                   )}
                 </div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  {rate.mealPlan || "Room only"} ·{" "}
+                  {rate.mealPlan || t("rtRoomOnly")} ·{" "}
                   {rate.roomCount === 0
-                    ? "no rooms priced"
-                    : `${rate.roomCount} room${rate.roomCount === 1 ? "" : "s"}`}
+                    ? t("rtNoRoomsPriced")
+                    : t(rate.roomCount === 1 ? "rtRooms_one" : "rtRooms_other", { n: rate.roomCount })}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">
                 <span className="font-semibold">
-                  {rate.fromPrice == null ? "—" : `from ${rate.fromPrice.toFixed(2)}/night`}
+                  {rate.fromPrice == null ? "—" : t("rtFromPerNight", { price: rate.fromPrice.toFixed(2) })}
                 </span>
-                <span className="text-[13px] font-semibold text-accent">Edit →</span>
+                <span className="text-[13px] font-semibold text-accent">{t("rtEdit")}</span>
               </div>
             </Link>
           ))}

@@ -6,6 +6,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pageDef, pickLang } from "~/lib/content";
 import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -34,14 +35,15 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
   const { configured, label, fields, overrides } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
+  const t = useAdminT();
 
   if (!configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
         <h1 className="mb-2 font-serif text-[22px] font-semibold">{label}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to edit
-          page content.
+          {t("pgConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("pgConfigureSuffix")}
         </p>
       </div>
     );
@@ -52,15 +54,15 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{label} page</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("pgTitle", { label })}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        Text guests see on the {label.toLowerCase()} screen. Empty fields use the defaults shown.
+        {t("pgIntro", { label: label.toLowerCase() })}
       </p>
 
       <Form
@@ -98,7 +100,7 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save changes"}
+            {saving ? t("saving") : t("saveChanges")}
           </button>
         </div>
       </Form>

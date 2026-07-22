@@ -6,6 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
 import { getLastAriReceivedAt } from "~/lib/ari.server";
+import { useAdminT } from "~/lib/admin-i18n";
 
 /** Systems a property can connect to. Only `available` ones can be selected;
  *  the rest are shown as upcoming so the list reads as a roadmap. */
@@ -13,12 +14,12 @@ const SYSTEMS = [
   {
     id: "channex",
     name: "Channex",
-    tagline: "Channel manager & booking gateway",
-    blurb: "Sync availability, rates and bookings through your Channex account.",
+    taglineKey: "cnTaglineChannex",
+    blurbKey: "cnBlurbChannex",
     available: true,
   },
-  { id: "apaleo", name: "Apaleo", tagline: "Property management system", blurb: "", available: false },
-  { id: "mews", name: "Mews", tagline: "Property management system", blurb: "", available: false },
+  { id: "apaleo", name: "Apaleo", taglineKey: "cnTaglinePms", blurbKey: "", available: false },
+  { id: "mews", name: "Mews", taglineKey: "cnTaglinePms", blurbKey: "", available: false },
 ] as const;
 
 const AVAILABLE = new Set<string>(SYSTEMS.filter((s) => s.available).map((s) => s.id));
@@ -59,6 +60,7 @@ export function meta() {
  *  operator's browser timezone/locale (server-side would use UTC and mismatch
  *  on hydration). */
 function LastAriUpdate({ at }: { at: number | null }) {
+  const t = useAdminT();
   const [text, setText] = useState("");
   useEffect(() => {
     if (at) setText(new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }));
@@ -67,15 +69,16 @@ function LastAriUpdate({ at }: { at: number | null }) {
     <p className="mt-4 flex items-center gap-2 text-[12.5px] text-muted">
       <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#3f7a52]" />
       {at ? (
-        <>Last update received {text || "…"}</>
+        <>{t("cnLastUpdate", { time: text || "…" })}</>
       ) : (
-        <>No availability or rate updates received yet.</>
+        <>{t("cnNoUpdates")}</>
       )}
     </p>
   );
 }
 
 function CopyField({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  const t = useAdminT();
   const [copied, setCopied] = useState(false);
   return (
     <div>
@@ -97,7 +100,7 @@ function CopyField({ label, value, hint }: { label: string; value: string; hint?
           }}
           className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-[11px] text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? t("cnCopied") : t("cnCopy")}
         </button>
       </div>
       {hint && <p className="mt-1.5 text-[12.5px] text-muted">{hint}</p>}
@@ -107,13 +110,14 @@ function CopyField({ label, value, hint }: { label: string; value: string; hint?
 
 export default function AdminConnectivity({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
+  const t = useAdminT();
   const saving = nav.state === "submitting";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Connectivity</h1>
-        <p className="text-[15px] text-secondary">Add a property first to connect a system.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("cnTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("cnNotConfigured")}</p>
       </div>
     );
   }
@@ -123,18 +127,15 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Connectivity</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("cnTitle")}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
 
-      <p className="mb-5 max-w-2xl text-[14px] text-secondary">
-        Choose the system this property connects to. We'll show you the details you need to set up
-        the connection on their side.
-      </p>
+      <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("cnIntro")}</p>
 
       {actionData?.error && (
         <p className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
@@ -155,22 +156,22 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-serif text-[18px] font-semibold">{sys.name}</div>
-                  <div className="text-[12.5px] text-muted">{sys.tagline}</div>
+                  <div className="text-[12.5px] text-muted">{t(sys.taglineKey)}</div>
                 </div>
                 {isConnected ? (
                   <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11.5px] font-semibold text-[#3f7a52]">
-                    Connected
+                    {t("cnConnected")}
                   </span>
                 ) : (
                   !sys.available && (
                     <span className="flex-none rounded-full bg-chip px-2.5 py-1 text-[11.5px] font-semibold text-muted">
-                      Coming soon
+                      {t("cnComingSoon")}
                     </span>
                   )
                 )}
               </div>
 
-              {sys.blurb && <p className="mt-3 text-[13px] text-secondary">{sys.blurb}</p>}
+              {sys.blurbKey && <p className="mt-3 text-[13px] text-secondary">{t(sys.blurbKey)}</p>}
 
               <div className="mt-4 flex-1" />
 
@@ -183,7 +184,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                       disabled={saving}
                       className="w-full rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
                     >
-                      Disconnect
+                      {t("cnDisconnect")}
                     </button>
                   </Form>
                 ) : (
@@ -195,7 +196,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                       disabled={saving}
                       className="w-full rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
                     >
-                      Connect
+                      {t("cnConnect")}
                     </button>
                   </Form>
                 )
@@ -205,7 +206,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                   disabled
                   className="w-full cursor-not-allowed rounded-[10px] border border-line-alt bg-surface-alt px-4 py-2.5 text-[14px] font-semibold text-faint"
                 >
-                  Connect
+                  {t("cnConnect")}
                 </button>
               )}
             </div>
@@ -215,16 +216,13 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
 
       {connected === "channex" && (
         <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
-          <h2 className="mb-1 font-serif text-[18px] font-semibold">Connect with Channex</h2>
-          <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
-            In Channex, map this booking engine to your property using the Property ID below. It
-            identifies your property across availability, rates and booking calls.
-          </p>
+          <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("cnChannexTitle")}</h2>
+          <p className="mb-4 max-w-2xl text-[13.5px] text-muted">{t("cnChannexIntro")}</p>
           <div className="max-w-xl">
             <CopyField
-              label="Property ID"
+              label={t("cnPropertyId")}
               value={propertyId}
-              hint="Paste this into the channel/mapping setup in your Channex account."
+              hint={t("cnPropertyIdHint")}
             />
           </div>
           <LastAriUpdate at={lastAriAt} />

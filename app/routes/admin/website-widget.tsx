@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website-widget";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
@@ -61,6 +62,7 @@ export function meta() {
 }
 
 export default function WebsiteWidget({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const [copied, setCopied] = useState(false);
   const [briefCopied, setBriefCopied] = useState(false);
   const [devCopied, setDevCopied] = useState(false);
@@ -71,16 +73,16 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Website widget</h1>
-        <p className="text-[15px] text-secondary">Add a property first.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("wwTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("wwAddPropertyFirst")}</p>
       </div>
     );
   }
   if (!loaderData.canManage) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Website widget</h1>
-        <p className="text-[15px] text-secondary">Only an owner or manager can manage the widget.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("wwTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("wwOwnerOnly")}</p>
       </div>
     );
   }
@@ -164,22 +166,21 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
 
   return (
     <div className="space-y-6">
-      <h1 className="font-serif text-[26px] font-semibold">Website widget</h1>
+      <h1 className="font-serif text-[26px] font-semibold">{t("wwTitle")}</h1>
       <p className="max-w-2xl text-[14px] text-secondary">
-        Add a date-picker to your own website that sends guests straight into your commission-free
-        booking pages. It matches your booking engine's theme automatically.
+        {t("wwIntro")}
       </p>
 
       {actionData && "error" in actionData && actionData.error && (
         <p className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">{actionData.error}</p>
       )}
       {actionData && "applied" in actionData && actionData.applied && (
-        <p className="rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">✓ Theme applied — preview updated below.</p>
+        <p className="rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">{t("wwThemeApplied")}</p>
       )}
 
       {/* Embed code */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Embed code</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("wwEmbedCode")}</h2>
         <div className="flex items-start gap-2">
           <code className="min-w-0 flex-1 whitespace-pre-wrap break-all rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 font-mono text-[13px] text-ink">
             {snippet}
@@ -194,38 +195,36 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
             }}
             className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-3 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
           >
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("wwCopied") : t("wwCopy")}
           </button>
         </div>
         <p className="mt-2.5 text-[12.5px] text-muted">
-          Optional: <code className="font-mono">data-target="my-div-id"</code> to render inside a specific element,
-          or <code className="font-mono">data-height="180"</code> for the initial height. It resizes itself to fit.
+          {t("wwEmbedHintP1")} <code className="font-mono">data-target="my-div-id"</code> {t("wwEmbedHintP2")}
+          {" "}<code className="font-mono">data-height="180"</code> {t("wwEmbedHintP3")}
         </p>
       </section>
 
       {/* AI branding */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-1 font-serif text-[18px] font-semibold">Theme it with AI</h2>
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwAiThemeTitle")}</h2>
         <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
-          Describe your brand, copy the ready-made prompt into ChatGPT or Claude, then paste the result
-          back here. No fiddling with colour pickers — the theme applies to your widget <em>and</em> your
-          booking pages.
+          {t("wwAiThemeIntroP1")} <em>{t("wwAnd")}</em> {t("wwAiThemeIntroP2")}
         </p>
 
         <div className="mb-4 flex flex-wrap items-center gap-3 text-[13px]">
-          <span className="text-secondary">Current theme:</span>
+          <span className="text-secondary">{t("wwCurrentTheme")}</span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-line-alt px-2.5 py-1 font-semibold">
             <span className="h-3.5 w-3.5 rounded-full border border-line-alt" style={{ background: accent || "var(--accent)" }} />
-            {accent ? accent : `preset · ${themeName}`}
+            {accent ? accent : t("wwPresetTheme", { name: themeName })}
           </span>
           <span className="rounded-full border border-line-alt px-2.5 py-1 font-semibold">{fontLabel}</span>
         </div>
 
-        <label className="mb-1.5 block text-[13px] font-semibold text-secondary">Your brand</label>
+        <label className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("wwYourBrand")}</label>
         <textarea
           ref={briefRef}
           rows={3}
-          placeholder="e.g. Coastal boutique hotel — calm, elegant, sandy neutrals with a deep navy accent; classic serif headings."
+          placeholder={t("wwBrandPlaceholder")}
           className={`${input} mb-2 w-full`}
         />
         <button
@@ -233,11 +232,11 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
           onClick={copyBrief}
           className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
         >
-          {briefCopied ? "Copied brief ✓" : "Copy AI brief"}
+          {briefCopied ? t("wwBriefCopied") : t("wwCopyAiBrief")}
         </button>
 
         <Form method="post" className="mt-5">
-          <label className="mb-1.5 block text-[13px] font-semibold text-secondary">Paste the AI's theme JSON</label>
+          <label className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("wwPasteThemeJson")}</label>
           <textarea
             name="themeJson"
             rows={4}
@@ -249,28 +248,26 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
             disabled={nav.state !== "idle"}
             className="mt-2 rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            Apply theme
+            {t("wwApplyTheme")}
           </button>
         </Form>
       </section>
 
       {/* Build a fully custom widget (advanced) */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-1 font-serif text-[18px] font-semibold">Build a fully custom widget</h2>
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwCustomTitle")}</h2>
         <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
-          Want total control over the design — corners, layout, wording, your own framework? Copy this
-          brief into ChatGPT or Claude and it'll build a bespoke widget from scratch. It just needs the
-          deep-link below; the booking page handles availability and pricing.
+          {t("wwCustomIntro")}
         </p>
 
-        <label className="mb-1.5 block text-[13px] font-semibold text-secondary">Your website tech (optional)</label>
+        <label className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("wwTechLabel")}</label>
         <input
           ref={techRef}
-          placeholder="e.g. WordPress, Squarespace, React, plain HTML"
+          placeholder={t("wwTechPlaceholder")}
           className={`${input} mb-3 w-full max-w-sm`}
         />
 
-        <div className="mb-1.5 text-[13px] font-semibold text-secondary">Booking deep-link for this property</div>
+        <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("wwDeepLinkLabel")}</div>
         <code className="mb-3 block whitespace-pre-wrap break-all rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 font-mono text-[12.5px] text-ink">
           {deepLink}
         </code>
@@ -280,21 +277,20 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
           onClick={copyDevBrief}
           className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
         >
-          {devCopied ? "Copied brief ✓" : "Copy developer brief"}
+          {devCopied ? t("wwBriefCopied") : t("wwCopyDevBrief")}
         </button>
         <p className="mt-2.5 text-[12.5px] text-muted">
-          The brief reuses the brand description above. Uses the same date/guest params as the standard
-          widget, so anything built this way drops straight into your booking flow.
+          {t("wwCustomHint")}
         </p>
       </section>
 
       {/* Live preview */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-1 font-serif text-[18px] font-semibold">Live preview</h2>
-        <p className="mb-4 text-[13.5px] text-muted">Exactly what visitors see on your site.</p>
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwLivePreview")}</h2>
+        <p className="mb-4 text-[13.5px] text-muted">{t("wwLivePreviewHint")}</p>
         <iframe
           key={themeVersion}
-          title="Widget preview"
+          title={t("wwPreviewIframeTitle")}
           src={previewSrc}
           className="w-full rounded-[12px] border border-line-alt"
           style={{ height: 160 }}

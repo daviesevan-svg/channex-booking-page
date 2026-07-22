@@ -3,6 +3,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/taxes";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveTaxSettings } from "~/lib/overrides.server";
@@ -17,10 +18,24 @@ import {
   type TaxRule,
 } from "~/lib/pricing";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_KEYS = [
+  "txMonthJan",
+  "txMonthFeb",
+  "txMonthMar",
+  "txMonthApr",
+  "txMonthMay",
+  "txMonthJun",
+  "txMonthJul",
+  "txMonthAug",
+  "txMonthSep",
+  "txMonthOct",
+  "txMonthNov",
+  "txMonthDec",
+];
 
 /** Annual month-day picker ("MM-DD") for the seasonal city-tax ranges. */
 function MonthDay({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useAdminT();
   const [mm = "01", dd = "01"] = value.split("-");
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
@@ -41,9 +56,9 @@ function MonthDay({ value, onChange }: { value: string; onChange: (v: string) =>
         onChange={(e) => onChange(`${e.target.value}-${dd}`)}
         className="rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
       >
-        {MONTHS.map((m, i) => (
-          <option key={m} value={pad(i + 1)}>
-            {m}
+        {MONTH_KEYS.map((k, i) => (
+          <option key={k} value={pad(i + 1)}>
+            {t(k)}
           </option>
         ))}
       </select>
@@ -90,10 +105,10 @@ const defaultCityTax = (): CityTaxConfig => ({
   maxNights: 0,
 });
 
-const BASIS_LABELS: Record<CityTaxBasis, string> = {
-  person_night: "per person, per night",
-  room_night: "per room, per night",
-  room_stay: "per room, per stay",
+const BASIS_LABEL_KEYS: Record<CityTaxBasis, string> = {
+  person_night: "txBasisPersonNight",
+  room_night: "txBasisRoomNight",
+  room_stay: "txBasisRoomStay",
 };
 
 const sectionCls = "rounded-[14px] border border-line bg-surface p-6";
@@ -102,6 +117,7 @@ const smallInput =
   "rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2 text-[14px] text-ink outline-none focus:border-accent";
 
 export default function AdminTaxes({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const nav = useNavigation();
   const saving = nav.state === "submitting";
 
@@ -115,10 +131,10 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
   if (!loaderData.configured) {
     return (
       <div className={sectionCls}>
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Taxes &amp; Fees</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("txTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to configure
-          taxes.
+          {t("txConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("txConfigureSuffix")}
         </p>
       </div>
     );
@@ -145,10 +161,10 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Taxes &amp; Fees</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("txTitle")}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
@@ -161,11 +177,8 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
 
         {/* 1. Taxes */}
         <section className={sectionCls}>
-          <div className="mb-1 font-serif text-[18px] font-semibold">Tax</div>
-          <p className="mb-4 text-[13.5px] text-muted">
-            Percentage taxes like VAT. The toggle below decides whether your inventory prices already
-            include them or they&rsquo;re added on top.
-          </p>
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("txTaxSection")}</div>
+          <p className="mb-4 text-[13.5px] text-muted">{t("txTaxIntro")}</p>
 
           <label className="mb-4 flex items-center gap-2.5 text-[14px] font-semibold">
             <input
@@ -175,19 +188,19 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
               onChange={(e) => setInclusive(e.target.checked)}
               className={checkbox}
             />
-            Inventory prices already include tax
+            {t("txInclusiveLabel")}
             <span className="font-normal text-faint">
-              {inclusive ? "(carved out of the price)" : "(added on top at checkout)"}
+              {inclusive ? t("txInclusiveOn") : t("txInclusiveOff")}
             </span>
           </label>
 
           <div className="flex flex-col gap-2.5">
-            {taxes.map((t, i) => (
-              <div key={t.id} className="flex items-center gap-2.5">
+            {taxes.map((tax, i) => (
+              <div key={tax.id} className="flex items-center gap-2.5">
                 <input
-                  value={t.name}
+                  value={tax.name}
                   onChange={(e) => setTax(i, { name: e.target.value })}
-                  placeholder="VAT"
+                  placeholder={t("txTaxNamePlaceholder")}
                   className={`${smallInput} flex-1`}
                 />
                 <div className="flex items-center gap-1.5">
@@ -196,7 +209,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     min={0}
                     max={100}
                     step="0.01"
-                    value={t.rate}
+                    value={tax.rate}
                     onChange={(e) => setTax(i, { rate: Number(e.target.value) })}
                     className={`${smallInput} w-24 text-right`}
                   />
@@ -207,7 +220,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   onClick={() => setTaxes((prev) => prev.filter((_, j) => j !== i))}
                   className="text-[13px] font-semibold text-[#c0392b] hover:underline"
                 >
-                  Remove
+                  {t("txRemove")}
                 </button>
               </div>
             ))}
@@ -217,16 +230,14 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
             onClick={() => setTaxes((prev) => [...prev, { id: rid(), name: "VAT", rate: 20 }])}
             className="mt-3 text-[13px] font-semibold text-accent hover:underline"
           >
-            + Add tax
+            {t("txAddTax")}
           </button>
         </section>
 
         {/* 2. City tax */}
         <section className={sectionCls}>
-          <div className="mb-1 font-serif text-[18px] font-semibold">City tax</div>
-          <p className="mb-4 text-[13.5px] text-muted">
-            A fixed local tax, charged per person/room and night. Always added on top.
-          </p>
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("txCityTaxSection")}</div>
+          <p className="mb-4 text-[13.5px] text-muted">{t("txCityTaxIntro")}</p>
 
           {!cityTax ? (
             <button
@@ -234,22 +245,22 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
               onClick={() => setCityTax(defaultCityTax())}
               className="text-[13px] font-semibold text-accent hover:underline"
             >
-              + Add city tax
+              {t("txAddCityTax")}
             </button>
           ) : (
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Name
+                  {t("txName")}
                   <input
                     value={cityTax.name}
                     onChange={(e) => setCity({ name: e.target.value })}
-                    placeholder="City tax"
+                    placeholder={t("txCityTaxPlaceholder")}
                     className={FIELD_INPUT}
                   />
                 </label>
                 <label className={`block text-[13px] font-semibold text-secondary ${cityTax.seasons ? "opacity-50" : ""}`}>
-                  Amount ({currency})
+                  {t("txAmountCurrency", { currency })}
                   <input
                     type="number"
                     min={0}
@@ -260,19 +271,19 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     className={FIELD_INPUT}
                   />
                   {cityTax.seasons && (
-                    <span className="mt-1 block text-[11px] font-normal text-faint">Set per season below.</span>
+                    <span className="mt-1 block text-[11px] font-normal text-faint">{t("txSetPerSeason")}</span>
                   )}
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Charged
+                  {t("txCharged")}
                   <select
                     value={cityTax.basis}
                     onChange={(e) => setCity({ basis: e.target.value as CityTaxBasis })}
                     className={FIELD_INPUT}
                   >
-                    {(Object.keys(BASIS_LABELS) as CityTaxBasis[]).map((b) => (
+                    {(Object.keys(BASIS_LABEL_KEYS) as CityTaxBasis[]).map((b) => (
                       <option key={b} value={b}>
-                        {BASIS_LABELS[b]}
+                        {t(BASIS_LABEL_KEYS[b])}
                       </option>
                     ))}
                   </select>
@@ -286,7 +297,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     onChange={(e) => setCity({ taxable: e.target.checked })}
                     className={checkbox}
                   />
-                  VAT applies to city tax
+                  {t("txVatAppliesCityTax")}
                 </label>
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
                   <input
@@ -295,10 +306,10 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     onChange={(e) => setCity({ childrenExempt: e.target.checked })}
                     className={checkbox}
                   />
-                  Children exempt
+                  {t("txChildrenExempt")}
                 </label>
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
-                  Max nights charged
+                  {t("txMaxNights")}
                   <input
                     type="number"
                     min={0}
@@ -306,7 +317,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     onChange={(e) => setCity({ maxNights: Number(e.target.value) })}
                     className={`${smallInput} w-20`}
                   />
-                  <span className="font-normal text-faint">(0 = no cap)</span>
+                  <span className="font-normal text-faint">{t("txNoCap")}</span>
                 </label>
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
                   <input
@@ -324,14 +335,14 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     }
                     className={checkbox}
                   />
-                  Seasonal rates
+                  {t("txSeasonalRates")}
                 </label>
                 <button
                   type="button"
                   onClick={() => setCityTax(null)}
                   className="text-[13px] font-semibold text-[#c0392b] hover:underline"
                 >
-                  Remove
+                  {t("txRemove")}
                 </button>
               </div>
 
@@ -346,7 +357,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                       setCity({ seasons: cityTax.seasons!.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
                     return (
                       <div key={i} className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[13px]">
-                        <span className="w-16 font-semibold text-secondary">Season {i + 1}</span>
+                        <span className="w-16 font-semibold text-secondary">{t("txSeason", { n: i + 1 })}</span>
                         <MonthDay value={s.from} onChange={(from) => setSeason({ from })} />
                         <span className="text-muted-2">→</span>
                         <MonthDay value={s.to} onChange={(to) => setSeason({ to })} />
@@ -367,7 +378,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                             onClick={() => setCity({ seasons: cityTax.seasons!.filter((_, j) => j !== i) })}
                             className="text-[12.5px] font-semibold text-[#c0392b] hover:underline"
                           >
-                            Remove
+                            {t("txRemove")}
                           </button>
                         )}
                       </div>
@@ -381,14 +392,10 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                       }
                       className="self-start text-[13px] font-semibold text-accent hover:underline"
                     >
-                      + Add a third season
+                      {t("txAddThirdSeason")}
                     </button>
                   )}
-                  <p className="text-[12px] text-muted">
-                    Dates recur every year (a range may wrap the year end). Each night is charged at
-                    its own date's rate — a stay spanning two seasons mixes them. Nights outside every
-                    season aren't charged.
-                  </p>
+                  <p className="text-[12px] text-muted">{t("txSeasonsHint")}</p>
                 </div>
               )}
             </div>
@@ -397,11 +404,8 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
 
         {/* 3. Fees */}
         <section className={sectionCls}>
-          <div className="mb-1 font-serif text-[18px] font-semibold">Fees</div>
-          <p className="mb-4 text-[13.5px] text-muted">
-            Service charges or other extras, as a percentage of the room or a fixed amount. Always
-            added on top.
-          </p>
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("txFeesSection")}</div>
+          <p className="mb-4 text-[13.5px] text-muted">{t("txFeesIntro")}</p>
 
           <div className="flex flex-col gap-2.5">
             {fees.map((f, i) => (
@@ -409,7 +413,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                 <input
                   value={f.name}
                   onChange={(e) => setFee(i, { name: e.target.value })}
-                  placeholder="Service charge"
+                  placeholder={t("txFeeNamePlaceholder")}
                   className={`${smallInput} min-w-[160px] flex-1`}
                 />
                 {/* One select encodes kind + (for fixed fees) the basis. */}
@@ -422,12 +426,12 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   }}
                   className={smallInput}
                 >
-                  <option value="percent">% of room</option>
-                  <option value="fixed:booking">Fixed ({currency}) — per stay</option>
-                  <option value="fixed:room">Fixed ({currency}) — per room</option>
-                  <option value="fixed:room_night">Fixed ({currency}) — per room, per night</option>
-                  <option value="fixed:person">Fixed ({currency}) — per person</option>
-                  <option value="fixed:person_night">Fixed ({currency}) — per person, per night</option>
+                  <option value="percent">{t("txFeePercent")}</option>
+                  <option value="fixed:booking">{t("txFeeFixedStay", { currency })}</option>
+                  <option value="fixed:room">{t("txFeeFixedRoom", { currency })}</option>
+                  <option value="fixed:room_night">{t("txFeeFixedRoomNight", { currency })}</option>
+                  <option value="fixed:person">{t("txFeeFixedPerson", { currency })}</option>
+                  <option value="fixed:person_night">{t("txFeeFixedPersonNight", { currency })}</option>
                 </select>
                 <input
                   type="number"
@@ -444,14 +448,14 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                     onChange={(e) => setFee(i, { taxable: e.target.checked })}
                     className={checkbox}
                   />
-                  VAT applies
+                  {t("txVatApplies")}
                 </label>
                 <button
                   type="button"
                   onClick={() => setFees((prev) => prev.filter((_, j) => j !== i))}
                   className="text-[13px] font-semibold text-[#c0392b] hover:underline"
                 >
-                  Remove
+                  {t("txRemove")}
                 </button>
               </div>
             ))}
@@ -466,19 +470,17 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
             }
             className="mt-3 text-[13px] font-semibold text-accent hover:underline"
           >
-            + Add fee
+            {t("txAddFee")}
           </button>
         </section>
 
         {/* Live preview */}
         <section className={`${sectionCls} bg-surface-alt`}>
-          <div className="mb-1 font-serif text-[16px] font-semibold">Example</div>
-          <p className="mb-3 text-[12.5px] text-muted">
-            A 2-night stay for 2 adults at a {money(200)} room price.
-          </p>
+          <div className="mb-1 font-serif text-[16px] font-semibold">{t("txExample")}</div>
+          <p className="mb-3 text-[12.5px] text-muted">{t("txExampleIntro", { price: money(200) })}</p>
           <div className="flex flex-col gap-1.5 text-[14px]">
             <div className="flex justify-between">
-              <span className="text-secondary">Room</span>
+              <span className="text-secondary">{t("txRoom")}</span>
               <span className="font-semibold">{money(preview.base)}</span>
             </div>
             {preview.charges.map((c, i) => (
@@ -494,12 +496,12 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
               </div>
             ))}
             <div className="mt-1.5 flex justify-between border-t border-divider pt-2 text-[15px]">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">{t("txTotal")}</span>
               <span className="font-serif text-[18px] font-semibold">{money(preview.total)}</span>
             </div>
             {preview.taxIncluded > 0 && (
               <div className="text-right text-[12px] text-muted-2">
-                Includes {money(preview.taxIncluded)} VAT
+                {t("txIncludesVat", { amount: money(preview.taxIncluded) })}
               </div>
             )}
           </div>
@@ -512,7 +514,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save settings"}
+            {saving ? t("saving") : t("txSaveSettings")}
           </button>
         </div>
       </Form>
