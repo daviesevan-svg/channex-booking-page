@@ -13,6 +13,16 @@ export interface RevNightRow {
   children: number | null;
 }
 
+/** A "running" import whose heartbeat is older than this is considered dead. */
+export const IMPORT_STALL_MS = 10 * 60_000;
+
+export function importLooksStalled(state: { importStatus: string; progressAt?: string }): boolean {
+  return (
+    state.importStatus === "running" &&
+    (!state.progressAt || Date.now() - Date.parse(state.progressAt) > IMPORT_STALL_MS)
+  );
+}
+
 export function daysBetween(fromISO: string, toISO: string): number {
   return Math.round((Date.parse(`${toISO}T00:00:00Z`) - Date.parse(`${fromISO}T00:00:00Z`)) / 86_400_000);
 }
