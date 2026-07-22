@@ -12,7 +12,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { fmtDate, todayISODate } from "~/lib/dates";
 import { formatMoney } from "~/lib/money";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getPaceCalendar, getRevmanKpis, type Kpi, type PaceDay, type RevmanKpis } from "~/lib/revman-analytics.server";
+import { getForecast, getPaceCalendar, getRevmanKpis, type Kpi, type PaceDay } from "~/lib/revman-analytics.server";
 import type { SalesScore } from "~/lib/revman-pace";
 import {
   connectRevman,
@@ -42,7 +42,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     .slice(0, 10);
   const paceDays = state && hasData ? await getPaceCalendar(pid, paceFrom, paceTo, today, state.roomCount) : undefined;
 
-  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays };
+  // Forecast covers the current month (chart overlay) through 30 days out.
+  const monthFrom = `${today.slice(0, 8)}01`;
+  const forecastTo = new Date(Date.parse(`${today}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
+  const forecast = state && hasData ? await getForecast(pid, monthFrom, forecastTo, state.roomCount) : undefined;
+
+  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast };
 }
 
 export function meta() {
@@ -274,32 +279,46 @@ function PaceCalendar({
   );
 }
 
-/** Current-month occupancy column chart — hand-rolled like the analytics page. */
-function OccupancyChart({ kpis, roomCount, today }: { kpis: RevmanKpis; roomCount: number; today: string }) {
-  const byDate = new Map(kpis.monthOccupancy.map((r) => [r.date, r.nights]));
-  const monthFrom = `${today.slice(0, 8)}01`;
-  const days: { date: string; nights: number }[] = [];
-  for (let i = 0; i < 31; i++) {
-    const d = new Date(`${monthFrom}T00:00:00Z`);
-    d.setUTCDate(d.getUTCDate() + i);
-    const iso = d.toISOString().slice(0, 10);
-    if (iso.slice(0, 7) !== today.slice(0, 7)) break;
-    days.push({ date: iso, nights: byDate.get(iso) ?? 0 });
-  }
+/** Occupancy column chart with an optional dashed forecast tick per bar —
+ *  hand-rolled like the analytics page. */
+function OccupancyChart({
+  days,
+  roomCount,
+  today,
+  forecastLabel,
+}: {
+  days: { date: string; nights: number; forecast?: number }[];
+  roomCount: number;
+  today: string;
+  forecastLabel: string;
+}) {
   const cap = Math.max(1, roomCount);
   return (
-    <div className="flex h-[160px] items-end gap-[3px]">
+    <div className="flex h-[160px] gap-[3px]">
       {days.map((d) => {
         const h = Math.min(1, d.nights / cap);
         const past = d.date < today;
+        const fc = d.forecast === undefined ? undefined : Math.min(1, d.forecast / cap);
         return (
           <div key={d.date} className="group relative flex-1">
             <div
-              className={`w-full rounded-t-[3px] ${past ? "bg-chip-border" : "bg-accent"} ${d.date === today ? "ring-2 ring-accent/40" : ""}`}
+              className={`absolute bottom-0 w-full rounded-t-[3px] ${past ? "bg-chip-border" : "bg-accent"} ${d.date === today ? "ring-2 ring-accent/40" : ""}`}
               style={{ height: `${Math.max(2, h * 152)}px` }}
             />
+            {fc !== undefined && !past && (
+              <div
+                className="absolute w-full border-t-2 border-dashed border-ink/50"
+                style={{ bottom: `${Math.max(2, fc * 152)}px` }}
+              />
+            )}
             <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-secondary shadow-sm group-hover:block">
               {d.date.slice(8)}.{d.date.slice(5, 7)} · {d.nights}/{cap} · {pctText(d.nights / cap)}
+              {d.forecast !== undefined && !past && (
+                <>
+                  <br />
+                  {forecastLabel}: {d.forecast}/{cap} · {pctText(d.forecast / cap)}
+                </>
+              )}
             </div>
           </div>
         );
@@ -330,7 +349,8 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { state, summary, kpis, paceDays, paceMonth } = loaderData;
+  const { state, summary, kpis, paceDays, paceMonth, forecast } = loaderData;
+  const forecastByDate = new Map((forecast ?? []).map((f) => [f.date, f]));
   const pick = actionData && "pick" in actionData && actionData.pick ? { pick: actionData.pick, apiKey: actionData.apiKey } : undefined;
   const money = (minor: number, currency?: string) => formatMoney(minor / 100, currency ?? "EUR");
 
@@ -434,9 +454,41 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
 
               <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
                 <div className="font-serif text-[18px] font-semibold">{t("revOccChartTitle")}</div>
-                <p className="mb-4 mt-1 text-[13px] text-muted">{t("revOccChartSub", { count: String(state.roomCount) })}</p>
-                <OccupancyChart kpis={kpis} roomCount={state.roomCount} today={loaderData.today} />
+                <p className="mb-4 mt-1 text-[13px] text-muted">
+                  {t("revOccChartSub", { count: String(state.roomCount) })} {forecast && t("revForecastLegend")}
+                </p>
+                <OccupancyChart
+                  days={(() => {
+                    const byDate = new Map(kpis.monthOccupancy.map((r) => [r.date, r.nights]));
+                    const monthFrom = `${loaderData.today.slice(0, 8)}01`;
+                    const out: { date: string; nights: number; forecast?: number }[] = [];
+                    for (let i = 0; i < 31; i++) {
+                      const iso = new Date(Date.parse(`${monthFrom}T00:00:00Z`) + i * 86_400_000).toISOString().slice(0, 10);
+                      if (iso.slice(0, 7) !== loaderData.today.slice(0, 7)) break;
+                      out.push({ date: iso, nights: byDate.get(iso) ?? 0, forecast: forecastByDate.get(iso)?.forecast });
+                    }
+                    return out;
+                  })()}
+                  roomCount={state.roomCount}
+                  today={loaderData.today}
+                  forecastLabel={t("revForecast")}
+                />
               </section>
+
+              {forecast && (
+                <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
+                  <div className="font-serif text-[18px] font-semibold">{t("revForecastTitle")}</div>
+                  <p className="mb-4 mt-1 max-w-[620px] text-[13px] text-muted">{t("revForecastSub")}</p>
+                  <OccupancyChart
+                    days={forecast
+                      .filter((f) => f.date >= loaderData.today)
+                      .map((f) => ({ date: f.date, nights: f.onBooks, forecast: f.forecast }))}
+                    roomCount={state.roomCount}
+                    today={loaderData.today}
+                    forecastLabel={t("revForecast")}
+                  />
+                </section>
+              )}
 
               {paceDays && (
                 <PaceCalendar days={paceDays} month={paceMonth} today={loaderData.today} roomCount={state.roomCount} />
