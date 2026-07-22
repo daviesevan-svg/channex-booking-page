@@ -5,11 +5,12 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSearchAnalytics } from "~/lib/search-analytics.server";
 import { COUNTRIES } from "~/lib/countries";
+import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 
 const WINDOWS = [
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
-  { days: 365, label: "12 months" },
+  { days: 30, labelKey: "anWindow30" },
+  { days: 90, labelKey: "anWindow90" },
+  { days: 365, labelKey: "anWindow365" },
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -30,13 +31,13 @@ export function meta() {
   return [{ title: "Admin · Search analytics" }];
 }
 
-const countryName = (code: string) =>
-  code === "??" ? "Unknown" : COUNTRIES.find((c) => c.code === code)?.name ?? code;
+const countryName = (code: string, unknown: string) =>
+  code === "??" ? unknown : COUNTRIES.find((c) => c.code === code)?.name ?? code;
 
-const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DOW = ["anDowSun", "anDowMon", "anDowTue", "anDowWed", "anDowThu", "anDowFri", "anDowSat"];
 
-const fmtDate = (iso: string) =>
-  new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", {
+const fmtDate = (iso: string, lang: string) =>
+  new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang === "de" ? "de-DE" : "en-GB", {
     weekday: "short",
     day: "numeric",
     month: "short",
@@ -61,8 +62,9 @@ function Bars({
   rows: { label: string; value: number; note?: string }[];
   max?: number;
 }) {
+  const t = useAdminT();
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
-  if (rows.length === 0) return <p className="text-[13.5px] text-muted">No data yet.</p>;
+  if (rows.length === 0) return <p className="text-[13.5px] text-muted">{t("anNoDataYet")}</p>;
   return (
     <div className="flex flex-col gap-2">
       {rows.map((r) => (
@@ -96,13 +98,15 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 
 export default function Analytics({ loaderData }: Route.ComponentProps) {
   const [, setSearchParams] = useSearchParams();
+  const t = useAdminT();
+  const lang = useAdminLang();
 
   if (!loaderData.configured) {
     return (
       <div>
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Search analytics</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("anTitle")}</h1>
         <p className="text-[14px] text-muted">
-          Select a property first on the <Link to="/admin/select-property" className="text-accent underline">properties page</Link>.
+          {t("anSelectPropertyPrefix")} <Link to="/admin/select-property" className="text-accent underline">{t("anSelectPropertyLink")}</Link>.
         </p>
       </div>
     );
@@ -116,10 +120,8 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-serif text-[26px] font-semibold">Search analytics</h1>
-          <p className="mt-1 text-[13.5px] text-muted">
-            What guests searched for on your booking page — demand you can price against.
-          </p>
+          <h1 className="font-serif text-[26px] font-semibold">{t("anTitle")}</h1>
+          <p className="mt-1 text-[13.5px] text-muted">{t("anSubtitle")}</p>
         </div>
         <div className="flex gap-1 rounded-[10px] border border-line-alt bg-surface p-1">
           {WINDOWS.map((w) => (
@@ -130,7 +132,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
                 days === w.days ? "bg-accent text-white" : "text-secondary hover:bg-field-hover"
               }`}
             >
-              {w.label}
+              {t(w.labelKey)}
             </button>
           ))}
         </div>
@@ -138,44 +140,37 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
 
       {totals.searches === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-8 text-center">
-          <div className="font-serif text-[18px] font-semibold">No searches recorded yet</div>
-          <p className="mx-auto mt-2 max-w-[440px] text-[13.5px] text-muted">
-            Every availability search on your booking page is logged from now on. Come back once
-            guests have started searching — you'll see the dates they want, how far ahead they book,
-            and where they're from.
-          </p>
+          <div className="font-serif text-[18px] font-semibold">{t("anEmptyTitle")}</div>
+          <p className="mx-auto mt-2 max-w-[440px] text-[13.5px] text-muted">{t("anEmptyBody")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
           {/* KPI row */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <Kpi label="Searches" value={String(totals.searches)} sub={`last ${days} days`} />
+            <Kpi label={t("anKpiSearches")} value={String(totals.searches)} sub={t("anKpiLastDays", { n: days })} />
             <Kpi
-              label="Found nothing"
+              label={t("anKpiFoundNothing")}
               value={`${lostShare}%`}
-              sub={`${totals.lost} searches with no availability`}
+              sub={t("anKpiLostSub", { n: totals.lost })}
             />
             <Kpi
-              label="Booking window"
-              value={totals.avgLeadDays == null ? "—" : `${totals.avgLeadDays}d`}
-              sub="average days before arrival"
+              label={t("anBookingWindow")}
+              value={totals.avgLeadDays == null ? "—" : t("anLeadDaysShort", { n: totals.avgLeadDays })}
+              sub={t("anKpiWindowSub")}
             />
             <Kpi
-              label="Stay length"
+              label={t("anKpiStay")}
               value={totals.avgNights == null ? "—" : `${totals.avgNights}`}
-              sub={`avg nights · party of ${totals.avgParty ?? "—"}`}
+              sub={t("anKpiStaySub", { party: totals.avgParty ?? "—" })}
             />
           </div>
 
           {/* Lost demand — the actionable one, so it goes first when present. */}
           {data.lostDates.length > 0 && (
-            <Card
-              title="Dates turning guests away"
-              sub="Arrival dates where searches found nothing bookable — demand you're not capturing. Check inventory, stop-sells and min-stay rules for these dates."
-            >
+            <Card title={t("anLostTitle")} sub={t("anLostSub")}>
               <Bars
                 rows={data.lostDates.map((d) => ({
-                  label: fmtDate(d.checkin),
+                  label: fmtDate(d.checkin, lang),
                   value: Number(d.lost),
                   note: `/ ${d.total}`,
                 }))}
@@ -184,31 +179,31 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           )}
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="Most-searched arrival dates" sub="Where guest demand is concentrated.">
+            <Card title={t("anTopArrivalsTitle")} sub={t("anTopArrivalsSub")}>
               <Bars
                 rows={data.topArrivals.slice(0, 10).map((d) => ({
-                  label: fmtDate(d.checkin),
+                  label: fmtDate(d.checkin, lang),
                   value: Number(d.searches),
                 }))}
               />
             </Card>
 
-            <Card title="Arrival day of week" sub="Which days guests want to check in.">
+            <Card title={t("anArrivalDowTitle")} sub={t("anArrivalDowSub")}>
               <Bars
                 rows={[1, 2, 3, 4, 5, 6, 0].map((dow) => ({
-                  label: DOW[dow],
+                  label: t(DOW[dow]),
                   value: Number(data.arrivalDow.find((r) => r.dow === dow)?.searches ?? 0),
                 }))}
               />
             </Card>
 
-            <Card title="Booking window" sub="How far ahead of arrival guests search.">
+            <Card title={t("anBookingWindow")} sub={t("anWindowSub")}>
               <Bars
                 rows={data.leadBuckets.map((b) => ({ label: b.bucket, value: Number(b.searches) }))}
               />
             </Card>
 
-            <Card title="Length of stay" sub="How many nights guests search for.">
+            <Card title={t("anLosTitle")} sub={t("anLosSub")}>
               <Bars
                 rows={data.losBuckets.map((b) => ({ label: b.bucket, value: Number(b.searches) }))}
               />
@@ -216,18 +211,18 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-2">
-            <Card title="Guest countries" sub="Where searches come from (by visitor IP).">
+            <Card title={t("anCountriesTitle")} sub={t("anCountriesSub")}>
               <Bars
                 rows={data.countries.map((c) => ({
-                  label: countryName(c.country),
+                  label: countryName(c.country, t("anCountryUnknown")),
                   value: Number(c.searches),
                 }))}
               />
             </Card>
 
-            <Card title="Search activity" sub="Searches per day over the selected period.">
+            <Card title={t("anActivityTitle")} sub={t("anActivitySub")}>
               {data.perDay.length === 0 ? (
-                <p className="text-[13.5px] text-muted">No data yet.</p>
+                <p className="text-[13.5px] text-muted">{t("anNoDataYet")}</p>
               ) : (
                 <div className="flex h-[160px] items-end gap-[2px]">
                   {data.perDay.map((d) => {
@@ -235,7 +230,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
                     return (
                       <div
                         key={d.day}
-                        title={`${d.day}: ${d.searches} search${Number(d.searches) === 1 ? "" : "es"}`}
+                        title={`${d.day}: ${t(Number(d.searches) === 1 ? "anSearchCount_one" : "anSearchCount_other", { n: d.searches })}`}
                         className="flex-1 rounded-t-[3px] bg-accent/70 hover:bg-accent"
                         style={{ height: `${Math.max(3, (Number(d.searches) / top) * 100)}%` }}
                       />

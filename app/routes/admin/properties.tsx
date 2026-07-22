@@ -2,6 +2,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/properties";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin, setSessionProperty } from "~/lib/auth.server";
 import {
   addProperty,
@@ -95,20 +96,20 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
   const { properties, current, isSuperadmin: su, userEmails } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
+  const t = useAdminT();
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Properties</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("prsTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        Each property has its own rooms, rates, inventory, taxes, content and bookings. Use the
-        switcher in the header (or “Edit” below) to choose which one you’re managing. Mark a
-        property <strong>Public</strong> to list it on the booking-engine home page.
-        {su && " As a superadmin you can see every property and reassign its owner."}
+        {t("prsIntroPre")} <strong>{t("prsPublic")}</strong>
+        {t("prsIntroPost")}
+        {su && t("prsIntroSuper")}
       </p>
 
       {properties.length === 0 && (
         <div className="mb-7 rounded-[14px] border border-dashed border-line bg-surface px-5 py-6 text-[14px] text-muted">
-          You don’t have any properties yet. Add one below to get started.
+          {t("prsEmpty")}
         </div>
       )}
 
@@ -127,22 +128,22 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                   <span className="font-semibold">{p.name}</span>
                   {p.id === current && (
                     <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
-                      Editing
+                      {t("prsEditing")}
                     </span>
                   )}
                   {!p.canManage && (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
-                      Teammate
+                      {t("prsTeammate")}
                     </span>
                   )}
                 </div>
                 <div className="mt-0.5 font-mono text-[12px] text-muted-2">{p.id}</div>
                 {su && (
                   <div className="mt-0.5 text-[12px] text-muted">
-                    Owner: {p.owner ?? <span className="italic text-faint">unassigned</span>}
+                    {t("prsOwner")}: {p.owner ?? <span className="italic text-faint">{t("prsUnassigned")}</span>}
                     {p.members && p.members.length > 0 && (
                       <span className="text-muted-2">
-                        {" "}· {p.members.length} teammate{p.members.length === 1 ? "" : "s"}
+                        {" "}· {t(p.members.length === 1 ? "prsTeammates_one" : "prsTeammates_other", { n: p.members.length })}
                       </span>
                     )}
                   </div>
@@ -157,11 +158,11 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                       name="owner"
                       defaultValue={p.owner ?? ""}
                       onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                      aria-label="Owner"
-                      title="Reassign owner"
+                      aria-label={t("prsOwner")}
+                      title={t("prsReassignOwner")}
                       className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[12px] font-semibold text-ink outline-none focus:border-accent"
                     >
-                      <option value="">Unassigned</option>
+                      <option value="">{t("prsUnassignedOption")}</option>
                       {[...new Set([...userEmails, ...(p.owner ? [p.owner] : [])])].map((em) => (
                         <option key={em} value={em}>
                           {em}
@@ -171,7 +172,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                   </Form>
                 )}
                 {p.canManage ? (
-                  <Form method="post" title={p.public ? "Listed on the public home page" : "Hidden from the public home page"}>
+                  <Form method="post" title={p.public ? t("prsListedTitle") : t("prsHiddenTitle")}>
                     <input type="hidden" name="intent" value="togglePublic" />
                     <input type="hidden" name="id" value={p.id} />
                     {/* flips the current value: send "on" only when turning it public */}
@@ -184,18 +185,18 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                           : "bg-chip text-muted hover:bg-line"
                       }`}
                     >
-                      {p.public ? "Public" : "Private"}
+                      {p.public ? t("prsPublic") : t("prsPrivate")}
                     </button>
                   </Form>
                 ) : (
                   p.public && (
                     <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
-                      Public
+                      {t("prsPublic")}
                     </span>
                   )
                 )}
                 <Link to={`/${p.slug || p.id}`} target="_blank" className="text-muted hover:text-accent">
-                  View ↗
+                  {t("prsView")}
                 </Link>
                 {p.id !== current && (
                   // reloadDocument: this sets the property cookie + redirects, so
@@ -207,7 +208,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     <input type="hidden" name="intent" value="switch" />
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className="text-accent hover:underline">
-                      Edit
+                      {t("prsEdit")}
                     </button>
                   </Form>
                 )}
@@ -218,18 +219,13 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     method="post"
                     reloadDocument
                     onSubmit={(e) => {
-                      if (
-                        !confirm(
-                          `Clone “${p.name}”? Rooms, rates, texts, taxes and extras are copied to a new property (connections, web address and public listing are not). Handy for multiple apartments in one building: clone once per unit, then delete the rooms that don't apply.`,
-                        )
-                      )
-                        e.preventDefault();
+                      if (!confirm(t("prsCloneConfirm", { name: p.name }))) e.preventDefault();
                     }}
                   >
                     <input type="hidden" name="intent" value="clone" />
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" disabled={saving} className="hover:text-accent hover:underline disabled:opacity-60">
-                      Clone
+                      {t("prsClone")}
                     </button>
                   </Form>
                 )}
@@ -237,13 +233,13 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                   <Form
                     method="post"
                     onSubmit={(e) => {
-                      if (!confirm(`Remove “${p.name}” from the list? Its data is kept.`)) e.preventDefault();
+                      if (!confirm(t("prsRemoveConfirm", { name: p.name }))) e.preventDefault();
                     }}
                   >
                     <input type="hidden" name="intent" value="delete" />
                     <input type="hidden" name="id" value={p.id} />
                     <button type="submit" className="text-[#c0392b] hover:underline">
-                      Remove
+                      {t("prsRemove")}
                     </button>
                   </Form>
                 )}
@@ -259,30 +255,29 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
         className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-6 py-5 hover:border-accent"
       >
         <span>
-          <span className="block font-serif text-[18px] font-semibold">Onboard from Channex ↗</span>
+          <span className="block font-serif text-[18px] font-semibold">{t("prsOnboardTitle")}</span>
           <span className="block text-[13px] text-muted">
-            Import a property’s details, room types and rate plans from your Channex account.
+            {t("prsOnboardDesc")}
           </span>
         </span>
-        <span className="flex-none text-[15px] font-semibold text-accent">Start →</span>
+        <span className="flex-none text-[15px] font-semibold text-accent">{t("prsStart")}</span>
       </Link>
 
       {/* add — reloadDocument: creating switches the session to the new property
           (see the Edit button above for why SPA nav is unsafe here). */}
       <Form method="post" reloadDocument className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
         <input type="hidden" name="intent" value="add" />
-        <h2 className="font-serif text-[18px] font-semibold">Add a property manually</h2>
+        <h2 className="font-serif text-[18px] font-semibold">{t("prsAddTitle")}</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
-            Name
-            <input name="name" placeholder="Seaside Inn" className={FIELD_INPUT} />
+            {t("prsName")}
+            <input name="name" placeholder={t("prsNamePlaceholder")} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
-            Property ID <span className="font-normal text-faint">(optional)</span>
-            <input name="id" placeholder="auto-generated" className={`${FIELD_INPUT} font-mono`} />
+            {t("prsId")} <span className="font-normal text-faint">{t("prsOptional")}</span>
+            <input name="id" placeholder={t("prsIdPlaceholder")} className={`${FIELD_INPUT} font-mono`} />
             <span className="mt-1 block text-[11px] font-normal text-faint">
-              For an Open Channel connection, set this to your Channex hotel code. Leave blank to
-              generate one.
+              {t("prsIdHint")}
             </span>
           </label>
         </div>
@@ -292,7 +287,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Adding…" : "Add property"}
+            {saving ? t("prsAdding") : t("prsAdd")}
           </button>
         </div>
       </Form>

@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/room";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
@@ -8,7 +9,7 @@ import { VR_AMENITY_KEYS } from "~/lib/content";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -86,6 +87,7 @@ export function meta() {
 }
 
 export default function AdminRoom({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const { isNew, room } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
@@ -97,11 +99,11 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         to="/admin/rooms"
         className="mb-4 inline-block text-[13px] font-semibold text-muted hover:text-accent"
       >
-        ← All rooms
+        {t("rmBackAll")}
       </Link>
       <div className="mb-5 flex items-center justify-between">
         <h1 className="font-serif text-[26px] font-semibold">
-          {isNew ? "New room" : room?.title}
+          {isNew ? t("rmNewTitle") : room?.title}
         </h1>
       </div>
 
@@ -111,38 +113,37 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <label className="block text-[13px] font-semibold text-secondary">
-          Room name
-          <input name="title" defaultValue={room?.title} placeholder="Executive Twin/Double" className={FIELD_INPUT} />
+          {t("rmNameLabel")}
+          <input name="title" defaultValue={room?.title} placeholder={t("rmNamePlaceholder")} className={FIELD_INPUT} />
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Description
+          {t("rmDescriptionLabel")}
           <textarea
             name="description"
             rows={5}
             defaultValue={room?.description}
-            placeholder="Describe this room…"
+            placeholder={t("rmDescriptionPlaceholder")}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
 
         <div className="grid grid-cols-2 gap-5">
           <label className="block text-[13px] font-semibold text-secondary">
-            Max adults
+            {t("rmMaxAdults")}
             <input name="maxAdults" type="number" min={1} defaultValue={room?.maxAdults ?? 2} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
-            Sleeps <span className="font-normal text-faint">(total guests — adults + children)</span>
+            {t("rmSleepsLabel")} <span className="font-normal text-faint">{t("rmSleepsHint")}</span>
             <input name="maxGuests" type="number" min={1} defaultValue={room?.maxGuests ?? 2} className={FIELD_INPUT} />
           </label>
         </div>
         <p className="-mt-2 text-[12.5px] text-faint">
-          There's no separate children limit — children are allowed up to the total guests minus the
-          adults in a booking (e.g. sleeps 4, max 2 adults → up to 2 children with 2 adults).
+          {t("rmChildrenNote")}
         </p>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Cleaning fee <span className="font-normal text-faint">(per stay, optional — VAT applies)</span>
+          {t("rmCleaningFee")} <span className="font-normal text-faint">{t("rmCleaningFeeHint")}</span>
           <input
             name="cleaningFee"
             type="number"
@@ -155,35 +156,34 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         </label>
 
         <div>
-          <div className="mb-2 text-[13px] font-semibold text-secondary">Amenities</div>
+          <div className="mb-2 text-[13px] font-semibold text-secondary">{t("rmAmenitiesTitle")}</div>
           <p className="mb-3 text-[12.5px] text-muted">
-            Tick what this room offers. Shown to guests in their language, and sent to Google
-            (which only accepts this fixed list).
+            {t("rmAmenitiesIntro")}
           </p>
           <AmenitiesPicker selected={room?.amenities ?? []} />
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Other facilities <span className="font-normal text-faint">(free text, one per line — shown to guests, not sent to Google)</span>
+          {t("rmFacilities")} <span className="font-normal text-faint">{t("rmFacilitiesHint")}</span>
           <textarea
             name="facilities"
             rows={4}
             defaultValue={room?.facilities.join("\n")}
-            placeholder={"Garden view\nEn-suite bathroom\nNespresso machine"}
+            placeholder={t("rmFacilitiesPlaceholder")}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
 
         {existing.length > 0 && (
           <div>
-            <div className="mb-2 text-[13px] font-semibold text-secondary">Current photos</div>
+            <div className="mb-2 text-[13px] font-semibold text-secondary">{t("rmCurrentPhotos")}</div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {existing.map((src) => (
                 <label key={src} className="block cursor-pointer">
                   <img src={src} alt="" className="h-28 w-full rounded-[10px] object-cover" />
                   <span className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-secondary">
                     <input type="checkbox" name="keepImage" value={src} defaultChecked />
-                    Keep
+                    {t("rmKeep")}
                   </span>
                 </label>
               ))}
@@ -191,22 +191,16 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
           </div>
         )}
 
-        <label className="block text-[13px] font-semibold text-secondary">
-          Upload photos
-          <input
-            type="file"
-            name="uploads"
-            multiple
-            accept="image/*"
-            className="mt-1.5 block w-full text-[13px] text-secondary file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-white hover:file:bg-accent-deep"
-          />
+        <div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("rmUploadPhotos")}</div>
+          <FilePicker name="uploads" accept="image/*" multiple />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            JPG/PNG/WebP, up to 8MB each. {isNew ? "Saved once you create the room." : "Uploaded to your R2 bucket."}
+            {t("rmUploadFormats")} {isNew ? t("rmUploadNewHint") : t("rmUploadExistingHint")}
           </span>
-        </label>
+        </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          Or add image URLs (one per line)
+          {t("rmImageUrls")}
           <textarea
             name="imageUrls"
             rows={2}
@@ -224,7 +218,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : isNew ? "Create room" : "Save room"}
+            {saving ? t("saving") : isNew ? t("rmCreate") : t("rmSave")}
           </button>
         </div>
       </Form>
@@ -234,7 +228,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
           method="post"
           className="mt-4"
           onSubmit={(e) => {
-            if (!confirm("Delete this room and its rates?")) e.preventDefault();
+            if (!confirm(t("rmDeleteConfirm"))) e.preventDefault();
           }}
         >
           <button
@@ -243,7 +237,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
             value="delete"
             className="text-[13px] font-semibold text-[#c0392b] hover:underline"
           >
-            Delete room
+            {t("rmDelete")}
           </button>
         </Form>
       )}

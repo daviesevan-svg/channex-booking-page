@@ -5,8 +5,9 @@ import { Form, Link, redirect, useNavigation, useSearchParams } from "react-rout
 import { useEffect, useState } from "react";
 
 import type { Route } from "./+types/vouchers";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
+import { useAdminDateLocale, useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getOverrides, getSettings, patchSettings } from "~/lib/overrides.server";
@@ -367,16 +368,21 @@ export function meta() {
   return [{ title: "Admin · Vouchers" }];
 }
 
-function summary(p: VoucherProduct, currency: string): string {
+function summary(p: VoucherProduct, currency: string, t: AdminT): string {
   const bits = [formatMoney(p.price, currency)];
-  if (p.kind === "gift") bits.push(`${formatMoney(p.value ?? p.price, currency)} value`);
-  else if (p.kind === "experience") bits.push(p.guests ? `for ${p.guests} guest${p.guests === 1 ? "" : "s"} · redeemed in person` : "redeemed in person");
+  if (p.kind === "gift") bits.push(t("voSumValue", { amount: formatMoney(p.value ?? p.price, currency) }));
+  else if (p.kind === "experience") bits.push(p.guests ? t(p.guests === 1 ? "voSumGuests_one" : "voSumGuests_other", { n: p.guests }) : t("voSumInPerson"));
   else if (p.package) {
-    bits.push(`${p.package.nights} night${p.package.nights === 1 ? "" : "s"} · ${p.package.adults} adult${p.package.adults === 1 ? "" : "s"}${p.package.children ? ` + ${p.package.children} child${p.package.children === 1 ? "" : "ren"}` : ""}`);
-    if (p.package.checkinDays.length) bits.push(`check-in ${p.package.checkinDays.map((d) => WEEKDAY_LABELS[d]).join("/")}`);
+    const nights = t(p.package.nights === 1 ? "voSumNights_one" : "voSumNights_other", { n: p.package.nights });
+    const adults = t(p.package.adults === 1 ? "voSumAdults_one" : "voSumAdults_other", { n: p.package.adults });
+    const children = p.package.children
+      ? ` ${t(p.package.children === 1 ? "voSumChildren_one" : "voSumChildren_other", { n: p.package.children })}`
+      : "";
+    bits.push(`${nights} · ${adults}${children}`);
+    if (p.package.checkinDays.length) bits.push(t("voSumCheckin", { days: p.package.checkinDays.map((d) => t(`voWd${d}`)).join("/") }));
   }
-  bits.push(`valid ${p.expiresMonths}mo`);
-  if (p.cap) bits.push(`max ${p.cap}`);
+  bits.push(t("voSumValid", { n: p.expiresMonths }));
+  if (p.cap) bits.push(t("voSumMax", { n: p.cap }));
   return bits.join(" · ");
 }
 
@@ -384,12 +390,14 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const [searchParams] = useSearchParams();
+  const t = useAdminT();
+  const dl = useAdminDateLocale();
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Vouchers</h1>
-        <p className="text-[15px] text-secondary">Add a property first to sell vouchers.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("voTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("voAddPropertyFirst")}</p>
       </div>
     );
   }
@@ -411,21 +419,20 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Vouchers</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("voTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        Sell vouchers from your booking page — a new revenue channel with cash up front.{" "}
-        <strong>Gift vouchers</strong> carry a value guests spend on a booking.{" "}
-        <strong>Stay packages</strong> (e.g. “Weekend Getaway — 2 nights for 2”) are bought now and{" "}
-        <strong>booked online later</strong> under your rules: which rooms, which dates, which
-        check-in days.
+        {t("voIntro1")}{" "}
+        <strong>{t("voIntroGift")}</strong> {t("voIntroGiftRest")}{" "}
+        <strong>{t("voIntroPackages")}</strong> {t("voIntroPackagesRest")}{" "}
+        <strong>{t("voIntroBooked")}</strong> {t("voIntroBookedRest")}
       </p>
 
       <div className="mb-6 flex gap-1 rounded-[10px] border border-line bg-surface p-1" style={{ width: "fit-content" }}>
-        {([["products", "For sale"], ["sold", `Sold (${tab === "sold" ? sold.length : "…"})`]] as const).map(([t, label]) => (
+        {([["products", t("voTabForSale")], ["sold", t("voTabSold", { n: tab === "sold" ? sold.length : "…" })]] as const).map(([tabId, label]) => (
           <Link
-            key={t}
-            to={t === "products" ? "/admin/vouchers" : "/admin/vouchers?tab=sold"}
-            className={`rounded-[8px] px-4 py-2 text-[13.5px] font-semibold ${tab === t ? "bg-accent text-white" : "text-muted hover:text-ink"}`}
+            key={tabId}
+            to={tabId === "products" ? "/admin/vouchers" : "/admin/vouchers?tab=sold"}
+            className={`rounded-[8px] px-4 py-2 text-[13.5px] font-semibold ${tab === tabId ? "bg-accent text-white" : "text-muted hover:text-ink"}`}
           >
             {label}
           </Link>
@@ -437,40 +444,40 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         {/* Issue a free voucher (loyalty gesture, competition prize, service recovery). */}
         {compIssued && (
           <p className="mb-4 rounded-[10px] border border-[#cfe3d2] bg-[#eef6ef] px-4 py-2.5 text-[13px] font-semibold text-[#3f7a52]">
-            Complimentary voucher{" "}
+            {t("voCompIssuedPrefix")}{" "}
             <Link to={`/admin/vouchers/${compIssued}`} className="underline">
               {compIssued}
             </Link>{" "}
-            issued — open it to manage or resend.
+            {t("voCompIssuedSuffix")}
           </p>
         )}
         {products.length > 0 && (
           <details key={compIssued ?? "comp"} className="mb-5 rounded-[14px] border border-line bg-surface p-5">
             <summary className="cursor-pointer text-[14px] font-semibold text-secondary hover:text-accent">
-              Issue a complimentary voucher
+              {t("voIssueComp")}
             </summary>
             <Form method="post" className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <input type="hidden" name="intent" value="voucherComp" />
               <label className="block text-[13px] font-semibold text-secondary">
-                Voucher
+                {t("voVoucher")}
                 <select name="productId" className={FIELD_INPUT}>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.title} ({p.kind})
+                      {p.title} ({t(p.kind === "gift" ? "voKindGift" : p.kind === "package" ? "voKindPackage" : "voKindExperience")})
                     </option>
                   ))}
                 </select>
               </label>
               <label className="block text-[13px] font-semibold text-secondary">
-                Recipient's name
+                {t("voRecipientName")}
                 <input name="recipientName" className={FIELD_INPUT} />
               </label>
               <label className="block text-[13px] font-semibold text-secondary">
-                Recipient's email <span className="font-normal text-faint">(optional — we'll email them the voucher)</span>
+                {t("voRecipientEmail")} <span className="font-normal text-faint">{t("voRecipientEmailHint")}</span>
                 <input name="recipientEmail" type="email" className={FIELD_INPUT} />
               </label>
               <label className="block text-[13px] font-semibold text-secondary">
-                Message <span className="font-normal text-faint">(optional)</span>
+                {t("voMessage")} <span className="font-normal text-faint">{t("voOptional")}</span>
                 <input name="message" className={FIELD_INPUT} />
               </label>
               <div className="sm:col-span-2">
@@ -479,7 +486,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   disabled={saving}
                   className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
                 >
-                  Issue voucher (free)
+                  {t("voIssueFree")}
                 </button>
               </div>
             </Form>
@@ -492,18 +499,18 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         )}
         {sold.length === 0 ? (
           <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-            No vouchers sold yet. When guests buy from your voucher shop they appear here.
+            {t("voNoSold")}
           </div>
         ) : (
           <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-muted-2">
-                  <th className="px-3 py-3">Code</th>
-                  <th className="px-3 py-3">Voucher</th>
-                  <th className="px-3 py-3">Buyer</th>
-                  <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Dates</th>
+                  <th className="px-3 py-3">{t("voThCode")}</th>
+                  <th className="px-3 py-3">{t("voVoucher")}</th>
+                  <th className="px-3 py-3">{t("voThBuyer")}</th>
+                  <th className="px-3 py-3">{t("voThStatus")}</th>
+                  <th className="px-3 py-3">{t("voThDates")}</th>
                   <th className="px-3 py-3" />
                 </tr>
               </thead>
@@ -515,8 +522,8 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                     </td>
                     <td className="px-3 py-3">
                       {v.title}
-                      {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">test</span>}
-                      {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10.5px] font-semibold text-muted">comp</span>}
+                      {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">{t("voBadgeTest")}</span>}
+                      {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10.5px] font-semibold text-muted">{t("voBadgeComp")}</span>}
                     </td>
                     <td className="px-3 py-3">
                       <div>{v.buyerName}{v.recipientName ? ` → ${v.recipientName}` : ""}</div>
@@ -524,19 +531,19 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                     </td>
                     <td className="px-3 py-3">
                       <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${v.status === "active" ? "bg-[#e8f0e6] text-[#3f7a52]" : v.status === "redeemed" ? "bg-chip text-muted" : "bg-[#fbe9e7] text-[#c0392b]"}`}>
-                        {v.status}
+                        {t(`voStatus_${v.status}`)}
                       </span>
                       {v.balance != null && (
-                        <div className="mt-1 text-[12px] text-muted">{formatMoney(v.balance, currency)} left</div>
+                        <div className="mt-1 text-[12px] text-muted">{t("voBalanceLeft", { amount: formatMoney(v.balance, currency) })}</div>
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-[12.5px] text-muted">
-                      <div>{fmtDate(v.purchasedAt, "d MMM yyyy")}</div>
-                      <div className="text-muted-2">→ {fmtDate(v.expiresAt, "d MMM yyyy")}</div>
+                      <div>{fmtDate(v.purchasedAt, "d MMM yyyy", dl)}</div>
+                      <div className="text-muted-2">→ {fmtDate(v.expiresAt, "d MMM yyyy", dl)}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-right">
                       <Link to={`/admin/vouchers/${v.code}`} className="text-[12.5px] font-semibold text-accent hover:text-accent-deep">
-                        View →
+                        {t("voView")}
                       </Link>
                     </td>
                   </tr>
@@ -554,19 +561,19 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             to="/admin/vouchers?new=1&kind=gift"
             className="inline-block rounded-[10px] bg-accent px-5 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
           >
-            + Gift voucher
+            {t("voNewGift")}
           </Link>
           <Link
             to="/admin/vouchers?new=1&kind=package"
             className="inline-block rounded-[10px] border border-accent px-5 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
           >
-            + Stay package
+            {t("voNewPackage")}
           </Link>
           <Link
             to="/admin/vouchers?new=1&kind=experience"
             className="inline-block rounded-[10px] border border-accent px-5 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
           >
-            + Experience
+            {t("voNewExperience")}
           </Link>
         </div>
       )}
@@ -578,15 +585,13 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
         >
           <input type="hidden" name="intent" value="selfService" />
           <div className="min-w-[260px] flex-1">
-            <h2 className="m-0 mb-1 font-serif text-[18px] font-semibold">Buyer self-service</h2>
+            <h2 className="m-0 mb-1 font-serif text-[18px] font-semibold">{t("voSelfServiceTitle")}</h2>
             <p className="m-0 text-[13px] leading-[1.55] text-secondary">
-              Buyers manage their vouchers on your booking page (Manage booking → sign in with the voucher
-              code + email): check redemption, nudge the recipient, and cancel for an automatic full refund
-              inside this window. Many countries mandate a 14-day cooling-off period for online purchases.
+              {t("voSelfServiceBody")}
             </p>
           </div>
           <label className="block text-[13px] font-semibold text-secondary">
-            Cooling-off window (days, 0 disables)
+            {t("voCoolingOff")}
             <input
               name="coolingOffDays"
               type="number"
@@ -601,7 +606,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             disabled={saving}
             className="rounded-[10px] border border-line-alt px-5 py-[11px] text-[14px] font-semibold text-secondary hover:bg-chip disabled:opacity-60"
           >
-            Save
+            {t("voSave")}
           </button>
         </Form>
       )}
@@ -618,17 +623,17 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           <div className="flex items-center justify-between">
             <h2 className="font-serif text-[18px] font-semibold">
-              {editing ? "Edit voucher" : "New voucher"}
+              {editing ? t("voEditVoucher") : t("voNewVoucher")}
             </h2>
             {(editing || creating) && (
               <Link to="/admin/vouchers" className="text-[13px] font-semibold text-muted hover:text-accent">
-                Cancel
+                {t("voCancel")}
               </Link>
             )}
           </div>
 
           <label className="block text-[13px] font-semibold text-secondary">
-            Type
+            {t("voType")}
             <select
               name="kind"
               value={kind}
@@ -636,32 +641,32 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               disabled={!!editing}
               className={FIELD_INPUT}
             >
-              <option value="gift">Gift voucher — a value to spend on any booking</option>
-              <option value="package">Stay package — a specific stay, booked online later</option>
-              <option value="experience">Experience — Day Pass, Spa, Dinner… redeemed in person</option>
+              <option value="gift">{t("voTypeGift")}</option>
+              <option value="package">{t("voTypePackage")}</option>
+              <option value="experience">{t("voTypeExperience")}</option>
             </select>
             {editing ? (
               <input type="hidden" name="kind" value={editing.kind} />
             ) : null}
             {editing && (
               <span className="mt-1 block text-[11px] font-normal text-faint">
-                The type can't change after creation — sold vouchers snapshot it.
+                {t("voTypeLocked")}
               </span>
             )}
           </label>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
-              Name
+              {t("voName")}
               <input
                 name="title"
                 defaultValue={editing?.title ?? ""}
-                placeholder={kind === "package" ? "Weekend Getaway" : kind === "experience" ? "Dinner for Two" : "£100 Gift Voucher"}
+                placeholder={kind === "package" ? t("voPhNamePackage") : kind === "experience" ? t("voPhNameExperience") : t("voPhNameGift")}
                 className={FIELD_INPUT}
               />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Sale price ({currency})
+              {t("voSalePrice")} ({currency})
               <input
                 name="price"
                 type="number"
@@ -676,15 +681,15 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           {kind === "gift" && (
             <label className="block text-[13px] font-semibold text-secondary">
-              Gift value ({currency}){" "}
-              <span className="font-normal text-faint">(what the buyer gets to spend — leave blank to match the price; set higher for an incentive, e.g. pay 90 get 100)</span>
+              {t("voGiftValue")} ({currency}){" "}
+              <span className="font-normal text-faint">{t("voGiftValueHint")}</span>
               <input
                 name="value"
                 type="number"
                 min={0}
                 step="0.01"
                 defaultValue={editing?.value != null ? String(editing.value) : ""}
-                placeholder="same as price"
+                placeholder={t("voPhSameAsPrice")}
                 className={FIELD_INPUT}
               />
             </label>
@@ -692,7 +697,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           {kind === "experience" && (
             <label className="block text-[13px] font-semibold text-secondary sm:max-w-[240px]">
-              Guests <span className="font-normal text-faint">(optional — e.g. 2 for "Dinner for Two")</span>
+              {t("voGuests")} <span className="font-normal text-faint">{t("voGuestsHint")}</span>
               <input
                 name="guests"
                 type="number"
@@ -705,63 +710,61 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
           )}
 
           <label className="block text-[13px] font-semibold text-secondary">
-            Description <span className="font-normal text-faint">(shown in the shop)</span>
+            {t("voDescription")} <span className="font-normal text-faint">{t("voDescriptionHint")}</span>
             <textarea
               name="description"
               rows={2}
               defaultValue={editing?.description ?? ""}
               placeholder={
                 kind === "package"
-                  ? "Two nights for two in a Garden Suite, any off-season weekend. Breakfast included."
+                  ? t("voPhDescPackage")
                   : kind === "experience"
-                    ? "A three-course dinner for two in our restaurant, wine included."
-                    : "The perfect gift — they choose the dates, you cover the stay."
+                    ? t("voPhDescExperience")
+                    : t("voPhDescGift")
               }
               className={`${FIELD_INPUT} resize-y`}
             />
           </label>
 
           <div className="text-[13px] font-semibold text-secondary">
-            Photo <span className="font-normal text-faint">(optional — the voucher's card in the shop)</span>
+            {t("voPhoto")} <span className="font-normal text-faint">{t("voPhotoHint")}</span>
             <div className="mt-1.5 flex items-start gap-4">
               {editing?.image && (
                 <div className="flex flex-none flex-col items-center gap-1.5">
                   <img src={editing.image} alt="" className="h-[72px] w-[104px] flex-none rounded-[10px] border border-line object-cover" />
                   <label className="flex items-center gap-1.5 text-[12px] font-medium text-muted">
                     <input type="checkbox" name="removeImage" className={checkbox} />
-                    Remove
+                    {t("voRemove")}
                   </label>
                 </div>
               )}
               <div className="w-full">
-                <input
-                  type="file"
-                  name="image"
-                  accept="image/*"
-                  className="block w-full text-[13px] font-normal text-muted file:mr-3 file:rounded-[8px] file:border-0 file:bg-accent-soft file:px-4 file:py-2 file:text-[13px] file:font-semibold file:text-accent-deep hover:file:bg-accent-soft-strong"
-                />
+                <FilePicker name="image" accept="image/*" />
                 <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
                   <button
                     type="button"
                     onClick={async (e) => {
                       const r = buildImageBrief(e.currentTarget.form!, kind, hotelName, currency, brandAccent, brandBg);
                       if ("missing" in r) {
-                        setBriefMsg({ ok: false, text: `Fill in ${r.missing.join(", ")} first — the brief is built from those details.` });
+                        // buildImageBrief reports the missing fields by their English form
+                        // labels; map them to the translated labels at display point.
+                        const fieldKeys: Record<string, string> = { Name: "voName", "Sale price": "voSalePrice", Description: "voDescription", Nights: "voNights" };
+                        setBriefMsg({ ok: false, text: t("voBriefMissing", { fields: r.missing.map((m) => t(fieldKeys[m] ?? m)).join(", ") }) });
                         return;
                       }
                       try {
                         await navigator.clipboard.writeText(r.brief);
-                        setBriefMsg({ ok: true, text: "Brief copied — paste it into ChatGPT, Gemini or any AI image tool, then upload the result here." });
+                        setBriefMsg({ ok: true, text: t("voBriefCopied") });
                       } catch {
-                        setBriefMsg({ ok: false, text: "Couldn't reach the clipboard — allow clipboard access and try again." });
+                        setBriefMsg({ ok: false, text: t("voBriefClipboard") });
                       }
                     }}
                     className="rounded-[9px] border border-line-alt px-3.5 py-2 text-[12.5px] font-semibold text-secondary hover:bg-chip"
                   >
-                    ✨ Copy brief for AI
+                    {t("voCopyBrief")}
                   </button>
                   <span className="text-[11.5px] font-normal text-faint">
-                    No photo handy? Let an AI make one from your offer's details.
+                    {t("voCopyBriefHint")}
                   </span>
                 </div>
                 {briefMsg && (
@@ -775,24 +778,24 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           {kind === "package" && (
             <fieldset className="flex flex-col gap-4 rounded-[12px] border border-line bg-surface-alt/40 p-4">
-              <legend className="px-1 text-[13px] font-semibold text-secondary">The stay</legend>
+              <legend className="px-1 text-[13px] font-semibold text-secondary">{t("voTheStay")}</legend>
               <div className="grid grid-cols-3 gap-4">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Nights
+                  {t("voNights")}
                   <input name="nights" type="number" min={1} max={30} defaultValue={editing?.package?.nights ?? 2} className={FIELD_INPUT} />
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Adults
+                  {t("voAdults")}
                   <input name="adults" type="number" min={1} defaultValue={editing?.package?.adults ?? 2} className={FIELD_INPUT} />
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Children
+                  {t("voChildren")}
                   <input name="children" type="number" min={0} defaultValue={editing?.package?.children ?? ""} placeholder="0" className={FIELD_INPUT} />
                 </label>
               </div>
 
               <div>
-                <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">Bookable room types</div>
+                <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("voBookableRooms")}</div>
                 <div className="flex flex-col gap-1.5">
                   {rooms.map((r) => (
                     <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
@@ -807,28 +810,28 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                     </label>
                   ))}
                   {rooms.length === 0 && (
-                    <span className="text-[12.5px] text-muted">No room types yet — add rooms first.</span>
+                    <span className="text-[12.5px] text-muted">{t("voNoRoomTypes")}</span>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Stay window from <span className="font-normal text-faint">(optional)</span>
+                  {t("voWindowFrom")} <span className="font-normal text-faint">{t("voOptional")}</span>
                   <input name="windowFrom" type="date" defaultValue={editing?.package?.window?.from ?? ""} className={FIELD_INPUT} />
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Stay window until <span className="font-normal text-faint">(optional)</span>
+                  {t("voWindowTo")} <span className="font-normal text-faint">{t("voOptional")}</span>
                   <input name="windowTo" type="date" defaultValue={editing?.package?.window?.to ?? ""} className={FIELD_INPUT} />
                 </label>
               </div>
 
               <div>
                 <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
-                  Check-in allowed on
+                  {t("voCheckinAllowed")}
                 </div>
                 <div className="flex flex-wrap gap-3">
-                  {WEEKDAY_LABELS.map((label, d) => (
+                  {WEEKDAY_LABELS.map((_, d) => (
                     <label key={d} className="flex items-center gap-1.5 text-[13.5px] font-medium text-secondary">
                       <input
                         type="checkbox"
@@ -837,17 +840,17 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                         defaultChecked={editing?.package?.checkinDays.includes(d) ?? false}
                         className={checkbox}
                       />
-                      {label}
+                      {t(`voWd${d}`)}
                     </label>
                   ))}
                 </div>
                 <span className="mt-1 block text-[11px] font-normal text-faint">
-                  Leave all unticked to allow any day. For a weekend package tick Fri + Sat.
+                  {t("voCheckinHint")}
                 </span>
               </div>
 
               <div className="block text-[13px] font-semibold text-secondary">
-                Blocked dates <span className="font-normal text-faint">(optional — e.g. peak season)</span>
+                {t("voBlockedDates")} <span className="font-normal text-faint">{t("voBlockedDatesHint")}</span>
                 <BlockedRangesEditor name="blockedRanges" initial={editing?.package?.blockedRanges ?? []} />
               </div>
             </fieldset>
@@ -855,28 +858,28 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           <div className="grid grid-cols-2 gap-4">
             <label className="block text-[13px] font-semibold text-secondary">
-              Valid for (months after purchase)
+              {t("voValidFor")}
               <input name="expiresMonths" type="number" min={1} max={60} defaultValue={editing?.expiresMonths ?? 12} className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Sale limit <span className="font-normal text-faint">(optional)</span>
-              <input name="cap" type="number" min={1} defaultValue={editing?.cap ?? ""} placeholder="unlimited" className={FIELD_INPUT} />
+              {t("voSaleLimit")} <span className="font-normal text-faint">{t("voOptional")}</span>
+              <input name="cap" type="number" min={1} defaultValue={editing?.cap ?? ""} placeholder={t("voPhUnlimited")} className={FIELD_INPUT} />
             </label>
           </div>
 
           <label className="block text-[13px] font-semibold text-secondary">
-            What&#39;s included <span className="font-normal text-faint">(optional — one per line, shown as bullet points on the gift page)</span>
+            {t("voIncluded")} <span className="font-normal text-faint">{t("voIncludedHint")}</span>
             <textarea
               name="included"
               rows={4}
               defaultValue={(editing?.included ?? []).join("\n")}
-              placeholder={"Two nights in a Sea-View room\nBreakfast each morning\nLate checkout on departure"}
+              placeholder={t("voPhIncluded")}
               className={`${FIELD_INPUT} resize-y`}
             />
           </label>
 
           <label className="block text-[13px] font-semibold text-secondary">
-            Terms <span className="font-normal text-faint">(optional — shown on the voucher and at purchase)</span>
+            {t("voTerms")} <span className="font-normal text-faint">{t("voTermsHint")}</span>
             <textarea
               key={editing ? editing.id : `terms-${kind}`}
               name="terms"
@@ -888,7 +891,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
           <label className="flex items-center gap-2.5 text-[14px] font-semibold">
             <input type="checkbox" name="active" defaultChecked={editing ? editing.active : true} className={checkbox} />
-            On sale (shown in the shop)
+            {t("voOnSale")}
           </label>
 
           {actionData?.error && <p className="text-[13px] text-red-600">{actionData.error}</p>}
@@ -898,7 +901,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               disabled={saving}
               className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
             >
-              {saving ? "Saving…" : editing ? "Save voucher" : "Add voucher"}
+              {saving ? t("saving") : editing ? t("voSaveVoucher") : t("voAddVoucher")}
             </button>
           </div>
         </Form>
@@ -906,7 +909,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
 
       {products.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No vouchers yet. Create your first one above.
+          {t("voNoProducts")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -925,31 +928,31 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                   <div className="flex items-center gap-2.5">
                     <span className="font-semibold">{p.title}</span>
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
-                      {p.kind === "gift" ? "Gift voucher" : p.kind === "package" ? "Stay package" : "Experience"}
+                      {t(p.kind === "gift" ? "voKindGift" : p.kind === "package" ? "voKindPackage" : "voKindExperience")}
                     </span>
                     {p.active ? (
-                      <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">On sale</span>
+                      <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">{t("voBadgeOnSale")}</span>
                     ) : (
-                      <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">Hidden</span>
+                      <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">{t("voBadgeHidden")}</span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-[12.5px] text-muted-2">{summary(p, currency)}</div>
+                  <div className="mt-0.5 text-[12.5px] text-muted-2">{summary(p, currency, t)}</div>
                 </div>
               </div>
               <div className="flex flex-none items-center gap-3">
                 <Form method="post">
                   <input type="hidden" name="id" value={p.id} />
                   <button type="submit" name="intent" value="toggle" className="text-[13px] font-semibold text-muted hover:text-accent">
-                    {p.active ? "Hide" : "Show"}
+                    {p.active ? t("voHide") : t("voShow")}
                   </button>
                 </Form>
                 <Link to={`/admin/vouchers?edit=${p.id}`} className="text-[13px] font-semibold text-accent hover:underline">
-                  Edit
+                  {t("voEdit")}
                 </Link>
-                <Form method="post" onSubmit={(ev) => { if (!confirm(`Delete "${p.title}"? Already-sold vouchers keep working.`)) ev.preventDefault(); }}>
+                <Form method="post" onSubmit={(ev) => { if (!confirm(t("voConfirmDelete", { title: p.title }))) ev.preventDefault(); }}>
                   <input type="hidden" name="id" value={p.id} />
                   <button type="submit" name="intent" value="delete" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
-                    Delete
+                    {t("voDelete")}
                   </button>
                 </Form>
               </div>

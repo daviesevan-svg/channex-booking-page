@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/google-hotels";
+import { useAdminT } from "~/lib/admin-i18n";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
@@ -107,22 +108,23 @@ export function meta() {
 }
 
 export default function AdminGoogleHotels({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Google Hotels</h1>
-        <p className="text-[15px] text-secondary">Add a property first to push to Google.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("ghTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("ghAddPropertyFirst")}</p>
       </div>
     );
   }
   if (!loaderData.canManage) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Google Hotels</h1>
-        <p className="text-[15px] text-secondary">Only an owner or manager can manage this for the property.</p>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("ghTitle")}</h1>
+        <p className="text-[15px] text-secondary">{t("ghOwnerOnly")}</p>
       </div>
     );
   }
@@ -130,6 +132,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
   const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl } =
     loaderData;
   const isVr = program === "vacation_rentals";
+  const programName = isVr ? t("ghTitleVr") : t("ghTitle");
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
   const canPush = push && partnerConfigured && readiness.ready;
@@ -137,17 +140,14 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{isVr ? "Google Vacation Rentals" : "Google Hotels"}</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{programName}</h1>
         {actionData && "ok" in actionData && actionData.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">✓ Saved</span>
+          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
         )}
       </div>
 
       <p className="max-w-2xl text-[14px] text-secondary">
-        Push this property's rooms, rates, discounts and availability (ARI) directly to{" "}
-        {isVr ? "Google Vacation Rentals" : "Google Hotels"}. Prices and discounts are computed by Roompanda,
-        so Google always shows exactly what your site does. Google matches the property by its ID (same as the{" "}
-        {isVr ? "Vacation Rentals list feed" : "Hotel List Feed"}).
+        {t("ghIntro", { program: programName, feed: isVr ? t("ghVrListFeed") : t("ghHotelListFeed") })}
       </p>
 
       {actionData && "error" in actionData && actionData.error && (
@@ -158,18 +158,18 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
 
       {/* Prerequisites */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Readiness</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("ghReadiness")}</h2>
         {!partnerConfigured && (
           <p className="mb-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
-            <strong>{isVr ? "GOOGLE_VR_PARTNER_KEY" : "GOOGLE_ARI_PARTNER_KEY"}</strong> is not set. Add your{" "}
-            {isVr ? "Vacation Rentals" : "Hotel Center"} partner key as a Cloudflare secret before pushing.
+            <strong>{isVr ? "GOOGLE_VR_PARTNER_KEY" : "GOOGLE_ARI_PARTNER_KEY"}</strong>{" "}
+            {t("ghKeyNotSet", { product: isVr ? "Vacation Rentals" : "Hotel Center" })}
           </p>
         )}
         {readiness.ready ? (
-          <p className="text-[14px] text-[#3f7a52]">✓ All required property details are set.</p>
+          <p className="text-[14px] text-[#3f7a52]">{t("ghAllSet")}</p>
         ) : (
           <div>
-            <p className="mb-2 text-[14px] text-secondary">These are required before Google will accept the property:</p>
+            <p className="mb-2 text-[14px] text-secondary">{t("ghRequiredIntro")}</p>
             <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-red-700">
               {readiness.missingRequired.map((m) => (
                 <li key={m.field}>{m.label}</li>
@@ -183,16 +183,16 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             list feed, a different pipeline). */}
         {!isVr && (
         <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-divider pt-3.5 text-[13px]">
-          <span className="text-secondary">On Google:</span>
+          <span className="text-secondary">{t("ghOnGoogle")}</span>
           {!matchConfigured ? (
             <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-              Not checked — add Travel Partner API secrets to enable
+              {t("ghNotCheckedSecrets")}
             </span>
           ) : matchStatus ? (
             <MatchStatusBadges status={matchStatus} />
           ) : (
             <span className="rounded-full bg-chip px-2.5 py-0.5 font-semibold text-muted">
-              Not checked yet — refreshed automatically once a day
+              {t("ghNotCheckedYet")}
             </span>
           )}
         </div>
@@ -201,29 +201,27 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
 
       {/* Settings */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-4 font-serif text-[18px] font-semibold">Settings</h2>
+        <h2 className="mb-4 font-serif text-[18px] font-semibold">{t("ghSettings")}</h2>
         <Form method="post" className="space-y-4">
           <input type="hidden" name="intent" value="save" />
           <div className="max-w-md">
-            <span className="mb-1.5 block text-[13px] font-semibold text-secondary">Google program</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("ghProgram")}</span>
             <select name="program" defaultValue={program} className={`${input} w-full`}>
-              <option value="hotels">Google Hotels</option>
+              <option value="hotels">{t("ghTitle")}</option>
               <option value="vacation_rentals" disabled={!singleUnit}>
-                Google Vacation Rentals{singleUnit ? "" : " — single-unit properties only"}
+                {t("ghTitleVr")}{singleUnit ? "" : ` — ${t("ghSingleUnitOnly")}`}
               </option>
             </select>
             <span className="mt-1 block text-[12px] text-muted">
-              {isVr
-                ? "Pushes to your Vacation Rentals account as a single-unit listing with binary availability."
-                : "Pushes to your Hotel Center account. Vacation Rentals is available for single-unit properties."}
+              {isVr ? t("ghProgramHintVr") : t("ghProgramHintHotels")}
             </span>
           </div>
           <label className="flex items-center gap-2.5 text-[14px] font-semibold text-ink">
             <input type="checkbox" name="push" defaultChecked={push} className="h-4 w-4 accent-[var(--accent)]" />
-            Push this property to {isVr ? "Google Vacation Rentals" : "Google Hotels"}
+            {t("ghPushToggle", { program: programName })}
           </label>
           <label className="block max-w-xs">
-            <span className="mb-1.5 block text-[13px] font-semibold text-secondary">Days ahead to push</span>
+            <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("ghWindowDays")}</span>
             <input
               type="number"
               name="windowDays"
@@ -232,14 +230,14 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
               defaultValue={windowDays}
               className={`${input} w-full`}
             />
-            <span className="mt-1 block text-[12px] text-muted">Availability & rates are pushed for today + this many days (max 500).</span>
+            <span className="mt-1 block text-[12px] text-muted">{t("ghWindowDaysHint")}</span>
           </label>
           <button
             type="submit"
             disabled={busy}
             className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            Save settings
+            {t("ghSaveSettings")}
           </button>
         </Form>
       </section>
@@ -249,22 +247,19 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           TAM once, account-wide), so superadmin only. */}
       {isVr && vrFeedUrl && superadmin && (
         <section className="rounded-[14px] border border-line bg-surface p-6">
-          <h2 className="mb-2 font-serif text-[18px] font-semibold">Vacation Rentals list feed</h2>
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("ghVrListFeed")}</h2>
           <p className="mb-3 max-w-2xl text-[13px] text-muted">
-            Give Google's Vacation Rentals Technical Account Manager the <strong>merged .zip</strong> URL
-            — Google requires the pulled feed to be a zip, and the merged file carries Channex's VR
-            listings plus ours. Google pulls it on a schedule to ingest each property's content; a
-            property must be ingested before the prices you push above will show.
+            {t("ghVrFeedP1")} <strong>{t("ghVrFeedZip")}</strong> {t("ghVrFeedP2")}
           </p>
           <div className="flex flex-col gap-2">
             <div>
-              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">For Google (merged, zipped)</div>
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("ghVrFeedForGoogle")}</div>
               <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[13px] text-secondary">
                 {new URL("/feeds/google-vacation-rentals-all.zip", vrFeedUrl).toString()}
               </code>
             </div>
             <div>
-              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">Plain XML (merged / ours only)</div>
+              <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("ghVrFeedPlainXml")}</div>
               <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[12.5px] text-secondary">
                 {new URL("/feeds/google-vacation-rentals-all.xml", vrFeedUrl).toString()}
                 {"  ·  "}
@@ -273,14 +268,13 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             </div>
           </div>
           <p className="mt-3 text-[12.5px] text-muted">
-            Listing content — amenities, property size (bedrooms / bathrooms / beds), photos and
-            description — is edited on{" "}
+            {t("ghVrFeedContentP1")}{" "}
             <a href="/admin" className="font-semibold text-accent hover:underline">
-              Property details
+              {t("ghPropertyDetailsLink")}
             </a>{" "}
-            and per room type on{" "}
+            {t("ghVrFeedContentP2")}{" "}
             <a href="/admin/rooms" className="font-semibold text-accent hover:underline">
-              Rooms
+              {t("ghRoomsLink")}
             </a>
             .
           </p>
@@ -292,19 +286,17 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           only. Owners keep the settings + readiness above. */}
       {superadmin && (
       <section className="rounded-[14px] border border-line bg-surface p-6">
-        <h2 className="mb-1 font-serif text-[18px] font-semibold">Push now</h2>
+        <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("ghPushNow")}</h2>
         <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
-          Send data to Google. All four core messages (property data, rates, availability, inventory)
-          must be accepted before prices display; taxes compose the all-in price and promotions carry
-          the discounts. "Push everything" sends them all in order.
+          {t("ghPushNowIntro")}
         </p>
         <div className="flex flex-wrap gap-2.5">
           {[
-            { kinds: "all", label: "Push everything", primary: true },
-            { kinds: "property_data", label: "Property data" },
-            { kinds: "ari", label: "Rates · availability · inventory" },
-            { kinds: "taxes", label: "Taxes & fees" },
-            { kinds: "promotions", label: "Promotions" },
+            { kinds: "all", label: t("ghPushEverything"), primary: true },
+            { kinds: "property_data", label: t("ghPushPropertyData") },
+            { kinds: "ari", label: t("ghPushAri") },
+            { kinds: "taxes", label: t("ghPushTaxes") },
+            { kinds: "promotions", label: t("ghPushPromotions") },
           ].map((b) => (
             <Form method="post" key={b.kinds}>
               <input type="hidden" name="intent" value="push" />
@@ -312,7 +304,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
               <button
                 type="submit"
                 disabled={busy || !canPush}
-                title={canPush ? undefined : "Enable the push, set the partner key and complete readiness first."}
+                title={canPush ? undefined : t("ghPushDisabledTitle")}
                 className={
                   b.primary
                     ? "rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
@@ -346,7 +338,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
       {/* Last sync */}
       {lastSync && (
         <section className="rounded-[14px] border border-line bg-surface p-6">
-          <h2 className="mb-2 font-serif text-[18px] font-semibold">Last push</h2>
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("ghLastPush")}</h2>
           <p className="mb-3 text-[13px] text-muted">{new Date(lastSync.at).toLocaleString()}</p>
           <div className="space-y-1.5">
             {lastSync.results.map((r, i) => (
@@ -364,19 +356,17 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           public) instead of waiting for the daily cron. */}
       {superadmin && (
         <section className="rounded-[14px] border border-line bg-surface p-6">
-          <h2 className="mb-2 font-serif text-[18px] font-semibold">Merged Google feed</h2>
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("ghMergedFeed")}</h2>
           <p className="mb-4 max-w-2xl text-[13px] text-muted">
-            Each merges Channex's partner feed with our own listings, rebuilt automatically once a day.
-            Rebuild now to publish changes (like a property that just went public) without waiting for the
-            daily refresh.
+            {t("ghMergedFeedIntro")}
           </p>
           <ul className="mb-4 space-y-1 text-[12px] text-muted-2">
-            <li>Hotels: <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-hotels-all.xml</code></li>
-            <li>Vacation Rentals: <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-vacation-rentals-all.xml</code></li>
+            <li>{t("ghFeedHotelsLabel")} <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-hotels-all.xml</code></li>
+            <li>{t("ghFeedVrLabel")} <code className="rounded bg-chip px-1.5 py-0.5">/feeds/google-vacation-rentals-all.xml</code></li>
           </ul>
           {actionData && "feedRefreshed" in actionData && actionData.feedRefreshed && (
             <p className="mb-3 rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">
-              ✓ Feed rebuilt — Google will see the latest listings on its next crawl.
+              {t("ghFeedRebuilt")}
             </p>
           )}
           <div className="flex flex-wrap gap-2.5">
@@ -387,7 +377,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
                 disabled={busy}
                 className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
               >
-                {busy ? "Rebuilding…" : "Refresh Hotels feed"}
+                {busy ? t("ghRebuilding") : t("ghRefreshHotelsFeed")}
               </button>
             </Form>
             <Form method="post">
@@ -397,7 +387,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
                 disabled={busy}
                 className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
               >
-                {busy ? "Rebuilding…" : "Refresh Vacation Rentals feed"}
+                {busy ? t("ghRebuilding") : t("ghRefreshVrFeed")}
               </button>
             </Form>
           </div>
@@ -409,6 +399,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
 
 /** The "On Google" badges, rendered once the Travel Partner status resolves. */
 function MatchStatusBadges({ status }: { status: GoogleMatchStatus }) {
+  const t = useAdminT();
   return (
     <>
       <span
@@ -421,17 +412,17 @@ function MatchStatusBadges({ status }: { status: GoogleMatchStatus }) {
         }`}
       >
         {status.state === "matched"
-          ? "Matched — ready for rates"
+          ? t("ghMatchMatched")
           : status.state === "not_found"
-            ? "Not uploaded to Google yet (feed not ingested)"
+            ? t("ghMatchNotFound")
             : status.state === "not_matched"
-              ? "Uploaded, but not matched to a business profile yet"
+              ? t("ghMatchNotMatched")
               : status.state === "overlap"
-                ? "Uploaded — overlaps another listing (map overlap)"
-                : `Status unclear (${status.matchStatus})`}
+                ? t("ghMatchOverlap")
+                : t("ghMatchUnclear", { status: status.matchStatus ?? "" })}
       </span>
       {status.liveOnGoogle && (
-        <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">Live on Google</span>
+        <span className="rounded-full bg-[#e8f0e6] px-2.5 py-0.5 font-semibold text-[#3f7a52]">{t("ghLiveOnGoogle")}</span>
       )}
       {status.state !== "matched" && status.reasons.length > 0 && (
         <span className="text-muted-2">· {status.reasons.join("; ")}</span>

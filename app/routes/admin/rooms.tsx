@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/rooms";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
@@ -30,12 +31,14 @@ export function meta() {
 }
 
 export default function AdminRooms({ loaderData }: Route.ComponentProps) {
+  const t = useAdminT();
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Rooms</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("rmTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to add rooms.
+          {t("rmConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("rmConfigureSuffix")}
         </p>
       </div>
     );
@@ -46,22 +49,21 @@ export default function AdminRooms({ loaderData }: Route.ComponentProps) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Rooms</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("rmTitle")}</h1>
         <Link
           to="/admin/rooms/new"
           className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep"
         >
-          + New room
+          {t("rmNew")}
         </Link>
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        The room types guests can book. Add photos, capacity and a description; attach rates on the
-        Rates page.
+        {t("rmIntro")}
       </p>
 
       {rooms.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-6 text-[14px] text-secondary">
-          No rooms yet. Create your first one.
+          {t("rmEmpty")}
         </div>
       ) : (
         <div className="overflow-hidden rounded-[14px] border border-line bg-surface">
@@ -82,14 +84,14 @@ export default function AdminRooms({ loaderData }: Route.ComponentProps) {
                 <div className="min-w-0">
                 <div className="truncate font-semibold">{room.title}</div>
                 <div className="mt-0.5 text-[12.5px] text-muted-2">
-                  Sleeps {room.maxGuests} · up to {room.maxAdults} adult
-                  {room.maxAdults === 1 ? "" : "s"} · {room.images} photo
-                  {room.images === 1 ? "" : "s"} · {room.rateCount} rate
-                  {room.rateCount === 1 ? "" : "s"}
+                  {t("rmSleeps", { n: room.maxGuests })} ·{" "}
+                  {t(room.maxAdults === 1 ? "rmUpToAdults_one" : "rmUpToAdults_other", { n: room.maxAdults })} ·{" "}
+                  {t(room.images === 1 ? "rmPhotos_one" : "rmPhotos_other", { n: room.images })} ·{" "}
+                  {t(room.rateCount === 1 ? "rmRates_one" : "rmRates_other", { n: room.rateCount })}
                 </div>
                 </div>
               </div>
-              <span className="flex-none text-[13px] font-semibold text-accent">Edit →</span>
+              <span className="flex-none text-[13px] font-semibold text-accent">{t("rmEdit")}</span>
             </Link>
           ))}
         </div>

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/rate";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { isDeadlineUnit } from "~/lib/content";
@@ -187,6 +188,7 @@ export function meta() {
 }
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {
+  const t = useAdminT();
   const { isNew, rate, rooms } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
@@ -252,12 +254,12 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
     setPerRoomOcc(true);
   };
   const OP_COL_LABEL: Record<OpField, string> = {
-    defaultOccupancy: "Default occ.",
-    extraAdultPrice: "Extra adult",
-    lessGuestDiscount: "Fewer-adult disc.",
-    child0to3: "Age 0–3",
-    child4to12: "Age 4–12",
-    child13plus: "Age 13+",
+    defaultOccupancy: t("rtColDefaultOcc"),
+    extraAdultPrice: t("rtColExtraAdult"),
+    lessGuestDiscount: t("rtColFewerAdult"),
+    child0to3: t("rtAge0to3"),
+    child4to12: t("rtAge4to12"),
+    child13plus: t("rtAge13plus"),
   };
 
   return (
@@ -266,13 +268,13 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         to="/admin/rates"
         className="mb-4 inline-block text-[13px] font-semibold text-muted hover:text-accent"
       >
-        ← All rates
+        {t("rtBackAll")}
       </Link>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{isNew ? "New rate" : rate?.title}</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{isNew ? t("rtNewTitle") : rate?.title}</h1>
         {actionData && "ok" in actionData && actionData.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
@@ -280,21 +282,19 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
       <Form ref={formRef} onChange={refreshPreview} method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
-            Rate name
-            <input name="title" defaultValue={rate?.title} placeholder="Breakfast Rate" className={FIELD_INPUT} />
+            {t("rtNameLabel")}
+            <input name="title" defaultValue={rate?.title} placeholder={t("rtNamePlaceholder")} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
-            Meal plan <span className="font-normal text-faint">(optional)</span>
-            <input name="mealPlan" defaultValue={rate?.mealPlan} placeholder="Breakfast included" className={FIELD_INPUT} />
+            {t("rtMealPlan")} <span className="font-normal text-faint">{t("rtOptional")}</span>
+            <input name="mealPlan" defaultValue={rate?.mealPlan} placeholder={t("rtMealPlanPlaceholder")} className={FIELD_INPUT} />
           </label>
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-1 font-serif text-[17px] font-semibold">Nightly price per room</div>
+          <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPricesTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            This rate applies to every room you price below — leave a room blank to not offer it
-            there. Occupancy is taken from each room&rsquo;s settings. Prices in your property
-            currency.
+            {t("rtPricesIntro")}
           </p>
           <div className="overflow-hidden rounded-[12px] border border-line">
             {rooms.map((r, i) => (
@@ -320,14 +320,13 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-1 font-serif text-[17px] font-semibold">Payment</div>
+          <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPaymentTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            How and when the guest pays. This drives the checkout breakdown and policy text — it
-            doesn&rsquo;t charge cards (no payment gateway is connected yet).
+            {t("rtPaymentIntro")}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
-              Payment timing
+              {t("rtPayTiming")}
               <select name="payTiming" value={payTiming} onChange={(e) => setPayTiming(e.target.value)} className={FIELD_INPUT}>
                 {PAYMENT_TIMINGS.map((t) => (
                   <option key={t} value={t}>{PAYMENT_TIMING_LABEL[t]}</option>
@@ -335,7 +334,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Card handling
+              {t("rtCardHandling")}
               <select name="cardHandling" defaultValue={pol.payment.card} className={FIELD_INPUT}>
                 {CARD_HANDLINGS.map((c) => (
                   <option key={c} value={c}>{CARD_HANDLING_LABEL[c]}</option>
@@ -343,7 +342,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Deposit type <span className="font-normal text-faint">(when timing = Deposit)</span>
+              {t("rtDepositType")} <span className="font-normal text-faint">{t("rtDepositTypeHint")}</span>
               <select name="depositType" defaultValue={pol.payment.deposit?.type ?? "percent"} disabled={payTiming !== "deposit"} className={disabledInput}>
                 {DEPOSIT_TYPES.map((d) => (
                   <option key={d} value={d}>{DEPOSIT_TYPE_LABEL[d]}</option>
@@ -351,22 +350,20 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Deposit value <span className="font-normal text-faint">(% , amount, or no. of nights)</span>
-              <input name="depositValue" type="number" min={0} step="0.01" defaultValue={pol.payment.deposit?.value ?? ""} placeholder="e.g. 30" disabled={payTiming !== "deposit"} className={disabledInput} />
+              {t("rtDepositValue")} <span className="font-normal text-faint">{t("rtDepositValueHint")}</span>
+              <input name="depositValue" type="number" min={0} step="0.01" defaultValue={pol.payment.deposit?.value ?? ""} placeholder={t("rtEg", { v: 30 })} disabled={payTiming !== "deposit"} className={disabledInput} />
             </label>
           </div>
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-1 font-serif text-[17px] font-semibold">Occupancy pricing</div>
+          <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtOccTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            Optional. Set a default occupancy to price by party size — the nightly price above covers
-            that many adults; extra adults add, fewer adults discount, and children are priced by age
-            band (all per night). Leave the default occupancy blank to charge a flat price for any party.
+            {t("rtOccIntro")}
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <label className="block text-[13px] font-semibold text-secondary">
-              Default occupancy <span className="font-normal text-faint">(adults)</span>
+              {t("rtDefaultOcc")} <span className="font-normal text-faint">{t("rtDefaultOccHint")}</span>
               <input
                 name="defaultOccupancy"
                 type="number"
@@ -377,7 +374,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Price per extra adult <span className="font-normal text-faint">(/night)</span>
+              {t("rtExtraAdult")} <span className="font-normal text-faint">{t("rtPerNightHint")}</span>
               <input
                 name="extraAdultPrice"
                 type="number"
@@ -389,7 +386,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Discount per fewer adult <span className="font-normal text-faint">(/night)</span>
+              {t("rtFewerAdult")} <span className="font-normal text-faint">{t("rtPerNightHint")}</span>
               <input
                 name="lessGuestDiscount"
                 type="number"
@@ -402,19 +399,19 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
           </div>
           <div className="mt-3 text-[13px] font-semibold text-secondary">
-            Child price per night <span className="font-normal text-faint">(per child, by age)</span>
+            {t("rtChildTitle")} <span className="font-normal text-faint">{t("rtChildHint")}</span>
           </div>
           <div className="mt-1.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <label className="block text-[12.5px] font-semibold text-muted-2">
-              Age 0–3
+              {t("rtAge0to3")}
               <input name="child0to3" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child0to3 ?? ""} placeholder="0" className={FIELD_INPUT} />
             </label>
             <label className="block text-[12.5px] font-semibold text-muted-2">
-              Age 4–12
+              {t("rtAge4to12")}
               <input name="child4to12" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child4to12 ?? ""} placeholder="15" className={FIELD_INPUT} />
             </label>
             <label className="block text-[12.5px] font-semibold text-muted-2">
-              Age 13+
+              {t("rtAge13plus")}
               <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
             </label>
           </div>
@@ -426,8 +423,8 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               onChange={(e) => (e.target.checked ? enablePerRoomOcc() : setPerRoomOcc(false))}
               className={checkbox}
             />
-            Set different per-person pricing per room
-            <span className="font-normal text-faint">(override the values above for specific rooms)</span>
+            {t("rtPerRoomToggle")}
+            <span className="font-normal text-faint">{t("rtPerRoomToggleHint")}</span>
           </label>
 
           {perRoomOcc && (
@@ -438,7 +435,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                 <table className="w-full border-collapse text-[13px]">
                   <thead>
                     <tr className="bg-surface-alt/60 text-[11px] font-semibold uppercase tracking-wide text-muted-2">
-                      <th className="px-3 py-2 text-left">Room</th>
+                      <th className="px-3 py-2 text-left">{t("rtRoomCol")}</th>
                       {OP_FIELDS.map((f) => (
                         <th key={f} className="px-2 py-2 text-center font-semibold">{OP_COL_LABEL[f]}</th>
                       ))}
@@ -467,26 +464,25 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                 </table>
               </div>
               <p className="mt-2 text-[12px] text-faint">
-                Pre-filled from the rate-wide values above — edit the rooms that differ and save. A
-                room left without a default occupancy falls back to the rate-wide pricing.
+                {t("rtPerRoomHint")}
               </p>
             </div>
           )}
         </div>
 
         <label className="block text-[13px] font-semibold text-secondary">
-          What&rsquo;s included <span className="font-normal text-faint">(one per line)</span>
+          {t("rtInclusions")} <span className="font-normal text-faint">{t("rtOnePerLine")}</span>
           <textarea
             name="inclusions"
             rows={3}
             defaultValue={rate?.inclusions.join("\n")}
-            placeholder={"Breakfast for two\nFree cancellation\nFree Wi-Fi"}
+            placeholder={t("rtInclusionsPlaceholder")}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-3 font-serif text-[17px] font-semibold">Cancellation policy</div>
+          <div className="mb-3 font-serif text-[17px] font-semibold">{t("rtCancelTitle")}</div>
           <label className="mb-3 flex items-center gap-2.5 text-[14px] font-semibold">
             <input
               type="checkbox"
@@ -495,11 +491,11 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               onChange={(e) => setRefundable(e.target.checked)}
               className={checkbox}
             />
-            Refundable (free cancellation)
+            {t("rtRefundable")}
           </label>
           {refundable ? (
             <>
-              <div className="text-[13px] font-semibold text-secondary">Free cancellation up to</div>
+              <div className="text-[13px] font-semibold text-secondary">{t("rtFreeCancelUpTo")}</div>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   name="cancelDeadlineValue"
@@ -514,14 +510,14 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                   defaultValue={rate?.cancelDeadlineUnit ?? "hours"}
                   className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
                 >
-                  <option value="hours">hours</option>
-                  <option value="days">days</option>
+                  <option value="hours">{t("rtHours")}</option>
+                  <option value="days">{t("rtDays")}</option>
                 </select>
-                <span className="text-[13px] text-muted-2">before arrival</span>
+                <span className="text-[13px] text-muted-2">{t("rtBeforeArrival")}</span>
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Late-cancellation charge <span className="font-normal text-faint">(after the deadline)</span>
+                  {t("rtLateCharge")} <span className="font-normal text-faint">{t("rtLateChargeHint")}</span>
                   <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
                     {PENALTY_TYPES.map((p) => (
                       <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
@@ -529,22 +525,22 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                   </select>
                 </label>
                 <label className="block text-[13px] font-semibold text-secondary">
-                  Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
-                  <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder="e.g. 50" disabled={!needsValue(latePenalty)} className={disabledInput} />
+                  {t("rtChargeValue")} <span className="font-normal text-faint">{t("rtChargeValueHint")}</span>
+                  <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder={t("rtEg", { v: 50 })} disabled={!needsValue(latePenalty)} className={disabledInput} />
                 </label>
               </div>
             </>
           ) : (
-            <p className="text-[13px] text-muted">All bookings are non-refundable — no free cancellation.</p>
+            <p className="text-[13px] text-muted">{t("rtNonRefundableNote")}</p>
           )}
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-1 font-serif text-[17px] font-semibold">No-show</div>
-          <p className="mb-3 text-[13px] text-muted">What&rsquo;s charged if the guest never arrives and doesn&rsquo;t cancel.</p>
+          <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtNoShowTitle")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("rtNoShowIntro")}</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
-              No-show charge
+              {t("rtNoShowCharge")}
               <select name="noShowPenalty" value={noShowPenalty} onChange={(e) => setNoShowPenalty(e.target.value)} className={FIELD_INPUT}>
                 {PENALTY_TYPES.map((p) => (
                   <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
@@ -552,22 +548,21 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               </select>
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
-              Charge value <span className="font-normal text-faint">(% or amount; for percentage / fixed)</span>
-              <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder="e.g. 100" disabled={!needsValue(noShowPenalty)} className={disabledInput} />
+              {t("rtChargeValue")} <span className="font-normal text-faint">{t("rtChargeValueHint")}</span>
+              <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder={t("rtEg", { v: 100 })} disabled={!needsValue(noShowPenalty)} className={disabledInput} />
             </label>
           </div>
         </div>
 
         <label className="flex items-center gap-2.5 border-t border-divider pt-5 text-[14px] font-semibold">
           <input type="checkbox" name="active" defaultChecked={rate ? rate.active : true} className={checkbox} />
-          Active (bookable by guests)
+          {t("rtActive")}
         </label>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-2 font-serif text-[17px] font-semibold">What guests will see</div>
+          <div className="mb-2 font-serif text-[17px] font-semibold">{t("rtPreviewTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            Live preview of the policy text shown on the booking page (the guest sees it in their
-            language, with the actual amounts).
+            {t("rtPreviewIntro")}
           </p>
           <div className="flex flex-col gap-1.5 rounded-[12px] border border-line bg-surface-alt/50 p-4 text-[14px] text-secondary">
             <div>{preview.payment}</div>
@@ -575,8 +570,8 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             {preview.noShow && <div>{preview.noShow}</div>}
           </div>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
-            Override note <span className="font-normal text-faint">(optional — replaces the cancellation line above)</span>
-            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder="Leave blank to show the policy generated from the fields above." className={FIELD_INPUT} />
+            {t("rtOverrideNote")} <span className="font-normal text-faint">{t("rtOverrideNoteHint")}</span>
+            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder={t("rtOverrideNotePlaceholder")} className={FIELD_INPUT} />
           </label>
         </div>
 
@@ -589,7 +584,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : isNew ? "Create rate" : "Save rate"}
+            {saving ? t("saving") : isNew ? t("rtCreate") : t("rtSave")}
           </button>
         </div>
       </Form>
@@ -599,11 +594,11 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           method="post"
           className="mt-4"
           onSubmit={(e) => {
-            if (!confirm("Delete this rate?")) e.preventDefault();
+            if (!confirm(t("rtDeleteConfirm"))) e.preventDefault();
           }}
         >
           <button type="submit" name="intent" value="delete" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
-            Delete rate
+            {t("rtDelete")}
           </button>
         </Form>
       )}

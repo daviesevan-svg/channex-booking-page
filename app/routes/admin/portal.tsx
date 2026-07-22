@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/portal";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, savePortalSettings } from "~/lib/overrides.server";
@@ -39,6 +40,7 @@ function Deadline({
   value?: number;
   unit?: string;
 }) {
+  const t = useAdminT();
   return (
     <div>
       <div className="text-[13px] font-semibold text-secondary">{label}</div>
@@ -56,10 +58,10 @@ function Deadline({
           defaultValue={unit ?? "days"}
           className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
         >
-          <option value="days">days</option>
-          <option value="hours">hours</option>
+          <option value="days">{t("poDays")}</option>
+          <option value="hours">{t("poHours")}</option>
         </select>
-        <span className="text-[13px] text-muted-2">before arrival</span>
+        <span className="text-[13px] text-muted-2">{t("poBeforeArrival")}</span>
       </div>
       <p className="mt-1 text-[11px] text-faint">{hint}</p>
     </div>
@@ -68,15 +70,16 @@ function Deadline({
 
 export default function AdminPortal({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
+  const t = useAdminT();
   const saving = nav.state === "submitting";
 
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">Customer Portal</h1>
+        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("poTitle")}</h1>
         <p className="text-[15px] text-secondary">
-          Set <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code> to edit
-          settings.
+          {t("poConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+          {t("poConfigureSuffix")}
         </p>
       </div>
     );
@@ -89,16 +92,15 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">Customer Portal</h1>
+        <h1 className="font-serif text-[26px] font-semibold">{t("poTitle")}</h1>
         {actionData?.ok && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ Saved
+            {t("saved")}
           </span>
         )}
       </div>
       <p className="mb-6 text-[14px] text-muted">
-        Controls what guests can do in “Manage my booking”. These are the defaults — a rate plan can
-        override its own windows.
+        {t("poIntro")}
       </p>
 
       <Form
@@ -107,11 +109,11 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
       >
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="allowCancel" defaultChecked={s.allowCancel} className={checkbox} />
-          Allow guests to cancel their booking
+          {t("poAllowCancel")}
         </label>
         <Deadline
-          label="Free cancellation up to"
-          hint="Guests can cancel until this long before arrival. Leave blank for no time limit."
+          label={t("poCancelUpTo")}
+          hint={t("poCancelHint")}
           nameValue="cancelDeadlineValue"
           nameUnit="cancelDeadlineUnit"
           value={s.cancelDeadlineValue}
@@ -120,11 +122,9 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
         <label className="flex items-start gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
           <span>
-            Automatically refund on cancellation
+            {t("poAutoRefund")}
             <span className="mt-0.5 block text-[12.5px] font-normal text-muted">
-              When a guest cancels within the free-cancellation window, refund their Stripe payment in
-              full automatically. Leave off to issue refunds yourself. Guarantee-card bookings have no
-              charge, so nothing is refunded.
+              {t("poAutoRefundHint")}
             </span>
           </span>
         </label>
@@ -133,11 +133,11 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
 
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="allowModify" defaultChecked={s.allowModify} className={checkbox} />
-          Allow guests to modify their booking <span className="text-[12px] font-normal text-faint">(coming soon)</span>
+          {t("poAllowModify")} <span className="text-[12px] font-normal text-faint">{t("poComingSoon")}</span>
         </label>
         <Deadline
-          label="Changes allowed up to"
-          hint="Guests can change dates/rooms until this long before arrival."
+          label={t("poModifyUpTo")}
+          hint={t("poModifyHint")}
           nameValue="modifyDeadlineValue"
           nameUnit="modifyDeadlineUnit"
           value={s.modifyDeadlineValue}
@@ -147,16 +147,16 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
         <div className="border-t border-divider" />
 
         <label className="block text-[13px] font-semibold text-secondary">
-          After-deadline message
+          {t("poAfterDeadline")}
           <textarea
             name="afterDeadlineMessage"
             rows={2}
             defaultValue={s.afterDeadlineMessage}
-            placeholder="Please contact us directly to change or cancel this booking."
+            placeholder={t("poAfterDeadlinePlaceholder")}
             className="mt-1.5 block w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            Shown to guests once the cancellation/modification window has passed.
+            {t("poAfterDeadlineHint")}
           </span>
         </label>
 
@@ -167,7 +167,7 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
             disabled={saving}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save settings"}
+            {saving ? t("saving") : t("poSaveSettings")}
           </button>
         </div>
       </Form>

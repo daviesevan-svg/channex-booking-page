@@ -5,12 +5,15 @@
 // stays as the server-side backstop).
 import { useState } from "react";
 
+import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { fmtDate } from "~/lib/dates";
 import { blockedRangesToText } from "~/lib/vouchers";
 
 type R = { from: string; to: string };
 
 export function BlockedRangesEditor({ name, initial }: { name: string; initial: R[] }) {
+  const t = useAdminT();
+  const dl = useAdminDateLocale();
   const [ranges, setRanges] = useState<R[]>(initial);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -21,16 +24,16 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
 
   const add = () => {
     if (!from) {
-      setError("Pick a start date.");
+      setError(t("brPickStart"));
       return;
     }
     const end = to || from; // single-day block
     if (end < from) {
-      setError("The end date is before the start date.");
+      setError(t("brEndBeforeStart"));
       return;
     }
     if (ranges.some((r) => from <= r.to && end >= r.from)) {
-      setError("That overlaps a range already in the list.");
+      setError(t("brOverlap"));
       return;
     }
     setRanges([...ranges, { from, to: end }].sort((a, b) => a.from.localeCompare(b.from)));
@@ -40,7 +43,9 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
   };
 
   const label = (r: R) =>
-    r.from === r.to ? fmtDate(r.from, "d MMM yyyy") : `${fmtDate(r.from, "d MMM yyyy")} – ${fmtDate(r.to, "d MMM yyyy")}`;
+    r.from === r.to
+      ? fmtDate(r.from, "d MMM yyyy", dl)
+      : `${fmtDate(r.from, "d MMM yyyy", dl)} – ${fmtDate(r.to, "d MMM yyyy", dl)}`;
 
   return (
     <div className="mt-1.5">
@@ -56,7 +61,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
               {label(r)}
               <button
                 type="button"
-                aria-label={`Remove ${label(r)}`}
+                aria-label={t("brRemove", { range: label(r) })}
                 onClick={() => setRanges(ranges.filter((_, j) => j !== i))}
                 className="text-[15px] leading-none text-muted-2 hover:text-[#c0392b]"
               >
@@ -76,9 +81,9 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
             setError(null);
           }}
           className={input}
-          aria-label="Block from"
+          aria-label={t("brFrom")}
         />
-        <span className="text-[13px] text-muted-2">to</span>
+        <span className="text-[13px] text-muted-2">{t("brTo")}</span>
         <input
           type="date"
           value={to}
@@ -88,20 +93,18 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
             setError(null);
           }}
           className={input}
-          aria-label="Block until (optional — blank blocks a single day)"
+          aria-label={t("brUntil")}
         />
         <button
           type="button"
           onClick={add}
           className="rounded-[10px] border border-line-alt px-3.5 py-2 text-[13px] font-semibold text-secondary hover:bg-chip"
         >
-          + Block dates
+          {t("brBlockDates")}
         </button>
       </div>
       {error && <p className="mb-0 mt-1.5 text-[12.5px] text-red-600">{error}</p>}
-      <p className="mb-0 mt-1.5 text-[11.5px] font-normal text-faint">
-        Leave the second date blank to block a single day. Guests can&#39;t check in on blocked dates.
-      </p>
+      <p className="mb-0 mt-1.5 text-[11.5px] font-normal text-faint">{t("brHint")}</p>
     </div>
   );
 }

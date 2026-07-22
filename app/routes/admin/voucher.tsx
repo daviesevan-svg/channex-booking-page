@@ -7,13 +7,14 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/voucher";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
+import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { fmtDate } from "~/lib/dates";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getBooking } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
-import { blockedRangesToText, displayStatus, giftBalance, normalizeVoucherCode, parseBlockedRanges, WEEKDAY_LABELS } from "~/lib/vouchers";
+import { blockedRangesToText, displayStatus, giftBalance, normalizeVoucherCode, parseBlockedRanges } from "~/lib/vouchers";
 import {
   cancelVoucher,
   deductGift,
@@ -225,19 +226,15 @@ const STATUS_STYLE: Record<string, string> = {
   expired: "bg-[#fbe9e7] text-[#c0392b]",
 };
 
-const KIND_LABEL: Record<string, string> = {
-  gift: "Gift voucher",
-  package: "Stay package",
-  experience: "Experience",
-};
-
 export default function AdminVoucher({ loaderData, actionData }: Route.ComponentProps) {
   const { voucher: v, currency, canManage, guestUrl } = loaderData;
+  const t = useAdminT();
+  const dl = useAdminDateLocale();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const money = (n: number) => formatMoney(n, currency);
-  const dt = (iso: string) => fmtDate(iso, "d MMM yyyy, HH:mm");
-  const d = (iso: string) => fmtDate(iso, "d MMM yyyy");
+  const dt = (iso: string) => fmtDate(iso, "d MMM yyyy, HH:mm", dl);
+  const d = (iso: string) => fmtDate(iso, "d MMM yyyy", dl);
   const section = "rounded-[14px] border border-line bg-surface p-5";
   const actionBtn =
     "rounded-[10px] border border-line-alt px-4 py-2.5 text-[13.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-60";
@@ -250,7 +247,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
         to="/admin/vouchers?tab=sold"
         className="mb-4 inline-block text-[13px] font-semibold text-muted hover:text-accent"
       >
-        ← Sold vouchers
+        {t("vdBack")}
       </Link>
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -259,13 +256,13 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
         </h1>
         <div className="flex items-center gap-2">
           {v.simulated && (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11.5px] font-semibold text-amber-800">test</span>
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11.5px] font-semibold text-amber-800">{t("vdBadgeTest")}</span>
           )}
           {v.comp && (
-            <span className="rounded-full bg-chip px-2.5 py-1 text-[11.5px] font-semibold text-muted">comp</span>
+            <span className="rounded-full bg-chip px-2.5 py-1 text-[11.5px] font-semibold text-muted">{t("vdBadgeComp")}</span>
           )}
           <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${STATUS_STYLE[v.status] ?? "bg-chip text-muted"}`}>
-            {v.status}
+            {t(`vdStatus_${v.status}`)}
           </span>
         </div>
       </div>
@@ -277,104 +274,108 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
       )}
       {actionData && "resent" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Voucher email re-sent to {actionData.resent}.
+          {t("vdResentTo", { to: actionData.resent ?? "" })}
         </div>
       )}
       {actionData && "redeemed" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Marked as redeemed.
+          {t("vdMarkedRedeemedBanner")}
         </div>
       )}
       {actionData && "deducted" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Amount deducted from the balance.
+          {t("vdDeductedBanner")}
         </div>
       )}
       {actionData && "cancelled" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
-          Voucher cancelled. Refund the payment below if one was taken.
+          {t("vdCancelledBanner")}
         </div>
       )}
       {actionData && "termsUpdated" in actionData && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ Redemption terms updated — the change applies to this voucher immediately.
+          {t("vdTermsUpdatedBanner")}
         </div>
       )}
       {actionData && "refunded" in actionData && typeof actionData.refunded === "number" && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
-          ✓ {money(actionData.refunded)} refunded to the buyer's payment method.
+          {t("vdRefundedBanner", { amount: money(actionData.refunded) })}
         </div>
       )}
 
       <div className="grid gap-5 lg:grid-cols-2">
         {/* Voucher */}
         <section className={section}>
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Voucher</h2>
-          <Row label="Type" value={KIND_LABEL[v.kind] ?? v.kind} />
-          <Row label="Sale price" value={money(v.product.price)} />
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("vdSectionVoucher")}</h2>
+          <Row label={t("vdType")} value={t(`vdKind_${v.kind}`)} />
+          <Row label={t("vdSalePrice")} value={money(v.product.price)} />
           {v.kind === "gift" && (
             <>
-              <Row label="Face value" value={money(v.product.value ?? v.product.price)} />
-              <Row label="Stored balance" value={money(v.balance ?? 0)} />
-              {v.spendable !== v.balance && <Row label="Spendable now (after holds)" value={money(v.spendable ?? 0)} />}
+              <Row label={t("vdFaceValue")} value={money(v.product.value ?? v.product.price)} />
+              <Row label={t("vdStoredBalance")} value={money(v.balance ?? 0)} />
+              {v.spendable !== v.balance && <Row label={t("vdSpendableNow")} value={money(v.spendable ?? 0)} />}
             </>
           )}
           {v.kind === "experience" && v.product.guests != null && (
-            <Row label="Guests" value={String(v.product.guests)} />
+            <Row label={t("vdGuests")} value={String(v.product.guests)} />
           )}
           {pkg && (
             <>
               <Row
-                label="Stay"
-                value={`${pkg.nights} night${pkg.nights === 1 ? "" : "s"} · ${pkg.adults} adult${pkg.adults === 1 ? "" : "s"}${pkg.children ? ` + ${pkg.children} child${pkg.children === 1 ? "" : "ren"}` : ""}`}
+                label={t("vdStay")}
+                value={`${t(pkg.nights === 1 ? "vdNights_one" : "vdNights_other", { n: pkg.nights })} · ${t(pkg.adults === 1 ? "vdAdults_one" : "vdAdults_other", { n: pkg.adults })}${pkg.children ? ` + ${t(pkg.children === 1 ? "vdChildren_one" : "vdChildren_other", { n: pkg.children })}` : ""}`}
               />
-              {v.product.roomTitles.length > 0 && <Row label="Rooms" value={v.product.roomTitles.join(" · ")} />}
+              {v.product.roomTitles.length > 0 && <Row label={t("vdRooms")} value={v.product.roomTitles.join(" · ")} />}
               <Row
-                label="Check-in days"
-                value={pkg.checkinDays.length ? pkg.checkinDays.map((x) => WEEKDAY_LABELS[x]).join(" / ") : "Any day"}
+                label={t("vdCheckinDays")}
+                value={pkg.checkinDays.length ? pkg.checkinDays.map((x) => t(`vdWd_${x}`)).join(" / ") : t("vdAnyDay")}
               />
               {(pkg.window?.from || pkg.window?.to) && (
-                <Row label="Stay window" value={`${pkg.window.from ?? "…"} – ${pkg.window.to ?? "…"}`} />
+                <Row label={t("vdStayWindow")} value={`${pkg.window.from ?? "…"} – ${pkg.window.to ?? "…"}`} />
               )}
               {pkg.blockedRanges.length > 0 && (
                 <Row
-                  label="Blocked dates"
+                  label={t("vdBlockedDates")}
                   value={pkg.blockedRanges.map((r) => (r.from === r.to ? r.from : `${r.from}..${r.to}`)).join(", ")}
                 />
               )}
             </>
           )}
-          <Row label="Purchased" value={dt(v.purchasedAt)} />
-          <Row label="Expires" value={d(v.expiresAt)} />
-          {v.product.terms && <Row label="Terms" value={v.product.terms} />}
+          <Row label={t("vdPurchased")} value={dt(v.purchasedAt)} />
+          <Row label={t("vdExpires")} value={d(v.expiresAt)} />
+          {v.product.terms && <Row label={t("vdTerms")} value={v.product.terms} />}
           <div className="mt-3 border-t border-divider pt-3 text-[13px]">
             <a href={guestUrl} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:text-accent-deep">
-              Open the guest voucher page ↗
+              {t("vdOpenGuestPage")}
             </a>
           </div>
         </section>
 
         {/* Buyer & recipient */}
         <section className={section}>
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">Buyer & recipient</h2>
-          <Row label="Buyer" value={v.buyer.name} />
-          <Row label="Buyer email" value={v.buyer.email} />
+          <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("vdSectionBuyer")}</h2>
+          <Row label={t("vdBuyer")} value={v.buyer.name} />
+          <Row label={t("vdBuyerEmail")} value={v.buyer.email} />
           {v.gift && (
             <>
-              <Row label="Recipient" value={v.gift.recipientName} />
-              <Row label="Recipient email" value={v.gift.recipientEmail ?? "— (buyer hands it over)"} />
-              {v.gift.message && <Row label="Gift message" value={`“${v.gift.message}”`} />}
+              <Row label={t("vdRecipient")} value={v.gift.recipientName} />
+              <Row label={t("vdRecipientEmail")} value={v.gift.recipientEmail ?? t("vdBuyerHandsOver")} />
+              {v.gift.message && <Row label={t("vdGiftMessage")} value={`“${v.gift.message}”`} />}
             </>
           )}
 
-          <h2 className="mb-3 mt-6 font-serif text-[18px] font-semibold">Payment</h2>
+          <h2 className="mb-3 mt-6 font-serif text-[18px] font-semibold">{t("vdSectionPayment")}</h2>
           {v.payment ? (
             <>
-              <Row label="Paid" value={money(v.payment.amount ?? v.product.price)} />
+              <Row label={t("vdPaid")} value={money(v.payment.amount ?? v.product.price)} />
               {v.payment.refund ? (
                 <Row
-                  label="Refunded"
-                  value={`${money(v.payment.refund.amount)} on ${d(v.payment.refund.at)}${v.payment.refund.by ? ` by ${v.payment.refund.by}` : ""}`}
+                  label={t("vdRefunded")}
+                  value={
+                    v.payment.refund.by
+                      ? t("vdRefundedOnBy", { amount: money(v.payment.refund.amount), date: d(v.payment.refund.at), by: v.payment.refund.by })
+                      : t("vdRefundedOn", { amount: money(v.payment.refund.amount), date: d(v.payment.refund.at) })
+                  }
                 />
               ) : (
                 v.payment.hasCharge &&
@@ -382,13 +383,13 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
                   <Form
                     method="post"
                     onSubmit={(e) => {
-                      if (!confirm(`Refund ${money(v.payment!.amount ?? v.product.price)} to the buyer's original payment method?`)) e.preventDefault();
+                      if (!confirm(t("vdConfirmRefund", { amount: money(v.payment!.amount ?? v.product.price) }))) e.preventDefault();
                     }}
                     className="mt-2"
                   >
                     <input type="hidden" name="intent" value="refund" />
                     <button type="submit" disabled={busy} className={actionBtn}>
-                      Refund {money(v.payment.amount ?? v.product.price)}
+                      {t("vdRefundBtn", { amount: money(v.payment.amount ?? v.product.price) })}
                     </button>
                   </Form>
                 )
@@ -396,7 +397,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
             </>
           ) : (
             <p className="m-0 text-[13.5px] text-muted">
-              {v.comp ? "Complimentary — no payment taken." : "Test purchase — no payment taken."}
+              {v.comp ? t("vdCompNoPayment") : t("vdTestNoPayment")}
             </p>
           )}
         </section>
@@ -404,32 +405,32 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
 
       {/* Activity */}
       <section className={`${section} mt-5`}>
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Activity</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("vdSectionActivity")}</h2>
         {v.activity.length === 0 ? (
-          <p className="m-0 text-[13.5px] text-muted">No redemptions yet.</p>
+          <p className="m-0 text-[13.5px] text-muted">{t("vdNoRedemptions")}</p>
         ) : (
           <div className="flex flex-col">
             {v.activity.map((a, i) => (
               <div key={i} className={`flex flex-wrap items-baseline justify-between gap-2 py-2 ${i > 0 ? "border-t border-divider" : ""}`}>
                 <span className="text-[14px] text-ink">
                   {a.note === "cooling-off cancel"
-                    ? `Cancelled by the buyer (cooling-off)${a.by ? ` — ${a.by}` : ""}`
+                    ? `${t("vdActCoolingOff")}${a.by ? ` — ${a.by}` : ""}`
                     : a.note === "manual" && a.amount == null
-                      ? `Marked redeemed${a.by ? ` by ${a.by}` : ""}`
+                      ? `${t("vdActMarkedRedeemed")}${a.by ? ` ${t("vdActBy", { by: a.by })}` : ""}`
                       : a.liveHold
-                        ? `${a.amount != null ? money(a.amount) : ""} held by a checkout in progress`
+                        ? t("vdActHeld", { amount: a.amount != null ? money(a.amount) : "" })
                         : a.expiredHold
-                          ? `${a.amount != null ? money(a.amount) : ""} hold expired (checkout abandoned)`
+                          ? t("vdActHoldExpired", { amount: a.amount != null ? money(a.amount) : "" })
                           : a.bookingRef
                             ? (
                                 <>
-                                  {a.amount != null ? `${money(a.amount)} spent on ` : "Redeemed against "}
+                                  {a.amount != null ? `${t("vdActSpentOn", { amount: money(a.amount) })} ` : `${t("vdActRedeemedAgainst")} `}
                                   <Link to={`/admin/bookings/${a.bookingId}`} className="font-semibold text-accent hover:text-accent-deep">
-                                    booking {a.bookingRef}
+                                    {t("vdActBookingLink", { ref: a.bookingRef ?? "" })}
                                   </Link>
                                 </>
                               )
-                            : `${a.amount != null ? `${money(a.amount)} deducted` : "Redeemed"}${a.by ? ` by ${a.by}` : ""}`}
+                            : `${a.amount != null ? t("vdActDeducted", { amount: money(a.amount) }) : t("vdActRedeemed")}${a.by ? ` ${t("vdActBy", { by: a.by })}` : ""}`}
                 </span>
                 <span className="text-[12.5px] text-muted-2">{dt(a.at)}</span>
               </div>
@@ -441,28 +442,26 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
       {/* Redemption terms — the deliberate way to amend a sold voucher */}
       {canManage && v.storedActive && (
         <section className={`${section} mt-5`}>
-          <h2 className="mb-1 font-serif text-[18px] font-semibold">Redemption terms</h2>
+          <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("vdSectionTerms")}</h2>
           <p className="mb-4 mt-0 text-[13px] leading-[1.55] text-secondary">
-            Sold vouchers keep the terms they were bought with — catalog edits never touch them. Amend this
-            voucher here instead: extend the expiry (an expired voucher becomes usable again), widen the stay
-            window, or add a blocked date you forgot. Every change is logged below
-            {v.gift ? " — resend the voucher email afterwards so the recipient sees the new dates" : ""}.
+            {t("vdTermsIntro")}
+            {v.gift ? t("vdTermsIntroGift") : ""}.
           </p>
           <Form method="post" className="flex flex-col gap-4">
             <input type="hidden" name="intent" value="editTerms" />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label className="block text-[13px] font-semibold text-secondary">
-                Expires
+                {t("vdExpires")}
                 <input name="expires" type="date" defaultValue={v.expiresAt.slice(0, 10)} className={FIELD_INPUT} />
               </label>
               {pkg && (
                 <>
                   <label className="block text-[13px] font-semibold text-secondary">
-                    Stay window from <span className="font-normal text-faint">(blank = open)</span>
+                    {t("vdStayWindowFrom")} <span className="font-normal text-faint">{t("vdBlankOpen")}</span>
                     <input name="windowFrom" type="date" defaultValue={pkg.window?.from ?? ""} className={FIELD_INPUT} />
                   </label>
                   <label className="block text-[13px] font-semibold text-secondary">
-                    Stay window to <span className="font-normal text-faint">(blank = open)</span>
+                    {t("vdStayWindowTo")} <span className="font-normal text-faint">{t("vdBlankOpen")}</span>
                     <input name="windowTo" type="date" defaultValue={pkg.window?.to ?? ""} className={FIELD_INPUT} />
                   </label>
                 </>
@@ -470,7 +469,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
             </div>
             {pkg && (
               <div className="block text-[13px] font-semibold text-secondary">
-                Blocked dates
+                {t("vdBlockedDates")}
                 <BlockedRangesEditor
                   key={blockedRangesToText(pkg.blockedRanges)}
                   name="blockedRanges"
@@ -480,13 +479,13 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
             )}
             <div>
               <button type="submit" disabled={busy} className={actionBtn}>
-                Save terms
+                {t("vdSaveTerms")}
               </button>
             </div>
           </Form>
           {v.edits.length > 0 && (
             <div className="mt-4 border-t border-divider pt-3">
-              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-2">Edit history</div>
+              <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-muted-2">{t("vdEditHistory")}</div>
               {v.edits.map((e, i) => (
                 <div key={i} className="py-1 text-[13px] text-secondary">
                   <span className="text-muted-2">{dt(e.at)}</span>
@@ -501,12 +500,12 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
 
       {/* Actions */}
       <section className={`${section} mt-5`}>
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">Actions</h2>
+        <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("vdSectionActions")}</h2>
         <div className="flex flex-wrap items-center gap-3">
           <Form method="post">
             <input type="hidden" name="intent" value="resend" />
             <button type="submit" disabled={busy} className={actionBtn}>
-              Resend voucher email
+              {t("vdResendEmail")}
             </button>
           </Form>
 
@@ -514,12 +513,12 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
             <Form
               method="post"
               onSubmit={(e) => {
-                if (!confirm(v.kind === "package" ? "Mark this package voucher as redeemed (booked by phone/at the desk)?" : "Mark this experience voucher as redeemed (the guest used it)?")) e.preventDefault();
+                if (!confirm(v.kind === "package" ? t("vdConfirmRedeemPackage") : t("vdConfirmRedeemExperience"))) e.preventDefault();
               }}
             >
               <input type="hidden" name="intent" value="markRedeemed" />
               <button type="submit" disabled={busy} className={actionBtn}>
-                Mark redeemed
+                {t("vdMarkRedeemed")}
               </button>
             </Form>
           )}
@@ -536,7 +535,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
                 className="w-[92px] rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13.5px] outline-none focus:border-accent"
               />
               <button type="submit" disabled={busy} className={actionBtn}>
-                Deduct from balance
+                {t("vdDeductBtn")}
               </button>
             </Form>
           )}
@@ -545,7 +544,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
             <Form
               method="post"
               onSubmit={(e) => {
-                if (!confirm("Cancel this voucher? It can no longer be used.")) e.preventDefault();
+                if (!confirm(t("vdConfirmCancel"))) e.preventDefault();
               }}
             >
               <input type="hidden" name="intent" value="cancel" />
@@ -554,14 +553,14 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
                 disabled={busy}
                 className="rounded-[10px] border border-[#e5c4bd] px-4 py-2.5 text-[13.5px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
               >
-                Cancel voucher
+                {t("vdCancelVoucher")}
               </button>
             </Form>
           )}
         </div>
         {!canManage && (
           <p className="mb-0 mt-3 text-[12.5px] text-faint">
-            Redeeming, deducting, cancelling and refunding are limited to owners and managers.
+            {t("vdManageOnly")}
           </p>
         )}
       </section>

@@ -2,6 +2,7 @@ import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/team";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { sendTeamInviteEmail } from "~/lib/email.server";
 import {
@@ -59,23 +60,23 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
   const { name, owner, members } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
+  const t = useAdminT();
 
   return (
     <div>
-      <h1 className="mb-1 font-serif text-[26px] font-semibold">Team</h1>
+      <h1 className="mb-1 font-serif text-[26px] font-semibold">{t("tmTitle")}</h1>
       <p className="mb-6 text-[14px] text-muted">
-        People who can manage <strong>{name || "this property"}</strong>. Teammates can edit
-        everything for this property; only you (the owner) can manage the team, rename, or delete
-        it. Teammates only ever see properties they’ve been added to.
+        {t("tmIntroPre")} <strong>{name || t("tmThisProperty")}</strong>
+        {t("tmIntroPost")}
       </p>
 
       <div className="mb-7 overflow-hidden rounded-[14px] border border-line bg-surface">
         {/* owner */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div className="flex items-center gap-2.5">
-            <span className="font-semibold">{owner ?? <span className="italic text-faint">unassigned</span>}</span>
+            <span className="font-semibold">{owner ?? <span className="italic text-faint">{t("tmUnassigned")}</span>}</span>
             <span className="rounded-full bg-[#e8f0e6] px-2 py-0.5 text-[11px] font-semibold text-[#3f7a52]">
-              Owner
+              {t("tmOwner")}
             </span>
           </div>
         </div>
@@ -90,13 +91,13 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
             <Form
               method="post"
               onSubmit={(e) => {
-                if (!confirm(`Remove ${m} from this property’s team?`)) e.preventDefault();
+                if (!confirm(t("tmRemoveConfirm", { email: m }))) e.preventDefault();
               }}
             >
               <input type="hidden" name="intent" value="remove" />
               <input type="hidden" name="email" value={m} />
               <button type="submit" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
-                Remove
+                {t("tmRemove")}
               </button>
             </Form>
           </div>
@@ -104,7 +105,7 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
 
         {members.length === 0 && (
           <div className="border-t border-divider px-5 py-4 text-[13px] text-muted">
-            No teammates yet — invite someone below.
+            {t("tmNoTeammates")}
           </div>
         )}
       </div>
@@ -112,19 +113,18 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
       {/* invite */}
       <Form method="post" className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">
         <input type="hidden" name="intent" value="invite" />
-        <h2 className="font-serif text-[18px] font-semibold">Invite a teammate</h2>
+        <h2 className="font-serif text-[18px] font-semibold">{t("tmInviteTitle")}</h2>
         <label className="block text-[13px] font-semibold text-secondary">
-          Email
+          {t("tmEmailLabel")}
           <input
             name="email"
             type="email"
             required
-            placeholder="teammate@example.com"
+            placeholder={t("tmEmailPlaceholder")}
             className={FIELD_INPUT}
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">
-            We'll email them an invite. They sign in with a magic link to this address and get full
-            access to this property.
+            {t("tmInviteHint")}
           </span>
         </label>
         <div>
@@ -133,7 +133,7 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
             disabled={busy}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
-            {busy ? "Inviting…" : "Invite teammate"}
+            {busy ? t("tmInviting") : t("tmInvite")}
           </button>
         </div>
       </Form>
