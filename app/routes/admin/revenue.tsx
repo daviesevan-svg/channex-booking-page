@@ -58,7 +58,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Forecast covers the current month (chart overlay) through 30 days out.
   const monthFrom = `${today.slice(0, 8)}01`;
   const forecastTo = new Date(Date.parse(`${today}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
-  const forecast = state && hasData ? await getForecast(pid, monthFrom, forecastTo, state.roomCount) : undefined;
+  const forecast = state && hasData ? await getForecast(pid, monthFrom, forecastTo, state.roomCount, today) : undefined;
 
   const guards = { minPrice: state?.minPrice, maxPrice: state?.maxPrice };
   const suggestions =
