@@ -51,6 +51,7 @@ export default [
     route("properties/onboard", "routes/admin/onboard-channex.tsx"),
     route("collections", "routes/admin/collections.tsx"),
     route("collections/:slug", "routes/admin/collection.tsx"),
+    route("collections/:slug/analytics", "routes/admin/collection-analytics.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("team", "routes/admin/team.tsx"),
     route("select-property", "routes/admin/select-property.tsx"),
