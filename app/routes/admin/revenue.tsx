@@ -24,6 +24,13 @@ import {
 } from "~/lib/revman-analytics.server";
 import type { SalesScore } from "~/lib/revman-pace";
 import { guardsReady } from "~/lib/revman-price";
+import {
+  addCompetitor,
+  getCompSet,
+  removeCompetitor,
+  updateCompetitor,
+  type CompSetView,
+} from "~/lib/revman-compset.server";
 import { importLooksStalled } from "~/lib/revman";
 import {
   connectRevman,
@@ -83,7 +90,21 @@ export async function loader({ request }: Route.LoaderArgs) {
   // skips when another chunk runner looks alive).
   if (state?.importStatus === "running" && state.cursor) nudgeRevmanImport(pid);
 
-  return { configured: true as const, state, summary, kpis, today, paceMonth, paceDays, forecast, suggestions, stalled };
+  const compSet = state ? await getCompSet(pid) : undefined;
+
+  return {
+    configured: true as const,
+    state,
+    summary,
+    kpis,
+    today,
+    paceMonth,
+    paceDays,
+    forecast,
+    suggestions,
+    stalled,
+    compSet,
+  };
 }
 
 export function meta() {
@@ -139,6 +160,22 @@ export async function action({ request }: Route.ActionArgs) {
       const n = Number(form.get("roomCount"));
       if (!Number.isFinite(n) || n < 1) return { errorKey: "revErrRoomCount" as const };
       await setRevmanRoomCount(pid, n);
+      return { okKey: "revSaved" as const };
+    }
+    if (intent === "compAdd" || intent === "compUpdate") {
+      const fields = {
+        name: String(form.get("name") || ""),
+        starClass: form.get("starClass"),
+        reviewScore: form.get("reviewScore"),
+        reviewCount: form.get("reviewCount"),
+        bookingRef: String(form.get("bookingRef") || ""),
+      };
+      if (intent === "compAdd") await addCompetitor(pid, fields);
+      else await updateCompetitor(pid, String(form.get("compId")), fields);
+      return { okKey: "revSaved" as const };
+    }
+    if (intent === "compRemove") {
+      await removeCompetitor(pid, String(form.get("compId")));
       return { okKey: "revSaved" as const };
     }
     if (intent === "disconnect") {
@@ -468,6 +505,157 @@ function OccupancyChart({
   );
 }
 
+/** Manual competitor set with quality ranking. Each row (including our own
+ *  hotel) is an inline edit form; a new-competitor form sits at the bottom. */
+function CompSet({ view, busy, t }: { view: CompSetView; busy: boolean; t: AdminT }) {
+  const numCls = "w-full rounded-[7px] border border-line-alt bg-surface px-2 py-1 text-[13px]";
+  const stars = [1, 2, 3, 4, 5];
+  return (
+    <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
+      <div className="font-serif text-[18px] font-semibold">{t("revCompTitle")}</div>
+      <p className="mb-4 mt-1 max-w-[640px] text-[13px] text-muted">{t("revCompSub")}</p>
+
+      <div
+        className={`mb-4 rounded-[10px] border px-4 py-3 text-[13.5px] ${
+          view.standing.position !== null
+            ? "border-accent/30 bg-accent/5 text-secondary"
+            : "border-amber-200 bg-amber-50 text-amber-800"
+        }`}
+      >
+        {view.standing.position !== null
+          ? t("revCompStanding", { pos: String(view.standing.position), of: String(view.standing.rated) })
+          : t("revCompStandingUnrated")}
+      </div>
+
+      {/* Header row */}
+      <div className="grid grid-cols-[2rem_1fr_5rem_5rem_6rem_3.5rem_5.5rem] items-center gap-2 px-1 pb-1 text-[11px] uppercase tracking-[0.05em] text-muted">
+        <span>#</span>
+        <span>{t("revCompColName")}</span>
+        <span>{t("revCompColStar")}</span>
+        <span>{t("revCompColScore")}</span>
+        <span>{t("revCompColReviews")}</span>
+        <span className="text-right">{t("revCompColQuality")}</span>
+        <span />
+      </div>
+
+      <div className="space-y-1.5">
+        {view.ranked.map((h) => (
+          <Form
+            method="post"
+            key={h.id}
+            className={`grid grid-cols-[2rem_1fr_5rem_5rem_6rem_3.5rem_5.5rem] items-center gap-2 rounded-[10px] border px-1.5 py-1.5 ${
+              h.isSelf ? "border-accent/40 bg-accent/5" : "border-line-alt"
+            }`}
+          >
+            <input type="hidden" name="intent" value="compUpdate" />
+            <input type="hidden" name="compId" value={h.id} />
+            <span className="pl-1 text-[13px] font-semibold tabular-nums text-secondary">{h.rank ?? "—"}</span>
+            <span className="min-w-0">
+              <input name="name" defaultValue={h.name} className={numCls} />
+              {h.isSelf && (
+                <span className="ml-0.5 mt-0.5 inline-block text-[11px] font-semibold text-accent">
+                  {t("revCompYou")}
+                </span>
+              )}
+            </span>
+            <select name="starClass" defaultValue={h.starClass ?? ""} className={numCls}>
+              <option value="">—</option>
+              {stars.map((s) => (
+                <option key={s} value={s}>
+                  {s}★
+                </option>
+              ))}
+            </select>
+            <input
+              name="reviewScore"
+              type="number"
+              min={0}
+              max={10}
+              step="0.1"
+              defaultValue={h.reviewScore ?? ""}
+              placeholder="/10"
+              className={numCls}
+            />
+            <input
+              name="reviewCount"
+              type="number"
+              min={0}
+              step="1"
+              defaultValue={h.reviewCount ?? ""}
+              placeholder="#"
+              className={numCls}
+            />
+            <span className="text-right text-[14px] font-semibold tabular-nums">{h.qualityIndex ?? "—"}</span>
+            <span className="flex justify-end gap-1">
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-[7px] border border-line-alt px-2 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
+              >
+                {t("revCompSave")}
+              </button>
+              {!h.isSelf && (
+                <button
+                  type="submit"
+                  name="intent"
+                  value="compRemove"
+                  disabled={busy}
+                  title={t("revCompRemove")}
+                  className="rounded-[7px] border border-line-alt px-2 py-1 text-[12px] text-muted hover:bg-chip disabled:opacity-50"
+                >
+                  ✕
+                </button>
+              )}
+            </span>
+          </Form>
+        ))}
+      </div>
+
+      {/* Add competitor */}
+      <Form method="post" className="mt-4 border-t border-line-alt pt-4">
+        <input type="hidden" name="intent" value="compAdd" />
+        <div className="text-[13px] font-semibold text-secondary">{t("revCompAddTitle")}</div>
+        <div className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="text-[12px] text-muted">
+            {t("revCompColName")}
+            <input name="name" required className={`${numCls} mt-0.5 w-48`} />
+          </label>
+          <label className="text-[12px] text-muted">
+            {t("revCompColStar")}
+            <select name="starClass" defaultValue="" className={`${numCls} mt-0.5 w-20`}>
+              <option value="">—</option>
+              {stars.map((s) => (
+                <option key={s} value={s}>
+                  {s}★
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-[12px] text-muted">
+            {t("revCompColScore")}
+            <input name="reviewScore" type="number" min={0} max={10} step="0.1" className={`${numCls} mt-0.5 w-20`} />
+          </label>
+          <label className="text-[12px] text-muted">
+            {t("revCompColReviews")}
+            <input name="reviewCount" type="number" min={0} step="1" className={`${numCls} mt-0.5 w-24`} />
+          </label>
+          <label className="text-[12px] text-muted">
+            {t("revCompColBooking")}
+            <input name="bookingRef" placeholder="booking.com/…" className={`${numCls} mt-0.5 w-56`} />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-[9px] bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
+          >
+            {t("revCompAdd")}
+          </button>
+        </div>
+      </Form>
+    </section>
+  );
+}
+
 export default function AdminRevenue({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
   const dl = useAdminDateLocale();
@@ -490,7 +678,7 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { state, summary, kpis, paceDays, paceMonth, forecast, suggestions } = loaderData;
+  const { state, summary, kpis, paceDays, paceMonth, forecast, suggestions, compSet } = loaderData;
   const forecastByDate = new Map((forecast ?? []).map((f) => [f.date, f]));
   const ready = state ? guardsReady(state) : false;
   const importing = state?.importStatus === "running" && !loaderData.stalled;
@@ -815,6 +1003,8 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
               <p className="text-[13.5px] text-muted">{t("revNoDataYet")}</p>
             </section>
           )}
+
+          {compSet && <CompSet view={compSet} busy={busy} t={t} />}
 
           <section className="mt-4 rounded-[14px] border border-line bg-surface p-6">
             <h2 className="font-serif text-[19px] font-semibold">{t("revConnectionTitle")}</h2>
