@@ -80,13 +80,13 @@ export function suggestFor(s: SuggestionInput): Suggestion {
   return { date: s.date, pct: 0, reasonKey: "revSugReasonHold" };
 }
 
-/** New price for one cell: percentage nudge, rounded to whole units, clamped
- *  to the guards. Returns undefined when the result wouldn't change anything. */
-export function applyNudge(current: number, pct: number, guards: Required<PriceGuards>): number | undefined {
-  if (pct === 0 || current <= 0) return undefined;
-  let next = Math.round(current * (1 + pct / 100));
-  next = Math.min(guards.maxPrice, Math.max(guards.minPrice, next));
-  return next === current ? undefined : next;
+/** Target price for one cell: the cell's BASE price (what it was before
+ *  revenue management ever touched it — never the current, possibly already
+ *  nudged price, so re-applying can't compound) scaled by the date's demand
+ *  percentage, rounded to whole units and clamped to the guards. */
+export function targetPrice(base: number, pct: number, guards: Required<PriceGuards>): number {
+  const next = Math.round(base * (1 + pct / 100));
+  return Math.min(guards.maxPrice, Math.max(guards.minPrice, next));
 }
 
 export function guardsReady(g: PriceGuards): g is Required<PriceGuards> {

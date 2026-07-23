@@ -146,7 +146,8 @@ export async function setRevmanPriceGuards(pid: string, minPrice: number, maxPri
   await writeState(pid, { ...s, minPrice, maxPrice });
 }
 
-/** Removes the stored key, every imported night and all demand snapshots. */
+/** Removes the stored key, every imported night, all demand snapshots and the
+ *  price-base anchors. */
 export async function disconnectRevman(pid: string): Promise<void> {
   await getConfigKV()?.delete(stateKey(pid));
   await ensureSchema();
@@ -157,6 +158,8 @@ export async function disconnectRevman(pid: string): Promise<void> {
     .bind(pid)
     .run()
     .catch(() => {});
+  const { wipePriceBases } = await import("./revman-analytics.server");
+  await wipePriceBases(pid);
 }
 
 // ---------------------------------------------------------------------------
