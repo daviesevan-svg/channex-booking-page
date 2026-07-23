@@ -46,8 +46,9 @@ export interface Suggestion {
 }
 
 /** Discounts are suppressed once total on-the-books occupancy (online +
- *  inferred offline) reaches this level — the date isn't cold, we just can't
- *  see its bookings. */
+ *  inferred offline) OR the forecast reaches this level — the date either
+ *  isn't cold (we just can't see its bookings) or is expected to fill
+ *  anyway. */
 export const DISCOUNT_OCC_CEILING = 0.7;
 
 /** Rule table, evaluated top-down. Demand pushing above capacity earns the
@@ -65,7 +66,7 @@ export function suggestFor(s: SuggestionInput): Suggestion {
   const wantsDiscount =
     (score === "needs_attention" && dba >= 0 && dba <= 30) ||
     (score === "slow_sales" && fc < 0.4 && dba >= 0 && dba <= 14);
-  if (wantsDiscount && s.totalOnBooksPct >= DISCOUNT_OCC_CEILING)
+  if (wantsDiscount && (s.totalOnBooksPct >= DISCOUNT_OCC_CEILING || fc >= DISCOUNT_OCC_CEILING))
     return { date: s.date, pct: 0, reasonKey: "revSugReasonFullHold" };
   if (score === "needs_attention" && dba >= 0 && dba <= 14)
     return { date: s.date, pct: -10, reasonKey: "revSugReasonColdNear" };

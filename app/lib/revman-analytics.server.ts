@@ -440,10 +440,19 @@ function leadTimeStmt(pid: string, from: string, to: string, bookedBy: string) {
     .bind(pid, from, to, bookedBy);
 }
 
+/** How much recent history feeds the typical-pace baseline, and how many
+ *  same-weekday occurrences are needed before it's trusted. */
+const TYPICAL_LOOKBACK_DAYS = 182;
+const TYPICAL_MIN_DATES = 4;
+const TYPICAL_MAX_DATES = 12;
+
 /** Pace/pickup/sales-score snapshots for every date in [from, to], compared
  *  against the weekday-aligned range one year (364 days) earlier — last year's
  *  bookings trimmed to the aligned as-of date so both years are observed at
- *  the same days-before-arrival. */
+ *  the same days-before-arrival. Dates whose aligned last-year date predates
+ *  the imported history are scored against the typical pace of recent
+ *  same-weekday dates instead (comparing against a year of nothing would mark
+ *  every booked date "high demand"). */
 export async function getPaceCalendar(
   pid: string,
   from: string,
@@ -451,10 +460,12 @@ export async function getPaceCalendar(
   asOf: string,
   roomCount: number,
 ): Promise<PaceDay[]> {
-  const [[cur, ly], inferred] = await Promise.all([
+  const [[cur, ly, dataStartRow, pool], inferred] = await Promise.all([
     db().batch([
       leadTimeStmt(pid, from, to, asOf),
       leadTimeStmt(pid, shiftISO(from, -364), shiftISO(to, -364), shiftISO(asOf, -364)),
+      db().prepare(`SELECT MIN(stay_date) AS s FROM rev_night WHERE pid = ?`).bind(pid),
+      leadTimeStmt(pid, shiftISO(asOf, -TYPICAL_LOOKBACK_DAYS), shiftISO(asOf, -1), asOf),
     ]),
     // Offline demand is only inferable where Channex still pushes availability
     // (today onwards) — skip the lookup for all-past ranges.
@@ -463,6 +474,28 @@ export async function getPaceCalendar(
   const offlineByDate = new Map(
     inferred.filter((d) => d.offline !== undefined).map((d) => [d.date, d.offline as number]),
   );
+  const dataStart = (dataStartRow.results[0] as { s: string | null } | undefined)?.s ?? null;
+
+  // Benchmark pool: finished dates' lead lists, newest first, grouped by
+  // weekday. Zero-booking dates are included (missing rows → empty list) so
+  // quiet days don't inflate the "typical" level.
+  const poolByDate = new Map<string, number[]>();
+  for (const r of pool.results as { stay_date: string; lead_time: number }[]) {
+    const arr = poolByDate.get(r.stay_date) ?? [];
+    arr.push(Number(r.lead_time));
+    poolByDate.set(r.stay_date, arr);
+  }
+  const typicalByDow = new Map<number, number[][]>();
+  if (dataStart !== null) {
+    let poolFrom = shiftISO(asOf, -TYPICAL_LOOKBACK_DAYS);
+    if (dataStart > poolFrom) poolFrom = dataStart;
+    for (let d = shiftISO(asOf, -1); d >= poolFrom; d = shiftISO(d, -1)) {
+      const dow = new Date(`${d}T00:00:00Z`).getUTCDay();
+      const lists = typicalByDow.get(dow) ?? [];
+      if (lists.length < TYPICAL_MAX_DATES) lists.push(poolByDate.get(d) ?? []);
+      typicalByDow.set(dow, lists);
+    }
+  }
   const group = (rows: { stay_date: string; lead_time: number }[]) => {
     const m = new Map<string, number[]>();
     for (const r of rows) {
@@ -478,7 +511,17 @@ export async function getPaceCalendar(
   const days: PaceDay[] = [];
   const cap = Math.max(1, roomCount);
   for (let d = from; d <= to; d = shiftISO(d, 1)) {
-    const snapshot = paceSnapshot(d, asOf, curByDate.get(d) ?? [], lyByDate.get(shiftISO(d, -364)) ?? []);
+    const lyDate = shiftISO(d, -364);
+    const lyExists = dataStart !== null && lyDate >= dataStart;
+    const typicalLists = typicalByDow.get(new Date(`${d}T00:00:00Z`).getUTCDay());
+    const useTypical = !lyExists && (typicalLists?.length ?? 0) >= TYPICAL_MIN_DATES;
+    const snapshot = paceSnapshot(
+      d,
+      asOf,
+      curByDate.get(d) ?? [],
+      lyByDate.get(lyDate) ?? [],
+      useTypical ? typicalLists : undefined,
+    );
     const occupancy = (curByDate.get(d) ?? []).length;
     const offline = d >= asOf ? offlineByDate.get(d) : undefined;
     // A date with no rooms left is never a sales problem — override the

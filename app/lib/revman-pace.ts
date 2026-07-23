@@ -46,8 +46,12 @@ export interface PaceSnapshot {
   paceLy: number;
   pickupCur: number;
   pickupLy: number;
-  /** On-the-books difference vs last year at the same DBA. */
+  /** On-the-books difference vs the baseline at the same DBA (1 decimal —
+   *  the typical baseline is a mean, so it can be fractional). */
   salesAbs: number;
+  /** True when the baseline is the typical same-weekday pace instead of last
+   *  year (last year's data doesn't exist yet). */
+  vsTypical: boolean;
   wPace: number;
   wPickup: number;
   scoreRaw: number;
@@ -75,27 +79,55 @@ export function scoreOf(raw: number): SalesScore {
   return "needs_attention";
 }
 
+/** Mean pace/pickup matrices over several finished dates' lead-time lists —
+ *  the "typical" benchmark used when last year's data doesn't exist yet. Each
+ *  list is trimmed to bookings that would have been visible at the target's
+ *  DBA (lead >= dba) so finished dates are compared at the same point in the
+ *  booking window. Fractional values are fine: they only feed the log-ratio
+ *  score and the display. */
+export function typicalMatrices(leadTimeLists: number[][], dba: number): { pace: number[]; pickup: number[] } {
+  const cut = Math.max(0, dba);
+  const paceSum = PACE_BUCKETS.map(() => 0);
+  for (const leads of leadTimeLists) {
+    buildPace(leads.filter((v) => v >= cut)).forEach((v, i) => {
+      paceSum[i] += v;
+    });
+  }
+  const n = Math.max(1, leadTimeLists.length);
+  const pace = paceSum.map((v) => Math.round((v / n) * 100) / 100);
+  return { pace, pickup: buildPickup(pace).map((v) => Math.round(v * 100) / 100) };
+}
+
 const daysBetween = (fromISO: string, toISO: string): number =>
   Math.round((Date.parse(`${toISO}T00:00:00Z`) - Date.parse(`${fromISO}T00:00:00Z`)) / 86_400_000);
 
 /** Full pace/pickup comparison for one stay date. `leadTimes` are the active
  *  (non-cancelled) per-night lead times for the date; `leadTimesLy` the same
  *  for the aligned date last year, pre-trimmed to bookings made by the aligned
- *  as-of date so both years are seen at the same DBA. */
+ *  as-of date so both years are seen at the same DBA.
+ *
+ *  When last year's data doesn't exist (the aligned date predates the imported
+ *  history), pass `typicalLeadLists` — recent finished same-weekday dates'
+ *  lead-time lists — and the baseline becomes their mean pace at this DBA
+ *  instead of the (empty) year-ago snapshot. */
 export function paceSnapshot(
   date: string,
   asOf: string,
   leadTimes: number[],
   leadTimesLy: number[],
+  typicalLeadLists?: number[][],
 ): PaceSnapshot {
   const dba = daysBetween(asOf, date);
   let bucketIndex = PACE_BUCKETS.findIndex((b) => b >= dba);
   if (bucketIndex === -1) bucketIndex = PACE_BUCKETS.length - 1;
 
+  const vsTypical = typicalLeadLists !== undefined;
+  const typical = vsTypical ? typicalMatrices(typicalLeadLists, dba) : undefined;
+
   const paceMatrix = buildPace(leadTimes);
-  const paceMatrixLy = buildPace(leadTimesLy);
+  const paceMatrixLy = typical ? typical.pace : buildPace(leadTimesLy);
   const pickupMatrix = buildPickup(paceMatrix);
-  const pickupMatrixLy = buildPickup(paceMatrixLy);
+  const pickupMatrixLy = typical ? typical.pickup : buildPickup(paceMatrixLy);
 
   const paceCur = paceMatrix[bucketIndex];
   const paceLy = paceMatrixLy[bucketIndex];
@@ -118,7 +150,8 @@ export function paceSnapshot(
     paceLy,
     pickupCur,
     pickupLy,
-    salesAbs: paceCur - paceLy,
+    salesAbs: Math.round((paceCur - paceLy) * 10) / 10,
+    vsTypical,
     wPace,
     wPickup,
     scoreRaw: Math.round(scoreRaw * 10000) / 10000,
