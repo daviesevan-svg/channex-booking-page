@@ -253,25 +253,34 @@ function PaceCalendar({
         {Array.from({ length: firstDow }, (_, i) => (
           <div key={`o${i}`} />
         ))}
-        {days.map((d) => (
-          <button
-            key={d.date}
-            type="button"
-            onClick={() => setSelected(selected?.date === d.date ? null : d)}
-            className={`min-h-[76px] rounded-[10px] border p-2 text-left ${SCORE_STYLE[d.score]} ${d.date < today ? "opacity-50" : ""} ${selected?.date === d.date ? "ring-2 ring-accent" : ""}`}
-          >
-            <div className="flex items-baseline justify-between text-[12.5px] font-semibold">
-              <span>{Number(d.date.slice(8))}</span>
-              <span>{d.occupancyPct}%</span>
-            </div>
-            <div className="mt-1.5 text-[11px] leading-tight opacity-80">
-              {d.occupancy}/{roomCount}
-              <br />
-              {d.salesAbs >= 0 ? `+${d.salesAbs}` : d.salesAbs} {t("revPaceVsLy")}
-            </div>
-          </button>
-        ))}
+        {days.map((d) => {
+          const offline = d.offline ?? 0;
+          const totalPct =
+            offline > 0 ? Math.round(((d.occupancy + offline) / Math.max(1, roomCount)) * 1000) / 10 : d.occupancyPct;
+          return (
+            <button
+              key={d.date}
+              type="button"
+              onClick={() => setSelected(selected?.date === d.date ? null : d)}
+              className={`min-h-[76px] rounded-[10px] border p-2 text-left ${SCORE_STYLE[d.score]} ${d.date < today ? "opacity-50" : ""} ${selected?.date === d.date ? "ring-2 ring-accent" : ""}`}
+            >
+              <div className="flex items-baseline justify-between text-[12.5px] font-semibold">
+                <span>{Number(d.date.slice(8))}</span>
+                <span>{totalPct}%</span>
+              </div>
+              <div className="mt-1.5 text-[11px] leading-tight opacity-80">
+                {d.occupancy}
+                {offline > 0 && <span className="opacity-70">+{offline}</span>}/{roomCount}
+                <br />
+                {d.salesAbs >= 0 ? `+${d.salesAbs}` : d.salesAbs} {t("revPaceVsLy")}
+              </div>
+            </button>
+          );
+        })}
       </div>
+      {days.some((d) => (d.offline ?? 0) > 0) && (
+        <p className="mb-0 mt-3 text-[12px] text-faint">{t("revPaceOfflineLegend")}</p>
+      )}
 
       {selected && (
         <div className="mt-4 rounded-[12px] border border-line-alt bg-surface-alt p-5">
@@ -304,7 +313,17 @@ function PaceCalendar({
             <div className="flex justify-between gap-4">
               <dt className="text-muted">{t("revPaceOccupancy")}</dt>
               <dd className="font-semibold">
-                {selected.occupancy}/{roomCount} ({selected.occupancyPct}%)
+                {(selected.offline ?? 0) > 0 ? (
+                  <>
+                    {selected.occupancy} + {selected.offline} {t("revPaceOffline")} /{roomCount} (
+                    {Math.round(((selected.occupancy + (selected.offline ?? 0)) / Math.max(1, roomCount)) * 1000) / 10}
+                    %)
+                  </>
+                ) : (
+                  <>
+                    {selected.occupancy}/{roomCount} ({selected.occupancyPct}%)
+                  </>
+                )}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
