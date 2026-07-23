@@ -343,52 +343,77 @@ function OccupancyChart({
   forecastLabel: string;
   offlineLabel: string;
 }) {
+  const dl = useAdminDateLocale();
   const cap = Math.max(1, roomCount);
+  // date-fns "EEEEE" = narrow one-letter weekday, localized (M T W T F S S).
+  const dayLetter = (iso: string) => fmtDate(iso, "EEEEE", dl);
+  const isWeekend = (iso: string) => [0, 6].includes(new Date(`${iso}T00:00:00Z`).getUTCDay());
   return (
-    <div className="flex h-[160px] gap-[3px]">
-      {days.map((d) => {
-        const h = Math.min(1, d.nights / cap);
-        const offline = d.offline ?? 0;
-        const hTotal = Math.min(1, (d.nights + offline) / cap);
-        const past = d.date < today;
-        const fc = d.forecast === undefined ? undefined : Math.min(1, d.forecast / cap);
-        return (
-          <div key={d.date} className="group relative flex-1">
-            {/* Inferred offline demand stacked under the online bar (lighter). */}
-            {offline > 0 && !past && (
-              <div
-                className="absolute bottom-0 w-full rounded-t-[3px] bg-accent/35"
-                style={{ height: `${Math.max(2, hTotal * 152)}px` }}
-              />
-            )}
-            <div
-              className={`absolute bottom-0 w-full rounded-t-[3px] ${past ? "bg-chip-border" : "bg-accent"} ${d.date === today ? "ring-2 ring-accent/40" : ""}`}
-              style={{ height: `${Math.max(2, h * 152)}px` }}
-            />
-            {fc !== undefined && !past && (
-              <div
-                className="absolute w-full border-t-2 border-dashed border-ink/50"
-                style={{ bottom: `${Math.max(2, fc * 152)}px` }}
-              />
-            )}
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-secondary shadow-sm group-hover:block">
-              {d.date.slice(8)}.{d.date.slice(5, 7)} · {d.nights}/{cap} · {pctText(d.nights / cap)}
+    <div>
+      <div className="flex h-[160px] gap-[3px]">
+        {days.map((d) => {
+          const h = Math.min(1, d.nights / cap);
+          const offline = d.offline ?? 0;
+          const hTotal = Math.min(1, (d.nights + offline) / cap);
+          const past = d.date < today;
+          const fc = d.forecast === undefined ? undefined : Math.min(1, d.forecast / cap);
+          return (
+            <div key={d.date} className="group relative flex-1">
+              {/* Inferred offline demand stacked under the online bar (lighter). */}
               {offline > 0 && !past && (
-                <>
-                  <br />
-                  {offlineLabel}: {offline} · {pctText((d.nights + offline) / cap)}
-                </>
+                <div
+                  className="absolute bottom-0 w-full rounded-t-[3px] bg-accent/35"
+                  style={{ height: `${Math.max(2, hTotal * 152)}px` }}
+                />
               )}
-              {d.forecast !== undefined && !past && (
-                <>
-                  <br />
-                  {forecastLabel}: {d.forecast}/{cap} · {pctText(d.forecast / cap)}
-                </>
+              <div
+                className={`absolute bottom-0 w-full rounded-t-[3px] ${past ? "bg-chip-border" : "bg-accent"} ${d.date === today ? "ring-2 ring-accent/40" : ""}`}
+                style={{ height: `${Math.max(2, h * 152)}px` }}
+              />
+              {fc !== undefined && !past && (
+                <div
+                  className="absolute w-full border-t-2 border-dashed border-ink/50"
+                  style={{ bottom: `${Math.max(2, fc * 152)}px` }}
+                />
               )}
+              <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-secondary shadow-sm group-hover:block">
+                <span className="font-semibold">{fmtDate(d.date, "EEE d MMM", dl)}</span> · {d.nights}/{cap} ·{" "}
+                {pctText(d.nights / cap)}
+                {offline > 0 && !past && (
+                  <>
+                    <br />
+                    {offlineLabel}: {offline} · {pctText((d.nights + offline) / cap)}
+                  </>
+                )}
+                {d.forecast !== undefined && !past && (
+                  <>
+                    <br />
+                    {forecastLabel}: {d.forecast}/{cap} · {pctText(d.forecast / cap)}
+                  </>
+                )}
+              </div>
             </div>
+          );
+        })}
+      </div>
+      {/* One-letter weekday axis; weekends emphasized, full date on hover. */}
+      <div className="mt-1.5 flex gap-[3px]">
+        {days.map((d) => (
+          <div
+            key={d.date}
+            title={fmtDate(d.date, "EEEE, d MMMM yyyy", dl)}
+            className={`flex-1 text-center text-[10px] leading-tight ${
+              d.date === today
+                ? "font-bold text-accent"
+                : isWeekend(d.date)
+                  ? "font-semibold text-secondary"
+                  : "text-faint"
+            }`}
+          >
+            {dayLetter(d.date)}
           </div>
-        );
-      })}
+        ))}
+      </div>
     </div>
   );
 }
