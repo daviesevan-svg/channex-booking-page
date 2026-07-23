@@ -275,7 +275,7 @@ function PaceCalendar({
                 {d.occupancy}
                 {offline > 0 && <span className="opacity-70">+{offline}</span>}/{roomCount}
                 <br />
-                {d.salesAbs >= 0 ? `+${d.salesAbs}` : d.salesAbs} {t("revPaceVsLy")}
+                {d.salesAbs >= 0 ? `+${d.salesAbs}` : d.salesAbs} {t(d.vsTypical ? "revPaceVsTypical" : "revPaceVsLy")}
               </div>
             </button>
           );
@@ -304,13 +304,19 @@ function PaceCalendar({
             <div className="flex justify-between gap-4">
               <dt className="text-muted">{t("revPaceOnBooks")}</dt>
               <dd className="font-semibold">
-                {selected.paceCur} {t("revPaceVsLyLong", { count: String(selected.paceLy) })}
+                {selected.paceCur}{" "}
+                {t(selected.vsTypical ? "revPaceVsTypicalLong" : "revPaceVsLyLong", {
+                  count: String(selected.paceLy),
+                })}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-muted">{t("revPacePickup")}</dt>
               <dd className="font-semibold">
-                {selected.pickupCur} {t("revPaceVsLyLong", { count: String(selected.pickupLy) })}
+                {selected.pickupCur}{" "}
+                {t(selected.vsTypical ? "revPaceVsTypicalLong" : "revPaceVsLyLong", {
+                  count: String(selected.pickupLy),
+                })}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
