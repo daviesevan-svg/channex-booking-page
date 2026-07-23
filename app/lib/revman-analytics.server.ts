@@ -157,9 +157,13 @@ export async function getRevmanKpis(pid: string, todayISO: string, roomCount: nu
 // Sales pace calendar
 
 export interface PaceDay extends PaceSnapshot {
-  /** Active room nights on the books for the date (occupancy numerator). */
+  /** Active ONLINE room nights on the books for the date (occupancy numerator). */
   occupancy: number;
   occupancyPct: number;
+  /** Inferred offline nights on the books; only future dates with availability
+   *  data, undefined otherwise. Raises displayed occupancy and guards price
+   *  discounts — never feeds the pace score. */
+  offline?: number;
 }
 
 /** Occupancy forecast for [from, to], fed with two years of prior history so
@@ -361,6 +365,7 @@ export async function getPriceSuggestions(
       score: day.score,
       forecastPercent: fc?.forecastPercent ?? 0,
       dba: day.dba,
+      totalOnBooksPct: Math.min(1, (day.occupancy + (day.offline ?? 0)) / Math.max(1, roomCount)),
     });
     const fromPrice = minPriceByDate.get(day.date);
     const fromPriceNudged =
@@ -441,10 +446,18 @@ export async function getPaceCalendar(
   asOf: string,
   roomCount: number,
 ): Promise<PaceDay[]> {
-  const [cur, ly] = await db().batch([
-    leadTimeStmt(pid, from, to, asOf),
-    leadTimeStmt(pid, shiftISO(from, -364), shiftISO(to, -364), shiftISO(asOf, -364)),
+  const [[cur, ly], inferred] = await Promise.all([
+    db().batch([
+      leadTimeStmt(pid, from, to, asOf),
+      leadTimeStmt(pid, shiftISO(from, -364), shiftISO(to, -364), shiftISO(asOf, -364)),
+    ]),
+    // Offline demand is only inferable where Channex still pushes availability
+    // (today onwards) — skip the lookup for all-past ranges.
+    to >= asOf ? getInferredDemand(pid, from > asOf ? from : asOf, to, roomCount) : Promise.resolve([]),
   ]);
+  const offlineByDate = new Map(
+    inferred.filter((d) => d.offline !== undefined).map((d) => [d.date, d.offline as number]),
+  );
   const group = (rows: { stay_date: string; lead_time: number }[]) => {
     const m = new Map<string, number[]>();
     for (const r of rows) {
@@ -462,7 +475,12 @@ export async function getPaceCalendar(
   for (let d = from; d <= to; d = shiftISO(d, 1)) {
     const snapshot = paceSnapshot(d, asOf, curByDate.get(d) ?? [], lyByDate.get(shiftISO(d, -364)) ?? []);
     const occupancy = (curByDate.get(d) ?? []).length;
-    days.push({ ...snapshot, occupancy, occupancyPct: Math.round((occupancy / cap) * 1000) / 10 });
+    days.push({
+      ...snapshot,
+      occupancy,
+      occupancyPct: Math.round((occupancy / cap) * 1000) / 10,
+      offline: d >= asOf ? offlineByDate.get(d) : undefined,
+    });
   }
   return days;
 }

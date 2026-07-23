@@ -184,6 +184,9 @@ const EN: Record<string, string> = {
   revPaceOnBooks: "Nights on the books",
   revPacePickup: "Booked in this window",
   revPaceOccupancy: "Occupancy",
+  revPaceOffline: "offline (inferred)",
+  revPaceOfflineLegend:
+    "“+n” counts are offline/PMS bookings inferred from availability. They raise the occupancy shown and hold back discount suggestions, but never affect the pace score.",
   revPaceDba: "Days until arrival",
   revPacePast: "Past date",
   revPaceWeights: "Weighting pace / pickup",
@@ -1702,6 +1705,9 @@ const DE: Record<string, string> = {
   revPaceOnBooks: "Gebuchte Nächte",
   revPacePickup: "In diesem Zeitfenster gebucht",
   revPaceOccupancy: "Auslastung",
+  revPaceOffline: "offline (abgeleitet)",
+  revPaceOfflineLegend:
+    "„+n“ sind aus der Verfügbarkeit abgeleitete Offline-/PMS-Buchungen. Sie erhöhen die angezeigte Auslastung und bremsen Rabatt-Vorschläge, fließen aber nie in den Pace-Score ein.",
   revPaceDba: "Tage bis Anreise",
   revPacePast: "Vergangenes Datum",
   revPaceWeights: "Gewichtung Nachfrage / Zulauf",

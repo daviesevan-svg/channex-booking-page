@@ -23,6 +23,10 @@ export interface SuggestionInput {
   forecastPercent: number;
   /** Days before arrival (from today). */
   dba: number;
+  /** TOTAL on-the-books occupancy 0..1 — online nights PLUS inferred offline
+   *  demand. The pace score only sees online sales, so without this a date
+   *  that's nearly sold out offline would still look "needs attention". */
+  totalOnBooksPct: number;
 }
 
 export interface Suggestion {
@@ -36,17 +40,29 @@ export interface Suggestion {
     | "revSugReasonSlowNear"
     | "revSugReasonColdNear"
     | "revSugReasonColdMid"
+    | "revSugReasonFullHold"
     | "revSugReasonHold";
 }
 
+/** Discounts are suppressed once total on-the-books occupancy (online +
+ *  inferred offline) reaches this level — the date isn't cold, we just can't
+ *  see its bookings. */
+export const DISCOUNT_OCC_CEILING = 0.7;
+
 /** Rule table, evaluated top-down. Demand pushing above capacity earns the
  *  biggest lift; weak pace only discounts when the date is close enough that
- *  price is the remaining lever. */
+ *  price is the remaining lever — and never when the date is already mostly
+ *  consumed offline. */
 export function suggestFor(s: SuggestionInput): Suggestion {
   const { score, forecastPercent: fc, dba } = s;
   if (score === "high_demand" && fc >= 0.8) return { date: s.date, pct: 15, reasonKey: "revSugReasonHot" };
   if (score === "high_demand") return { date: s.date, pct: 10, reasonKey: "revSugReasonHigh" };
   if (score === "steady_sales" && fc >= 0.85) return { date: s.date, pct: 5, reasonKey: "revSugReasonFilling" };
+  const wantsDiscount =
+    (score === "needs_attention" && dba >= 0 && dba <= 30) ||
+    (score === "slow_sales" && fc < 0.4 && dba >= 0 && dba <= 14);
+  if (wantsDiscount && s.totalOnBooksPct >= DISCOUNT_OCC_CEILING)
+    return { date: s.date, pct: 0, reasonKey: "revSugReasonFullHold" };
   if (score === "needs_attention" && dba >= 0 && dba <= 14)
     return { date: s.date, pct: -10, reasonKey: "revSugReasonColdNear" };
   if (score === "needs_attention" && dba > 14 && dba <= 30)
