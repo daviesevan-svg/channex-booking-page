@@ -53,12 +53,24 @@ export async function loader({ request }: Route.LoaderArgs) {
   const paceTo = new Date(Date.UTC(Number(paceMonth.slice(0, 4)), Number(paceMonth.slice(5, 7)), 0))
     .toISOString()
     .slice(0, 10);
-  const paceDays = state && hasData ? await getPaceCalendar(pid, paceFrom, paceTo, today, state.roomCount) : undefined;
-
   // Forecast covers the current month (chart overlay) through 30 days out.
+  // Computed before the pace calendar so warning scores can clear to
+  // "filling up" on dates the forecast expects to fill.
   const monthFrom = `${today.slice(0, 8)}01`;
   const forecastTo = new Date(Date.parse(`${today}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
   const forecast = state && hasData ? await getForecast(pid, monthFrom, forecastTo, state.roomCount, today) : undefined;
+
+  const paceDays =
+    state && hasData
+      ? await getPaceCalendar(
+          pid,
+          paceFrom,
+          paceTo,
+          today,
+          state.roomCount,
+          forecast ? new Map(forecast.map((f) => [f.date, f.forecastPercent])) : undefined,
+        )
+      : undefined;
 
   const guards = { minPrice: state?.minPrice, maxPrice: state?.maxPrice };
   const suggestions =
@@ -167,6 +179,7 @@ const pctText = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
 const SCORE_STYLE: Record<SalesScore, string> = {
   sold_out: "bg-emerald-600 border-emerald-700 text-white",
+  filling_up: "bg-teal-100 border-teal-200 text-teal-900",
   high_demand: "bg-emerald-100 border-emerald-200 text-emerald-900",
   steady_sales: "bg-sky-100 border-sky-200 text-sky-900",
   slow_sales: "bg-amber-100 border-amber-200 text-amber-900",
@@ -174,6 +187,7 @@ const SCORE_STYLE: Record<SalesScore, string> = {
 };
 const SCORE_DOT: Record<SalesScore, string> = {
   sold_out: "bg-emerald-600",
+  filling_up: "bg-teal-400",
   high_demand: "bg-emerald-400",
   steady_sales: "bg-sky-400",
   slow_sales: "bg-amber-400",
@@ -181,6 +195,7 @@ const SCORE_DOT: Record<SalesScore, string> = {
 };
 const SCORE_KEY: Record<SalesScore, string> = {
   sold_out: "revScoreSoldOut",
+  filling_up: "revScoreFilling",
   high_demand: "revScoreHigh",
   steady_sales: "revScoreSteady",
   slow_sales: "revScoreSlow",
@@ -209,7 +224,14 @@ function PaceCalendar({
   // Monday-first grid offset; 2026-07-20 is a Monday, used to label columns.
   const firstDow = (new Date(`${month}-01T00:00:00Z`).getUTCDay() + 6) % 7;
   const mondayRef = "2026-07-20";
-  const scores: SalesScore[] = ["sold_out", "high_demand", "steady_sales", "slow_sales", "needs_attention"];
+  const scores: SalesScore[] = [
+    "sold_out",
+    "filling_up",
+    "high_demand",
+    "steady_sales",
+    "slow_sales",
+    "needs_attention",
+  ];
 
   return (
     <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">

@@ -6,7 +6,7 @@ import { getInventory, saveInventory, type AriActor, type InventoryEdits } from 
 import { getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
 import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
-import { paceSnapshot, type PaceSnapshot } from "./revman-pace";
+import { fillAwareScore, paceSnapshot, type PaceSnapshot } from "./revman-pace";
 import { applyNudge, guardsReady, suggestFor, type PriceGuards, type Suggestion } from "./revman-price";
 
 function db(): D1Database {
@@ -350,12 +350,21 @@ export async function getPriceSuggestions(
   guards: PriceGuards,
 ): Promise<PriceSuggestionRow[]> {
   const to = shiftISO(today, SUGGESTION_DAYS - 1);
-  const [pace, forecast, inventory] = await Promise.all([
-    getPaceCalendar(pid, today, to, today, roomCount),
+  const [forecast, inventory] = await Promise.all([
     getForecast(pid, today, to, roomCount, today),
     getInventory(pid, today, to),
   ]);
   const fcByDate = new Map(forecast.map((f) => [f.date, f]));
+  // Pace runs after the forecast so warning scores can clear to "filling up"
+  // on dates that are forecast to fill anyway.
+  const pace = await getPaceCalendar(
+    pid,
+    today,
+    to,
+    today,
+    roomCount,
+    new Map(forecast.map((f) => [f.date, f.forecastPercent])),
+  );
 
   const minPriceByDate = new Map<string, number>();
   for (const [key, price] of Object.entries(inventory.prices)) {
@@ -452,13 +461,18 @@ const TYPICAL_MAX_DATES = 12;
  *  the same days-before-arrival. Dates whose aligned last-year date predates
  *  the imported history are scored against the typical pace of recent
  *  same-weekday dates instead (comparing against a year of nothing would mark
- *  every booked date "high demand"). */
+ *  every booked date "high demand").
+ *
+ *  `forecastByDate` (date → forecastPercent), when provided, lets warning
+ *  scores on future dates clear to "filling_up" when the date is forecast to
+ *  fill — without it only the on-the-books level can clear them. */
 export async function getPaceCalendar(
   pid: string,
   from: string,
   to: string,
   asOf: string,
   roomCount: number,
+  forecastByDate?: Map<string, number>,
 ): Promise<PaceDay[]> {
   const [[cur, ly, dataStartRow, pool], inferred] = await Promise.all([
     db().batch([
@@ -524,12 +538,21 @@ export async function getPaceCalendar(
     );
     const occupancy = (curByDate.get(d) ?? []).length;
     const offline = d >= asOf ? offlineByDate.get(d) : undefined;
-    // A date with no rooms left is never a sales problem — override the
-    // online-pace score so full dates don't show as "needs attention".
-    const soldOut = occupancy + (offline ?? 0) >= cap;
+    // (Nearly) full dates are never a sales problem — override the online-pace
+    // score: sold out at capacity, "filling up" when a warning score coincides
+    // with the date being close to full or forecast to fill. Future dates only;
+    // past dates keep their retrospective score.
+    const total = occupancy + (offline ?? 0);
+    let score = snapshot.score;
+    if (d >= asOf) {
+      score =
+        total >= cap
+          ? "sold_out"
+          : fillAwareScore(score, total / cap, forecastByDate?.get(d));
+    }
     days.push({
       ...snapshot,
-      score: soldOut ? "sold_out" : snapshot.score,
+      score,
       occupancy,
       occupancyPct: Math.round((occupancy / cap) * 1000) / 10,
       offline,

@@ -8,11 +8,19 @@
 // short-term pickup is the meaningful signal, far out cumulative pace is — and
 // the blend is scored on a log ratio (Haldane +1 smoothing keeps zeros stable).
 
-/** The four pace-driven scores come from scoreOf; "sold_out" is an override
- *  applied downstream when total on-the-books demand (online + inferred
- *  offline) reaches capacity — a full date is never a sales problem, whatever
- *  its online pace says. */
-export type SalesScore = "high_demand" | "steady_sales" | "slow_sales" | "needs_attention" | "sold_out";
+/** The four pace-driven scores come from scoreOf. Two overrides are applied
+ *  downstream, because a date that's (nearly) full is never a sales problem,
+ *  whatever its online pace says: "sold_out" when total on-the-books demand
+ *  (online + inferred offline) reaches capacity, and "filling_up" when a
+ *  warning score coincides with the date being nearly full or forecast to
+ *  fill (see fillAwareScore). */
+export type SalesScore =
+  | "high_demand"
+  | "steady_sales"
+  | "slow_sales"
+  | "needs_attention"
+  | "filling_up"
+  | "sold_out";
 
 /** DBA bucket upper bounds; the last entry catches everything beyond. */
 export const PACE_BUCKETS = [0, 3, 7, 14, 30, 60, 90, 91] as const;
@@ -77,6 +85,24 @@ export function scoreOf(raw: number): SalesScore {
   if (raw >= 0.15) return "steady_sales";
   if (raw >= -0.1) return "slow_sales";
   return "needs_attention";
+}
+
+/** A warning score (slow / needs attention) is replaced with "filling_up"
+ *  once the date is this full — on the books or by forecast. The online pace
+ *  really is behind, but there is nothing to act on. Deliberately higher than
+ *  the discount ceiling (0.7): discounts stop early, the warning label only
+ *  clears when the date is genuinely close to full. */
+export const FILL_LABEL_CEILING = 0.85;
+
+export function fillAwareScore(
+  score: SalesScore,
+  totalOnBooksPct: number,
+  forecastPercent?: number,
+): SalesScore {
+  if (score !== "slow_sales" && score !== "needs_attention") return score;
+  if (totalOnBooksPct >= FILL_LABEL_CEILING || (forecastPercent ?? 0) >= FILL_LABEL_CEILING)
+    return "filling_up";
+  return score;
 }
 
 /** Mean pace/pickup matrices over several finished dates' lead-time lists —

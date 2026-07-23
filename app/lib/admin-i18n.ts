@@ -176,6 +176,7 @@ const EN: Record<string, string> = {
   revPaceSub:
     "How each date is selling compared to the same point last year — or, until a full year of history has built up, to your typical pace for that weekday. Close to arrival the score follows recent pickup; further out it follows cumulative demand.",
   revScoreSoldOut: "Sold out",
+  revScoreFilling: "Filling up",
   revScoreHigh: "High demand",
   revScoreSteady: "Steady sales",
   revScoreSlow: "Slow sales",
@@ -1700,6 +1701,7 @@ const DE: Record<string, string> = {
   revPaceSub:
     "Wie sich jedes Datum im Vergleich zum selben Zeitpunkt des Vorjahres verkauft — oder, bis ein volles Jahr Historie vorliegt, im Vergleich zum üblichen Tempo dieses Wochentags. Kurz vor Anreise zählt der jüngste Zulauf, weiter im Voraus die aufgelaufene Nachfrage.",
   revScoreSoldOut: "Ausverkauft",
+  revScoreFilling: "Füllt sich",
   revScoreHigh: "Hohe Nachfrage",
   revScoreSteady: "Stabiler Verkauf",
   revScoreSlow: "Schleppender Verkauf",

@@ -60,6 +60,9 @@ export function suggestFor(s: SuggestionInput): Suggestion {
   // Sold out (incl. offline): nothing left to price. Conservative hold — a
   // cancellation re-sells at the current rate.
   if (score === "sold_out") return { date: s.date, pct: 0, reasonKey: "revSugReasonSoldOut" };
+  // Filling up: online pace is behind, but the date is (nearly) full or
+  // forecast to fill — hold rather than discount.
+  if (score === "filling_up") return { date: s.date, pct: 0, reasonKey: "revSugReasonFullHold" };
   if (score === "high_demand" && fc >= 0.8) return { date: s.date, pct: 15, reasonKey: "revSugReasonHot" };
   if (score === "high_demand") return { date: s.date, pct: 10, reasonKey: "revSugReasonHigh" };
   if (score === "steady_sales" && fc >= 0.85) return { date: s.date, pct: 5, reasonKey: "revSugReasonFilling" };
