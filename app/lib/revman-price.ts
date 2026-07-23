@@ -41,6 +41,7 @@ export interface Suggestion {
     | "revSugReasonColdNear"
     | "revSugReasonColdMid"
     | "revSugReasonFullHold"
+    | "revSugReasonSoldOut"
     | "revSugReasonHold";
 }
 
@@ -55,6 +56,9 @@ export const DISCOUNT_OCC_CEILING = 0.7;
  *  consumed offline. */
 export function suggestFor(s: SuggestionInput): Suggestion {
   const { score, forecastPercent: fc, dba } = s;
+  // Sold out (incl. offline): nothing left to price. Conservative hold — a
+  // cancellation re-sells at the current rate.
+  if (score === "sold_out") return { date: s.date, pct: 0, reasonKey: "revSugReasonSoldOut" };
   if (score === "high_demand" && fc >= 0.8) return { date: s.date, pct: 15, reasonKey: "revSugReasonHot" };
   if (score === "high_demand") return { date: s.date, pct: 10, reasonKey: "revSugReasonHigh" };
   if (score === "steady_sales" && fc >= 0.85) return { date: s.date, pct: 5, reasonKey: "revSugReasonFilling" };

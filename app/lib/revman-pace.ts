@@ -8,7 +8,11 @@
 // short-term pickup is the meaningful signal, far out cumulative pace is — and
 // the blend is scored on a log ratio (Haldane +1 smoothing keeps zeros stable).
 
-export type SalesScore = "high_demand" | "steady_sales" | "slow_sales" | "needs_attention";
+/** The four pace-driven scores come from scoreOf; "sold_out" is an override
+ *  applied downstream when total on-the-books demand (online + inferred
+ *  offline) reaches capacity — a full date is never a sales problem, whatever
+ *  its online pace says. */
+export type SalesScore = "high_demand" | "steady_sales" | "slow_sales" | "needs_attention" | "sold_out";
 
 /** DBA bucket upper bounds; the last entry catches everything beyond. */
 export const PACE_BUCKETS = [0, 3, 7, 14, 30, 60, 90, 91] as const;

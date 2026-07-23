@@ -166,18 +166,21 @@ function KpiTile({ label, value, kpi, t }: { label: string; value: string; kpi: 
 const pctText = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
 const SCORE_STYLE: Record<SalesScore, string> = {
+  sold_out: "bg-emerald-600 border-emerald-700 text-white",
   high_demand: "bg-emerald-100 border-emerald-200 text-emerald-900",
   steady_sales: "bg-sky-100 border-sky-200 text-sky-900",
   slow_sales: "bg-amber-100 border-amber-200 text-amber-900",
   needs_attention: "bg-rose-100 border-rose-200 text-rose-900",
 };
 const SCORE_DOT: Record<SalesScore, string> = {
+  sold_out: "bg-emerald-600",
   high_demand: "bg-emerald-400",
   steady_sales: "bg-sky-400",
   slow_sales: "bg-amber-400",
   needs_attention: "bg-rose-400",
 };
 const SCORE_KEY: Record<SalesScore, string> = {
+  sold_out: "revScoreSoldOut",
   high_demand: "revScoreHigh",
   steady_sales: "revScoreSteady",
   slow_sales: "revScoreSlow",
@@ -206,7 +209,7 @@ function PaceCalendar({
   // Monday-first grid offset; 2026-07-20 is a Monday, used to label columns.
   const firstDow = (new Date(`${month}-01T00:00:00Z`).getUTCDay() + 6) % 7;
   const mondayRef = "2026-07-20";
-  const scores: SalesScore[] = ["high_demand", "steady_sales", "slow_sales", "needs_attention"];
+  const scores: SalesScore[] = ["sold_out", "high_demand", "steady_sales", "slow_sales", "needs_attention"];
 
   return (
     <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
