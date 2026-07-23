@@ -724,64 +724,83 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                         </tr>
                       </thead>
                       <tbody>
-                        {suggestions.map((s) => (
-                          <tr key={s.date} className="border-t border-line-alt">
-                            <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(s.date, "EEE d MMM", dl)}</td>
-                            <td className="px-3 py-2">
-                              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]">
-                                <span className={`inline-block h-2.5 w-2.5 rounded-full ${SCORE_DOT[s.score]}`} />
-                                {t(SCORE_KEY[s.score])}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">{pctText(s.forecastPercent)}</td>
-                            <td className="px-3 py-2">{s.fromPrice !== undefined ? money(s.fromPrice * 100, kpis?.currency) : "—"}</td>
-                            <td className="whitespace-nowrap px-3 py-2">
-                              {s.pct === 0 || s.fromPrice === undefined ? (
-                                <span className="text-muted">{t("revSugHold")}</span>
-                              ) : (
-                                <>
-                                  <span
-                                    className={`mr-2 rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${s.pct > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
-                                  >
-                                    {s.pct > 0 ? `+${s.pct}%` : `${s.pct}%`}
-                                  </span>
-                                  {ready && s.fromPriceNudged !== undefined && (
-                                    <span className="font-semibold">{money(s.fromPriceNudged * 100, kpis?.currency)}</span>
-                                  )}
-                                </>
-                              )}
-                            </td>
-                            <td className="px-3 py-2 text-right">
-                              {s.pct !== 0 && s.fromPrice !== undefined && (
-                                <Form method="post" className="inline">
-                                  <input type="hidden" name="intent" value="applyPrice" />
-                                  <input type="hidden" name="date" value={s.date} />
-                                  <button
-                                    type="submit"
-                                    disabled={busy || !ready}
-                                    title={ready ? undefined : t("revSugGuardsHint")}
-                                    className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
-                                  >
-                                    {t("revSugApply")}
-                                  </button>
-                                </Form>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                        {suggestions.map((s) => {
+                          const atTarget = s.target !== undefined && s.target === s.fromPrice;
+                          const actionable =
+                            s.pct !== 0 && s.fromPrice !== undefined && (!ready || !atTarget);
+                          return (
+                            <tr key={s.date} className="border-t border-line-alt">
+                              <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(s.date, "EEE d MMM", dl)}</td>
+                              <td className="px-3 py-2">
+                                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[12px]">
+                                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${SCORE_DOT[s.score]}`} />
+                                  {t(SCORE_KEY[s.score])}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">{pctText(s.forecastPercent)}</td>
+                              <td className="px-3 py-2">{s.fromPrice !== undefined ? money(s.fromPrice * 100, kpis?.currency) : "—"}</td>
+                              <td className="whitespace-nowrap px-3 py-2">
+                                {s.pct === 0 || s.fromPrice === undefined ? (
+                                  <span className="text-muted">{t("revSugHold")}</span>
+                                ) : atTarget ? (
+                                  <span className="text-muted">✓ {t("revSugAtTarget")}</span>
+                                ) : (
+                                  <>
+                                    {ready && s.target !== undefined && (
+                                      <span className="mr-2 font-semibold">{money(s.target * 100, kpis?.currency)}</span>
+                                    )}
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${s.pct > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
+                                    >
+                                      {s.pct > 0 ? `+${s.pct}%` : `${s.pct}%`}
+                                    </span>
+                                  </>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {actionable && (
+                                  <Form method="post" className="inline">
+                                    <input type="hidden" name="intent" value="applyPrice" />
+                                    <input type="hidden" name="date" value={s.date} />
+                                    <button
+                                      type="submit"
+                                      disabled={busy || !ready}
+                                      title={ready ? undefined : t("revSugGuardsHint")}
+                                      className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
+                                    >
+                                      {t("revSugApply")}
+                                    </button>
+                                  </Form>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <span className="text-[12.5px] text-faint">
-                      {t("revSugCount", { count: String(suggestions.filter((s) => s.pct !== 0 && s.fromPrice !== undefined).length) })}
+                      {t("revSugCount", {
+                        count: String(
+                          suggestions.filter(
+                            (s) => s.pct !== 0 && s.fromPrice !== undefined && (s.target === undefined || s.target !== s.fromPrice),
+                          ).length,
+                        ),
+                      })}
                     </span>
                     <Form method="post">
                       <input type="hidden" name="intent" value="applyPriceAll" />
                       <button
                         type="submit"
-                        disabled={busy || !ready || suggestions.every((s) => s.pct === 0 || s.fromPrice === undefined)}
+                        disabled={
+                          busy ||
+                          !ready ||
+                          suggestions.every(
+                            (s) => s.pct === 0 || s.fromPrice === undefined || s.target === s.fromPrice,
+                          )
+                        }
                         className="rounded-[10px] bg-accent px-4 py-2 text-[13.5px] font-semibold text-white disabled:opacity-60"
                       >
                         {busyIntent === "applyPriceAll" ? t("revSugApplying") : t("revSugApplyAll")}

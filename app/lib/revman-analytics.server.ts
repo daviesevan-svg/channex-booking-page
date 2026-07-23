@@ -7,7 +7,7 @@ import { getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
 import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
 import { fillAwareScore, paceSnapshot, type PaceSnapshot } from "./revman-pace";
-import { applyNudge, guardsReady, suggestFor, type PriceGuards, type Suggestion } from "./revman-price";
+import { guardsReady, suggestFor, targetPrice, type PriceGuards, type Suggestion } from "./revman-price";
 
 function db(): D1Database {
   const d = getDB();
@@ -326,6 +326,61 @@ export async function snapshotDemand(pid: string, todayISO: string, roomCount: n
 
 // ---------------------------------------------------------------------------
 // Price suggestions
+//
+// Suggestions are ABSOLUTE target prices, not relative nudges: each cell's
+// target = its base price × the date's demand percentage. The base is the
+// price before revenue management ever touched the cell, remembered in
+// rev_price_base — so re-applying is idempotent (the target doesn't move),
+// while a manual price change after an apply re-anchors the base to the
+// hotelier's new price.
+
+let priceBaseSchemaReady = false;
+async function ensurePriceBaseSchema(): Promise<void> {
+  if (priceBaseSchemaReady) return;
+  await db()
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS rev_price_base (
+        pid TEXT NOT NULL,
+        room_id TEXT NOT NULL,
+        rate_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        base REAL NOT NULL,
+        applied REAL NOT NULL,
+        PRIMARY KEY (pid, room_id, rate_id, date)
+      )`,
+    )
+    .run();
+  priceBaseSchemaReady = true;
+}
+
+/** date-keyed cell map "roomId|rateId|date" → {base, applied}. */
+async function getPriceBases(pid: string, from: string, to: string): Promise<Map<string, { base: number; applied: number }>> {
+  await ensurePriceBaseSchema();
+  const res = await db()
+    .prepare(`SELECT room_id, rate_id, date, base, applied FROM rev_price_base WHERE pid = ? AND date >= ? AND date <= ?`)
+    .bind(pid, from, to)
+    .all();
+  return new Map(
+    (res.results as { room_id: string; rate_id: string; date: string; base: number; applied: number }[]).map((r) => [
+      `${r.room_id}|${r.rate_id}|${r.date}`,
+      { base: r.base, applied: r.applied },
+    ]),
+  );
+}
+
+/** The stable anchor for a cell. No record yet → the current price IS the
+ *  base. Current price differs from what we last applied → the hotelier
+ *  changed it manually, and their price becomes the new base. */
+function resolveBase(current: number, row?: { base: number; applied: number }): number {
+  if (!row) return current;
+  return row.applied === current ? row.base : current;
+}
+
+/** Wipes the price-base anchors (used by disconnect). */
+export async function wipePriceBases(pid: string): Promise<void> {
+  await ensurePriceBaseSchema();
+  await db().prepare(`DELETE FROM rev_price_base WHERE pid = ?`).bind(pid).run();
+}
 
 export interface PriceSuggestionRow extends Suggestion {
   score: PaceDay["score"];
@@ -334,9 +389,10 @@ export interface PriceSuggestionRow extends Suggestion {
   /** Lowest current price across the date's room|rate cells (major units);
    *  undefined when no price is loaded for the date. */
   fromPrice?: number;
-  /** fromPrice with the nudge + guards applied (display only; the action
-   *  recomputes per cell). */
-  fromPriceNudged?: number;
+  /** Absolute target price for that lowest-priced cell (base × demand pct,
+   *  clamped to guards; display only — the action recomputes per cell).
+   *  Undefined when guards aren't set, no price is loaded, or the date holds. */
+  target?: number;
 }
 
 const SUGGESTION_DAYS = 60;
@@ -366,11 +422,12 @@ export async function getPriceSuggestions(
     new Map(forecast.map((f) => [f.date, f.forecastPercent])),
   );
 
-  const minPriceByDate = new Map<string, number>();
+  const minCellByDate = new Map<string, { key: string; price: number }>();
   for (const [key, price] of Object.entries(inventory.prices)) {
     const date = key.split("|")[2];
-    if (price > 0 && (minPriceByDate.get(date) ?? Infinity) > price) minPriceByDate.set(date, price);
+    if (price > 0 && (minCellByDate.get(date)?.price ?? Infinity) > price) minCellByDate.set(date, { key, price });
   }
+  const bases = await getPriceBases(pid, today, to);
 
   return pace.map((day) => {
     const fc = fcByDate.get(day.date);
@@ -381,27 +438,28 @@ export async function getPriceSuggestions(
       dba: day.dba,
       totalOnBooksPct: Math.min(1, (day.occupancy + (day.offline ?? 0)) / Math.max(1, roomCount)),
     });
-    const fromPrice = minPriceByDate.get(day.date);
-    const fromPriceNudged =
-      fromPrice !== undefined && guardsReady(guards)
-        ? (applyNudge(fromPrice, suggestion.pct, guards) ?? fromPrice)
+    const minCell = minCellByDate.get(day.date);
+    const target =
+      minCell !== undefined && suggestion.pct !== 0 && guardsReady(guards)
+        ? targetPrice(resolveBase(minCell.price, bases.get(minCell.key)), suggestion.pct, guards)
         : undefined;
     return {
       ...suggestion,
       score: day.score,
       forecastPercent: fc?.forecastPercent ?? 0,
       occupancyPct: day.occupancyPct,
-      fromPrice,
-      fromPriceNudged,
+      fromPrice: minCell?.price,
+      target,
     };
   });
 }
 
 /** Apply the CURRENT server-side suggestions to the given dates: every priced
- *  room|rate cell gets the date's percentage nudge, clamped to the guards, and
- *  written through the audited ARI path (so the change flows to Google ARI and
- *  the change log like any manual edit). Dates whose suggestion is 0% are
- *  skipped. */
+ *  room|rate cell is set to its TARGET price (base × the date's demand pct,
+ *  clamped to guards) through the audited ARI path (so the change flows to
+ *  Google ARI and the change log like any manual edit). Bases are remembered
+ *  per cell, so re-applying is a no-op and manual edits re-anchor. Dates whose
+ *  suggestion is 0% are skipped. */
 export async function applyPriceSuggestions(
   pid: string,
   dates: string[],
@@ -417,6 +475,7 @@ export async function applyPriceSuggestions(
 
   const to = shiftISO(today, SUGGESTION_DAYS - 1);
   const inventory = await getInventory(pid, today, to);
+  const bases = await getPriceBases(pid, today, to);
   const settings = await getSettings(pid);
 
   const edits: InventoryEdits = {
@@ -425,18 +484,31 @@ export async function applyPriceSuggestions(
     prices: [],
     restrictions: [],
   };
+  const upsertBase = db().prepare(
+    `INSERT INTO rev_price_base (pid, room_id, rate_id, date, base, applied)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (pid, room_id, rate_id, date) DO UPDATE SET
+       base = excluded.base, applied = excluded.applied`,
+  );
+  const baseStmts: D1PreparedStatement[] = [];
   const touchedDates = new Set<string>();
   for (const [key, price] of Object.entries(inventory.prices)) {
     const [roomId, rateId, date] = key.split("|");
-    if (!wanted.has(date)) continue;
+    if (!wanted.has(date) || price <= 0) continue;
     const s = byDate.get(date);
     if (!s || s.pct === 0) continue;
-    const next = applyNudge(price, s.pct, guards);
-    if (next === undefined) continue;
+    const base = resolveBase(price, bases.get(key));
+    const next = targetPrice(base, s.pct, guards);
+    // Remember the anchor even when the price is already at target, so later
+    // applies keep resolving against the pre-revman base.
+    baseStmts.push(upsertBase.bind(pid, roomId, rateId, date, base, next));
+    if (next === price) continue;
     edits.prices.push({ roomId, rateId, date, price: next });
     touchedDates.add(date);
   }
   if (edits.prices.length > 0) await saveInventory(pid, edits, actor);
+  baseStmts.push(db().prepare(`DELETE FROM rev_price_base WHERE pid = ? AND date < ?`).bind(pid, today));
+  for (let i = 0; i < baseStmts.length; i += 90) await db().batch(baseStmts.slice(i, i + 90));
   return { dates: touchedDates.size, cells: edits.prices.length };
 }
 
