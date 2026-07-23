@@ -160,6 +160,8 @@ export async function disconnectRevman(pid: string): Promise<void> {
     .catch(() => {});
   const { wipePriceBases } = await import("./revman-analytics.server");
   await wipePriceBases(pid);
+  const { wipeCompSet } = await import("./revman-compset.server");
+  await wipeCompSet(pid);
 }
 
 // ---------------------------------------------------------------------------
