@@ -91,13 +91,21 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
       </div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-serif text-[26px] font-semibold">{c.name}</h1>
-        <Link
-          to={`/c/${c.slug}`}
-          target="_blank"
-          className="rounded-[10px] border border-line-alt bg-surface-alt px-[16px] py-[9px] text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
-        >
-          {t("coViewPage")}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            to={`/admin/collections/${c.slug}/analytics`}
+            className="rounded-[10px] border border-line-alt bg-surface-alt px-[16px] py-[9px] text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
+          >
+            {t("caTitle")}
+          </Link>
+          <Link
+            to={`/c/${c.slug}`}
+            target="_blank"
+            className="rounded-[10px] border border-line-alt bg-surface-alt px-[16px] py-[9px] text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
+          >
+            {t("coViewPage")}
+          </Link>
+        </div>
       </div>
 
       <Form method="post" className="flex flex-col gap-6">

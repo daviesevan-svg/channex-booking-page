@@ -1,11 +1,12 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/collection.$collectionSlug";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { getCollectionBySlug } from "~/lib/collections.server";
+import { queueCollectionEvent } from "~/lib/collection-analytics.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { getConfig } from "~/lib/config.server";
 import {
@@ -30,6 +31,7 @@ import { isStayBookable } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
 type PropView = {
+  pid: string;
   urlSeg: string;
   name: string;
   area: string;
@@ -137,6 +139,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         lat: Number.isFinite(lat) ? lat : null,
         lng: Number.isFinite(lng) ? lng : null,
         view: {
+          pid,
           urlSeg: ref.slug || pid,
           name: overrides.hotelName || ref.name,
           area: settings.addressCity || settings.addressRegion || "",
@@ -179,6 +182,29 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const availableCount = hasDates ? properties.filter((p) => !p.soldOut).length : properties.length;
 
+  // Engagement analytics: log one view per fresh landing (prefetches don't
+  // count). A dated landing doubles as an availability search (has_dates=1).
+  // Non-fatal by design.
+  const purpose = request.headers.get("sec-purpose") ?? request.headers.get("purpose") ?? "";
+  if (!purpose.includes("prefetch")) {
+    queueCollectionEvent({
+      slug: collection.slug,
+      type: "view",
+      hasDates,
+      nights: hasDates ? nights : null,
+      leadDays: hasDates ? Math.max(0, differenceInCalendarDays(parseISO(checkin!), new Date())) : null,
+      adults: occ.adults,
+      children: occ.childrenAge?.length ?? 0,
+      availableCount,
+      propertyCount: properties.length,
+      country:
+        request.headers.get("cf-ipcountry") ??
+        (request as { cf?: { country?: string } }).cf?.country ??
+        null,
+      lang,
+    });
+  }
+
   return {
     name: collection.name,
     destination: collection.destination || "",
@@ -203,6 +229,31 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export function headers() {
   return { "Cache-Control": "private, no-store" }; // per-date availability isn't cacheable
+}
+
+// Click-through beacon: the "View property" button posts here (via a fetcher)
+// just before navigating into a member property's booking flow, so we can see
+// which stays the collection actually sends guests to. Returns 204 — the guest
+// is already on their way; this is pure telemetry and must never block.
+export async function action({ params, request }: Route.ActionArgs) {
+  const form = await request.formData();
+  if (String(form.get("intent")) === "click") {
+    const collection = await getCollectionBySlug(params.collectionSlug);
+    const pid = String(form.get("pid") || "");
+    if (collection && pid && collection.propertyIds.includes(pid)) {
+      queueCollectionEvent({
+        slug: collection.slug,
+        type: "click",
+        propertyId: pid,
+        hasDates: form.get("hasDates") === "1",
+        country:
+          request.headers.get("cf-ipcountry") ??
+          (request as { cf?: { country?: string } }).cf?.country ??
+          null,
+      });
+    }
+  }
+  return new Response(null, { status: 204 });
 }
 
 export function meta() {
@@ -245,6 +296,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
   const tr = makeTranslator(lang);
   const navigate = useNavigate();
+  const params = useParams();
   const [searchParams] = useSearchParams();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -278,6 +330,25 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
   const goToProperty = (p: (typeof properties)[number]) => {
     if (p.soldOut) return;
+    // Fire-and-forget click beacon before we leave (see the route action).
+    // navigator.sendBeacon is used deliberately (not a router fetcher): it lives
+    // outside React Router, so it triggers no loader revalidation — a fetcher
+    // POST would re-run this loader and log a phantom view. It also survives the
+    // navigation that follows. Falls back to keepalive fetch where unsupported.
+    try {
+      const fd = new FormData();
+      fd.set("intent", "click");
+      fd.set("pid", p.pid);
+      fd.set("hasDates", hasDates ? "1" : "0");
+      const url = `/c/${params.collectionSlug}`;
+      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+        navigator.sendBeacon(url, fd);
+      } else {
+        void fetch(url, { method: "POST", body: fd, keepalive: true });
+      }
+    } catch {
+      /* telemetry must never block navigation */
+    }
     const base = `/${p.urlSeg}`;
     if (!hasDates) return navigate(base);
     const qs = writeOccupancy(
