@@ -175,6 +175,7 @@ const EN: Record<string, string> = {
   revPaceTitle: "Sales pace",
   revPaceSub:
     "How each date is selling compared to the same point last year. Close to arrival the score follows recent pickup; further out it follows cumulative demand.",
+  revScoreSoldOut: "Sold out",
   revScoreHigh: "High demand",
   revScoreSteady: "Steady sales",
   revScoreSlow: "Slow sales",
@@ -186,7 +187,7 @@ const EN: Record<string, string> = {
   revPaceOccupancy: "Occupancy",
   revPaceOffline: "offline (inferred)",
   revPaceOfflineLegend:
-    "“+n” counts are offline/PMS bookings inferred from availability. They raise the occupancy shown and hold back discount suggestions, but never affect the pace score.",
+    "“+n” counts are offline/PMS bookings inferred from availability. They raise the occupancy shown, hold back discount suggestions and can mark a full date as sold out, but never feed the pace score itself.",
   revPaceDba: "Days until arrival",
   revPacePast: "Past date",
   revPaceWeights: "Weighting pace / pickup",
@@ -1696,6 +1697,7 @@ const DE: Record<string, string> = {
   revPaceTitle: "Verkaufstempo",
   revPaceSub:
     "Wie sich jedes Datum im Vergleich zum selben Zeitpunkt des Vorjahres verkauft. Kurz vor Anreise zählt der jüngste Zulauf, weiter im Voraus die aufgelaufene Nachfrage.",
+  revScoreSoldOut: "Ausverkauft",
   revScoreHigh: "Hohe Nachfrage",
   revScoreSteady: "Stabiler Verkauf",
   revScoreSlow: "Schleppender Verkauf",
@@ -1707,7 +1709,7 @@ const DE: Record<string, string> = {
   revPaceOccupancy: "Auslastung",
   revPaceOffline: "offline (abgeleitet)",
   revPaceOfflineLegend:
-    "„+n“ sind aus der Verfügbarkeit abgeleitete Offline-/PMS-Buchungen. Sie erhöhen die angezeigte Auslastung und bremsen Rabatt-Vorschläge, fließen aber nie in den Pace-Score ein.",
+    "„+n“ sind aus der Verfügbarkeit abgeleitete Offline-/PMS-Buchungen. Sie erhöhen die angezeigte Auslastung, bremsen Rabatt-Vorschläge und können ein volles Datum als ausverkauft markieren, fließen aber nie in den Pace-Score selbst ein.",
   revPaceDba: "Tage bis Anreise",
   revPacePast: "Vergangenes Datum",
   revPaceWeights: "Gewichtung Nachfrage / Zulauf",

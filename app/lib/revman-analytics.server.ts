@@ -480,11 +480,16 @@ export async function getPaceCalendar(
   for (let d = from; d <= to; d = shiftISO(d, 1)) {
     const snapshot = paceSnapshot(d, asOf, curByDate.get(d) ?? [], lyByDate.get(shiftISO(d, -364)) ?? []);
     const occupancy = (curByDate.get(d) ?? []).length;
+    const offline = d >= asOf ? offlineByDate.get(d) : undefined;
+    // A date with no rooms left is never a sales problem — override the
+    // online-pace score so full dates don't show as "needs attention".
+    const soldOut = occupancy + (offline ?? 0) >= cap;
     days.push({
       ...snapshot,
+      score: soldOut ? "sold_out" : snapshot.score,
       occupancy,
       occupancyPct: Math.round((occupancy / cap) * 1000) / 10,
-      offline: d >= asOf ? offlineByDate.get(d) : undefined,
+      offline,
     });
   }
   return days;
