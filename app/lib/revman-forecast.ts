@@ -15,6 +15,13 @@
 // - Missing feature values (not enough history for a window/lag) fall back to
 //   0 instead of null-propagating — with short history the forecast leans on
 //   the pace/pickup terms and the max(actual, forecast) floor.
+// - The regression has no days-before-arrival input and its coefficients were
+//   trained on another hotel, so alone it under-predicts dates that sell late.
+//   We therefore also floor the ONLINE estimate at on-books + the remaining
+//   pickup this property typically adds at that lead time (buildPickupCurve),
+//   and inferred offline demand is ADDED on top of the online estimate — the
+//   regression never sees offline flow, so flooring by the total (the old
+//   behaviour) collapsed the forecast onto the bar for offline-heavy dates.
 
 export interface ForecastNight {
   stayDate: string;
@@ -83,17 +90,67 @@ function trailingMean(series: number[], i: number, n: number): number {
   return mean(series.slice(from, i));
 }
 
+// ---------------------------------------------------------------------------
+// Hotel-calibrated pickup curve
+
+export const PICKUP_CURVE_MAX_DBA = 90;
+export const PICKUP_CURVE_LOOKBACK_DAYS = 182;
+/** Below this many materialized past dates the curve is too noisy — return
+ *  empty and let the forecast fall back to regression + on-books only. */
+export const PICKUP_CURVE_MIN_DATES = 28;
+
+/** Expected remaining ONLINE pickup by days-before-arrival, from this
+ *  property's own history. For a finished stay date, the nights that arrived
+ *  with lead time < d are exactly the pickup that came within the last d days
+ *  before arrival — so averaging that count over recent past dates says how
+ *  much a date at DBA d typically still gains. Index = DBA, value = share of
+ *  rooms. Dates with zero bookings count as zero pickup (skipping them would
+ *  bias the curve upward). */
+export function buildPickupCurve(nights: ForecastNight[], asOf: string, roomCount: number): number[] {
+  const rooms = Math.max(1, roomCount);
+  const byDate = new Map<string, number[]>();
+  let dataFrom: string | undefined;
+  for (const n of nights) {
+    if (dataFrom === undefined || n.stayDate < dataFrom) dataFrom = n.stayDate;
+    if (n.isCancelled || n.stayDate >= asOf) continue;
+    const arr = byDate.get(n.stayDate) ?? [];
+    arr.push(n.leadTime);
+    byDate.set(n.stayDate, arr);
+  }
+  if (dataFrom === undefined) return [];
+  // Window: recent past only, but never before the data starts (a hotel with
+  // 60 days of history must not average in 122 artificial empty dates).
+  let from = addDays(asOf, -PICKUP_CURVE_LOOKBACK_DAYS);
+  if (dataFrom > from) from = dataFrom;
+
+  const perDate: number[][] = [];
+  for (let d = from; d < asOf; d = addDays(d, 1)) perDate.push(byDate.get(d) ?? []);
+  if (perDate.length < PICKUP_CURVE_MIN_DATES) return [];
+
+  const curve: number[] = [];
+  for (let dba = 0; dba <= PICKUP_CURVE_MAX_DBA; dba++) {
+    let sum = 0;
+    for (const leads of perDate) sum += leads.filter((v) => v < dba).length;
+    curve.push(sum / perDate.length / rooms);
+  }
+  return curve;
+}
+
 /** Occupancy forecast for every date in [startDate, endDate]. `nights` should
  *  cover ~2 years before startDate for the long features to be meaningful.
- *  `offlineOnBooks` (inferred offline nights per date) does NOT feed the
- *  regression — the coefficients were trained on booking data — it only lifts
- *  the on-the-books floor so the forecast never sits below TOTAL demand. */
+ *
+ *  Composition per date: the ONLINE estimate is the regression, floored at
+ *  on-books + the property's typical remaining pickup for that lead time
+ *  (opts.pickupCurve, at DBA measured from opts.asOf); inferred offline demand
+ *  is then ADDED on top — it never feeds the regression (the coefficients were
+ *  trained on booking flow), and the result never sits below TOTAL on-books. */
 export function buildForecast(
   nights: ForecastNight[],
   startDate: string,
   endDate: string,
   roomCount: number,
   offlineOnBooks?: Record<string, number>,
+  opts?: { asOf?: string; pickupCurve?: number[] },
 ): ForecastDay[] {
   const rooms = Math.max(1, roomCount);
 
@@ -179,11 +236,22 @@ export function buildForecast(
       COEF.pickup7Share * (pickup7 / (pickup30 + 1e-6));
 
     const rawPercent = clip01(Math.round(raw * 10000) / 10000);
-    // Never forecast below what's already on the books — online AND inferred
-    // offline together.
+
+    // Online estimate: regression, floored at on-books plus the pickup this
+    // property typically still adds at this lead time (past dates add none).
+    const curve = opts?.pickupCurve;
+    let expectedPickup = 0;
+    if (opts?.asOf && curve && curve.length > 0) {
+      const dba = Math.round((Date.parse(`${d}T00:00:00Z`) - Date.parse(`${opts.asOf}T00:00:00Z`)) / dayMs);
+      if (dba >= 0) expectedPickup = curve[Math.min(dba, curve.length - 1)];
+    }
+    const onlineOcc = clip01(f.active / rooms);
+    const onlineFinal = Math.max(rawPercent, clip01(onlineOcc + expectedPickup));
+
+    // Offline demand is invisible to the regression, so it stacks on top of
+    // the online estimate (capped at capacity) instead of merely flooring it.
     const offline = offlineOnBooks?.[d] ?? 0;
-    const totalOcc = clip01((f.active + offline) / rooms);
-    const forecastPercent = Math.max(totalOcc, rawPercent);
+    const forecastPercent = clip01(onlineFinal + offline / rooms);
     out.push({
       date: d,
       rawPercent,

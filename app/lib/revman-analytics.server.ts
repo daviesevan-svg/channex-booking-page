@@ -5,7 +5,7 @@
 import { getInventory, saveInventory, type AriActor, type InventoryEdits } from "./ari.server";
 import { getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
-import { buildForecast, type ForecastDay } from "./revman-forecast";
+import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
 import { paceSnapshot, type PaceSnapshot } from "./revman-pace";
 import { applyNudge, guardsReady, suggestFor, type PriceGuards, type Suggestion } from "./revman-price";
 
@@ -167,12 +167,14 @@ export interface PaceDay extends PaceSnapshot {
 }
 
 /** Occupancy forecast for [from, to], fed with two years of prior history so
- *  the trailing/lag features have data. */
+ *  the trailing/lag features have data. `asOf` (the property's today) anchors
+ *  the days-before-arrival lookup into the property's own pickup curve. */
 export async function getForecast(
   pid: string,
   from: string,
   to: string,
   roomCount: number,
+  asOf: string,
 ): Promise<ForecastDay[]> {
   const [rows, inferred] = await Promise.all([
     db()
@@ -195,7 +197,10 @@ export async function getForecast(
   const offlineByDate = Object.fromEntries(
     inferred.filter((d) => d.offline !== undefined && d.offline > 0).map((d) => [d.date, d.offline as number]),
   );
-  return buildForecast(nights, from, to, roomCount, offlineByDate);
+  return buildForecast(nights, from, to, roomCount, offlineByDate, {
+    asOf,
+    pickupCurve: buildPickupCurve(nights, asOf, roomCount),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +352,7 @@ export async function getPriceSuggestions(
   const to = shiftISO(today, SUGGESTION_DAYS - 1);
   const [pace, forecast, inventory] = await Promise.all([
     getPaceCalendar(pid, today, to, today, roomCount),
-    getForecast(pid, today, to, roomCount),
+    getForecast(pid, today, to, roomCount, today),
     getInventory(pid, today, to),
   ]);
   const fcByDate = new Map(forecast.map((f) => [f.date, f]));

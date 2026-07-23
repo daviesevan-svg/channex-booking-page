@@ -171,7 +171,7 @@ const EN: Record<string, string> = {
   revForecastLegend: "The dashed tick is the forecast occupancy for that date.",
   revForecastTitle: "Occupancy forecast — next 30 days",
   revForecastSub:
-    "Solid bars are nights already on the books; the dashed tick is where the model expects the date to end up, based on your booking pace, weekday patterns and recent trend. It never predicts below what's already booked.",
+    "Solid bars are nights already on the books; the dashed tick is where the model expects the date to end up — from your booking pace, weekday patterns, recent trend, and the pickup this property typically still gains at that lead time. It never predicts below what's already booked.",
   revPaceTitle: "Sales pace",
   revPaceSub:
     "How each date is selling compared to the same point last year. Close to arrival the score follows recent pickup; further out it follows cumulative demand.",
@@ -1692,7 +1692,7 @@ const DE: Record<string, string> = {
   revForecastLegend: "Der gestrichelte Strich ist die prognostizierte Auslastung für das Datum.",
   revForecastTitle: "Auslastungsprognose — nächste 30 Tage",
   revForecastSub:
-    "Volle Balken sind bereits gebuchte Nächte; der gestrichelte Strich zeigt, wo das Modell das Datum am Ende erwartet — auf Basis Ihres Buchungstempos, der Wochentagsmuster und des jüngsten Trends. Es prognostiziert nie weniger als bereits gebucht ist.",
+    "Volle Balken sind bereits gebuchte Nächte; der gestrichelte Strich zeigt, wo das Modell das Datum am Ende erwartet — auf Basis Ihres Buchungstempos, der Wochentagsmuster, des jüngsten Trends und des Zulaufs, der bei dieser Unterkunft je Vorlaufzeit üblicherweise noch dazukommt. Es prognostiziert nie weniger als bereits gebucht ist.",
   revPaceTitle: "Verkaufstempo",
   revPaceSub:
     "Wie sich jedes Datum im Vergleich zum selben Zeitpunkt des Vorjahres verkauft. Kurz vor Anreise zählt der jüngste Zulauf, weiter im Voraus die aufgelaufene Nachfrage.",
