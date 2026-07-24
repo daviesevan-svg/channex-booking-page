@@ -1,0 +1,181 @@
+// Competitor-set discovery: find nearby similar hotels from Booking.com search
+// results (via Scrapfly) and hand them back as *suggestions* for the owner to
+// review, confirm and reorder — nothing is added automatically. This is the
+// "auto-pull the comp set" setup step; the manual comp set + ranking already
+// exist (see revman-compset.server / revman-compset).
+//
+// We scrape the public Booking.com search-results page for the property's area
+// and parse the property cards. Booking renders these server-side, so no JS
+// render is needed; the anti-bot posture is Scrapfly's (residential pool + ASP).
+import { scrapeUrl, isScrapflyConfigured } from "./scrapfly.server";
+
+export interface CandidateHotel {
+  name: string;
+  /** Canonical Booking.com hotel path, e.g. "/hotel/gb/ivybushroyal.html" —
+   *  stable across locales/query junk; the key for the later price feed. */
+  bookingRef: string;
+  starClass?: number;
+  reviewScore?: number;
+  reviewCount?: number;
+  /** Human price string as shown on the card (stay total, market currency). A
+   *  preview only — not used for ranking; the price feed captures real prices. */
+  priceText?: string;
+}
+
+export interface DiscoverResult {
+  ok: boolean;
+  candidates: CandidateHotel[];
+  /** Scrapfly credit cost of the search (billing visibility). */
+  cost: number | null;
+  /** The Booking.com search URL actually scraped. */
+  searchUrl: string;
+  error?: string;
+}
+
+const BOOKING_SEARCH = "https://www.booking.com/searchresults.html";
+
+/** Builds a Booking.com search URL for a free-text area (town/city/region). */
+export function buildBookingSearchUrl(
+  area: string,
+  opts: { checkin?: string; checkout?: string; adults?: number } = {},
+): string {
+  const p = new URLSearchParams({
+    ss: area.trim(),
+    group_adults: String(opts.adults ?? 2),
+    no_rooms: "1",
+    group_children: "0",
+  });
+  if (opts.checkin && opts.checkout) {
+    p.set("checkin", opts.checkin);
+    p.set("checkout", opts.checkout);
+  }
+  return `${BOOKING_SEARCH}?${p.toString()}`;
+}
+
+/** Normalises a Booking hotel href to its stable path: drops the query string
+ *  and any locale segment (".en-gb.html" → ".html"). */
+export function canonicalBookingRef(href: string): string {
+  try {
+    const u = new URL(href, "https://www.booking.com");
+    let path = u.pathname; // /hotel/gb/ivybushroyal.en-gb.html
+    path = path.replace(/\.[a-z]{2}(-[a-z]{2})?\.html$/i, ".html");
+    return path;
+  } catch {
+    return href;
+  }
+}
+
+const decode = (s: string): string =>
+  s
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
+/** Parses Booking.com search-results HTML into candidate hotels. Resilient to
+ *  markup churn: it splits on property-card boundaries and pulls each field with
+ *  its own regex, tolerating missing fields (unrated/self-catering listings). */
+export function parseCandidates(html: string): CandidateHotel[] {
+  const marker = 'data-testid="property-card"';
+  const starts: number[] = [];
+  for (let i = html.indexOf(marker); i !== -1; i = html.indexOf(marker, i + 1)) starts.push(i);
+  starts.push(html.length);
+
+  const out: CandidateHotel[] = [];
+  const seen = new Set<string>();
+  for (let k = 0; k < starts.length - 1; k++) {
+    const card = html.slice(starts[k], starts[k + 1]);
+
+    const nameM = card.match(/data-testid="title"[^>]*>([^<]+)</);
+    const name = nameM ? decode(nameM[1]) : "";
+    if (!name) continue;
+
+    const hrefM = card.match(/href="(https:\/\/www\.booking\.com\/hotel\/[^"]+)"/);
+    const bookingRef = hrefM ? canonicalBookingRef(decode(hrefM[1])) : "";
+    const dedupeKey = bookingRef || name.toLowerCase();
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    // Review score block renders as "Scored 7.3 7.3 Good 1,635 reviews".
+    const scoreArea = card.match(/data-testid="review-score"(.*?)(?:<\/div>\s*){3}/s)?.[1] ?? "";
+    const scoreText = scoreArea.replace(/<[^>]+>/g, " ");
+    const scoreM = scoreText.match(/Scored\s+([\d.]+)/) ?? scoreText.match(/([\d]+\.[\d])/);
+    const countM = scoreText.match(/([\d,]+)\s*reviews?/i);
+    const reviewScore = scoreM ? Number(scoreM[1]) : undefined;
+    const reviewCount = countM ? Number(countM[1].replace(/,/g, "")) : undefined;
+
+    // Stars: prefer an explicit aria-label ("N out of 5 stars"), else count the
+    // star svgs in the rating-stars region (rating-squares = self-catering, skip).
+    let starClass: number | undefined;
+    const starAria = card.match(/aria-label="(\d)\s*(?:out of 5\s*)?stars?"/i);
+    if (starAria) starClass = Number(starAria[1]);
+    else {
+      const starRegion = card.match(/data-testid="rating-stars"(.*?)<\/div>/s)?.[1];
+      if (starRegion) {
+        const n = (starRegion.match(/<svg/g) ?? []).length;
+        if (n >= 1 && n <= 5) starClass = n;
+      }
+    }
+
+    const priceM = card.match(/data-testid="price-and-discounted-price"[^>]*>([^<]+)</);
+    const priceText = priceM ? decode(priceM[1]) : undefined;
+
+    out.push({
+      name,
+      bookingRef,
+      starClass,
+      reviewScore: reviewScore && reviewScore > 0 && reviewScore <= 10 ? reviewScore : undefined,
+      reviewCount: reviewCount && reviewCount > 0 ? reviewCount : undefined,
+      priceText,
+    });
+    if (out.length >= 40) break;
+  }
+  return out;
+}
+
+/** Discovers competitor candidates for an area (free text) or a full Booking.com
+ *  search URL. Never throws. `excludeName` drops the owner's own hotel from the
+ *  results (case-insensitive contains match). */
+export async function discoverCompetitors(
+  areaOrUrl: string,
+  opts: {
+    checkin?: string;
+    checkout?: string;
+    adults?: number;
+    country?: string;
+    excludeName?: string;
+  } = {},
+): Promise<DiscoverResult> {
+  const input = areaOrUrl.trim();
+  const searchUrl = /^https?:\/\//i.test(input)
+    ? input
+    : buildBookingSearchUrl(input, opts);
+
+  if (!isScrapflyConfigured()) {
+    return { ok: false, candidates: [], cost: null, searchUrl, error: "Scrapfly API key not configured." };
+  }
+  if (!input) {
+    return { ok: false, candidates: [], cost: null, searchUrl, error: "Enter a town, city or region to search." };
+  }
+
+  const res = await scrapeUrl(searchUrl, {
+    asp: true,
+    proxyPool: "public_residential_pool", // datacenter gets a 202 challenge from Booking
+    country: opts.country ?? "gb",
+    format: "raw",
+    timeoutMs: 60_000,
+  });
+  if (!res.ok) {
+    return { ok: false, candidates: [], cost: res.cost, searchUrl, error: res.error ?? "Scrape failed." };
+  }
+
+  let candidates = parseCandidates(res.content);
+  const ex = opts.excludeName?.trim().toLowerCase();
+  if (ex) {
+    candidates = candidates.filter((c) => !c.name.toLowerCase().includes(ex) && !ex.includes(c.name.toLowerCase()));
+  }
+  return { ok: true, candidates, cost: res.cost, searchUrl };
+}

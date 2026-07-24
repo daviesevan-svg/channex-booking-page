@@ -67,6 +67,10 @@ export interface AppConfig extends ChannexConfig {
   googleTravelPartnerSaEmail?: string;
   /** The service account's PEM private key (may contain literal \n from the JSON). */
   googleTravelPartnerSaKey?: string;
+  /** Scrapfly web-scraping API key (scp-live-… / scp-test-…). Powers competitor-
+   *  set discovery + price capture from OTA pages. Unset = scraping disabled
+   *  (surfaced in the admin; manual comp set still works). Secret — never in vars. */
+  scrapflyApiKey?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -121,6 +125,7 @@ export function getConfig(): AppConfig {
     googleTravelPartnerAccountId: read("GOOGLE_TRAVELPARTNER_ACCOUNT_ID") || undefined,
     googleTravelPartnerSaEmail: read("GOOGLE_TRAVELPARTNER_SA_EMAIL") || undefined,
     googleTravelPartnerSaKey: read("GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY") || undefined,
+    scrapflyApiKey: read("SCRAPFLY_API_KEY") || undefined,
   };
   // Fail closed: a production build must never sign with the public default
   // secret. (Dev builds keep the placeholder so local dev needs no setup.)
