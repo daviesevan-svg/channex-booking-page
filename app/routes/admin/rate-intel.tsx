@@ -233,7 +233,9 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
       )}
       {job?.status === "paused" && (
         <div className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">
-          {t("riJobPaused", { done: String(job.done), total: String(job.total) })}
+          {job.reason === "provider"
+            ? t("riJobPausedProvider", { done: String(job.done), total: String(job.total) })
+            : t("riJobPaused", { done: String(job.done), total: String(job.total) })}
         </div>
       )}
 
