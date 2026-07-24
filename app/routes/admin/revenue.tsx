@@ -35,6 +35,8 @@ import {
 import { discoverCompetitors, type CandidateHotel } from "~/lib/revman-compset-discovery.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { creditTokens, getBalance, getLedger, type LedgerEntry } from "~/lib/revman-tokens.server";
+import { isSuperadmin } from "~/lib/users.server";
 import { importLooksStalled } from "~/lib/revman";
 import {
   connectRevman,
@@ -48,9 +50,10 @@ import {
 } from "~/lib/revman.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const pid = await currentPropertyId(request);
   if (!pid) return { configured: false as const };
+  const isSuper = await isSuperadmin(email);
   const state = await getRevmanState(pid);
   const summary = state ? await getRevmanSummary(pid) : undefined;
   const today = todayISODate();
@@ -106,6 +109,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       .join(", ");
   }
 
+  // Rate-intelligence token wallet (comp-price capture is metered against it).
+  const tokenBalance = state ? await getBalance(pid) : 0;
+  const tokenLedger = state && isSuper ? await getLedger(pid, 8) : [];
+
   return {
     configured: true as const,
     state,
@@ -120,6 +127,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     compSet,
     compArea,
     scrapflyOn: isScrapflyConfigured(),
+    isSuper,
+    tokenBalance,
+    tokenLedger,
   };
 }
 
@@ -234,6 +244,19 @@ export async function action({ request }: Route.ActionArgs) {
         }
       }
       return { okKey: "revCompAdded" as const, addedCount: added };
+    }
+    if (intent === "tokenCredit") {
+      // Manual/invoice top-up — superadmin only (self-serve Stripe is a later phase).
+      const email = await requireAdmin(request);
+      if (!(await isSuperadmin(email))) return { error: "Only a superadmin can credit tokens." };
+      const amount = Number(form.get("amount"));
+      if (!Number.isFinite(amount) || amount <= 0) return { errorKey: "revTokErrAmount" as const };
+      const balance = await creditTokens(pid, amount, {
+        reason: "credit_manual",
+        note: String(form.get("note") || "").trim() || undefined,
+        actor: email,
+      });
+      return { okKey: "revTokCredited" as const, tokenBalance: balance };
     }
     if (intent === "disconnect") {
       await disconnectRevman(pid);
@@ -571,6 +594,9 @@ function CompSet({
   scrapflyOn,
   area,
   discover,
+  tokenBalance,
+  isSuper,
+  tokenLedger,
 }: {
   view: CompSetView;
   busy: boolean;
@@ -578,6 +604,9 @@ function CompSet({
   scrapflyOn: boolean;
   area: string;
   discover?: { candidates: CandidateHotel[]; cost: number | null; area: string; selfScore?: number | null };
+  tokenBalance: number;
+  isSuper: boolean;
+  tokenLedger: LedgerEntry[];
 }) {
   const numCls = "w-full rounded-[7px] border border-line-alt bg-surface px-2 py-1 text-[13px]";
   const stars = [1, 2, 3, 4, 5];
@@ -597,6 +626,69 @@ function CompSet({
           ? t("revCompStanding", { pos: String(view.standing.position), of: String(view.standing.rated) })
           : t("revCompStandingUnrated")}
       </div>
+
+      {/* Rate-intelligence token wallet — comp-price capture is metered against it.
+          Superadmin-only until capture (PR-B) is live, so hoteliers don't see
+          "capture paused" copy for a feature that isn't wired up yet. */}
+      {isSuper && (
+      <div
+        className={`mb-5 rounded-[12px] border px-4 py-3 ${
+          tokenBalance > 0 ? "border-line-alt bg-chip/40" : "border-amber-200 bg-amber-50"
+        }`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="text-[13px]">
+            <span className="font-semibold text-secondary">{t("revTokTitle")}</span>{" "}
+            <span className={`font-serif text-[18px] font-semibold tabular-nums ${tokenBalance > 0 ? "text-ink" : "text-amber-800"}`}>
+              {tokenBalance.toLocaleString()}
+            </span>{" "}
+            <span className="text-muted">{t("revTokUnit")}</span>
+          </div>
+          <span className="text-[12px] text-muted">{t("revTokMeter")}</span>
+        </div>
+        {tokenBalance === 0 && <p className="mt-1 text-[12.5px] text-amber-800">{t("revTokEmpty")}</p>}
+
+        {isSuper && (
+          <div className="mt-3 border-t border-line-alt pt-3">
+            <Form method="post" className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="intent" value="tokenCredit" />
+              <label className="text-[12px] text-muted">
+                {t("revTokAmount")}
+                <input name="amount" type="number" min={1} step="1" required className={`${numCls} mt-0.5 w-28`} />
+              </label>
+              <label className="text-[12px] text-muted">
+                {t("revTokNote")}
+                <input name="note" placeholder={t("revTokNotePlaceholder")} className={`${numCls} mt-0.5 w-56`} />
+              </label>
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-[9px] bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
+              >
+                {t("revTokCredit")}
+              </button>
+              <span className="text-[11px] text-muted">{t("revTokSuperHint")}</span>
+            </Form>
+            {tokenLedger.length > 0 && (
+              <div className="mt-3 space-y-0.5 text-[12px]">
+                {tokenLedger.map((l) => (
+                  <div key={l.id} className="flex items-center justify-between gap-2 text-muted">
+                    <span>
+                      <span className={l.delta >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-secondary"}>
+                        {l.delta >= 0 ? `+${l.delta}` : l.delta}
+                      </span>{" "}
+                      {t(`revTokReason_${l.reason}` as Parameters<typeof t>[0])}
+                      {l.note ? ` · ${l.note}` : ""}
+                    </span>
+                    <span className="tabular-nums">{l.createdAt.slice(0, 10)} · bal {l.balanceAfter}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      )}
 
       {/* Discovery: find nearby hotels on Booking.com, review, then add. */}
       {scrapflyOn ? (
@@ -1171,6 +1263,9 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
               scrapflyOn={loaderData.scrapflyOn}
               area={loaderData.compArea}
               discover={actionData && "discover" in actionData ? actionData.discover : undefined}
+              tokenBalance={loaderData.tokenBalance}
+              isSuper={loaderData.isSuper}
+              tokenLedger={loaderData.tokenLedger}
             />
           )}
 
