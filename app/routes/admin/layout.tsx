@@ -193,6 +193,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/inventory", label: t("navInventory") },
         { to: "/admin/analytics", label: t("navAnalytics") },
         { to: "/admin/revenue", label: t("navRevenue") },
+        { to: "/admin/rate-intel", label: t("navRateIntel") },
         { to: "/admin/ari-log", label: t("navChangeLog") },
         { to: "/admin/bookings", label: t("navBookings") },
         { to: "/admin/reviews", label: t("navReviews") },

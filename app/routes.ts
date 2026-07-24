@@ -75,6 +75,8 @@ export default [
     route("reviews", "routes/admin/reviews.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("revenue", "routes/admin/revenue.tsx"),
+    route("rate-intel", "routes/admin/rate-intel.tsx"),
+    route("rate-intel/settings", "routes/admin/rate-intel.settings.tsx"),
     route("ari-log", "routes/admin/ari-log.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),
