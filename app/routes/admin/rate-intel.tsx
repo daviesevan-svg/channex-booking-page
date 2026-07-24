@@ -77,9 +77,17 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   if (String(form.get("intent")) === "captureNow") {
     if ((await getBalance(pid)) < 1) return { errorKey: "riNoTokens" as const };
+    // Optional explicit date range — lets the owner pull a chosen window (e.g.
+    // a future season) instead of the default horizon from today.
+    const from = String(form.get("from") || "").trim();
+    const to = String(form.get("to") || "").trim();
+    const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+    const range = isIso(from) && isIso(to) ? { from, to } : undefined;
+    if ((from || to) && !range) return { errorKey: "riBadRange" as const };
+    if (range && range.to < range.from) return { errorKey: "riBadRange" as const };
     // Best-effort background run: each date persists as it's captured, so a
     // time-capped run just resumes on the next click/cron (freshness-skip).
-    startCaptureNow(pid, email);
+    startCaptureNow(pid, email, range);
     return { okKey: "riCaptureStarted" as const };
   }
   return null;
@@ -149,15 +157,23 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
           <h1 className="font-serif text-[26px] font-semibold">{t("riTitle")}</h1>
           <p className="mt-1 text-[13.5px] text-muted">{t("riSubtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-end gap-2">
           <Link
             to="/admin/rate-intel/settings"
             className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
           >
             {t("riSettings")}
           </Link>
-          <form method="post">
+          <form method="post" className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="intent" value="captureNow" />
+            <label className="text-[11px] font-medium text-muted">
+              {t("riFrom")}
+              <input type="date" name="from" defaultValue={dates[0]} className="mt-0.5 block rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px]" />
+            </label>
+            <label className="text-[11px] font-medium text-muted">
+              {t("riTo")}
+              <input type="date" name="to" defaultValue={dates[dates.length - 1]} className="mt-0.5 block rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px]" />
+            </label>
             <button
               type="submit"
               disabled={busy || !scrapflyOn || balance < 1}

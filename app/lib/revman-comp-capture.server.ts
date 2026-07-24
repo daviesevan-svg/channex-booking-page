@@ -162,20 +162,27 @@ export interface CaptureRun {
   error?: string;
 }
 
-/** Captures all dates in the horizon that are missing or stale, nearest-first,
- *  up to `max` per run (time budget). Each captured date costs 1 token; stops
- *  when the wallet is empty. `todayMs` is passed in (scripts can't call Date.now
- *  freely) — defaults to now. */
-export async function captureDueDates(
+const MAX_RANGE_DAYS = 365;
+
+/** Captures an explicit date range [fromISO, toISO] (inclusive), nearest-first.
+ *  Dates in the past are skipped; the span is clamped to a year. Each date costs
+ *  one token per hotel priced; stops when the wallet is empty. Freshly-captured
+ *  dates are skipped (freshness window) unless `force`. */
+export async function captureRange(
   pid: string,
+  fromISO: string,
+  toISO: string,
   opts: { max?: number; force?: boolean; actor?: string; nowMs?: number } = {},
 ): Promise<CaptureRun> {
   await ensureSchema();
   const run: CaptureRun = { captured: 0, spent: 0, skippedFresh: 0, pausedNoTokens: false };
   if (!isScrapflyConfigured()) return { ...run, error: "Scrapfly not configured." };
 
-  const settings = await getCaptureSettings(pid);
-  const [set, propSettings] = await Promise.all([getCompSet(pid), getSettings(pid)]);
+  const [settings, set, propSettings] = await Promise.all([
+    getCaptureSettings(pid),
+    getCompSet(pid),
+    getSettings(pid),
+  ]);
   const currency = propSettings.currency || "GBP";
   // We price each hotel from its own Booking page (deterministic — a dated area
   // search only lists AVAILABLE hotels and caps at ~25, so a specific hotel can
@@ -188,29 +195,35 @@ export async function captureDueDates(
   }
 
   const now = opts.nowMs ?? Date.now();
-  const max = opts.max ?? settings.horizonDays;
+  const todayMs = Date.parse(`${iso(now)}T00:00:00Z`);
+  const startMs = Math.max(todayMs, Date.parse(`${fromISO}T00:00:00Z`)); // never the past
+  let endMs = Date.parse(`${toISO}T00:00:00Z`);
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
+    return { ...run, error: "Invalid date range." };
+  }
+  endMs = Math.min(endMs, startMs + (MAX_RANGE_DAYS - 1) * DAY); // clamp span to a year
+  const totalDays = Math.round((endMs - startMs) / DAY) + 1;
+  const max = opts.max ?? totalDays;
 
-  // Which dates already have a fresh capture?
-  const from = iso(now);
-  const to = iso(now + settings.horizonDays * DAY);
-  const existing = await getCompPrices(pid, from, to);
+  // Freshness map across the range.
+  const existing = await getCompPrices(pid, iso(startMs), iso(endMs));
   const freshestByDate = new Map<string, number>();
   for (const r of existing) {
     const t = Date.parse(r.capturedAt);
-    if (!Number.isFinite(t)) continue;
-    freshestByDate.set(r.date, Math.max(freshestByDate.get(r.date) ?? 0, t));
+    if (Number.isFinite(t)) freshestByDate.set(r.date, Math.max(freshestByDate.get(r.date) ?? 0, t));
   }
 
-  for (let d = 0; d < settings.horizonDays && run.captured < max; d++) {
-    const date = iso(now + d * DAY);
+  for (let i = 0; i < totalDays && run.captured < max; i++) {
+    const dateMs = startMs + i * DAY;
+    const date = iso(dateMs);
+    const daysAhead = Math.round((dateMs - todayMs) / DAY);
     if (!opts.force) {
       const last = freshestByDate.get(date);
-      if (last && now - last < freshnessMs(d, settings)) {
+      if (last && now - last < freshnessMs(daysAhead, settings)) {
         run.skippedFresh++;
         continue;
       }
     }
-    // Each date needs one token per hotel we can price.
     if ((await getBalance(pid)) < hotels.length) {
       run.pausedNoTokens = true;
       break;
@@ -227,6 +240,17 @@ export async function captureDueDates(
     run.captured++;
   }
   return run;
+}
+
+/** Captures the settings horizon starting today (missing/stale dates first) —
+ *  the shape the cron and default "update now" use. Delegates to captureRange. */
+export async function captureDueDates(
+  pid: string,
+  opts: { max?: number; force?: boolean; actor?: string; nowMs?: number } = {},
+): Promise<CaptureRun> {
+  const settings = await getCaptureSettings(pid);
+  const now = opts.nowMs ?? Date.now();
+  return captureRange(pid, iso(now), iso(now + (settings.horizonDays - 1) * DAY), opts);
 }
 
 /** Prices one hotel for one date from its Booking hotel page. Reserves a token
@@ -275,8 +299,10 @@ async function captureHotelDate(
  *  waitUntil) so the admin "Update prices now" click returns immediately. Each
  *  date persists as it's captured, so a time-capped run just resumes on the next
  *  click or cron tick (freshness-skip). */
-export function startCaptureNow(pid: string, actor: string): void {
-  const work = captureDueDates(pid, { actor }).then(() => {});
+export function startCaptureNow(pid: string, actor: string, range?: { from: string; to: string }): void {
+  const work = (
+    range ? captureRange(pid, range.from, range.to, { actor, force: true }) : captureDueDates(pid, { actor })
+  ).then(() => {});
   try {
     waitUntil(work);
   } catch {
