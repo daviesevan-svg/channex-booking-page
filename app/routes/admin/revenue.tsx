@@ -221,7 +221,14 @@ export async function action({ request }: Route.ActionArgs) {
         });
         selfScore = result.self.reviewScore;
       }
-      return { discover: { candidates: result.candidates, cost: result.cost, area, selfScore } };
+      // Don't re-suggest hotels already in the set (match on Booking ref or name).
+      const set = await getCompSet(pid);
+      const haveRef = new Set(set.ranked.map((h) => h.bookingRef).filter(Boolean));
+      const haveName = new Set(set.ranked.map((h) => h.name.toLowerCase()));
+      const candidates = result.candidates.filter(
+        (c) => !(c.bookingRef && haveRef.has(c.bookingRef)) && !haveName.has(c.name.toLowerCase()),
+      );
+      return { discover: { candidates, cost: result.cost, area, selfScore } };
     }
     if (intent === "compAddBulk") {
       const picked = form.getAll("cand").map(String);

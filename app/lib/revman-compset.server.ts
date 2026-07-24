@@ -114,11 +114,42 @@ export interface CompInput {
   bookingRef?: string;
 }
 
-/** Adds a competitor. Name is required; everything else is optional. */
+/** Canonical Booking hotel path (drops query + locale), so the same hotel added
+ *  from different links/searches dedupes to one row. */
+function canonicalRef(ref: string | undefined): string | null {
+  const r = ref?.trim();
+  if (!r) return null;
+  try {
+    const path = r.startsWith("http") ? new URL(r).pathname : r.split("?")[0];
+    return path.replace(/\.[a-z]{2}(-[a-z]{2})?\.html$/i, ".html");
+  } catch {
+    return r.split("?")[0];
+  }
+}
+
+/** Adds a competitor — or updates the matching one instead of duplicating it, so
+ *  re-running discovery / "add selected" is idempotent. A match is the same
+ *  Booking reference (canonicalised) or, absent a reference, the same name. */
 export async function addCompetitor(pid: string, input: CompInput): Promise<void> {
   await ensureSchema();
   const name = input.name.trim();
   if (!name) throw new Error("A competitor name is required.");
+  const ref = canonicalRef(input.bookingRef);
+
+  const existing = await db()
+    .prepare(
+      `SELECT comp_id FROM rev_comp
+       WHERE pid = ? AND is_self = 0
+         AND ( (? IS NOT NULL AND booking_ref = ?) OR (? IS NULL AND lower(name) = lower(?)) )
+       LIMIT 1`,
+    )
+    .bind(pid, ref, ref, ref, name)
+    .first<{ comp_id: string }>();
+  if (existing) {
+    await updateCompetitor(pid, existing.comp_id, { ...input, bookingRef: ref ?? input.bookingRef });
+    return;
+  }
+
   await db()
     .prepare(
       `INSERT INTO rev_comp (pid, comp_id, name, star_class, review_score, review_count, booking_ref, is_self, created_at)
@@ -131,7 +162,7 @@ export async function addCompetitor(pid: string, input: CompInput): Promise<void
       clampStar(input.starClass),
       clampScore(input.reviewScore),
       clampCount(input.reviewCount),
-      input.bookingRef?.trim() || null,
+      ref,
       new Date().toISOString(),
     )
     .run();
@@ -195,6 +226,27 @@ export async function wipeCompSet(pid: string): Promise<void> {
   await db().prepare(`DELETE FROM rev_comp WHERE pid = ?`).bind(pid).run();
 }
 
+/** Removes duplicate competitor rows (keeps the earliest of each Booking ref,
+ *  or of each name when there's no ref). Self-heals sets that gathered dupes
+ *  before add-time dedupe existed; also drops any orphaned duplicate prices. */
+export async function dedupeCompSet(pid: string): Promise<void> {
+  await ensureSchema();
+  await db().batch([
+    db()
+      .prepare(
+        `DELETE FROM rev_comp WHERE pid = ? AND is_self = 0 AND booking_ref IS NOT NULL AND rowid NOT IN (
+           SELECT MIN(rowid) FROM rev_comp WHERE pid = ? AND is_self = 0 AND booking_ref IS NOT NULL GROUP BY booking_ref )`,
+      )
+      .bind(pid, pid),
+    db()
+      .prepare(
+        `DELETE FROM rev_comp WHERE pid = ? AND is_self = 0 AND booking_ref IS NULL AND rowid NOT IN (
+           SELECT MIN(rowid) FROM rev_comp WHERE pid = ? AND is_self = 0 AND booking_ref IS NULL GROUP BY lower(name) )`,
+      )
+      .bind(pid, pid),
+  ]);
+}
+
 export interface CompSetView {
   ranked: RankedHotel[];
   /** Our hotel's rank and how many hotels in the set are rated. */
@@ -206,6 +258,7 @@ export interface CompSetView {
 /** The ranked competitor set including our own hotel. */
 export async function getCompSet(pid: string): Promise<CompSetView> {
   await ensureSelfRow(pid);
+  await dedupeCompSet(pid); // self-heal any pre-existing duplicates
   const hotels = (await listRows(pid)).map(toHotel);
   const ranked = rankCompSet(hotels);
   const self = ranked.find((h) => h.isSelf);
