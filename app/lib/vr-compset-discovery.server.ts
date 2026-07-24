@@ -23,6 +23,11 @@ export interface CandidateVrUnit {
   reviewCount?: number;
   lat?: number;
   lng?: number;
+  /** Card price in minor units. On an UNDATED search this is a non-comparable
+   *  sample (each card shows a different date range); on a DATED search it is
+   *  the price for exactly those dates, so the availability capture uses it. */
+  priceMinor?: number;
+  currency?: string;
 }
 
 export interface DiscoverVrResult {
@@ -82,6 +87,16 @@ function decodeRoomId(nodeId: string): string {
     /* not base64 — fall through */
   }
   return nodeId;
+}
+
+/** Price string ("£57", "US$1,234") → { minor, currency }; null when unparseable. */
+function parsePrice(text: string | undefined): { minor: number; currency: string } | null {
+  if (!text) return null;
+  const sym = text.match(/US\$|£|€|\$|A\$|C\$/);
+  const map: Record<string, string> = { "£": "GBP", "€": "EUR", "$": "USD", "US$": "USD", "A$": "AUD", "C$": "CAD" };
+  const amount = parseFloat(text.replace(/[^\d.,]/g, "").replace(/,/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  return { minor: Math.round(amount * 100), currency: (sym && map[sym[0]]) || "GBP" };
 }
 
 /** "5.0 (25)" → { score: 5, count: 25 }; null when it doesn't match. */
@@ -147,6 +162,13 @@ export function parseAirbnbListings(html: string): CandidateVrUnit[] {
     const lat = typeof coord.latitude === "number" ? coord.latitude : undefined;
     const lng = typeof coord.longitude === "number" ? coord.longitude : undefined;
 
+    // structuredDisplayPrice.primaryLine.{discountedPrice|price|originalPrice}
+    const primary = ((node.structuredDisplayPrice as Record<string, unknown>)?.primaryLine ?? {}) as Record<string, unknown>;
+    const priceStr = [primary.discountedPrice, primary.price, primary.originalPrice].find((v) => typeof v === "string") as
+      | string
+      | undefined;
+    const price = parsePrice(priceStr);
+
     out.push({
       name,
       airbnbRef: ref,
@@ -156,6 +178,8 @@ export function parseAirbnbListings(html: string): CandidateVrUnit[] {
       reviewCount: rating?.count,
       lat,
       lng,
+      priceMinor: price?.minor,
+      currency: price?.currency,
     });
   }
   return out;
