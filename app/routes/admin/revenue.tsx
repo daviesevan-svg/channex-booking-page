@@ -803,7 +803,9 @@ function CompSet({
               h.isSelf ? "border-accent/40 bg-accent/5" : "border-line-alt"
             }`}
           >
-            <input type="hidden" name="intent" value="compUpdate" />
+            {/* No hidden intent: each button carries its own, so clicking ✕
+                submits only compRemove (a hidden compUpdate would win the
+                form.get("intent") race and silently update instead of delete). */}
             <input type="hidden" name="compId" value={h.id} />
             <span className="pl-1 text-[13px] font-semibold tabular-nums text-secondary">{h.rank ?? "—"}</span>
             <span className="min-w-0">
@@ -845,6 +847,8 @@ function CompSet({
             <span className="flex justify-end gap-1">
               <button
                 type="submit"
+                name="intent"
+                value="compUpdate"
                 disabled={busy}
                 className="rounded-[7px] border border-line-alt px-2 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
               >
