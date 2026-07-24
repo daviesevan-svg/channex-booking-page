@@ -41,7 +41,7 @@ const BOOKING_SEARCH = "https://www.booking.com/searchresults.html";
 /** Builds a Booking.com search URL for a free-text area (town/city/region). */
 export function buildBookingSearchUrl(
   area: string,
-  opts: { checkin?: string; checkout?: string; adults?: number } = {},
+  opts: { checkin?: string; checkout?: string; adults?: number; currency?: string } = {},
 ): string {
   const p = new URLSearchParams({
     ss: area.trim(),
@@ -53,7 +53,56 @@ export function buildBookingSearchUrl(
     p.set("checkin", opts.checkin);
     p.set("checkout", opts.checkout);
   }
+  if (opts.currency) p.set("selected_currency", opts.currency.toUpperCase());
   return `${BOOKING_SEARCH}?${p.toString()}`;
+}
+
+const BOOKING = "https://www.booking.com";
+
+/** Builds a Booking.com hotel-page URL for a canonical ref ("/hotel/gb/x.html")
+ *  with a 1-night stay + currency, so the page embeds that night's room prices. */
+export function buildHotelUrl(
+  bookingRef: string,
+  opts: { checkin: string; checkout: string; adults?: number; currency?: string },
+): string {
+  const p = new URLSearchParams({
+    checkin: opts.checkin,
+    checkout: opts.checkout,
+    group_adults: String(opts.adults ?? 2),
+    no_rooms: "1",
+    group_children: "0",
+  });
+  if (opts.currency) p.set("selected_currency", opts.currency.toUpperCase());
+  const path = bookingRef.startsWith("http") ? bookingRef : `${BOOKING}${bookingRef}`;
+  return `${path}?${p.toString()}`;
+}
+
+/** Parses the cheapest bookable nightly price from a Booking hotel page. The page
+ *  embeds each room block as `"b_price":"£NN"`; for a 1-night search the minimum
+ *  of those is the cheapest nightly rate a shopper sees (incl. promos). Null when
+ *  the hotel has no availability for the searched night. */
+export function parseHotelCheapestPrice(html: string): { minor: number; currency: string } | null {
+  let best: { minor: number; currency: string } | null = null;
+  for (const m of html.matchAll(/"b_price":"([^"]+)"/g)) {
+    const p = parsePriceText(m[1]);
+    if (p && (!best || p.minor < best.minor)) best = p;
+  }
+  return best;
+}
+
+/** Parses a Booking price string like "£1,180" / "€92" / "US$140" into minor
+ *  units + ISO currency. Returns null when unrecognised. */
+export function parsePriceText(text: string | undefined): { minor: number; currency: string } | null {
+  if (!text) return null;
+  const sym = text.match(/US\$|£|€|\$|R\$|zł|kr|CHF|A\$|C\$/);
+  const map: Record<string, string> = {
+    "£": "GBP", "€": "EUR", "$": "USD", "US$": "USD", "A$": "AUD", "C$": "CAD", "R$": "BRL",
+  };
+  const num = text.replace(/[^\d.,]/g, "").replace(/,/g, "");
+  const amount = parseFloat(num);
+  if (!Number.isFinite(amount) || amount <= 0) return null;
+  const currency = (sym && map[sym[0]]) || "GBP";
+  return { minor: Math.round(amount * 100), currency };
 }
 
 /** Normalises a Booking hotel href to its stable path: drops the query string
