@@ -28,6 +28,7 @@ import {
   addCompetitor,
   getCompSet,
   removeCompetitor,
+  setSelfRating,
   updateCompetitor,
   type CompSetView,
 } from "~/lib/revman-compset.server";
@@ -195,11 +196,22 @@ export async function action({ request }: Route.ActionArgs) {
     }
     if (intent === "compDiscover") {
       const area = String(form.get("area") || "").trim();
-      // Exclude the owner's own hotel from the suggestions (name match).
       const selfName = (await getOverrides(pid)).hotelName || "";
-      const result = await discoverCompetitors(area, { excludeName: selfName });
+      const result = await discoverCompetitors(area, { selfName });
       if (!result.ok) return { error: result.error ?? "Search failed." };
-      return { discover: { candidates: result.candidates, cost: result.cost, area } };
+      // Score our own hotel from the same Booking.com search, so it gets a
+      // placement in the ranking (self row is pulled out of the suggestions).
+      let selfScore: number | null = null;
+      if (result.self && result.self.reviewScore) {
+        await setSelfRating(pid, {
+          starClass: result.self.starClass,
+          reviewScore: result.self.reviewScore,
+          reviewCount: result.self.reviewCount,
+          bookingRef: result.self.bookingRef,
+        });
+        selfScore = result.self.reviewScore;
+      }
+      return { discover: { candidates: result.candidates, cost: result.cost, area, selfScore } };
     }
     if (intent === "compAddBulk") {
       const picked = form.getAll("cand").map(String);
@@ -565,7 +577,7 @@ function CompSet({
   t: AdminT;
   scrapflyOn: boolean;
   area: string;
-  discover?: { candidates: CandidateHotel[]; cost: number | null; area: string };
+  discover?: { candidates: CandidateHotel[]; cost: number | null; area: string; selfScore?: number | null };
 }) {
   const numCls = "w-full rounded-[7px] border border-line-alt bg-surface px-2 py-1 text-[13px]";
   const stars = [1, 2, 3, 4, 5];
@@ -613,6 +625,11 @@ function CompSet({
 
           {discover && (
             <div className="mt-4">
+              {discover.selfScore != null && (
+                <p className="mb-3 rounded-[8px] border border-accent/30 bg-accent/5 px-3 py-2 text-[12.5px] text-secondary">
+                  {t("revCompSelfScored", { score: String(discover.selfScore) })}
+                </p>
+              )}
               {discover.candidates.length === 0 ? (
                 <p className="text-[13px] text-muted">{t("revCompFindNone")}</p>
               ) : (
