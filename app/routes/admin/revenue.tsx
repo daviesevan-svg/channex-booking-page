@@ -23,7 +23,7 @@ import {
   type PriceSuggestionRow,
 } from "~/lib/revman-analytics.server";
 import type { SalesScore } from "~/lib/revman-pace";
-import { guardsReady } from "~/lib/revman-price";
+import { COMP_ABOVE_MARKET, COMP_BELOW_MARKET, guardsReady } from "~/lib/revman-price";
 import {
   addCompetitor,
   getCompSet,
@@ -1168,6 +1168,7 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                           <th className="px-3 py-2 font-semibold">{t("revSugColDate")}</th>
                           <th className="px-3 py-2 font-semibold">{t("revSugColPace")}</th>
                           <th className="px-3 py-2 font-semibold">{t("revSugColForecast")}</th>
+                          <th className="px-3 py-2 font-semibold">{t("revSugColMarket")}</th>
                           <th className="px-3 py-2 font-semibold">{t("revSugColCurrent")}</th>
                           <th className="px-3 py-2 font-semibold">{t("revSugColSuggested")}</th>
                           <th className="px-3 py-2" />
@@ -1188,8 +1189,33 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                                 </span>
                               </td>
                               <td className="px-3 py-2">{pctText(s.forecastPercent)}</td>
-                              <td className="px-3 py-2">{s.fromPrice !== undefined ? money(s.fromPrice * 100, kpis?.currency) : "—"}</td>
                               <td className="whitespace-nowrap px-3 py-2">
+                                {s.comp ? (
+                                  <span
+                                    title={t("revSugMarketTip", {
+                                      own: money(s.comp.ownMinor, s.comp.currency),
+                                      median: money(s.comp.medianMinor, s.comp.currency),
+                                      n: s.comp.n,
+                                    })}
+                                    className={`cursor-help rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${
+                                      s.comp.index <= COMP_BELOW_MARKET
+                                        ? "bg-sky-100 text-sky-800"
+                                        : s.comp.index >= COMP_ABOVE_MARKET
+                                          ? "bg-amber-100 text-amber-800"
+                                          : "bg-chip text-secondary"
+                                    }`}
+                                  >
+                                    {(() => {
+                                      const d = Math.round((s.comp.index - 1) * 100);
+                                      return d > 0 ? `+${d}%` : d < 0 ? `−${-d}%` : "0%";
+                                    })()}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted">—</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">{s.fromPrice !== undefined ? money(s.fromPrice * 100, kpis?.currency) : "—"}</td>
+                              <td className="whitespace-nowrap px-3 py-2" title={t(s.reasonKey)}>
                                 {s.pct === 0 || s.fromPrice === undefined ? (
                                   <span className="text-muted">{t("revSugHold")}</span>
                                 ) : atTarget ? (

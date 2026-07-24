@@ -5,7 +5,9 @@
 // - the sales-pace score (how the date sells vs last year, DBA-weighted), and
 // - the forecast occupancy (where the date is expected to end up),
 //
-// into a percentage nudge on the date's current prices. Suggestions are
+// into a percentage nudge on the date's current prices, modulated by a third
+// signal when Rate Intelligence has captured it: where our own Booking.com
+// price sits against the comp set's median that night. Suggestions are
 // advisory: nothing changes until the hotelier clicks Apply, and applied
 // prices are clamped to per-property min/max guards.
 
@@ -15,6 +17,47 @@ export interface PriceGuards {
   /** Major currency units. Both must be set before Apply is enabled. */
   minPrice?: number;
   maxPrice?: number;
+}
+
+/** Where our price sits against the comp set for one date, from Rate
+ *  Intelligence captures. Both sides are the same measure — cheapest 1-night
+ *  price on each hotel's own Booking.com page — so OTA-side discounts wash
+ *  out of the ratio. */
+export interface CompSignal {
+  /** Own captured price ÷ comp-set median (same currency). 0.9 = priced 10%
+   *  below the market that night. */
+  index: number;
+  /** Own price at or below EVERY captured comp price that night. */
+  cheapest: boolean;
+}
+
+/** Comp prices needed before the signal activates — a median of one or two
+ *  hotels is too noisy to move prices on. */
+export const COMP_MIN_SAMPLE = 3;
+/** Priced at or below this share of the comp median counts as below market. */
+export const COMP_BELOW_MARKET = 0.9;
+/** Priced at or above this share of the comp median counts as above market
+ *  (wider than the below-market band: raising into a premium position is the
+ *  riskier move, so it takes a clearer gap to temper a raise). */
+export const COMP_ABOVE_MARKET = 1.15;
+/** How much the comp position adds to / shaves off a demand-driven raise. */
+export const COMP_NUDGE = 5;
+
+/** Comp position for one date, or undefined when the signal shouldn't
+ *  activate: own price missing, or fewer than COMP_MIN_SAMPLE comp prices.
+ *  Prices are minor units, pre-filtered to one currency by the caller. */
+export function compSignalFor(ownMinor: number | null | undefined, compMinors: number[]): CompSignal | undefined {
+  if (typeof ownMinor !== "number" || ownMinor <= 0) return undefined;
+  const comps = compMinors.filter((p) => p > 0);
+  if (comps.length < COMP_MIN_SAMPLE) return undefined;
+  const median = medianOf(comps);
+  return { index: ownMinor / median, cheapest: ownMinor <= Math.min(...comps) };
+}
+
+export function medianOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 export interface SuggestionInput {
@@ -27,6 +70,9 @@ export interface SuggestionInput {
    *  demand. The pace score only sees online sales, so without this a date
    *  that's nearly sold out offline would still look "needs attention". */
   totalOnBooksPct: number;
+  /** Market position from Rate Intelligence; absent (no capture, stale, too
+   *  few comps) leaves the demand-only rules untouched. */
+  comp?: CompSignal;
 }
 
 export interface Suggestion {
@@ -42,7 +88,10 @@ export interface Suggestion {
     | "revSugReasonColdMid"
     | "revSugReasonFullHold"
     | "revSugReasonSoldOut"
-    | "revSugReasonHold";
+    | "revSugReasonHold"
+    | "revSugReasonBelowMarket"
+    | "revSugReasonAboveMarket"
+    | "revSugReasonCheapestHold";
 }
 
 /** Discounts are suppressed once total on-the-books occupancy (online +
@@ -51,11 +100,33 @@ export interface Suggestion {
  *  anyway. */
 export const DISCOUNT_OCC_CEILING = 0.7;
 
-/** Rule table, evaluated top-down. Demand pushing above capacity earns the
- *  biggest lift; weak pace only discounts when the date is close enough that
- *  price is the remaining lever — and never when the date is already mostly
- *  consumed offline. */
+/** Rule table, evaluated top-down, then modulated by market position. Demand
+ *  pushing above capacity earns the biggest lift; weak pace only discounts
+ *  when the date is close enough that price is the remaining lever — and
+ *  never when the date is already mostly consumed offline. */
 export function suggestFor(s: SuggestionInput): Suggestion {
+  return applyCompSignal(demandSuggestion(s), s.comp);
+}
+
+/** Market-position modulation, applied AFTER the demand rules so it only ever
+ *  adjusts a nudge the demand signals already justify — it never invents one:
+ *  - raising while priced below market: the comps confirm the market bears
+ *    more, so raise harder;
+ *  - raising while already well above market: keep the direction, temper the
+ *    size (never below the demand floor of "hold");
+ *  - discounting while ALREADY the cheapest in the set: price isn't why the
+ *    date is slow — hold instead of racing the market down. */
+function applyCompSignal(s: Suggestion, comp?: CompSignal): Suggestion {
+  if (!comp) return s;
+  if (s.pct > 0 && comp.index <= COMP_BELOW_MARKET)
+    return { ...s, pct: s.pct + COMP_NUDGE, reasonKey: "revSugReasonBelowMarket" };
+  if (s.pct > 0 && comp.index >= COMP_ABOVE_MARKET)
+    return { ...s, pct: Math.max(0, s.pct - COMP_NUDGE), reasonKey: "revSugReasonAboveMarket" };
+  if (s.pct < 0 && comp.cheapest) return { ...s, pct: 0, reasonKey: "revSugReasonCheapestHold" };
+  return s;
+}
+
+function demandSuggestion(s: SuggestionInput): Suggestion {
   const { score, forecastPercent: fc, dba } = s;
   // Sold out (incl. offline): nothing left to price. Conservative hold — a
   // cancellation re-sells at the current rate.

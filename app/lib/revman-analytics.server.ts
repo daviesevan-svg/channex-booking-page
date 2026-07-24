@@ -5,9 +5,20 @@
 import { getInventory, saveInventory, type AriActor, type InventoryEdits } from "./ari.server";
 import { getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
+import { getCompPrices } from "./revman-comp-capture.server";
+import { getCompSet } from "./revman-compset.server";
 import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
 import { fillAwareScore, paceSnapshot, type PaceSnapshot } from "./revman-pace";
-import { guardsReady, suggestFor, targetPrice, type PriceGuards, type Suggestion } from "./revman-price";
+import {
+  compSignalFor,
+  guardsReady,
+  medianOf,
+  suggestFor,
+  targetPrice,
+  type CompSignal,
+  type PriceGuards,
+  type Suggestion,
+} from "./revman-price";
 
 function db(): D1Database {
   const d = getDB();
@@ -393,6 +404,61 @@ export interface PriceSuggestionRow extends Suggestion {
    *  clamped to guards; display only — the action recomputes per cell).
    *  Undefined when guards aren't set, no price is loaded, or the date holds. */
   target?: number;
+  /** Market position from Rate Intelligence captures; undefined when the
+   *  signal isn't active for the date (see compStatsByDate). */
+  comp?: CompMarketStats;
+}
+
+/** The comp signal plus the numbers behind it, for the "vs market" column. */
+export interface CompMarketStats extends CompSignal {
+  /** Comp-set median that night, minor units. */
+  medianMinor: number;
+  /** Our own captured Booking.com price that night, minor units. */
+  ownMinor: number;
+  /** Comp prices behind the median. */
+  n: number;
+  currency: string;
+}
+
+/** Captures older than this don't feed the signal — matches the default far
+ *  cadence, so an enabled capture keeps every horizon date fresh enough. */
+const COMP_FRESH_MS = 7 * 86_400_000;
+
+/** Market position per date from the latest Rate Intelligence captures: our
+ *  own captured price vs the same-currency comp median, only where both sides
+ *  are fresh and the sample is big enough (compSignalFor). Suggestions must
+ *  work without Rate Intelligence, so any failure here (comp tables absent,
+ *  capture never configured) degrades to "no signal". */
+async function compStatsByDate(pid: string, from: string, to: string): Promise<Map<string, CompMarketStats>> {
+  try {
+    const [set, rows] = await Promise.all([getCompSet(pid), getCompPrices(pid, from, to)]);
+    const selfId = set.ranked.find((h) => h.isSelf)?.id;
+    if (!selfId) return new Map();
+    const cutoff = Date.now() - COMP_FRESH_MS;
+    const byDate = new Map<string, { own?: { minor: number; currency: string }; comps: { minor: number; currency: string }[] }>();
+    for (const r of rows) {
+      if (r.priceMinor == null || r.priceMinor <= 0 || !r.currency) continue;
+      const t = Date.parse(r.capturedAt);
+      if (!Number.isFinite(t) || t < cutoff) continue;
+      const entry = byDate.get(r.date) ?? { comps: [] };
+      if (r.compId === selfId) entry.own = { minor: r.priceMinor, currency: r.currency };
+      else entry.comps.push({ minor: r.priceMinor, currency: r.currency });
+      byDate.set(r.date, entry);
+    }
+    const out = new Map<string, CompMarketStats>();
+    for (const [date, entry] of byDate) {
+      const own = entry.own;
+      if (!own) continue;
+      const comps = entry.comps.filter((c) => c.currency === own.currency).map((c) => c.minor);
+      const signal = compSignalFor(own.minor, comps);
+      if (!signal) continue;
+      out.set(date, { ...signal, medianMinor: medianOf(comps), ownMinor: own.minor, n: comps.length, currency: own.currency });
+    }
+    return out;
+  } catch (err) {
+    console.log(`[revman] comp signal unavailable for ${pid}: ${err}`);
+    return new Map();
+  }
 }
 
 const SUGGESTION_DAYS = 60;
@@ -406,9 +472,10 @@ export async function getPriceSuggestions(
   guards: PriceGuards,
 ): Promise<PriceSuggestionRow[]> {
   const to = shiftISO(today, SUGGESTION_DAYS - 1);
-  const [forecast, inventory] = await Promise.all([
+  const [forecast, inventory, compStats] = await Promise.all([
     getForecast(pid, today, to, roomCount, today),
     getInventory(pid, today, to),
+    compStatsByDate(pid, today, to),
   ]);
   const fcByDate = new Map(forecast.map((f) => [f.date, f]));
   // Pace runs after the forecast so warning scores can clear to "filling up"
@@ -431,12 +498,14 @@ export async function getPriceSuggestions(
 
   return pace.map((day) => {
     const fc = fcByDate.get(day.date);
+    const comp = compStats.get(day.date);
     const suggestion = suggestFor({
       date: day.date,
       score: day.score,
       forecastPercent: fc?.forecastPercent ?? 0,
       dba: day.dba,
       totalOnBooksPct: Math.min(1, (day.occupancy + (day.offline ?? 0)) / Math.max(1, roomCount)),
+      comp,
     });
     const minCell = minCellByDate.get(day.date);
     const target =
@@ -450,6 +519,7 @@ export async function getPriceSuggestions(
       occupancyPct: day.occupancyPct,
       fromPrice: minCell?.price,
       target,
+      comp,
     };
   });
 }
