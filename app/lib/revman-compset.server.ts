@@ -160,6 +160,30 @@ export async function updateCompetitor(pid: string, compId: string, input: CompI
     .run();
 }
 
+/** Scores the self row from discovered Booking.com data, so our hotel ranks in
+ *  the set on the same basis as its competitors (that's what gives it a
+ *  placement). Updates only the rating fields + Booking ref; the self name is
+ *  left untouched. Only touches an existing self row (no-op if none). */
+export async function setSelfRating(
+  pid: string,
+  input: { starClass?: unknown; reviewScore?: unknown; reviewCount?: unknown; bookingRef?: string },
+): Promise<void> {
+  await ensureSchema();
+  await db()
+    .prepare(
+      `UPDATE rev_comp SET star_class = ?, review_score = ?, review_count = ?, booking_ref = ?
+       WHERE pid = ? AND is_self = 1`,
+    )
+    .bind(
+      clampStar(input.starClass),
+      clampScore(input.reviewScore),
+      clampCount(input.reviewCount),
+      input.bookingRef?.trim() || null,
+      pid,
+    )
+    .run();
+}
+
 /** Removes a competitor. The self row can't be removed (guarded). */
 export async function removeCompetitor(pid: string, compId: string): Promise<void> {
   await ensureSchema();

@@ -25,6 +25,10 @@ export interface CandidateHotel {
 export interface DiscoverResult {
   ok: boolean;
   candidates: CandidateHotel[];
+  /** The owner's own hotel as found on Booking.com (matched by name), so the
+   *  self row can be scored from the same source as its competitors — that's
+   *  what gives it a placement in the ranking. Null when not matched. */
+  self: CandidateHotel | null;
   /** Scrapfly credit cost of the search (billing visibility). */
   cost: number | null;
   /** The Booking.com search URL actually scraped. */
@@ -146,7 +150,9 @@ export async function discoverCompetitors(
     checkout?: string;
     adults?: number;
     country?: string;
-    excludeName?: string;
+    /** The owner's own hotel name: pulled out of the candidates and returned as
+     *  `self` so the caller can score the self row from Booking.com. */
+    selfName?: string;
   } = {},
 ): Promise<DiscoverResult> {
   const input = areaOrUrl.trim();
@@ -155,10 +161,10 @@ export async function discoverCompetitors(
     : buildBookingSearchUrl(input, opts);
 
   if (!isScrapflyConfigured()) {
-    return { ok: false, candidates: [], cost: null, searchUrl, error: "Scrapfly API key not configured." };
+    return { ok: false, candidates: [], self: null, cost: null, searchUrl, error: "Scrapfly API key not configured." };
   }
   if (!input) {
-    return { ok: false, candidates: [], cost: null, searchUrl, error: "Enter a town, city or region to search." };
+    return { ok: false, candidates: [], self: null, cost: null, searchUrl, error: "Enter a town, city or region to search." };
   }
 
   const res = await scrapeUrl(searchUrl, {
@@ -169,13 +175,19 @@ export async function discoverCompetitors(
     timeoutMs: 60_000,
   });
   if (!res.ok) {
-    return { ok: false, candidates: [], cost: res.cost, searchUrl, error: res.error ?? "Scrape failed." };
+    return { ok: false, candidates: [], self: null, cost: res.cost, searchUrl, error: res.error ?? "Scrape failed." };
   }
 
   let candidates = parseCandidates(res.content);
-  const ex = opts.excludeName?.trim().toLowerCase();
-  if (ex) {
-    candidates = candidates.filter((c) => !c.name.toLowerCase().includes(ex) && !ex.includes(c.name.toLowerCase()));
+  let self: CandidateHotel | null = null;
+  const sn = opts.selfName?.trim().toLowerCase();
+  if (sn) {
+    const isSelf = (c: CandidateHotel) => {
+      const n = c.name.toLowerCase();
+      return n.includes(sn) || sn.includes(n);
+    };
+    self = candidates.find(isSelf) ?? null;
+    candidates = candidates.filter((c) => !isSelf(c));
   }
-  return { ok: true, candidates, cost: res.cost, searchUrl };
+  return { ok: true, candidates, self, cost: res.cost, searchUrl };
 }
