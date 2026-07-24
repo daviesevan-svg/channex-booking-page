@@ -44,9 +44,35 @@ async function ensureSchema(): Promise<void> {
       )`,
     ),
     db().prepare(`CREATE INDEX IF NOT EXISTS rev_comp_price_pid_date ON rev_comp_price (pid, date)`),
+    // Append-only history: rev_comp_price keeps only the LATEST capture per
+    // (comp, date) — each refresh overwrites it — so trend signals ("comps are
+    // cutting their December rates as the date nears") need every snapshot.
+    // One row per capture, keyed by captured_at; pruned after HIST_KEEP_DAYS.
+    db().prepare(
+      `CREATE TABLE IF NOT EXISTS rev_comp_price_hist (
+        pid TEXT NOT NULL,
+        comp_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        price_minor INTEGER,
+        currency TEXT,
+        captured_at TEXT NOT NULL,
+        PRIMARY KEY (pid, comp_id, date, captured_at)
+      )`,
+    ),
+    db().prepare(`CREATE INDEX IF NOT EXISTS rev_comp_price_hist_pid_date ON rev_comp_price_hist (pid, date)`),
+    // Seed history with the snapshots we already hold (idempotent via the PK) —
+    // otherwise the latest table's rows are lost to history on first overwrite.
+    db().prepare(
+      `INSERT OR IGNORE INTO rev_comp_price_hist (pid, comp_id, date, price_minor, currency, captured_at)
+       SELECT pid, comp_id, date, price_minor, currency, captured_at FROM rev_comp_price`,
+    ),
   ]);
   schemaReady = true;
 }
+
+/** History retention: long enough to compare a date's lead-up against the same
+ *  season last year, bounded so the append-only table can't grow unchecked. */
+const HIST_KEEP_DAYS = 400;
 
 // ---------------------------------------------------------------------------
 // Capture settings (per property, in KV) — how far ahead and how often to scrape.
@@ -124,6 +150,21 @@ export async function getCompPrices(pid: string, from: string, to: string): Prom
     .prepare(
       `SELECT comp_id AS compId, date, price_minor AS priceMinor, currency, captured_at AS capturedAt
        FROM rev_comp_price WHERE pid = ? AND date >= ? AND date <= ? ORDER BY date`,
+    )
+    .bind(pid, from, to)
+    .all<CompPriceRow>();
+  return results ?? [];
+}
+
+/** Every capture snapshot for [from, to] (oldest first per date) — the raw
+ *  series for trend signals; rev_comp_price/getCompPrices stay the fast
+ *  "latest" view. */
+export async function getCompPriceHistory(pid: string, from: string, to: string): Promise<CompPriceRow[]> {
+  await ensureSchema();
+  const { results } = await db()
+    .prepare(
+      `SELECT comp_id AS compId, date, price_minor AS priceMinor, currency, captured_at AS capturedAt
+       FROM rev_comp_price_hist WHERE pid = ? AND date >= ? AND date <= ? ORDER BY date, captured_at`,
     )
     .bind(pid, from, to)
     .all<CompPriceRow>();
@@ -409,15 +450,23 @@ async function captureHotelDate(
   }
 
   const price = parseHotelCheapestPrice(scrape.content);
-  await db()
-    .prepare(
-      `INSERT INTO rev_comp_price (pid, comp_id, date, price_minor, currency, captured_at)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(pid, comp_id, date) DO UPDATE SET
-         price_minor = excluded.price_minor, currency = excluded.currency, captured_at = excluded.captured_at`,
-    )
-    .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, new Date().toISOString())
-    .run();
+  const capturedAt = new Date().toISOString();
+  await db().batch([
+    db()
+      .prepare(
+        `INSERT INTO rev_comp_price (pid, comp_id, date, price_minor, currency, captured_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(pid, comp_id, date) DO UPDATE SET
+           price_minor = excluded.price_minor, currency = excluded.currency, captured_at = excluded.captured_at`,
+      )
+      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, capturedAt),
+    db()
+      .prepare(
+        `INSERT OR IGNORE INTO rev_comp_price_hist (pid, comp_id, date, price_minor, currency, captured_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, capturedAt),
+  ]);
   return { charged: true };
 }
 
@@ -427,6 +476,14 @@ async function captureHotelDate(
  *  fills over subsequent cron ticks without re-charging fresh dates. */
 export async function scheduledCompCapture(): Promise<void> {
   if (!isScrapflyConfigured()) return;
+  await ensureSchema();
+  // Retention pass first (cheap, property-independent) so history is bounded
+  // even for properties that later disable capture.
+  await db()
+    .prepare(`DELETE FROM rev_comp_price_hist WHERE captured_at < ?`)
+    .bind(new Date(Date.now() - HIST_KEEP_DAYS * DAY).toISOString())
+    .run()
+    .catch((err) => console.error("[cron] comp price history prune failed", err));
   const props = await getProperties();
   for (const p of props) {
     try {
