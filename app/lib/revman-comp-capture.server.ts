@@ -154,10 +154,13 @@ function freshnessMs(daysAhead: number, s: CaptureSettings): number {
 }
 
 const MAX_RANGE_DAYS = 365;
-/** Hotel-dates processed per continuation invocation. Each is one ~10s scrape,
- *  so a small chunk stays well under the Worker background time cap; the chain
- *  hops across fresh invocations to cover a whole range. */
-const CHUNK_UNITS = 3;
+/** Parallel scrapes per wave. Scrapfly allows concurrent requests (5 on the
+ *  Discovery plan, 20 on Pro); 4 stays safely under Discovery while cutting
+ *  wall-time ~4× vs one-at-a-time. */
+const CONCURRENCY = 4;
+/** Waves run per continuation before chaining the next (bounds per-invocation
+ *  wall time: ~WAVES × one scrape ≈ 2 × ~13s here). */
+const WAVES_PER_CHUNK = 2;
 /** If a job's progress was touched more recently than this, a drive-by nudge
  *  assumes a runner is alive and skips (so polls don't duplicate the chain). */
 const CHUNK_ACTIVE_MS = 90_000;
@@ -174,6 +177,9 @@ interface CaptureJob {
   done: number; // hotel-dates finished (captured or skipped-fresh)
   spent: number; // tokens actually charged
   status: "running" | "done" | "paused" | "error";
+  /** Why a paused job stopped: out of tokens, or the scraping provider is out of
+   *  credits / rate-limited. */
+  reason?: "no_tokens" | "provider";
   actor: string;
   startedAt: string;
   progressAt: string;
@@ -201,6 +207,7 @@ async function putJob(pid: string, job: CaptureJob): Promise<void> {
 
 export interface CaptureJobView {
   status: CaptureJob["status"];
+  reason?: CaptureJob["reason"];
   done: number;
   total: number;
   spent: number;
@@ -212,7 +219,7 @@ export interface CaptureJobView {
 export async function getCaptureJob(pid: string): Promise<CaptureJobView | null> {
   const j = await getJob(pid);
   if (!j) return null;
-  return { status: j.status, done: j.done, total: j.total, spent: j.spent, from: j.from, to: j.to };
+  return { status: j.status, reason: j.reason, done: j.done, total: j.total, spent: j.spent, from: j.from, to: j.to };
 }
 
 /** Creates (or replaces) a capture job over [fromISO, toISO] and kicks the first
@@ -309,36 +316,50 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
     if (Number.isFinite(t)) fresh.set(`${r.compId}|${r.date}`, t);
   }
 
-  let units = 0;
   const now = Date.now();
-  while (units < CHUNK_UNITS && job.di < job.dates.length) {
-    const date = job.dates[job.di];
-    const hotel = job.hotels[job.hi];
-    const daysAhead = Math.round((Date.parse(`${date}T00:00:00Z`) - todayMs) / DAY);
-    const last = fresh.get(`${hotel.id}|${date}`);
-    const isFresh = last && now - last < freshnessMs(daysAhead, settings);
-
-    if (!isFresh) {
-      if ((await getBalance(pid)) < 1) {
-        job.status = "paused";
-        job.progressAt = new Date().toISOString();
-        await putJob(pid, job);
-        return; // no continuation — resumes when topped up + re-run
-      }
-      const res = await captureHotelDate(pid, hotel, date, job.currency, job.actor);
-      if (res.charged) job.spent++;
-      units++;
+  let paused = false;
+  let pauseReason: "no_tokens" | "provider" | undefined;
+  for (let wave = 0; wave < WAVES_PER_CHUNK && job.di < job.dates.length && !paused; wave++) {
+    const balance = await getBalance(pid);
+    if (balance < 1) {
+      paused = true;
+      pauseReason = "no_tokens";
+      break;
     }
-    job.done++;
-    // advance cursor
-    job.hi++;
-    if (job.hi >= job.hotels.length) {
-      job.hi = 0;
-      job.di++;
+    // Collect up to `cap` non-fresh units (skipping fresh, which advance the
+    // cursor for free), then scrape them all in parallel.
+    const cap = Math.min(CONCURRENCY, balance);
+    const batch: { date: string; hotel: (typeof job.hotels)[number] }[] = [];
+    while (batch.length < cap && job.di < job.dates.length) {
+      const date = job.dates[job.di];
+      const hotel = job.hotels[job.hi];
+      const daysAhead = Math.round((Date.parse(`${date}T00:00:00Z`) - todayMs) / DAY);
+      const last = fresh.get(`${hotel.id}|${date}`);
+      if (!(last && now - last < freshnessMs(daysAhead, settings))) batch.push({ date, hotel });
+      job.done++;
+      job.hi++;
+      if (job.hi >= job.hotels.length) {
+        job.hi = 0;
+        job.di++;
+      }
+    }
+    if (batch.length) {
+      const results = await Promise.all(
+        batch.map((u) => captureHotelDate(pid, u.hotel, u.date, job.currency, job.actor)),
+      );
+      job.spent += results.filter((r) => r.charged).length;
+      if (results.some((r) => r.providerExhausted)) {
+        paused = true;
+        pauseReason = "provider";
+      } else if (results.some((r) => r.pausedNoTokens)) {
+        paused = true;
+        pauseReason = "no_tokens";
+      }
     }
   }
 
-  job.status = job.di >= job.dates.length ? "done" : "running";
+  job.reason = paused ? pauseReason : undefined;
+  job.status = paused ? "paused" : job.di >= job.dates.length ? "done" : "running";
   job.progressAt = new Date().toISOString();
   await putJob(pid, job);
   if (job.status === "running") kickCaptureContinuation(pid);
@@ -365,7 +386,7 @@ async function captureHotelDate(
   date: string,
   currency: string,
   actor?: string,
-): Promise<{ charged: boolean; pausedNoTokens?: boolean }> {
+): Promise<{ charged: boolean; pausedNoTokens?: boolean; providerExhausted?: boolean }> {
   const deb = await debitTokens(pid, 1, { reason: "capture", note: `${date} · ${hotel.name}`, actor: actor ?? "system" });
   if (!deb.ok) return { charged: false, pausedNoTokens: true };
 
@@ -381,7 +402,10 @@ async function captureHotelDate(
   });
   if (!scrape.ok) {
     await creditTokens(pid, 1, { reason: "refund", note: `scrape failed ${date} · ${hotel.name}`, actor: "system" });
-    return { charged: false };
+    // Scrapfly account out of credits / rate-limited: stop the whole run rather
+    // than hammer the API with doomed requests (nothing is charged either way).
+    const providerExhausted = /quota|upgrade to continue|too many requests|429/i.test(scrape.error ?? "");
+    return { charged: false, providerExhausted };
   }
 
   const price = parseHotelCheapestPrice(scrape.content);
