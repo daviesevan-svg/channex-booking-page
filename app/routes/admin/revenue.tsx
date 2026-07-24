@@ -31,6 +31,9 @@ import {
   updateCompetitor,
   type CompSetView,
 } from "~/lib/revman-compset.server";
+import { discoverCompetitors, type CandidateHotel } from "~/lib/revman-compset-discovery.server";
+import { isScrapflyConfigured } from "~/lib/scrapfly.server";
+import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { importLooksStalled } from "~/lib/revman";
 import {
   connectRevman,
@@ -91,6 +94,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (state?.importStatus === "running" && state.cursor) nudgeRevmanImport(pid);
 
   const compSet = state ? await getCompSet(pid) : undefined;
+  // Default the discovery search to the property's own town/region, so the
+  // owner usually just clicks "Find competitors".
+  let compArea = "";
+  if (state) {
+    const settings = await getSettings(pid);
+    compArea = [settings.addressCity, settings.addressRegion, settings.addressCountry]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+  }
 
   return {
     configured: true as const,
@@ -104,6 +117,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     suggestions,
     stalled,
     compSet,
+    compArea,
+    scrapflyOn: isScrapflyConfigured(),
   };
 }
 
@@ -177,6 +192,36 @@ export async function action({ request }: Route.ActionArgs) {
     if (intent === "compRemove") {
       await removeCompetitor(pid, String(form.get("compId")));
       return { okKey: "revSaved" as const };
+    }
+    if (intent === "compDiscover") {
+      const area = String(form.get("area") || "").trim();
+      // Exclude the owner's own hotel from the suggestions (name match).
+      const selfName = (await getOverrides(pid)).hotelName || "";
+      const result = await discoverCompetitors(area, { excludeName: selfName });
+      if (!result.ok) return { error: result.error ?? "Search failed." };
+      return { discover: { candidates: result.candidates, cost: result.cost, area } };
+    }
+    if (intent === "compAddBulk") {
+      const picked = form.getAll("cand").map(String);
+      let added = 0;
+      for (const raw of picked) {
+        try {
+          const c = JSON.parse(raw) as CandidateHotel;
+          if (c?.name) {
+            await addCompetitor(pid, {
+              name: c.name,
+              starClass: c.starClass,
+              reviewScore: c.reviewScore,
+              reviewCount: c.reviewCount,
+              bookingRef: c.bookingRef,
+            });
+            added++;
+          }
+        } catch {
+          /* skip malformed row */
+        }
+      }
+      return { okKey: "revCompAdded" as const, addedCount: added };
     }
     if (intent === "disconnect") {
       await disconnectRevman(pid);
@@ -507,7 +552,21 @@ function OccupancyChart({
 
 /** Manual competitor set with quality ranking. Each row (including our own
  *  hotel) is an inline edit form; a new-competitor form sits at the bottom. */
-function CompSet({ view, busy, t }: { view: CompSetView; busy: boolean; t: AdminT }) {
+function CompSet({
+  view,
+  busy,
+  t,
+  scrapflyOn,
+  area,
+  discover,
+}: {
+  view: CompSetView;
+  busy: boolean;
+  t: AdminT;
+  scrapflyOn: boolean;
+  area: string;
+  discover?: { candidates: CandidateHotel[]; cost: number | null; area: string };
+}) {
   const numCls = "w-full rounded-[7px] border border-line-alt bg-surface px-2 py-1 text-[13px]";
   const stars = [1, 2, 3, 4, 5];
   return (
@@ -526,6 +585,87 @@ function CompSet({ view, busy, t }: { view: CompSetView; busy: boolean; t: Admin
           ? t("revCompStanding", { pos: String(view.standing.position), of: String(view.standing.rated) })
           : t("revCompStandingUnrated")}
       </div>
+
+      {/* Discovery: find nearby hotels on Booking.com, review, then add. */}
+      {scrapflyOn ? (
+        <div className="mb-5 rounded-[12px] border border-dashed border-line-alt bg-chip/40 p-4">
+          <div className="text-[13px] font-semibold text-secondary">{t("revCompFindTitle")}</div>
+          <p className="mb-2 mt-0.5 text-[12.5px] text-muted">{t("revCompFindSub")}</p>
+          <Form method="post" className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="intent" value="compDiscover" />
+            <label className="text-[12px] text-muted">
+              {t("revCompArea")}
+              <input
+                name="area"
+                defaultValue={discover?.area ?? area}
+                placeholder={t("revCompAreaPlaceholder")}
+                className={`${numCls} mt-0.5 w-72`}
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-[9px] bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-60"
+            >
+              {t("revCompFind")}
+            </button>
+          </Form>
+
+          {discover && (
+            <div className="mt-4">
+              {discover.candidates.length === 0 ? (
+                <p className="text-[13px] text-muted">{t("revCompFindNone")}</p>
+              ) : (
+                <Form method="post">
+                  <input type="hidden" name="intent" value="compAddBulk" />
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[12.5px] text-muted">
+                      {t("revCompFound", { n: String(discover.candidates.length) })}
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="rounded-[9px] bg-accent px-4 py-1.5 text-[13px] font-semibold text-white disabled:opacity-60"
+                    >
+                      {t("revCompAddSelected")}
+                    </button>
+                  </div>
+                  <div className="max-h-[320px] space-y-1 overflow-y-auto rounded-[8px] border border-line-alt bg-surface p-1.5">
+                    {discover.candidates.map((c, i) => (
+                      <label
+                        key={`${c.bookingRef}-${i}`}
+                        className="grid grid-cols-[1.5rem_1fr_3rem_3.5rem_5rem_4rem] items-center gap-2 rounded-[7px] px-2 py-1 text-[13px] hover:bg-chip"
+                      >
+                        <input
+                          type="checkbox"
+                          name="cand"
+                          value={JSON.stringify(c)}
+                          defaultChecked={Boolean(c.starClass)}
+                          className="justify-self-center"
+                        />
+                        <span className="min-w-0 truncate" title={c.name}>
+                          {c.name}
+                        </span>
+                        <span className="text-muted">{c.starClass ? `${c.starClass}★` : "—"}</span>
+                        <span className="font-semibold tabular-nums">{c.reviewScore ?? "—"}</span>
+                        <span className="text-muted tabular-nums">
+                          {c.reviewCount ? c.reviewCount.toLocaleString() : "—"}
+                        </span>
+                        <span className="text-right text-muted tabular-nums">{c.priceText ?? ""}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11.5px] text-muted">{t("revCompFindHint")}</p>
+                </Form>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mb-5 rounded-[12px] border border-dashed border-line-alt bg-chip/40 p-4 text-[12.5px] text-muted">
+          {t("revCompScrapeOff")}
+        </div>
+      )}
 
       {/* Header row */}
       <div className="grid grid-cols-[2rem_1fr_5rem_5rem_6rem_3.5rem_5.5rem] items-center gap-2 px-1 pb-1 text-[11px] uppercase tracking-[0.05em] text-muted">
@@ -718,7 +858,9 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                 dates: String(actionData.applied.dates),
                 cells: String(actionData.applied.cells),
               })
-            : t(actionData.okKey)}
+            : actionData.okKey === "revCompAdded" && "addedCount" in actionData
+              ? t("revCompAdded", { n: String(actionData.addedCount) })
+              : t(actionData.okKey)}
         </p>
       )}
 
@@ -1004,7 +1146,16 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
             </section>
           )}
 
-          {compSet && <CompSet view={compSet} busy={busy} t={t} />}
+          {compSet && (
+            <CompSet
+              view={compSet}
+              busy={busy}
+              t={t}
+              scrapflyOn={loaderData.scrapflyOn}
+              area={loaderData.compArea}
+              discover={actionData && "discover" in actionData ? actionData.discover : undefined}
+            />
+          )}
 
           <section className="mt-4 rounded-[14px] border border-line bg-surface p-6">
             <h2 className="font-serif text-[19px] font-semibold">{t("revConnectionTitle")}</h2>
