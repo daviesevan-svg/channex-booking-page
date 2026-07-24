@@ -1,8 +1,10 @@
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/rate-intel.settings";
+import { FeatureUnavailable } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
+import { getSettings } from "~/lib/overrides.server";
 import { getRevmanState } from "~/lib/revman.server";
 import { getCaptureSettings, setCaptureSettings } from "~/lib/revman-comp-capture.server";
 import { getCompSet } from "~/lib/revman-compset.server";
@@ -13,11 +15,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const pid = await currentPropertyId(request);
   if (!pid) return { configured: false as const };
+  // Part of revenue management — not available to single-unit rentals.
+  if ((await getSettings(pid)).singleUnit === true)
+    return { configured: true as const, singleUnit: true as const, connected: false as const };
   const state = await getRevmanState(pid);
-  if (!state) return { configured: true as const, connected: false as const };
+  if (!state) return { configured: true as const, singleUnit: false as const, connected: false as const };
   const [settings, balance, set] = await Promise.all([getCaptureSettings(pid), getBalance(pid), getCompSet(pid)]);
   const hotelCount = set.ranked.filter((h) => Boolean(h.bookingRef)).length;
-  return { configured: true as const, connected: true as const, settings, balance, hotelCount };
+  return { configured: true as const, singleUnit: false as const, connected: true as const, settings, balance, hotelCount };
 }
 
 export function meta() {
@@ -45,6 +50,8 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
   const nav = useNavigation();
   const busy = nav.state !== "idle";
 
+  if (loaderData.configured && loaderData.singleUnit)
+    return <FeatureUnavailable title={t("revSingleUnitTitle")} body={t("revSingleUnitBody")} />;
   if (!loaderData.configured || !loaderData.connected) {
     return (
       <div>

@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Form, Link, useNavigation, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/revenue";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FeatureUnavailable, FIELD_INPUT } from "~/components/admin-form";
 import { useAdminDateLocale, useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { fmtDate, todayISODate } from "~/lib/dates";
@@ -53,6 +53,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
   const pid = await currentPropertyId(request);
   if (!pid) return { configured: false as const };
+  // Single-unit rentals don't get revenue management (multi-room maths + a
+  // Booking.com hotel comp set don't apply); the nav hides it, this guards
+  // direct navigation.
+  if ((await getSettings(pid)).singleUnit === true) return { configured: true as const, singleUnit: true as const };
   const isSuper = await isSuperadmin(email);
   const state = await getRevmanState(pid);
   const summary = state ? await getRevmanSummary(pid) : undefined;
@@ -115,6 +119,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     configured: true as const,
+    singleUnit: false as const,
     state,
     summary,
     kpis,
@@ -937,6 +942,8 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
       </div>
     );
   }
+
+  if (loaderData.singleUnit) return <FeatureUnavailable title={t("revSingleUnitTitle")} body={t("revSingleUnitBody")} />;
 
   const { state, summary, kpis, paceDays, paceMonth, forecast, suggestions, compSet } = loaderData;
   const forecastByDate = new Map((forecast ?? []).map((f) => [f.date, f]));

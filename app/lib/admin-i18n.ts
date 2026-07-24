@@ -99,6 +99,9 @@ const EN: Record<string, string> = {
   // Revenue management (rev*)
   revTitle: "Revenue management",
   revSubtitle: "Your booking history from every channel, turned into demand insight and pricing guidance.",
+  revSingleUnitTitle: "Not available for single-unit properties",
+  revSingleUnitBody:
+    "Revenue management turns a multi-room inventory into occupancy, ADR and pace insight, and compares you against a set of Booking.com hotels — none of which fits a single rental. Insights tailored to short-term rentals are on the way.",
   revConnectTitle: "Connect your Channex account",
   revConnectBody:
     "Paste your personal Channex API key and we'll import this property's full booking history — direct and OTA bookings alike. That data powers the revenue dashboard: KPIs, the sales pace calendar, the occupancy forecast and price suggestions.",
@@ -1754,6 +1757,9 @@ const DE: Record<string, string> = {
   // Revenue management (rev*)
   revTitle: "Revenue Management",
   revSubtitle: "Ihre Buchungshistorie aus allen Kanälen — aufbereitet als Nachfrageanalyse und Preisempfehlung.",
+  revSingleUnitTitle: "Für Einzelobjekte nicht verfügbar",
+  revSingleUnitBody:
+    "Revenue-Management macht aus einem Mehrzimmer-Bestand Auslastungs-, ADR- und Tempo-Analysen und vergleicht Sie mit einer Auswahl von Booking.com-Hotels — beides passt nicht zu einem einzelnen Objekt. Auf Kurzzeitvermietungen zugeschnittene Auswertungen sind in Vorbereitung.",
   revConnectTitle: "Channex-Konto verbinden",
   revConnectBody:
     "Fügen Sie Ihren persönlichen Channex-API-Schlüssel ein und wir importieren die komplette Buchungshistorie dieser Unterkunft — Direkt- und OTA-Buchungen gleichermaßen. Diese Daten speisen das Revenue-Dashboard: Kennzahlen, den Verkaufskalender, die Auslastungsprognose und Preisempfehlungen.",
