@@ -1,4 +1,5 @@
-import { Link, useNavigation, useSearchParams } from "react-router";
+import { useEffect } from "react";
+import { Link, useNavigation, useRevalidator, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/rate-intel";
 import { requireAdmin } from "~/lib/auth.server";
@@ -7,10 +8,12 @@ import { getSettings } from "~/lib/overrides.server";
 import { getRevmanState } from "~/lib/revman.server";
 import { getCompSet } from "~/lib/revman-compset.server";
 import {
+  enqueueCaptureJob,
+  getCaptureJob,
   getCaptureSettings,
   getCompPrices,
   lastCapturedAt,
-  startCaptureNow,
+  nudgeCaptureJob,
 } from "~/lib/revman-comp-capture.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
@@ -29,13 +32,17 @@ export async function loader({ request }: Route.LoaderArgs) {
   const state = await getRevmanState(pid);
   if (!state) return { configured: true as const, connected: false as const };
 
-  const [set, settings, balance, propSettings, lastCap] = await Promise.all([
+  const [set, settings, balance, propSettings, lastCap, job] = await Promise.all([
     getCompSet(pid),
     getCaptureSettings(pid),
     getBalance(pid),
     getSettings(pid),
     lastCapturedAt(pid),
+    getCaptureJob(pid),
   ]);
+  // Drive-by: while a capture job is running, each page load nudges the next
+  // chunk (backup to the signed self-fetch chain).
+  if (job?.status === "running") nudgeCaptureJob(pid);
 
   const today = todayISODate();
   const horizon = settings.horizonDays;
@@ -63,6 +70,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     datesWithData,
     lastCap,
     settingsEnabled: settings.enabled,
+    job,
   };
 }
 
@@ -82,12 +90,17 @@ export async function action({ request }: Route.ActionArgs) {
     const from = String(form.get("from") || "").trim();
     const to = String(form.get("to") || "").trim();
     const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
-    const range = isIso(from) && isIso(to) ? { from, to } : undefined;
-    if ((from || to) && !range) return { errorKey: "riBadRange" as const };
-    if (range && range.to < range.from) return { errorKey: "riBadRange" as const };
-    // Best-effort background run: each date persists as it's captured, so a
-    // time-capped run just resumes on the next click/cron (freshness-skip).
-    startCaptureNow(pid, email, range);
+    if ((from || to) && !(isIso(from) && isIso(to))) return { errorKey: "riBadRange" as const };
+    if (isIso(from) && isIso(to) && to < from) return { errorKey: "riBadRange" as const };
+    // Default to the settings horizon when no explicit range is given.
+    const settings = await getCaptureSettings(pid);
+    const today = todayISODate();
+    const rangeFrom = isIso(from) ? from : today;
+    const rangeTo = isIso(to) ? to : isoAt(today, settings.horizonDays - 1);
+    // Resumable job: chunks hop across invocations (self-fetch chain + this
+    // page's poll), so a week/month completes past the Worker time cap.
+    const res = await enqueueCaptureJob(pid, rangeFrom, rangeTo, email);
+    if (!res.ok) return { error: res.error ?? "Could not start capture." };
     return { okKey: "riCaptureStarted" as const };
   }
   return null;
@@ -135,7 +148,19 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { hotels, dates, cells, currency, balance, horizon, datesWithData, lastCap, scrapflyOn } = loaderData;
+  const { hotels, dates, cells, currency, balance, horizon, datesWithData, lastCap, scrapflyOn, job } = loaderData;
+
+  // Poll while a capture job is running: revalidate every 4s so the table +
+  // progress fill in live, and each load nudges the next chunk (loader).
+  const revalidator = useRevalidator();
+  const jobRunning = job?.status === "running";
+  useEffect(() => {
+    if (!jobRunning) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [jobRunning, revalidator]);
   const money = (minor: number | null | undefined, cur: string | null) =>
     minor == null ? "—" : formatMoney(minor / 100, cur || currency);
 
@@ -176,10 +201,10 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
             </label>
             <button
               type="submit"
-              disabled={busy || !scrapflyOn || balance < 1}
+              disabled={busy || jobRunning || !scrapflyOn || balance < 1}
               className="rounded-[10px] bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-50"
             >
-              {busy && nav.formData?.get("intent") === "captureNow" ? t("riCapturing") : t("riUpdateNow")}
+              {jobRunning || (busy && nav.formData?.get("intent") === "captureNow") ? t("riCapturing") : t("riUpdateNow")}
             </button>
           </form>
         </div>
@@ -193,6 +218,23 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
       )}
       {actionData && "okKey" in actionData && actionData.okKey && (
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">{t(actionData.okKey)}</p>
+      )}
+
+      {jobRunning && job && (
+        <div className="mb-4 rounded-[12px] border border-accent/30 bg-accent/5 px-4 py-3">
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="font-semibold text-secondary">{t("riJobRunning", { done: String(job.done), total: String(job.total) })}</span>
+            <span className="text-muted">{t("riJobSpent", { n: String(job.spent) })}</span>
+          </div>
+          <div className="mt-2 h-[6px] overflow-hidden rounded-full bg-chip">
+            <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${Math.min(100, Math.round((job.done / Math.max(1, job.total)) * 100))}%` }} />
+          </div>
+        </div>
+      )}
+      {job?.status === "paused" && (
+        <div className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-800">
+          {t("riJobPaused", { done: String(job.done), total: String(job.total) })}
+        </div>
       )}
 
       {/* Status strip */}

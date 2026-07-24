@@ -13,7 +13,7 @@
 // and repeated "update now" clicks don't double-spend.
 import { waitUntil } from "cloudflare:workers";
 
-import { getConfigKV, getDB } from "./config.server";
+import { getConfig, getConfigKV, getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 import { getRevmanState } from "./revman.server";
@@ -153,104 +153,206 @@ function freshnessMs(daysAhead: number, s: CaptureSettings): number {
   return (daysAhead <= s.nearDays ? 1 : s.farCadenceDays) * DAY - 2 * 3_600_000; // minus 2h slack
 }
 
-export interface CaptureRun {
-  captured: number;
-  spent: number;
-  skippedFresh: number;
-  /** True when we stopped because the wallet hit zero. */
-  pausedNoTokens: boolean;
+const MAX_RANGE_DAYS = 365;
+/** Hotel-dates processed per continuation invocation. Each is one ~10s scrape,
+ *  so a small chunk stays well under the Worker background time cap; the chain
+ *  hops across fresh invocations to cover a whole range. */
+const CHUNK_UNITS = 3;
+/** If a job's progress was touched more recently than this, a drive-by nudge
+ *  assumes a runner is alive and skips (so polls don't duplicate the chain). */
+const CHUNK_ACTIVE_MS = 90_000;
+
+interface CaptureJob {
+  from: string;
+  to: string;
+  currency: string;
+  hotels: { id: string; name: string; bookingRef: string }[];
+  dates: string[];
+  di: number; // current date index
+  hi: number; // current hotel index within the date
+  total: number; // total hotel-dates
+  done: number; // hotel-dates finished (captured or skipped-fresh)
+  spent: number; // tokens actually charged
+  status: "running" | "done" | "paused" | "error";
+  actor: string;
+  startedAt: string;
+  progressAt: string;
   error?: string;
 }
 
-const MAX_RANGE_DAYS = 365;
+const jobKey = (pid: string) => `revcap-job:${pid}`;
 
-/** Captures an explicit date range [fromISO, toISO] (inclusive), nearest-first.
- *  Dates in the past are skipped; the span is clamped to a year. Each date costs
- *  one token per hotel priced; stops when the wallet is empty. Freshly-captured
- *  dates are skipped (freshness window) unless `force`. */
-export async function captureRange(
+async function getJob(pid: string): Promise<CaptureJob | null> {
+  const kv = getConfigKV();
+  if (!kv) return null;
+  const raw = await kv.get(jobKey(pid));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as CaptureJob;
+  } catch {
+    return null;
+  }
+}
+
+async function putJob(pid: string, job: CaptureJob): Promise<void> {
+  const kv = getConfigKV();
+  if (kv) await kv.put(jobKey(pid), JSON.stringify(job));
+}
+
+export interface CaptureJobView {
+  status: CaptureJob["status"];
+  done: number;
+  total: number;
+  spent: number;
+  from: string;
+  to: string;
+}
+
+/** The current capture job's progress (for the page's progress bar + polling). */
+export async function getCaptureJob(pid: string): Promise<CaptureJobView | null> {
+  const j = await getJob(pid);
+  if (!j) return null;
+  return { status: j.status, done: j.done, total: j.total, spent: j.spent, from: j.from, to: j.to };
+}
+
+/** Creates (or replaces) a capture job over [fromISO, toISO] and kicks the first
+ *  chunk. Refuses to clobber a job that's actively running (a live runner). */
+export async function enqueueCaptureJob(
   pid: string,
   fromISO: string,
   toISO: string,
-  opts: { max?: number; force?: boolean; actor?: string; nowMs?: number } = {},
-): Promise<CaptureRun> {
+  actor: string,
+): Promise<{ ok: boolean; error?: string }> {
   await ensureSchema();
-  const run: CaptureRun = { captured: 0, spent: 0, skippedFresh: 0, pausedNoTokens: false };
-  if (!isScrapflyConfigured()) return { ...run, error: "Scrapfly not configured." };
+  if (!isScrapflyConfigured()) return { ok: false, error: "Scrapfly not configured." };
 
-  const [settings, set, propSettings] = await Promise.all([
-    getCaptureSettings(pid),
-    getCompSet(pid),
-    getSettings(pid),
-  ]);
+  const existing = await getJob(pid);
+  if (existing && existing.status === "running" && Date.now() - Date.parse(existing.progressAt) < CHUNK_ACTIVE_MS) {
+    return { ok: false, error: "A capture is already running." };
+  }
+
+  const [set, propSettings] = await Promise.all([getCompSet(pid), getSettings(pid)]);
   const currency = propSettings.currency || "GBP";
-  // We price each hotel from its own Booking page (deterministic — a dated area
-  // search only lists AVAILABLE hotels and caps at ~25, so a specific hotel can
-  // be missing). Only hotels with a Booking reference can be located this way.
+  // Price each hotel from its own Booking page (deterministic — a dated area
+  // search only lists AVAILABLE hotels and caps at ~25). Needs a Booking ref.
   const hotels = set.ranked
     .filter((h) => Boolean(h.bookingRef))
     .map((h) => ({ id: h.id, name: h.name, bookingRef: h.bookingRef as string }));
-  if (hotels.length === 0) {
-    return { ...run, error: "No hotels in the set have a Booking.com reference to price yet." };
-  }
+  if (hotels.length === 0) return { ok: false, error: "No hotels in the set have a Booking.com reference yet." };
 
-  const now = opts.nowMs ?? Date.now();
-  const todayMs = Date.parse(`${iso(now)}T00:00:00Z`);
+  const todayMs = Date.parse(`${iso(Date.now())}T00:00:00Z`);
   const startMs = Math.max(todayMs, Date.parse(`${fromISO}T00:00:00Z`)); // never the past
   let endMs = Date.parse(`${toISO}T00:00:00Z`);
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) {
-    return { ...run, error: "Invalid date range." };
-  }
-  endMs = Math.min(endMs, startMs + (MAX_RANGE_DAYS - 1) * DAY); // clamp span to a year
-  const totalDays = Math.round((endMs - startMs) / DAY) + 1;
-  const max = opts.max ?? totalDays;
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs < startMs) return { ok: false, error: "Invalid date range." };
+  endMs = Math.min(endMs, startMs + (MAX_RANGE_DAYS - 1) * DAY);
+  const dates: string[] = [];
+  for (let ms = startMs; ms <= endMs; ms += DAY) dates.push(iso(ms));
 
-  // Freshness map across the range.
-  const existing = await getCompPrices(pid, iso(startMs), iso(endMs));
-  const freshestByDate = new Map<string, number>();
-  for (const r of existing) {
-    const t = Date.parse(r.capturedAt);
-    if (Number.isFinite(t)) freshestByDate.set(r.date, Math.max(freshestByDate.get(r.date) ?? 0, t));
-  }
-
-  for (let i = 0; i < totalDays && run.captured < max; i++) {
-    const dateMs = startMs + i * DAY;
-    const date = iso(dateMs);
-    const daysAhead = Math.round((dateMs - todayMs) / DAY);
-    if (!opts.force) {
-      const last = freshestByDate.get(date);
-      if (last && now - last < freshnessMs(daysAhead, settings)) {
-        run.skippedFresh++;
-        continue;
-      }
-    }
-    if ((await getBalance(pid)) < hotels.length) {
-      run.pausedNoTokens = true;
-      break;
-    }
-    for (const hotel of hotels) {
-      const res = await captureHotelDate(pid, hotel, date, currency, opts.actor);
-      if (res.charged) run.spent++;
-      if (res.pausedNoTokens) {
-        run.pausedNoTokens = true;
-        break;
-      }
-    }
-    if (run.pausedNoTokens) break;
-    run.captured++;
-  }
-  return run;
+  const now = new Date().toISOString();
+  const job: CaptureJob = {
+    from: iso(startMs),
+    to: iso(endMs),
+    currency,
+    hotels,
+    dates,
+    di: 0,
+    hi: 0,
+    total: dates.length * hotels.length,
+    done: 0,
+    spent: 0,
+    status: "running",
+    actor,
+    startedAt: now,
+    progressAt: now,
+  };
+  await putJob(pid, job);
+  kickCaptureContinuation(pid);
+  return { ok: true };
 }
 
-/** Captures the settings horizon starting today (missing/stale dates first) —
- *  the shape the cron and default "update now" use. Delegates to captureRange. */
-export async function captureDueDates(
-  pid: string,
-  opts: { max?: number; force?: boolean; actor?: string; nowMs?: number } = {},
-): Promise<CaptureRun> {
+/** Fire-and-forget self-fetch so the next chunk runs in a fresh invocation with
+ *  fresh limits (signed with the session secret; the page poll is the backup). */
+function kickCaptureContinuation(pid: string): void {
+  const work = (async () => {
+    const { hmacSha256Hex } = await import("./hmac.server");
+    const sig = await hmacSha256Hex(getConfig().sessionSecret, `revcap-continue:${pid}`);
+    const base = getConfig().appUrl.replace(/\/+$/, "");
+    await fetch(`${base}/api/revman-capture-continue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pid, sig }),
+    });
+  })().catch((err) => console.log(`[revcap] continuation kick failed for ${pid}: ${err}`));
+  try {
+    waitUntil(work);
+  } catch {
+    void work;
+  }
+}
+
+/** Processes one CHUNK_UNITS-sized slice of the current job and chains the next.
+ *  `onlyIfStale` is the page-poll drive-by: skips when a runner looks alive. */
+export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: boolean } = {}): Promise<void> {
+  const job = await getJob(pid);
+  if (!job || job.status !== "running") return;
+  if (opts.onlyIfStale && Date.now() - Date.parse(job.progressAt) < CHUNK_ACTIVE_MS) return;
+
+  await ensureSchema();
   const settings = await getCaptureSettings(pid);
-  const now = opts.nowMs ?? Date.now();
-  return captureRange(pid, iso(now), iso(now + (settings.horizonDays - 1) * DAY), opts);
+  const todayMs = Date.parse(`${iso(Date.now())}T00:00:00Z`);
+
+  // Freshness map so a resumed/re-run job doesn't re-charge fresh (comp,date)s.
+  const existing = await getCompPrices(pid, job.from, job.to);
+  const fresh = new Map<string, number>();
+  for (const r of existing) {
+    const t = Date.parse(r.capturedAt);
+    if (Number.isFinite(t)) fresh.set(`${r.compId}|${r.date}`, t);
+  }
+
+  let units = 0;
+  const now = Date.now();
+  while (units < CHUNK_UNITS && job.di < job.dates.length) {
+    const date = job.dates[job.di];
+    const hotel = job.hotels[job.hi];
+    const daysAhead = Math.round((Date.parse(`${date}T00:00:00Z`) - todayMs) / DAY);
+    const last = fresh.get(`${hotel.id}|${date}`);
+    const isFresh = last && now - last < freshnessMs(daysAhead, settings);
+
+    if (!isFresh) {
+      if ((await getBalance(pid)) < 1) {
+        job.status = "paused";
+        job.progressAt = new Date().toISOString();
+        await putJob(pid, job);
+        return; // no continuation — resumes when topped up + re-run
+      }
+      const res = await captureHotelDate(pid, hotel, date, job.currency, job.actor);
+      if (res.charged) job.spent++;
+      units++;
+    }
+    job.done++;
+    // advance cursor
+    job.hi++;
+    if (job.hi >= job.hotels.length) {
+      job.hi = 0;
+      job.di++;
+    }
+  }
+
+  job.status = job.di >= job.dates.length ? "done" : "running";
+  job.progressAt = new Date().toISOString();
+  await putJob(pid, job);
+  if (job.status === "running") kickCaptureContinuation(pid);
+}
+
+/** Drive-by nudge from the page poll — keeps the chain moving even if the signed
+ *  self-fetch can't reach the Worker; skips when a runner is already alive. */
+export function nudgeCaptureJob(pid: string): void {
+  const work = continueCaptureJob(pid, { onlyIfStale: true }).catch(() => {});
+  try {
+    waitUntil(work);
+  } catch {
+    void work;
+  }
 }
 
 /** Prices one hotel for one date from its Booking hotel page. Reserves a token
@@ -295,26 +397,11 @@ async function captureHotelDate(
   return { charged: true };
 }
 
-/** Kicks off a capture run in the background (kept alive past the response via
- *  waitUntil) so the admin "Update prices now" click returns immediately. Each
- *  date persists as it's captured, so a time-capped run just resumes on the next
- *  click or cron tick (freshness-skip). */
-export function startCaptureNow(pid: string, actor: string, range?: { from: string; to: string }): void {
-  const work = (
-    range ? captureRange(pid, range.from, range.to, { actor, force: true }) : captureDueDates(pid, { actor })
-  ).then(() => {});
-  try {
-    waitUntil(work);
-  } catch {
-    void work;
-  }
-}
-
-/** Cron entry: capture due dates for every connected property that has enabled
- *  automatic capture. Bounded per property per run so one slow property can't
- *  starve the others; the daily freshness window means unfinished windows fill
- *  over subsequent cron ticks. */
-export async function scheduledCompCapture(perPropertyMax = 12): Promise<void> {
+/** Cron entry: for every connected property with automatic capture enabled and
+ *  tokens to spend, ensure a job covering the settings horizon exists and nudge
+ *  it along. The resumable chain + freshness-skip mean an unfinished horizon
+ *  fills over subsequent cron ticks without re-charging fresh dates. */
+export async function scheduledCompCapture(): Promise<void> {
   if (!isScrapflyConfigured()) return;
   const props = await getProperties();
   for (const p of props) {
@@ -324,7 +411,14 @@ export async function scheduledCompCapture(perPropertyMax = 12): Promise<void> {
       const settings = await getCaptureSettings(p.id);
       if (!settings.enabled) continue;
       if ((await getBalance(p.id)) < 1) continue; // paused; email handled elsewhere
-      await captureDueDates(p.id, { max: perPropertyMax, actor: "cron" });
+      const job = await getJob(p.id);
+      const active = job && job.status === "running" && Date.now() - Date.parse(job.progressAt) < CHUNK_ACTIVE_MS;
+      if (active) {
+        await continueCaptureJob(p.id); // keep an in-flight job moving
+      } else {
+        const now = Date.now();
+        await enqueueCaptureJob(p.id, iso(now), iso(now + (settings.horizonDays - 1) * DAY), "cron");
+      }
     } catch (err) {
       console.error(`[cron] comp capture failed for ${p.id}`, err);
     }
