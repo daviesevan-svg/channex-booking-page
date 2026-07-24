@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, useNavigation, useRevalidator, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/rate-intel";
+import { FeatureUnavailable } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
@@ -29,8 +30,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const pid = await currentPropertyId(request);
   if (!pid) return { configured: false as const };
+  // Rate intelligence is part of revenue management, which single-unit rentals
+  // don't get (see /admin/revenue guard). Hidden in nav; this guards the URL.
+  if ((await getSettings(pid)).singleUnit === true) return { configured: true as const, singleUnit: true as const };
   const state = await getRevmanState(pid);
-  if (!state) return { configured: true as const, connected: false as const };
+  if (!state) return { configured: true as const, singleUnit: false as const, connected: false as const };
 
   const [set, settings, balance, propSettings, lastCap, job] = await Promise.all([
     getCompSet(pid),
@@ -59,6 +63,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     configured: true as const,
+    singleUnit: false as const,
     connected: true as const,
     scrapflyOn: isScrapflyConfigured(),
     hotels: set.ranked.map((h) => ({ id: h.id, name: h.name, isSelf: h.isSelf, rank: h.rank })),
@@ -136,6 +141,7 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
       </div>
     );
   }
+  if (loaderData.singleUnit) return <FeatureUnavailable title={t("revSingleUnitTitle")} body={t("revSingleUnitBody")} />;
   if (!loaderData.connected) {
     return (
       <div>

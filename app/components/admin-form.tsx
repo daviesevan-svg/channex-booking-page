@@ -7,6 +7,18 @@ import { useAdminT } from "~/lib/admin-i18n";
 export const FIELD_INPUT =
   "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
 
+/** Full-page notice for a feature that doesn't apply to the current property
+ *  (e.g. revenue management on a single-unit rental). Caller passes already
+ *  translated strings so this stays i18n-agnostic. */
+export function FeatureUnavailable({ title, body }: { title: string; body: string }) {
+  return (
+    <div className="max-w-[560px]">
+      <h1 className="mb-2 font-serif text-[26px] font-semibold">{title}</h1>
+      <p className="rounded-[12px] border border-line bg-surface px-5 py-4 text-[14px] leading-relaxed text-muted">{body}</p>
+    </div>
+  );
+}
+
 /** A labelled text field (input or textarea). When `channexHint` is set and a
  *  placeholder is provided, it renders the "From Channex — leave blank" hint;
  *  otherwise `hint` (if given) renders as a faint help line under the field. */
