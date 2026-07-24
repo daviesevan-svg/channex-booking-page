@@ -3,16 +3,19 @@
 // set; a short-term rental needs a different comp basis, so this page builds a
 // comparable-listings set from Airbnb, matched on unit type + review quality.
 // (Rental-tailored demand analytics land here in a later phase.)
-import { useState } from "react";
-import { Form, Link, useNavigation } from "react-router";
+import { useEffect, useState } from "react";
+import { Form, Link, useNavigation, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/vr-insights";
 import { FeatureUnavailable } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
+import { fmtDate, todayISODate } from "~/lib/dates";
+import { formatMoney } from "~/lib/money";
+import { getBalance } from "~/lib/revman-tokens.server";
 import {
   addVrComp,
   getVrCompSet,
@@ -21,6 +24,27 @@ import {
   updateVrComp,
 } from "~/lib/vr-compset.server";
 import { discoverVrComps, type CandidateVrUnit } from "~/lib/vr-compset-discovery.server";
+import {
+  enqueueVrCaptureJob,
+  getMarketPickup,
+  getVrAvail,
+  getVrCaptureJob,
+  getVrCaptureSettings,
+  lastVrCapturedAt,
+  nudgeVrCaptureJob,
+  setVrCaptureSettings,
+} from "~/lib/vr-comp-capture.server";
+
+const DAY = 86_400_000;
+const isoAt = (base: string, add: number) => new Date(Date.parse(`${base}T00:00:00Z`) + add * DAY).toISOString().slice(0, 10);
+
+/** Median of a numeric list (minor units), or null when empty. */
+function median(xs: number[]): number | null {
+  if (xs.length === 0) return null;
+  const s = [...xs].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -30,11 +54,41 @@ export async function loader({ request }: Route.LoaderArgs) {
   // This page is the inverse of the RMS gate: single-unit ONLY.
   if (settings.singleUnit !== true) return { configured: true as const, singleUnit: false as const };
 
-  const [set, overrides] = await Promise.all([getVrCompSet(pid), getOverrides(pid)]);
+  const [set, overrides, capSettings, balance, job, lastCap] = await Promise.all([
+    getVrCompSet(pid),
+    getOverrides(pid),
+    getVrCaptureSettings(pid),
+    getBalance(pid),
+    getVrCaptureJob(pid),
+    lastVrCapturedAt(pid),
+  ]);
   const area = [settings.addressCity, settings.addressRegion, settings.addressCountry]
     .map((s) => (s ?? "").trim())
     .filter(Boolean)
     .join(", ");
+
+  // Drive-by nudge for a running capture (backup to the self-fetch chain).
+  if (job?.status === "running") nudgeVrCaptureJob(pid);
+
+  const today = todayISODate();
+  const to = isoAt(today, capSettings.horizonDays - 1);
+  const [pickup, availRows] = await Promise.all([getMarketPickup(pid, today, to), getVrAvail(pid, today, to)]);
+  // Median available comp price per date (from the latest snapshot).
+  const priceByDate = new Map<string, number>();
+  const pricesForDate = new Map<string, number[]>();
+  for (const r of availRows) {
+    if (r.available === 1 && r.priceMinor != null) {
+      const arr = pricesForDate.get(r.date) ?? [];
+      arr.push(r.priceMinor);
+      pricesForDate.set(r.date, arr);
+    }
+  }
+  for (const [d, xs] of pricesForDate) {
+    const m = median(xs);
+    if (m != null) priceByDate.set(d, m);
+  }
+  const currency = availRows.find((r) => r.currency)?.currency || settings.currency || "GBP";
+
   return {
     configured: true as const,
     singleUnit: true as const,
@@ -42,6 +96,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     area,
     ownName: overrides.hotelName || "",
     scrapflyOn: isScrapflyConfigured(),
+    capSettings,
+    balance,
+    job,
+    lastCap,
+    pickup: pickup.map((p) => ({ ...p, priceMinor: priceByDate.get(p.date) ?? null })),
+    currency,
+    trackedCount: set.ranked.filter((u) => !u.isSelf && u.airbnbRef).length,
   };
 }
 
@@ -120,6 +181,22 @@ export async function action({ request }: Route.ActionArgs) {
       await removeVrComp(pid, String(form.get("compId")));
       return { okKey: "vrSaved" as const };
     }
+    if (intent === "captureNow") {
+      if ((await getBalance(pid)) < 1) return { error: "Out of capture tokens." };
+      const cap = await getVrCaptureSettings(pid);
+      const today = todayISODate();
+      const res = await enqueueVrCaptureJob(pid, today, isoAt(today, cap.horizonDays - 1), "manual");
+      if (!res.ok) return { error: res.error ?? "Could not start capture." };
+      return { okKey: "vrCaptureStarted" as const };
+    }
+    if (intent === "captureSettings") {
+      await setVrCaptureSettings(pid, {
+        enabled: form.get("enabled") === "on",
+        horizonDays: Number(form.get("horizonDays")),
+        nights: Number(form.get("nights")),
+      });
+      return { okKey: "vrSaved" as const };
+    }
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Something went wrong." };
   }
@@ -133,10 +210,22 @@ const CLASS_LABEL: Record<string, "vrClassEntire" | "vrClassPrivate"> = {
 
 export default function VrInsights({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
+  const dl = useAdminDateLocale();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+
+  // While a capture runs, poll so the progress + pickup table fill in.
+  const capturing = loaderData.configured && "job" in loaderData && loaderData.job?.status === "running";
+  const revalidator = useRevalidator();
+  useEffect(() => {
+    if (!capturing) return;
+    const id = setInterval(() => {
+      if (revalidator.state === "idle") revalidator.revalidate();
+    }, 4000);
+    return () => clearInterval(id);
+  }, [capturing, revalidator]);
 
   if (!loaderData.configured) {
     return (
@@ -151,7 +240,8 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
   }
   if (!loaderData.singleUnit) return <FeatureUnavailable title={t("vrTitle")} body={t("vrSingleUnitOnly")} />;
 
-  const { set, area, ownName, scrapflyOn } = loaderData;
+  const { set, area, scrapflyOn, capSettings, balance, job, lastCap, pickup, currency, trackedCount } = loaderData;
+  const money = (minor: number) => formatMoney(minor / 100, currency);
   const discover = actionData && "discover" in actionData ? actionData.discover : undefined;
   const matchLabel = (m: number | null) =>
     m === null ? "" : m === 1 ? t("vrMatchSame") : m >= 0.5 ? t("vrMatchClass") : t("vrMatchDiff");
@@ -169,6 +259,11 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
       {actionData && "okKey" in actionData && actionData.okKey === "vrAdded" && (
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
           {t("vrAdded", { count: String("addedCount" in actionData ? actionData.addedCount : 0) })}
+        </p>
+      )}
+      {actionData && "okKey" in actionData && (actionData.okKey === "vrSaved" || actionData.okKey === "vrCaptureStarted") && (
+        <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
+          {t(actionData.okKey)}
         </p>
       )}
 
@@ -373,6 +468,121 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
             </Form>
           );
         })()}
+      </section>
+
+      {/* Market availability + pickup */}
+      <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="font-serif text-[16px] font-semibold">{t("vrMarketTitle")}</div>
+            <p className="mt-1 max-w-[620px] text-[13px] text-muted">{t("vrMarketSub")}</p>
+          </div>
+          <div className="text-right text-[12.5px] text-muted">
+            <div>{t("vrTokens", { n: String(balance) })}</div>
+            {lastCap && <div className="text-faint">{t("vrLastCapture", { when: fmtDate(lastCap.slice(0, 10), "d MMM", dl) })}</div>}
+          </div>
+        </div>
+
+        {!scrapflyOn ? (
+          <p className="mt-3 text-[13px] text-amber-700">{t("vrScrapflyOff")}</p>
+        ) : trackedCount === 0 ? (
+          <p className="mt-3 text-[13px] text-muted">{t("vrNoTracked")}</p>
+        ) : (
+          <>
+            <div className="mt-3 flex flex-wrap items-end gap-4">
+              <Form method="post">
+                <input type="hidden" name="intent" value="captureNow" />
+                <button
+                  type="submit"
+                  disabled={busy || balance < 1 || Boolean(job && job.status === "running")}
+                  className="rounded-[10px] bg-accent px-4 py-2 text-[13.5px] font-semibold text-white disabled:opacity-60"
+                >
+                  {job?.status === "running" ? t("vrCapturing") : t("vrCaptureNow")}
+                </button>
+              </Form>
+              <Form method="post" className="flex flex-wrap items-end gap-3">
+                <input type="hidden" name="intent" value="captureSettings" />
+                <label className="flex items-center gap-1.5 text-[12.5px] text-secondary">
+                  <input type="checkbox" name="enabled" defaultChecked={capSettings.enabled} /> {t("vrAutoCapture")}
+                </label>
+                <label className="text-[12px] text-secondary">
+                  {t("vrHorizon")}
+                  <input name="horizonDays" type="number" min="1" max="365" defaultValue={capSettings.horizonDays} className="mt-1 block w-20 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
+                </label>
+                <label className="text-[12px] text-secondary">
+                  {t("vrNights")}
+                  <input name="nights" type="number" min="1" max="14" defaultValue={capSettings.nights} className="mt-1 block w-16 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
+                </label>
+                <button type="submit" disabled={busy} className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-50">
+                  {t("vrSave")}
+                </button>
+              </Form>
+            </div>
+
+            {job && job.status !== "done" && (
+              <div className="mt-3 text-[12.5px] text-muted">
+                {job.status === "running" && t("vrCaptureProgress", { done: String(job.done), total: String(job.total) })}
+                {job.status === "paused" && job.reason === "no_tokens" && <span className="text-amber-700">{t("vrPausedTokens")}</span>}
+                {job.status === "paused" && job.reason === "provider" && <span className="text-amber-700">{t("vrPausedProvider")}</span>}
+              </div>
+            )}
+
+            <p className="mt-4 rounded-[8px] bg-surface-alt px-3 py-2 text-[12px] text-faint">{t("vrPickupCaveat")}</p>
+
+            <div className="mt-3 overflow-x-auto rounded-[10px] border border-line-alt">
+              <table className="w-full text-[13px]">
+                <thead className="bg-surface-alt text-left text-[11.5px] uppercase tracking-[0.06em] text-muted">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">{t("vrColDate")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrColMarket")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrColMedPrice")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrColPickup")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pickup.filter((p) => p.tracked > 0).length === 0 ? (
+                    <tr><td colSpan={4} className="px-3 py-6 text-center text-[13px] text-muted">{t("vrNoData")}</td></tr>
+                  ) : (
+                    pickup
+                      .filter((p) => p.tracked > 0)
+                      .map((p) => (
+                        <tr key={p.date} className="border-t border-line-alt">
+                          <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(p.date, "EEE d MMM", dl)}</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-line-alt">
+                                <span
+                                  className={`block h-full ${(p.occupancy ?? 0) >= 0.8 ? "bg-rose-500" : (p.occupancy ?? 0) >= 0.5 ? "bg-amber-500" : "bg-emerald-500"}`}
+                                  style={{ width: `${Math.round((p.occupancy ?? 0) * 100)}%` }}
+                                />
+                              </span>
+                              <span className="text-[12px] text-muted">
+                                {t("vrMarketCell", { closed: String(p.closedNow), tracked: String(p.tracked) })}
+                              </span>
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{p.priceMinor != null ? money(p.priceMinor) : "—"}</td>
+                          <td className="px-3 py-2">
+                            {p.bookedRecent > 0 ? (
+                              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11.5px] font-semibold text-rose-800">
+                                {t("vrPickupCell", { n: String(p.bookedRecent) })}
+                              </span>
+                            ) : p.openedRecent > 0 ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11.5px] font-semibold text-emerald-800">
+                                {t("vrOpenedCell", { n: String(p.openedRecent) })}
+                              </span>
+                            ) : (
+                              <span className="text-faint">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );

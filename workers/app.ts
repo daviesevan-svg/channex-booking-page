@@ -10,6 +10,7 @@ import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { scheduledRevmanImport } from "../app/lib/revman.server";
 import { scheduledCompCapture } from "../app/lib/revman-comp-capture.server";
+import { scheduledVrCapture } from "../app/lib/vr-comp-capture.server";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -46,5 +47,8 @@ export default {
     // Rate intelligence: capture due competitor/own prices for properties with
     // automatic capture enabled (metered against their token wallet).
     ctx.waitUntil(scheduledCompCapture().catch((e) => console.log(`[cron] scheduledCompCapture failed: ${e}`)));
+    // VR insights: capture competitor availability + price for single-unit
+    // properties with automatic capture enabled (also token-metered).
+    ctx.waitUntil(scheduledVrCapture().catch((e) => console.log(`[cron] scheduledVrCapture failed: ${e}`)));
   },
 } satisfies ExportedHandler<Env>;

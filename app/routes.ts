@@ -28,6 +28,7 @@ export default [
   // Internal (HMAC-signed) self-invocation target for chunked revman imports.
   route("api/revman-continue", "routes/api.revman-continue.tsx"),
   route("api/revman-capture-continue", "routes/api.revman-capture-continue.tsx"),
+  route("api/vr-capture-continue", "routes/api.vr-capture-continue.tsx"),
 
   // Public REST API (v1), authenticated by per-property API keys.
   route("v1/openapi.json", "routes/api.v1.openapi.tsx"),
