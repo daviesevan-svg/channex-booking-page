@@ -9,10 +9,25 @@
 import { getConfig } from "../config.server";
 import { getRevmanChannexAuth } from "../revman.server";
 import { getAriRatePairs } from "../revman-rate-link.server";
-import { composeRoomMap, keepKnownCodes, type ChannelRatePlan } from "./bcom-mapping";
+import {
+  codeOverlap,
+  composeRoomMap,
+  keepKnownCodes,
+  pickBookingChannel,
+  type BookingChannel,
+} from "./bcom-mapping";
 
 /** Channex's Booking.com channel identifier. */
 const BOOKING_CHANNEL = "BookingCom";
+
+/** A Booking.com channel we found, for the owner to see what was considered. */
+export interface FoundChannel {
+  title?: string;
+  hotelId?: string;
+  isActive?: boolean;
+  /** How many of its Booking rooms we've captured prices for. */
+  overlap: number;
+}
 
 export interface ImportedRoomMap {
   ok: boolean;
@@ -22,6 +37,10 @@ export interface ImportedRoomMap {
   channelTitle?: string;
   /** Booking's hotel id from the channel settings. */
   hotelId?: string;
+  /** Every Booking.com channel on the property — shown when the choice matters. */
+  channels: FoundChannel[];
+  /** How the channel was chosen (or why none could be). */
+  pickedBy?: string;
   /** Rooms whose rate plans point at different Booking rooms — not mapped. */
   conflicts: { roomId: string; codes: string[] }[];
   /** Mappings dropped because we hold no captured room with that code. */
@@ -29,7 +48,7 @@ export interface ImportedRoomMap {
   error?: string;
 }
 
-const EMPTY: ImportedRoomMap = { ok: false, roomMap: {}, conflicts: [], dropped: [] };
+const EMPTY: ImportedRoomMap = { ok: false, roomMap: {}, channels: [], conflicts: [], dropped: [] };
 
 interface ChannelEnvelope {
   data?: {
@@ -77,27 +96,36 @@ async function channexGet<T>(path: string, apiKey: string): Promise<T | null> {
 }
 
 /** Reads the property's Booking.com channel and composes the room mapping.
- *  `knownCodes` are the Booking room ids we have actually captured — anything
- *  outside that list is dropped, because a mapping we can't compare against
- *  would look like it works while never showing a badge. */
-export async function importBookingRoomMap(pid: string, knownCodes: string[]): Promise<ImportedRoomMap> {
+ *  `knownCodes` are the Booking room ids we have actually captured — they both
+ *  decide WHICH channel to read when a property has several Booking.com
+ *  connections, and filter the result, since a mapping we can't compare against
+ *  would look like it works while never showing a badge.
+ *  `preferredHotelId` pins the choice explicitly and overrides that inference. */
+export async function importBookingRoomMap(
+  pid: string,
+  knownCodes: string[],
+  preferredHotelId?: string,
+): Promise<ImportedRoomMap> {
   const auth = await getRevmanChannexAuth(pid).catch(() => undefined);
   if (!auth) return { ...EMPTY, error: "not_connected" };
 
-  let channels: ChannelListEnvelope | null;
+  let listed: ChannelListEnvelope | null;
   try {
-    channels = await channexGet<ChannelListEnvelope>("/api/v1/channels", auth.apiKey);
+    listed = await channexGet<ChannelListEnvelope>("/api/v1/channels", auth.apiKey);
   } catch (err) {
     return { ...EMPTY, error: String(err instanceof Error ? err.message : err) };
   }
-  const candidates = (channels?.data ?? []).filter(
+  const candidates = (listed?.data ?? []).filter(
     (c) => !c.attributes?.channel || c.attributes.channel === BOOKING_CHANNEL,
   );
   if (candidates.length === 0) return { ...EMPTY, error: "no_channel" };
 
   // The list response doesn't always carry `channel` or `properties`, so confirm
   // on the detail fetch: the channel must be Booking.com AND cover this property.
-  let matched: NonNullable<NonNullable<ChannelEnvelope["data"]>["attributes"]> | null = null;
+  // ALL of them are collected, not just the first — a property can have more than
+  // one Booking.com connection (a second listing, a legacy one), and reading the
+  // wrong one would map our rooms to another listing's rooms.
+  const found: BookingChannel[] = [];
   let lastDetailError: string | undefined;
   for (const c of candidates.slice(0, MAX_CHANNELS_INSPECTED)) {
     const id = c.id ?? c.attributes?.id;
@@ -113,21 +141,41 @@ export async function importBookingRoomMap(pid: string, knownCodes: string[]): P
     if (!a || a.channel !== BOOKING_CHANNEL) continue;
     const props = a.properties ?? [];
     if (props.length > 0 && !props.includes(auth.channexPropertyId)) continue;
-    matched = a;
-    break;
+    found.push({
+      channelId: String(id),
+      title: a.title,
+      hotelId: a.settings?.hotel_id === undefined || a.settings?.hotel_id === null ? undefined : String(a.settings.hotel_id),
+      isActive: a.is_active,
+      ratePlans: (a.rate_plans ?? []).map((rp) => ({
+        ratePlanId: String(rp.rate_plan_id ?? ""),
+        roomTypeCode:
+          rp.settings?.room_type_code === undefined || rp.settings?.room_type_code === null
+            ? null
+            : String(rp.settings.room_type_code),
+      })),
+    });
   }
   // A channel we couldn't read is not the same as a channel that isn't there —
   // saying "no Booking.com channel" would send the owner looking for the wrong
   // problem.
-  if (!matched) return { ...EMPTY, error: lastDetailError ?? "no_channel" };
+  if (found.length === 0) return { ...EMPTY, error: lastDetailError ?? "no_channel" };
 
-  const channelRates: ChannelRatePlan[] = (matched.rate_plans ?? []).map((rp) => ({
-    ratePlanId: String(rp.rate_plan_id ?? ""),
-    roomTypeCode: rp.settings?.room_type_code === undefined || rp.settings?.room_type_code === null
-      ? null
-      : String(rp.settings.room_type_code),
+  const channels = found.map((c) => ({
+    title: c.title,
+    hotelId: c.hotelId,
+    isActive: c.isActive,
+    /** How many of its Booking rooms we've actually captured — why it won or lost. */
+    overlap: codeOverlap(c, knownCodes),
   }));
-  if (channelRates.every((r) => !r.roomTypeCode)) return { ...EMPTY, error: "not_mapped" };
+
+  const pick = pickBookingChannel(found, knownCodes, preferredHotelId);
+  if (!pick.chosen) return { ...EMPTY, channels, error: pick.reason };
+  const matched = pick.chosen;
+
+  const channelRates = matched.ratePlans;
+  if (channelRates.every((r) => !r.roomTypeCode)) {
+    return { ...EMPTY, channels, channelTitle: matched.title, hotelId: matched.hotelId, error: "not_mapped" };
+  }
 
   // Which of our rooms each rate plan prices, from our own ARI. A wide window so
   // rate plans that only sell a future season still resolve.
@@ -151,7 +199,9 @@ export async function importBookingRoomMap(pid: string, knownCodes: string[]): P
     ok,
     roomMap: kept,
     channelTitle: matched.title,
-    hotelId: matched.settings?.hotel_id === undefined ? undefined : String(matched.settings.hotel_id),
+    hotelId: matched.hotelId,
+    channels,
+    pickedBy: pick.reason,
     conflicts: composed.conflicts,
     dropped,
     error,
