@@ -9,6 +9,7 @@ import { getCompPrices } from "./revman-comp-capture.server";
 import { getCompSet } from "./revman-compset.server";
 import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
 import { fillAwareScore, paceSnapshot, type PaceSnapshot } from "./revman-pace";
+import { pushPricesToChannex, type ChangedCell, type PushResult } from "./channex/ari-push.server";
 import { cellKey, deriveTarget } from "./revman-rate-link";
 import { getRateLinkConfig } from "./revman-rate-link.server";
 import {
@@ -534,7 +535,7 @@ export async function applyPriceSuggestions(
   roomCount: number,
   guards: PriceGuards,
   actor: AriActor,
-): Promise<{ dates: number; cells: number }> {
+): Promise<{ dates: number; cells: number; push?: PushResult }> {
   if (!guardsReady(guards)) throw new Error("Set the minimum and maximum price guards first.");
   const suggestions = await getPriceSuggestions(pid, today, roomCount, guards);
   const byDate = new Map(suggestions.map((s) => [s.date, s]));
@@ -559,6 +560,7 @@ export async function applyPriceSuggestions(
   );
   const baseStmts: D1PreparedStatement[] = [];
   const touchedDates = new Set<string>();
+  const changed: ChangedCell[] = [];
 
   // Rate derivation: when a room nominates a master rate plan, the suggestion
   // moves the MASTER and every other rate for that room follows it at its
@@ -596,12 +598,31 @@ export async function applyPriceSuggestions(
     baseStmts.push(upsertBase.bind(pid, roomId, rateId, date, base, next));
     if (next === price) continue;
     edits.prices.push({ roomId, rateId, date, price: next });
+    changed.push({
+      roomId,
+      rateId,
+      date,
+      deltaMinor: Math.round(next * 100) - Math.round(price * 100),
+      newBaseMinor: Math.round(next * 100),
+    });
     touchedDates.add(date);
   }
   if (edits.prices.length > 0) await saveInventory(pid, edits, actor);
   baseStmts.push(db().prepare(`DELETE FROM rev_price_base WHERE pid = ? AND date < ?`).bind(pid, today));
   for (let i = 0; i < baseStmts.length; i += 90) await db().batch(baseStmts.slice(i, i + 90));
-  return { dates: touchedDates.size, cells: edits.prices.length };
+
+  // saveInventory only writes the base ("occupancy 0") price, so any
+  // per-occupancy prices we hold would go stale. Shift them by the same amount
+  // and send the result to Channex — which simulates unless the property has
+  // opted in and selected Channex.
+  let push: PushResult | undefined;
+  if (changed.length > 0) {
+    push = await pushPricesToChannex(pid, changed).catch((err) => {
+      console.log(`[revman] price push failed for ${pid}: ${err}`);
+      return undefined;
+    });
+  }
+  return { dates: touchedDates.size, cells: edits.prices.length, push };
 }
 
 function leadTimeStmt(pid: string, from: string, to: string, bookedBy: string) {

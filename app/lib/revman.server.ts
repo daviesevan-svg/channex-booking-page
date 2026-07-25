@@ -113,6 +113,18 @@ async function decryptApiKey(state: RevmanState): Promise<string> {
   return new TextDecoder().decode(plain);
 }
 
+/** The property's Channex credentials for an OUTBOUND call: the decrypted
+ *  user-api-key plus the Channex property id. Undefined when the property isn't
+ *  connected; throws only if the stored key can't be decrypted. Kept here so the
+ *  ciphertext never leaves this module. */
+export async function getRevmanChannexAuth(
+  pid: string,
+): Promise<{ apiKey: string; channexPropertyId: string } | undefined> {
+  const state = await readState(pid);
+  if (!state) return undefined;
+  return { apiKey: await decryptApiKey(state), channexPropertyId: state.channexPropertyId };
+}
+
 async function readState(pid: string): Promise<RevmanState | undefined> {
   const raw = await getConfigKV()?.get(stateKey(pid));
   if (!raw) return undefined;
