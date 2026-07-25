@@ -221,6 +221,10 @@ interface CaptureJob {
   /** Why a paused job stopped: out of tokens, or the scraping provider is out of
    *  credits / rate-limited. */
   reason?: "no_tokens" | "provider";
+  /** Id of the continuation currently working the job. Written before any paid
+   *  work so a concurrent nudge can tell a runner is alive, and re-checked after
+   *  each wave so a superseded runner stops instead of double-charging. */
+  runner?: string;
   actor: string;
   startedAt: string;
   progressAt: string;
@@ -346,6 +350,29 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
   if (opts.onlyIfStale && Date.now() - Date.parse(job.progressAt) < CHUNK_ACTIVE_MS) return;
 
   await ensureSchema();
+
+  // Claim the job BEFORE any paid work: a chunk of JS-rendered scrapes can run
+  // longer than CHUNK_ACTIVE_MS, and without this the page poll would start a
+  // second runner that re-reads the same cursor and pays for the same work
+  // again (observed in the VR equivalent: one date charged 30×).
+  const runner = crypto.randomUUID();
+  job.runner = runner;
+  job.progressAt = new Date().toISOString();
+  await putJob(pid, job);
+  /** True when another continuation has taken the job over. */
+  const superseded = async (): Promise<boolean> => {
+    const cur = await getJob(pid);
+    return Boolean(cur?.runner && cur.runner !== runner);
+  };
+  /** Persist the advanced cursor (and a fresh heartbeat) before spending, so
+   *  work is reserved: a duplicate runner resumes AFTER this batch rather than
+   *  repeating it. Skipping a unit on a crash is far cheaper than paying twice —
+   *  the freshness-skip plus the next cron tick will pick it up. */
+  const reserve = async (): Promise<void> => {
+    job.progressAt = new Date().toISOString();
+    await putJob(pid, job);
+  };
+
   const settings = await getCaptureSettings(pid);
   const todayMs = Date.parse(`${iso(Date.now())}T00:00:00Z`);
 
@@ -361,6 +388,7 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
   let paused = false;
   let pauseReason: "no_tokens" | "provider" | undefined;
   for (let wave = 0; wave < WAVES_PER_CHUNK && job.di < job.dates.length && !paused; wave++) {
+    if (await superseded()) return;
     const balance = await getBalance(pid);
     if (balance < 1) {
       paused = true;
@@ -384,6 +412,7 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
         job.di++;
       }
     }
+    await reserve();
     if (batch.length) {
       const results = await Promise.all(
         batch.map((u) => captureHotelDate(pid, u.hotel, u.date, job.currency, job.actor)),
@@ -398,6 +427,10 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
       }
     }
   }
+
+  // Another runner owns the job now — don't overwrite its progress or fork a
+  // second continuation chain.
+  if (await superseded()) return;
 
   job.reason = paused ? pauseReason : undefined;
   job.status = paused ? "paused" : job.di >= job.dates.length ? "done" : "running";
