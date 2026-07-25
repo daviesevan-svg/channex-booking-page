@@ -364,10 +364,8 @@ async function ensurePriceBaseSchema(): Promise<void> {
   priceBaseSchemaReady = true;
 }
 
-/** date-keyed cell map "roomId|rateId|date" → {base, applied}. Exported so the
- *  vacation-rental suggestion engine anchors prices the same way rather than
- *  reimplementing (and drifting from) these semantics. */
-export async function getPriceBases(pid: string, from: string, to: string): Promise<Map<string, { base: number; applied: number }>> {
+/** date-keyed cell map "roomId|rateId|date" → {base, applied}. */
+async function getPriceBases(pid: string, from: string, to: string): Promise<Map<string, { base: number; applied: number }>> {
   await ensurePriceBaseSchema();
   const res = await db()
     .prepare(`SELECT room_id, rate_id, date, base, applied FROM rev_price_base WHERE pid = ? AND date >= ? AND date <= ?`)
@@ -384,7 +382,7 @@ export async function getPriceBases(pid: string, from: string, to: string): Prom
 /** The stable anchor for a cell. No record yet → the current price IS the
  *  base. Current price differs from what we last applied → the hotelier
  *  changed it manually, and their price becomes the new base. */
-export function resolveBase(current: number, row?: { base: number; applied: number }): number {
+function resolveBase(current: number, row?: { base: number; applied: number }): number {
   if (!row) return current;
   return row.applied === current ? row.base : current;
 }
