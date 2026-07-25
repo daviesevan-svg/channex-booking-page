@@ -26,6 +26,10 @@ export interface ScrapeOptions {
   format?: "raw" | "clean_html" | "text" | "markdown" | "json";
   /** Abort the request after this many ms (Scrapfly can be slow with render_js). */
   timeoutMs?: number;
+  /** Extra request headers to send upstream (Scrapfly `headers[Name]=Value`).
+   *  Needed for API endpoints that gate on a header, e.g. Airbnb's public
+   *  X-Airbnb-Api-Key on its GraphQL calls. */
+  headers?: Record<string, string>;
 }
 
 export interface ScrapeResult {
@@ -61,6 +65,7 @@ export async function scrapeUrl(target: string, opts: ScrapeOptions = {}): Promi
   if (opts.proxyPool) params.set("proxy_pool", opts.proxyPool);
   params.set("retry", String(opts.retry ?? true));
   if (opts.format) params.set("format", opts.format);
+  for (const [name, value] of Object.entries(opts.headers ?? {})) params.set(`headers[${name}]`, value);
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 60_000);

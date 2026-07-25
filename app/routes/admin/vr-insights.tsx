@@ -26,10 +26,13 @@ import {
 import { discoverVrComps, type CandidateVrUnit } from "~/lib/vr-compset-discovery.server";
 import {
   enqueueVrCaptureJob,
+  estimateVrCost,
+  getMarketPace,
   getMarketPickup,
   getVrAvail,
   getVrCaptureJob,
   getVrCaptureSettings,
+  getVrPrices,
   lastVrCapturedAt,
   nudgeVrCaptureJob,
   setVrCaptureSettings,
@@ -72,22 +75,35 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const today = todayISODate();
   const to = isoAt(today, capSettings.horizonDays - 1);
-  const [pickup, availRows] = await Promise.all([getMarketPickup(pid, today, to), getVrAvail(pid, today, to)]);
-  // Median available comp price per date (from the latest snapshot).
-  const priceByDate = new Map<string, number>();
+  const [pace, pickup, availRows, priceRows] = await Promise.all([
+    getMarketPace(pid, today, to, today),
+    getMarketPickup(pid, today, to),
+    getVrAvail(pid, today, to),
+    getVrPrices(pid, today, to),
+  ]);
+
+  // Prices come from their own (coarser) feed, so a date may have availability
+  // without a price sample — median over whatever comps were priced.
   const pricesForDate = new Map<string, number[]>();
-  for (const r of availRows) {
-    if (r.available === 1 && r.priceMinor != null) {
-      const arr = pricesForDate.get(r.date) ?? [];
-      arr.push(r.priceMinor);
-      pricesForDate.set(r.date, arr);
-    }
+  for (const r of priceRows) {
+    if (r.priceMinor == null) continue;
+    const arr = pricesForDate.get(r.date) ?? [];
+    arr.push(r.priceMinor);
+    pricesForDate.set(r.date, arr);
   }
+  const priceByDate = new Map<string, number>();
   for (const [d, xs] of pricesForDate) {
     const m = median(xs);
     if (m != null) priceByDate.set(d, m);
   }
-  const currency = availRows.find((r) => r.currency)?.currency || settings.currency || "GBP";
+  // Typical minimum stay per date across comps — explains an "unavailable" that
+  // is really a stay-length rule.
+  const minNightsByDate = new Map<string, number>();
+  for (const r of availRows) {
+    if (r.minNights && r.minNights > (minNightsByDate.get(r.date) ?? 0)) minNightsByDate.set(r.date, r.minNights);
+  }
+  const pickupByDate = new Map(pickup.map((p) => [p.date, p]));
+  const currency = priceRows.find((r) => r.currency)?.currency || settings.currency || "GBP";
 
   return {
     configured: true as const,
@@ -100,9 +116,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     balance,
     job,
     lastCap,
-    pickup: pickup.map((p) => ({ ...p, priceMinor: priceByDate.get(p.date) ?? null })),
+    rows: pace.map((p) => ({
+      ...p,
+      priceMinor: priceByDate.get(p.date) ?? null,
+      maxMinNights: minNightsByDate.get(p.date) ?? null,
+      bookedRecent: pickupByDate.get(p.date)?.bookedRecent ?? 0,
+      openedRecent: pickupByDate.get(p.date)?.openedRecent ?? 0,
+    })),
     currency,
     trackedCount: set.ranked.filter((u) => !u.isSelf && u.airbnbRef).length,
+    cost: estimateVrCost(set.ranked.filter((u) => u.airbnbRef).length, capSettings),
   };
 }
 
@@ -193,7 +216,9 @@ export async function action({ request }: Route.ActionArgs) {
       await setVrCaptureSettings(pid, {
         enabled: form.get("enabled") === "on",
         horizonDays: Number(form.get("horizonDays")),
-        nights: Number(form.get("nights")),
+        priceEnabled: form.get("priceEnabled") === "on",
+        priceCadenceDays: Number(form.get("priceCadenceDays")),
+        priceHorizonDays: Number(form.get("priceHorizonDays")),
       });
       return { okKey: "vrSaved" as const };
     }
@@ -240,8 +265,19 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
   }
   if (!loaderData.singleUnit) return <FeatureUnavailable title={t("vrTitle")} body={t("vrSingleUnitOnly")} />;
 
-  const { set, area, scrapflyOn, capSettings, balance, job, lastCap, pickup, currency, trackedCount } = loaderData;
+  const { set, area, scrapflyOn, capSettings, balance, job, lastCap, rows, currency, trackedCount, cost } = loaderData;
   const money = (minor: number) => formatMoney(minor / 100, currency);
+  const PACE_STYLE: Record<string, string> = {
+    ahead: "bg-rose-100 text-rose-800",
+    on_track: "bg-chip text-secondary",
+    behind: "bg-sky-100 text-sky-800",
+    unknown: "",
+  };
+  const PACE_LABEL: Record<string, "vrPaceAhead" | "vrPaceOnTrack" | "vrPaceBehind"> = {
+    ahead: "vrPaceAhead",
+    on_track: "vrPaceOnTrack",
+    behind: "vrPaceBehind",
+  };
   const discover = actionData && "discover" in actionData ? actionData.discover : undefined;
   const matchLabel = (m: number | null) =>
     m === null ? "" : m === 1 ? t("vrMatchSame") : m >= 0.5 ? t("vrMatchClass") : t("vrMatchDiff");
@@ -509,9 +545,16 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
                   {t("vrHorizon")}
                   <input name="horizonDays" type="number" min="1" max="365" defaultValue={capSettings.horizonDays} className="mt-1 block w-20 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
                 </label>
+                <label className="flex items-center gap-1.5 text-[12.5px] text-secondary">
+                  <input type="checkbox" name="priceEnabled" defaultChecked={capSettings.priceEnabled} /> {t("vrPriceEnabled")}
+                </label>
                 <label className="text-[12px] text-secondary">
-                  {t("vrNights")}
-                  <input name="nights" type="number" min="1" max="14" defaultValue={capSettings.nights} className="mt-1 block w-16 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
+                  {t("vrPriceEvery")}
+                  <input name="priceCadenceDays" type="number" min="1" max="90" defaultValue={capSettings.priceCadenceDays} className="mt-1 block w-16 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
+                </label>
+                <label className="text-[12px] text-secondary">
+                  {t("vrPriceWithin")}
+                  <input name="priceHorizonDays" type="number" min="1" max="365" defaultValue={capSettings.priceHorizonDays} className="mt-1 block w-20 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]" />
                 </label>
                 <button type="submit" disabled={busy} className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-50">
                   {t("vrSave")}
@@ -519,12 +562,23 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
               </Form>
             </div>
 
+            <p className="mt-2 text-[12px] text-faint">
+              {t("vrCostEstimate", { avail: String(cost.avail), price: String(cost.price), total: String(cost.total) })}
+            </p>
+
             {job && job.status !== "done" && (
               <div className="mt-3 text-[12.5px] text-muted">
-                {job.status === "running" && t("vrCaptureProgress", { done: String(job.done), total: String(job.total) })}
+                {job.status === "running" &&
+                  t(job.phase === "price" ? "vrProgressPrice" : "vrProgressAvail", { done: String(job.done), total: String(job.total) })}
                 {job.status === "paused" && job.reason === "no_tokens" && <span className="text-amber-700">{t("vrPausedTokens")}</span>}
                 {job.status === "paused" && job.reason === "provider" && <span className="text-amber-700">{t("vrPausedProvider")}</span>}
               </div>
+            )}
+
+            {job?.calendarDegraded && (
+              <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-800">
+                {t("vrCalendarDegraded")}
+              </p>
             )}
 
             <p className="mt-4 rounded-[8px] bg-surface-alt px-3 py-2 text-[12px] text-faint">{t("vrPickupCaveat")}</p>
@@ -535,31 +589,57 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
                   <tr>
                     <th className="px-3 py-2 font-semibold">{t("vrColDate")}</th>
                     <th className="px-3 py-2 font-semibold">{t("vrColMarket")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrColPace")}</th>
                     <th className="px-3 py-2 font-semibold">{t("vrColMedPrice")}</th>
                     <th className="px-3 py-2 font-semibold">{t("vrColPickup")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pickup.filter((p) => p.tracked > 0).length === 0 ? (
-                    <tr><td colSpan={4} className="px-3 py-6 text-center text-[13px] text-muted">{t("vrNoData")}</td></tr>
+                  {rows.filter((p) => p.tracked > 0).length === 0 ? (
+                    <tr><td colSpan={5} className="px-3 py-6 text-center text-[13px] text-muted">{t("vrNoData")}</td></tr>
                   ) : (
-                    pickup
+                    rows
                       .filter((p) => p.tracked > 0)
                       .map((p) => (
                         <tr key={p.date} className="border-t border-line-alt">
-                          <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(p.date, "EEE d MMM", dl)}</td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <span className="font-semibold">{fmtDate(p.date, "EEE d MMM", dl)}</span>
+                            {p.maxMinNights && p.maxMinNights > 1 && (
+                              <span className="ml-1.5 text-[11px] text-faint" title={t("vrMinStayHint")}>
+                                {t("vrMinStay", { n: String(p.maxMinNights) })}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-2">
                             <span className="inline-flex items-center gap-2">
-                              <span className="h-1.5 w-24 overflow-hidden rounded-full bg-line-alt">
+                              <span className="h-1.5 w-20 overflow-hidden rounded-full bg-line-alt">
                                 <span
                                   className={`block h-full ${(p.occupancy ?? 0) >= 0.8 ? "bg-rose-500" : (p.occupancy ?? 0) >= 0.5 ? "bg-amber-500" : "bg-emerald-500"}`}
                                   style={{ width: `${Math.round((p.occupancy ?? 0) * 100)}%` }}
                                 />
                               </span>
                               <span className="text-[12px] text-muted">
-                                {t("vrMarketCell", { closed: String(p.closedNow), tracked: String(p.tracked) })}
+                                {Math.round((p.occupancy ?? 0) * 100)}%
                               </span>
                             </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            {p.signal === "unknown" ? (
+                              <span className="text-faint">—</span>
+                            ) : (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${PACE_STYLE[p.signal]}`}
+                                title={t("vrPaceTip", {
+                                  expected: String(Math.round((p.expectedOccupancy ?? 0) * 100)),
+                                  dba: String(p.dba),
+                                })}
+                              >
+                                {t(PACE_LABEL[p.signal])}
+                              </span>
+                            )}
+                            {p.velocity != null && p.velocity > 0 && (
+                              <span className="ml-1.5 text-[11px] text-faint">{t("vrVelocity", { n: String(p.velocity) })}</span>
+                            )}
                           </td>
                           <td className="px-3 py-2">{p.priceMinor != null ? money(p.priceMinor) : "—"}</td>
                           <td className="px-3 py-2">
