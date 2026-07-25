@@ -16,6 +16,7 @@ import {
   lastCapturedAt,
   nudgeCaptureJob,
 } from "~/lib/revman-comp-capture.server";
+import { getRoomPrices } from "~/lib/revman-room-prices.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 import { formatMoney } from "~/lib/money";
@@ -53,6 +54,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const to = isoAt(today, horizon - 1);
   const rows = await getCompPrices(pid, today, to);
 
+  // Room-level prices for one hotel at a time — the whole set at once would be a
+  // grid of ~100 rows. Defaults to our own hotel, which is the one an owner
+  // checks against their direct rates.
+  const selfId = set.ranked.find((h) => h.isSelf)?.id;
+  const wanted = new URL(request.url).searchParams.get("rooms");
+  const roomsFor = set.ranked.some((h) => h.id === wanted) ? (wanted as string) : selfId;
+  const roomRows = roomsFor ? await getRoomPrices(pid, roomsFor, today, to) : [];
+
   const dates = Array.from({ length: horizon }, (_, i) => isoAt(today, i));
   // cells[compId][date] = {minor, currency}
   const cells: Record<string, Record<string, { minor: number | null; currency: string | null }>> = {};
@@ -60,6 +69,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     (cells[r.compId] ??= {})[r.date] = { minor: r.priceMinor, currency: r.currency };
   }
   const datesWithData = new Set(rows.filter((r) => r.priceMinor != null).map((r) => r.date)).size;
+
+  // One row per room type, keeping the newest name we saw for it.
+  const roomNames = new Map<string, { name: string; maxPersons: number | null }>();
+  const roomCells: Record<string, Record<string, RoomCell>> = {};
+  for (const r of roomRows) {
+    roomNames.set(r.roomRef, { name: r.roomName, maxPersons: r.maxPersons });
+    (roomCells[r.roomRef] ??= {})[r.date] = {
+      minor: r.priceMinor,
+      currency: r.currency,
+      mealPlan: r.mealPlan,
+      flexMinor: r.flexPriceMinor,
+      genius: r.genius,
+    };
+  }
 
   return {
     configured: true as const,
@@ -76,7 +99,18 @@ export async function loader({ request }: Route.LoaderArgs) {
     lastCap,
     settingsEnabled: settings.enabled,
     job,
+    roomsFor: roomsFor ?? null,
+    rooms: [...roomNames].map(([roomRef, v]) => ({ roomRef, ...v })),
+    roomCells,
   };
+}
+
+interface RoomCell {
+  minor: number;
+  currency: string | null;
+  mealPlan: string | null;
+  flexMinor: number | null;
+  genius: boolean;
 }
 
 export function meta() {
@@ -314,6 +348,151 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
         </div>
       )}
       <p className="mt-2 text-[11.5px] text-muted">{t("riCheapestHint")}</p>
+
+      <RoomPrices
+        hotels={hotels}
+        dates={dates}
+        rooms={loaderData.rooms}
+        roomCells={loaderData.roomCells}
+        roomsFor={loaderData.roomsFor}
+        currency={currency}
+        onHotelChange={(id) =>
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.set("rooms", id);
+              return next;
+            },
+            { preventScrollReset: true },
+          )
+        }
+      />
     </div>
+  );
+}
+
+/** Per-room-type prices for one hotel of the set. Same captures as the grid
+ *  above — the hotel page carries every room type, so this costs nothing extra. */
+function RoomPrices({
+  hotels,
+  dates,
+  rooms,
+  roomCells,
+  roomsFor,
+  currency,
+  onHotelChange,
+}: {
+  hotels: { id: string; name: string; isSelf: boolean }[];
+  dates: string[];
+  rooms: { roomRef: string; name: string; maxPersons: number | null }[];
+  roomCells: Record<string, Record<string, RoomCell>>;
+  roomsFor: string | null;
+  currency: string;
+  onHotelChange: (id: string) => void;
+}) {
+  const t = useAdminT();
+  const dl = useAdminDateLocale();
+  if (hotels.length === 0) return null;
+  const money = (minor: number, cur: string | null) => formatMoney(minor / 100, cur || currency);
+
+  // Cheapest room per date, to highlight where each night's entry price sits.
+  const cheapest: Record<string, number> = {};
+  for (const d of dates) {
+    let min = Infinity;
+    for (const r of rooms) {
+      const c = roomCells[r.roomRef]?.[d];
+      if (c && c.minor < min) min = c.minor;
+    }
+    if (min < Infinity) cheapest[d] = min;
+  }
+
+  return (
+    <section className="mt-8">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-serif text-[19px] font-semibold">{t("riRoomsTitle")}</h2>
+          <p className="mt-0.5 text-[13px] text-muted">{t("riRoomsSub")}</p>
+        </div>
+        <label className="text-[11px] font-medium text-muted">
+          {t("riRoomsHotel")}
+          {/* Bare selects don't reliably dispatch in LiveView-style flows; here
+              it's a plain React handler, so onChange is fine. */}
+          <select
+            value={roomsFor ?? ""}
+            onChange={(e) => onHotelChange(e.target.value)}
+            className="mt-0.5 block rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px] font-normal text-ink"
+          >
+            {hotels.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+                {h.isSelf ? ` (${t("riYou")})` : ""}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {rooms.length === 0 ? (
+        <div className="rounded-[14px] border border-line bg-surface p-6 text-center text-[13.5px] text-muted">
+          {t("riRoomsNone")}
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
+            <table className="w-full border-collapse text-[13px]">
+              <thead>
+                <tr className="border-b border-line">
+                  <th className="sticky left-0 z-10 min-w-[190px] bg-surface px-3 py-2.5 text-left font-semibold text-muted">
+                    {t("riRoomsColRoom")}
+                  </th>
+                  {dates.map((d) => (
+                    <th key={d} className="min-w-[74px] px-3 py-2.5 text-right font-semibold text-secondary">
+                      {fmtDate(d, "EEE d", dl)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rooms.map((r) => (
+                  <tr key={r.roomRef} className="border-b border-line-alt last:border-0">
+                    <td className="sticky left-0 z-10 bg-surface px-3 py-2">
+                      <div className="font-medium text-secondary">{r.name}</div>
+                      {r.maxPersons ? (
+                        <div className="text-[11px] text-muted">{t("riRoomsSleeps", { n: String(r.maxPersons) })}</div>
+                      ) : null}
+                    </td>
+                    {dates.map((d) => {
+                      const c = roomCells[r.roomRef]?.[d];
+                      if (!c) return <td key={d} className="px-3 py-2 text-right text-muted">—</td>;
+                      const tip = [
+                        c.mealPlan ? t("riRoomsMeal", { meal: c.mealPlan }) : t("riRoomsRoomOnly"),
+                        c.flexMinor != null
+                          ? t("riRoomsFlex", { price: money(c.flexMinor, c.currency) })
+                          : t("riRoomsNoFlex"),
+                        c.genius ? t("riRoomsGenius") : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ");
+                      return (
+                        <td
+                          key={d}
+                          title={tip}
+                          className={`px-3 py-2 text-right tabular-nums ${
+                            c.minor === cheapest[d] ? "font-semibold text-emerald-700" : "text-ink"
+                          }`}
+                        >
+                          {money(c.minor, c.currency)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11.5px] text-muted">{t("riRoomsHint")}</p>
+        </>
+      )}
+    </section>
   );
 }
