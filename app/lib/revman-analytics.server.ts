@@ -9,6 +9,8 @@ import { getCompPrices } from "./revman-comp-capture.server";
 import { getCompSet } from "./revman-compset.server";
 import { buildForecast, buildPickupCurve, type ForecastDay } from "./revman-forecast";
 import { fillAwareScore, paceSnapshot, type PaceSnapshot } from "./revman-pace";
+import { cellKey, deriveTarget } from "./revman-rate-link";
+import { getRateLinkConfig } from "./revman-rate-link.server";
 import {
   compSignalFor,
   guardsReady,
@@ -557,13 +559,38 @@ export async function applyPriceSuggestions(
   );
   const baseStmts: D1PreparedStatement[] = [];
   const touchedDates = new Set<string>();
+
+  // Rate derivation: when a room nominates a master rate plan, the suggestion
+  // moves the MASTER and every other rate for that room follows it at its
+  // configured relationship. Rooms with no master keep the original behaviour —
+  // each cell scaled from its own base — so this only changes properties that
+  // opt in by choosing a master.
+  const linkCfg = await getRateLinkConfig(pid);
+  const masterTargets = new Map<string, number>(); // `${roomId}|${date}` → master target
+  for (const [key, price] of Object.entries(inventory.prices)) {
+    const [roomId, rateId, date] = key.split("|");
+    if (linkCfg.masterByRoom[roomId] !== rateId) continue;
+    if (!wanted.has(date) || price <= 0) continue;
+    const s = byDate.get(date);
+    if (!s || s.pct === 0) continue;
+    masterTargets.set(`${roomId}|${date}`, targetPrice(resolveBase(price, bases.get(key)), s.pct, guards));
+  }
+
   for (const [key, price] of Object.entries(inventory.prices)) {
     const [roomId, rateId, date] = key.split("|");
     if (!wanted.has(date) || price <= 0) continue;
     const s = byDate.get(date);
     if (!s || s.pct === 0) continue;
     const base = resolveBase(price, bases.get(key));
-    const next = targetPrice(base, s.pct, guards);
+    const masterId = linkCfg.masterByRoom[roomId];
+    const link = masterId && masterId !== rateId ? linkCfg.links[cellKey(roomId, rateId)] : undefined;
+    const masterTarget = masterTargets.get(`${roomId}|${date}`);
+    // A derived rate follows the master (still clamped to the property guards);
+    // the master itself, and any rate without a relationship, scales from base.
+    const next =
+      link && masterTarget !== undefined
+        ? Math.min(guards.maxPrice, Math.max(guards.minPrice, deriveTarget(masterTarget, link)))
+        : targetPrice(base, s.pct, guards);
     // Remember the anchor even when the price is already at target, so later
     // applies keep resolving against the pre-revman base.
     baseStmts.push(upsertBase.bind(pid, roomId, rateId, date, base, next));
