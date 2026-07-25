@@ -57,6 +57,8 @@ export function buildBookingSearchUrl(
   return `${BOOKING_SEARCH}?${p.toString()}`;
 }
 
+import { parseMoneyMinor } from "./revman-room-prices";
+
 const BOOKING = "https://www.booking.com";
 
 /** Builds a Booking.com hotel-page URL for a canonical ref ("/hotel/gb/x.html")
@@ -90,11 +92,12 @@ export function parsePriceText(text: string | undefined): { minor: number; curre
   const map: Record<string, string> = {
     "£": "GBP", "€": "EUR", "$": "USD", "US$": "USD", "A$": "AUD", "C$": "CAD", "R$": "BRL",
   };
-  const num = text.replace(/[^\d.,]/g, "").replace(/,/g, "");
-  const amount = parseFloat(num);
-  if (!Number.isFinite(amount) || amount <= 0) return null;
+  // Shares the locale-aware number parse, so this can't drift back into reading
+  // "€1.101" as 1.10 (see parseMoneyMinor).
+  const minor = parseMoneyMinor(text);
+  if (minor === null) return null;
   const currency = (sym && map[sym[0]]) || "GBP";
-  return { minor: Math.round(amount * 100), currency };
+  return { minor, currency };
 }
 
 /** Normalises a Booking hotel href to its stable path: drops the query string
