@@ -17,11 +17,23 @@
 // one. Comparing a flexible rate to someone's non-refundable rate is the classic
 // way to draw a false conclusion, so both sides are kept.
 
-/** Total price for a stay of `nights` nights starting on the captured date. */
+/** Total price for a stay of `nights` nights starting on the captured date.
+ *  Always ALL-IN — see taxBasis on OtaBlock for why that matters. */
 export interface OtaStayPrice {
   nights: number;
   totalMinor: number;
+  /** What Booking displayed, before any excluded tax was added back on. */
+  shownMinor: number;
 }
+
+/** Whether the price Booking displayed already contained taxes and charges.
+ *
+ *  This is NOT a property of the hotel — it follows the visitor's market, so the
+ *  same hotel on the same day can be scraped inclusive at 08:00 and exclusive at
+ *  14:00. Recording it is what stops a series silently mixing the two bases: live,
+ *  Spilman's 26 July was captured ex-VAT at £70.83 and its 27 July inclusive at
+ *  £99.00, which read as a 40% overnight rise when about half was VAT. */
+export type TaxBasis = "incl" | "excl" | "unknown";
 
 /** One rate plan on one room type, as Booking presents it to a public visitor. */
 export interface OtaBlock {
@@ -29,8 +41,16 @@ export interface OtaBlock {
   blockRef: string;
   /** Rate-plan segment of the block id — stable across dates. */
   ratePlanRef: string;
-  /** Total for the stay as searched (one night, the way capture searches). */
+  /** Total for the stay as searched (one night, the way capture searches),
+   *  ALL-IN: taxes and charges Booking excluded from its display are added back,
+   *  so this figure is comparable across dates, markets and hotels. */
   priceMinor: number;
+  /** The figure Booking actually displayed, kept for the audit trail. Equals
+   *  priceMinor whenever Booking's price was already inclusive. */
+  shownMinor: number;
+  /** Whether Booking's displayed price included taxes. "unknown" means the page
+   *  didn't say, so priceMinor may be understated — treat it as not comparable. */
+  taxBasis: TaxBasis;
   /** e.g. "breakfast"; null when the rate is room-only. */
   mealPlan: string | null;
   /** True for free_cancellation. Non-refundable rates are cheaper and must not
@@ -39,8 +59,7 @@ export interface OtaBlock {
   /** Booking showed a Genius (loyalty) price to an anonymous visitor. */
   genius: boolean;
   maxPersons: number;
-  /** Booking says the price includes taxes and charges. When false, the price is
-   *  not comparable to an all-in direct price without adding the extras. */
+  /** Booking's own "includes taxes and charges" flag, as shown to the visitor. */
   allIncluded: boolean;
   /** Totals for longer stays starting the same date, ascending. Length varies by
    *  min/max-stay restrictions, so a night count can simply be absent. */
@@ -183,7 +202,45 @@ interface RawBlock {
   b_cancellation_type?: string;
   b_rate_is_genius?: number;
   b_stay_prices?: { b_stays?: number; b_raw_price?: string | number; b_price?: string }[];
-  b_price_breakdown_simplified?: { b_charges_info_copy?: { b_is_all_included?: number } };
+  b_price_breakdown_simplified?: {
+    b_charges_info_copy?: { b_is_all_included?: number };
+    /** The all-in total Booking itself computes — verified equal to
+     *  b_raw_price + b_excluded_charges_amount across 240 blocks / 5 hotels. */
+    b_total_price?: { b_raw_value_user_currency?: number | string }[];
+    /** Taxes and charges NOT in the displayed price (e.g. "20 % VAT"). */
+    b_excluded_charges_amount?: number | string;
+  };
+}
+
+/** The all-in price of a block plus how we know it, from Booking's own
+ *  breakdown. Preference order matters: `b_total_price` is Booking's arithmetic
+ *  and needs no assumptions; adding `b_excluded_charges_amount` is the fallback;
+ *  and if neither is present we only trust the displayed price when Booking said
+ *  it was already inclusive. Guessing a tax rate is never an option — it would
+ *  put a number we invented into a price comparison shown to guests. */
+function allInOf(
+  shownMinor: number,
+  bd: RawBlock["b_price_breakdown_simplified"],
+): { allInMinor: number; taxBasis: TaxBasis } {
+  const flag = bd?.b_charges_info_copy?.b_is_all_included;
+  const declared: TaxBasis = flag === 1 ? "incl" : flag === 0 ? "excl" : "unknown";
+
+  const totalRaw = Number(bd?.b_total_price?.[0]?.b_raw_value_user_currency);
+  if (Number.isFinite(totalRaw) && totalRaw > 0) {
+    const total = Math.round(totalRaw * 100);
+    // Booking's total can only be at or above what it displayed. Anything else
+    // means we've misread a field, so fall through rather than trust it.
+    if (total >= shownMinor) return { allInMinor: total, taxBasis: declared === "unknown" ? "incl" : declared };
+  }
+
+  const excluded = Number(bd?.b_excluded_charges_amount);
+  if (Number.isFinite(excluded) && excluded > 0) {
+    return { allInMinor: shownMinor + Math.round(excluded * 100), taxBasis: "excl" };
+  }
+  if (declared === "incl" || (declared === "excl" && excluded === 0)) {
+    return { allInMinor: shownMinor, taxBasis: declared };
+  }
+  return { allInMinor: shownMinor, taxBasis: declared };
 }
 
 interface RawRoom {
@@ -194,27 +251,39 @@ interface RawRoom {
 
 function toBlock(raw: RawBlock, roomRef: string): OtaBlock | null {
   const blockRef = typeof raw.b_block_id === "string" ? raw.b_block_id : "";
-  const priceMinor = blockPriceMinor(raw.b_raw_price, raw.b_price);
-  if (!blockRef || priceMinor === null) return null;
+  const shownMinor = blockPriceMinor(raw.b_raw_price, raw.b_price);
+  if (!blockRef || shownMinor === null) return null;
+  const { allInMinor, taxBasis } = allInOf(shownMinor, raw.b_price_breakdown_simplified);
+  // Longer stays carry only a displayed price, so the same uplift is applied.
+  // Excluded charges here are percentage VAT ("20 % VAT"), which scales with the
+  // room total exactly as this does. A flat per-STAY fee would not, and would be
+  // slightly overstated — the conservative direction for a "cheaper direct"
+  // claim, since it makes the OTA look dearer, never cheaper.
+  const uplift = shownMinor > 0 ? allInMinor / shownMinor : 1;
+
   // "{roomId}_{ratePlanId}_{...}" — the rate plan is the second segment.
   const parts = blockRef.split("_");
   const stays: OtaStayPrice[] = [];
   for (const s of raw.b_stay_prices ?? []) {
     const nights = Number(s?.b_stays);
-    const totalMinor = blockPriceMinor(s?.b_raw_price, s?.b_price);
-    if (Number.isFinite(nights) && nights >= 1 && totalMinor !== null) stays.push({ nights, totalMinor });
+    const shown = blockPriceMinor(s?.b_raw_price, s?.b_price);
+    if (Number.isFinite(nights) && nights >= 1 && shown !== null) {
+      stays.push({ nights, totalMinor: Math.round(shown * uplift), shownMinor: shown });
+    }
   }
   stays.sort((a, b) => a.nights - b.nights);
   return {
     blockRef,
     ratePlanRef: parts[1] ?? "",
-    priceMinor,
+    priceMinor: allInMinor,
+    shownMinor,
+    taxBasis,
     mealPlan: raw.b_mealplan_included_name ? decode(String(raw.b_mealplan_included_name)) : null,
     refundable: raw.b_cancellation_type === "free_cancellation",
     genius: raw.b_rate_is_genius === 1,
     maxPersons: Number.isFinite(Number(raw.b_max_persons)) ? Number(raw.b_max_persons) : 0,
     allIncluded: raw.b_price_breakdown_simplified?.b_charges_info_copy?.b_is_all_included === 1,
-    stays: stays.length ? stays : [{ nights: 1, totalMinor: priceMinor }],
+    stays: stays.length ? stays : [{ nights: 1, totalMinor: allInMinor, shownMinor }],
   };
 }
 
@@ -256,10 +325,16 @@ export function parseHotelRoomPrices(html: string): OtaRoom[] {
 /** Cheapest bookable price across all room types — the same headline figure the
  *  comp table already stores, but taken from the structured data so it keeps its
  *  pennies instead of Booking's rounded display string. */
-export function cheapestRoomPrice(rooms: OtaRoom[]): { minor: number; currency: string } | null {
-  let best: { minor: number; currency: string } | null = null;
+export function cheapestRoomPrice(
+  rooms: OtaRoom[],
+): { minor: number; currency: string; taxBasis: TaxBasis } | null {
+  let best: { minor: number; currency: string; taxBasis: TaxBasis } | null = null;
   for (const r of rooms) {
-    if (!best || r.cheapest.priceMinor < best.minor) best = { minor: r.cheapest.priceMinor, currency: r.currency };
+    // priceMinor is all-in, so "cheapest" is a like-for-like comparison even when
+    // Booking rendered some rooms inclusive and others not.
+    if (!best || r.cheapest.priceMinor < best.minor) {
+      best = { minor: r.cheapest.priceMinor, currency: r.currency, taxBasis: r.cheapest.taxBasis };
+    }
   }
   return best;
 }

@@ -83,6 +83,8 @@ export async function loader({ request }: Route.LoaderArgs) {
       mealPlan: r.mealPlan,
       flexMinor: r.flexPriceMinor,
       genius: r.genius,
+      taxBasis: r.taxBasis,
+      shownMinor: r.shownPriceMinor,
     };
   }
 
@@ -119,6 +121,9 @@ interface RoomCell {
   mealPlan: string | null;
   flexMinor: number | null;
   genius: boolean;
+  /** "excl" = Booking displayed this ex-tax and we grossed it up. */
+  taxBasis: string | null;
+  shownMinor: number | null;
 }
 
 export function meta() {
@@ -502,6 +507,9 @@ function RoomPrices({
                           ? t("riRoomsFlex", { price: money(c.flexMinor, c.currency) })
                           : t("riRoomsNoFlex"),
                         c.genius ? t("riRoomsGenius") : "",
+                        c.taxBasis === "excl" && c.shownMinor != null
+                          ? t("riRoomsGrossedUp", { shown: money(c.shownMinor, c.currency) })
+                          : "",
                       ]
                         .filter(Boolean)
                         .join(" · ");
@@ -514,6 +522,9 @@ function RoomPrices({
                           }`}
                         >
                           {money(c.minor, c.currency)}
+                          {c.taxBasis === "excl" && (
+                            <span className="ml-0.5 align-super text-[9px] font-normal text-muted">*</span>
+                          )}
                         </td>
                       );
                     })}
@@ -522,7 +533,12 @@ function RoomPrices({
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-[11.5px] text-muted">{t("riRoomsHint")}</p>
+          <p className="mt-2 text-[11.5px] text-muted">
+            {t("riRoomsHint")}
+            {Object.values(roomCells).some((byDate) =>
+              Object.values(byDate).some((c) => c.taxBasis === "excl"),
+            ) && <span className="ml-1">{t("riRoomsGrossedUpHint")}</span>}
+          </p>
         </>
       )}
     </section>

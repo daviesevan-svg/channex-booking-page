@@ -23,7 +23,9 @@ export interface OtaQuote {
   /** Booking's total for the whole stay, or null when it wouldn't sell it. */
   totalMinor: number | null;
   currency: string;
-  /** Booking says the price includes taxes and charges. */
+  /** True when the captured total is known to be all-in — either Booking showed
+   *  it inclusive, or it told us what it excluded and we added that back. False
+   *  only when the page didn't say, which is when a comparison is unsafe. */
   allIncluded: boolean;
   /** e.g. "breakfast" — disclosed to the guest, since it changes what they get. */
   mealPlan: string | null;
@@ -83,8 +85,10 @@ export function compareDirect(input: CompareInput): CompareResult {
   // Comparing across currencies would need a conversion we don't do, and getting
   // it wrong would misstate the saving.
   if (ota.currency.toUpperCase() !== currency.toUpperCase()) return { show: false, skip: "currency_mismatch" };
-  // Our headline is tax- and fee-inclusive. If Booking's isn't, the guest would
-  // be shown a comparison against a number that grows at their checkout.
+  // Our headline is tax- and fee-inclusive, so theirs must be too. An
+  // ex-tax capture is fine — the excluded charges are read off Booking's own
+  // breakdown and added back at capture time. What is NOT fine is a page that
+  // never said, because then the number could quietly grow at their checkout.
   if (!ota.allIncluded) return { show: false, skip: "not_all_in" };
 
   const savingMinor = ota.totalMinor - directTotalMinor;

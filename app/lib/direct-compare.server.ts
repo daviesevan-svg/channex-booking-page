@@ -150,6 +150,17 @@ export function cheapestDirectMinor(
   return Number.isFinite(best) && best > 0 ? Math.round(best * 100) : null;
 }
 
+/** Whether a captured row's total can be compared with our all-in price.
+ *  A known basis means the stored figure is already all-in (excluded taxes were
+ *  added back from Booking's own breakdown at capture time). Rows written before
+ *  that normalisation carry no basis, so they fall back to Booking's raw flag —
+ *  which is exactly the old, stricter behaviour. */
+function comparableBasis(row: { taxBasis?: string | null; allIncluded: boolean }): boolean {
+  if (row.taxBasis === "incl" || row.taxBasis === "excl") return true;
+  if (row.taxBasis === "unknown") return false;
+  return row.allIncluded;
+}
+
 /** Badges for a search, keyed by OUR room id. Returns an empty map whenever the
  *  feature is off, unmapped, or anything at all goes wrong — the booking page
  *  renders exactly as it did before in that case.
@@ -191,7 +202,7 @@ export async function directCompareBadges(
         ? {
             totalMinor: stayTotalMinor({ stays: row.stays }, opts.nights),
             currency: row.currency ?? opts.currency,
-            allIncluded: row.allIncluded,
+            allIncluded: comparableBasis(row),
             mealPlan: row.mealPlan,
             refundable: row.flexPriceMinor !== null && row.flexPriceMinor === row.priceMinor,
             capturedAt: row.capturedAt,
@@ -314,7 +325,7 @@ export async function explainDirectCompare(
       ? {
           totalMinor: stayTotalMinor({ stays: captureRow.stays }, nights),
           currency: captureRow.currency ?? currency,
-          allIncluded: captureRow.allIncluded,
+          allIncluded: comparableBasis(captureRow),
           mealPlan: captureRow.mealPlan,
           refundable: captureRow.flexPriceMinor !== null && captureRow.flexPriceMinor === captureRow.priceMinor,
           capturedAt: captureRow.capturedAt,
