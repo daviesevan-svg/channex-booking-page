@@ -6,6 +6,10 @@
 // kept. Prices land in rev_comp_price keyed on each comp row's id and are shown
 // on the Rate Intelligence page.
 //
+// The same page also carries every room type with its rate plans and its totals
+// for stays of 1..N nights, so each capture additionally fills rev_ota_room_price
+// (see revman-room-prices) at no extra scraping cost.
+//
 // Metering is fail-safe: we debit a token, scrape, and REFUND only when the
 // scrape itself failed — so hotels pay for data, not for errors, and the wallet
 // can never go negative (the debit is the guard). Capture is idempotent per
@@ -18,7 +22,14 @@ import { getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 import { getRevmanState } from "./revman.server";
 import { getCompSet } from "./revman-compset.server";
-import { buildHotelUrl, parseHotelCheapestPrice } from "./revman-compset-discovery.server";
+import { buildHotelUrl } from "./revman-compset-discovery.server";
+import {
+  cheapestRoomPrice,
+  hasRoomTable,
+  isBookingHotelPage,
+  parseHotelRoomPrices,
+} from "./revman-room-prices";
+import { pruneRoomPrices, writeRoomPrices } from "./revman-room-prices.server";
 import { scrapeUrl, isScrapflyConfigured } from "./scrapfly.server";
 import { debitTokens, creditTokens, getBalance } from "./revman-tokens.server";
 
@@ -464,26 +475,54 @@ async function captureHotelDate(
   const deb = await debitTokens(pid, 1, { reason: "capture", note: `${date} · ${hotel.name}`, actor: actor ?? "system" });
   if (!deb.ok) return { charged: false, pausedNoTokens: true };
 
+  const refund = async (why: string): Promise<void> => {
+    await creditTokens(pid, 1, { reason: "refund", note: `${why} ${date} · ${hotel.name}`, actor: "system" });
+  };
+
   const checkout = iso(Date.parse(`${date}T00:00:00Z`) + DAY);
   const url = buildHotelUrl(hotel.bookingRef, { checkin: date, checkout, adults: 2, currency });
   const scrape = await scrapeUrl(url, {
     asp: true,
-    renderJs: true, // hotel pages 202-challenge without a real render; JS render passes it (~6 credits)
+    // No JS render: the room table is server-rendered, so rendering adds nothing
+    // but cost (6 Scrapfly credits vs 1) and a race — a render that snapshots
+    // early returns a page with no prices at all. Measured July 2026 over 9
+    // fetches: every un-rendered fetch returned the full table; a third of the
+    // rendered ones came back challenged or half-built.
     proxyPool: "public_residential_pool",
     country: currency === "GBP" ? "gb" : undefined,
     format: "raw",
     timeoutMs: 60_000,
   });
   if (!scrape.ok) {
-    await creditTokens(pid, 1, { reason: "refund", note: `scrape failed ${date} · ${hotel.name}`, actor: "system" });
+    await refund("scrape failed");
     // Scrapfly account out of credits / rate-limited: stop the whole run rather
     // than hammer the API with doomed requests (nothing is charged either way).
     const providerExhausted = /quota|upgrade to continue|too many requests|429/i.test(scrape.error ?? "");
     return { charged: false, providerExhausted };
   }
 
-  const price = parseHotelCheapestPrice(scrape.content);
+  // Scrapfly reports success for an anti-bot challenge page too (HTTP 202 with a
+  // WAF body), and a challenge parses to no prices — which we would otherwise
+  // store as "this hotel was sold out". A false sold-out is worse than no data:
+  // it drags the market average down and can talk the hotel into cutting a rate.
+  // So only a page we can positively identify as a hotel page with its
+  // availability table counts; anything else is a failed fetch, refunded.
+  if (!isBookingHotelPage(scrape.content) || !hasRoomTable(scrape.content)) {
+    await refund("incomplete page");
+    console.log(
+      `[revcap] ${pid}/${hotel.id} ${date}: incomplete page (${scrape.content.length} bytes, upstream ${scrape.upstreamStatus}) — refunded`,
+    );
+    return { charged: false };
+  }
+
+  const rooms = parseHotelRoomPrices(scrape.content);
+  const price = cheapestRoomPrice(rooms);
   const capturedAt = new Date().toISOString();
+  await writeRoomPrices(pid, hotel.id, date, rooms, capturedAt).catch((err) =>
+    // Room detail is a bonus on top of the headline price; losing it must not
+    // cost the hotel the token or the price it just paid for.
+    console.error(`[revcap] room prices not stored for ${pid}/${hotel.id} ${date}`, err),
+  );
   await db().batch([
     db()
       .prepare(
@@ -517,6 +556,8 @@ export async function scheduledCompCapture(): Promise<void> {
     .bind(new Date(Date.now() - HIST_KEEP_DAYS * DAY).toISOString())
     .run()
     .catch((err) => console.error("[cron] comp price history prune failed", err));
+  // Room-level prices describe dates ahead of us only; drop the ones now past.
+  await pruneRoomPrices(iso(Date.now())).catch((err) => console.error("[cron] room price prune failed", err));
   const props = await getProperties();
   for (const p of props) {
     try {

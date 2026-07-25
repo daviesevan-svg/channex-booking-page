@@ -77,18 +77,10 @@ export function buildHotelUrl(
   return `${path}?${p.toString()}`;
 }
 
-/** Parses the cheapest bookable nightly price from a Booking hotel page. The page
- *  embeds each room block as `"b_price":"£NN"`; for a 1-night search the minimum
- *  of those is the cheapest nightly rate a shopper sees (incl. promos). Null when
- *  the hotel has no availability for the searched night. */
-export function parseHotelCheapestPrice(html: string): { minor: number; currency: string } | null {
-  let best: { minor: number; currency: string } | null = null;
-  for (const m of html.matchAll(/"b_price":"([^"]+)"/g)) {
-    const p = parsePriceText(m[1]);
-    if (p && (!best || p.minor < best.minor)) best = p;
-  }
-  return best;
-}
+// The cheapest bookable price used to be scraped here with a regex over every
+// `"b_price"` on the page. It now comes from the structured room table instead
+// (revman-room-prices), which yields the same figure with its pennies intact and
+// the room type it belongs to.
 
 /** Parses a Booking price string like "£1,180" / "€92" / "US$140" into minor
  *  units + ISO currency. Returns null when unrecognised. */
