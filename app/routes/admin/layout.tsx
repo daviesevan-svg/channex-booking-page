@@ -196,10 +196,11 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       items: [
         { to: "/admin/inventory", label: t("navInventory") },
         { to: "/admin/analytics", label: t("navAnalytics") },
-        // Revenue management is hidden for single-unit properties; they get the
-        // vacation-rental insights page instead (see the respective loaders).
+        // Revenue management is hidden for single-unit properties (see loader):
+        // its occupancy/ADR/pace maths and Booking.com comp set assume a
+        // multi-room hotel.
         ...(singleUnit
-          ? [{ to: "/admin/vr-insights", label: t("navVrInsights") }]
+          ? []
           : [
               { to: "/admin/revenue", label: t("navRevenue") },
               { to: "/admin/rate-intel", label: t("navRateIntel") },
