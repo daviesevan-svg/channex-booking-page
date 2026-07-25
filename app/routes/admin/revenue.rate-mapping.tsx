@@ -15,6 +15,7 @@ import { getSettings } from "~/lib/overrides.server";
 import { getRevmanState } from "~/lib/revman.server";
 import { getRevmanKpis } from "~/lib/revman-analytics.server";
 import { cellKey, type DetectedLink } from "~/lib/revman-rate-link";
+import { getLastPush, type LastPush } from "~/lib/channex/ari-push.server";
 import {
   applyDetectedLinks,
   detectRateLinks,
@@ -23,6 +24,7 @@ import {
   getRateLinkConfig,
   setRateLink,
   setRateMaster,
+  setPushOnApply,
   setReferenceRoom,
   type AriRatePair,
   type RateLinkConfig,
@@ -43,12 +45,13 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const today = todayISODate();
   const to = windowTo(today);
-  const [cfg, pairs, detections, rooms, kpis] = await Promise.all([
+  const [cfg, pairs, detections, rooms, kpis, lastPush] = await Promise.all([
     getRateLinkConfig(pid),
     getAriRatePairs(pid, today, to),
     detectRateLinks(pid, today, to),
     detectRoomRelations(pid, today, to),
     getRevmanKpis(pid, today, state.roomCount).catch(() => undefined),
+    getLastPush(pid),
   ]);
   return {
     configured: true as const,
@@ -59,6 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     detections,
     rooms,
     currency: kpis?.currency,
+    lastPush,
   };
 }
 
@@ -93,6 +97,10 @@ export async function action({ request }: Route.ActionArgs) {
       const value = Number(raw);
       if (!Number.isFinite(value)) return { errorKey: "revRateLinkErr" as const };
       await setRateLink(pid, roomId, rateId, { mode, value });
+      return { okKey: "revSaved" as const };
+    }
+    if (intent === "pushOnApply") {
+      await setPushOnApply(pid, form.get("on") === "on");
       return { okKey: "revSaved" as const };
     }
     if (intent === "rateDetect") {
@@ -357,6 +365,41 @@ function RoomLadder({
   );
 }
 
+/** Sending applied prices on to Channex, which puts them in front of the OTAs.
+ *  Off by default and stated plainly, because it writes to live inventory. */
+function PushSettings({ on, lastPush, busy, t }: { on: boolean; lastPush?: LastPush; busy: boolean; t: AdminT }) {
+  return (
+    <section className="mt-5 rounded-[14px] border border-line bg-surface p-6">
+      <div className="font-serif text-[18px] font-semibold">{t("revPushTitle")}</div>
+      <p className="mb-3 mt-1 max-w-[640px] text-[13px] text-muted">{t("revPushSub")}</p>
+      <Form method="post" className="flex flex-wrap items-center gap-3">
+        <input type="hidden" name="intent" value="pushOnApply" />
+        <label className="flex items-center gap-2 text-[13px] text-secondary">
+          <input type="checkbox" name="on" defaultChecked={on} /> {t("revPushEnable")}
+        </label>
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
+        >
+          {t("revSave")}
+        </button>
+      </Form>
+      <p className="mt-2 rounded-[8px] bg-surface-alt px-3 py-2 text-[12px] text-faint">{t("revPushWarn")}</p>
+      {lastPush && (
+        <p className={`mt-2 text-[12.5px] ${lastPush.ok ? "text-muted" : "text-amber-700"}`}>
+          {lastPush.error
+            ? t("revPushLastError", { when: lastPush.at.slice(0, 16).replace("T", " "), error: lastPush.error })
+            : lastPush.simulated
+            ? t("revPushLastSimulated", { when: lastPush.at.slice(0, 16).replace("T", " "), n: String(lastPush.values) })
+            : t("revPushLastOk", { when: lastPush.at.slice(0, 16).replace("T", " "), n: String(lastPush.values) })}
+          {lastPush.skipped > 0 && ` ${t("revPushSkipped", { n: String(lastPush.skipped) })}`}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function RateMappingPage({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
   const nav = useNavigation();
@@ -399,6 +442,7 @@ export default function RateMappingPage({ loaderData, actionData }: Route.Compon
 
       <RateMapping cfg={cfg} pairs={pairs} detections={detections} currency={currency} busy={busy} t={t} />
       <RoomLadder rooms={rooms} pairs={pairs} currency={currency} busy={busy} t={t} />
+      <PushSettings on={cfg.pushOnApply} lastPush={loaderData.lastPush} busy={busy} t={t} />
     </div>
   );
 }

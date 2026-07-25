@@ -148,6 +148,16 @@ const EN: Record<string, string> = {
   revRoomLadderIsRef: "The reference room type.",
   revRoomLadderSteadyPct: "steady percentage ({n} dates)",
   revRoomLadderSteadyAmt: "steady amount ({n} dates)",
+  revPushTitle: "Send prices to Channex",
+  revPushSub:
+    "When this is on, applying a suggestion also sends the new prices to Channex, which passes them on to your connected channels. Only the dates you just changed are sent, and every occupancy of each rate is included so per-person prices aren't wiped.",
+  revPushEnable: "Send applied prices to Channex",
+  revPushWarn:
+    "This writes to your live rates. If a PMS also pushes rates to Channex for this property, whichever system wrote last wins — check before turning it on. Nothing is sent unless the property has selected Channex on the Connectivity page.",
+  revPushLastOk: "Last send {when}: {n} rate ranges accepted.",
+  revPushLastSimulated: "Last run {when}: {n} rate ranges prepared but not sent (sending is off, or Channex isn't selected).",
+  revPushLastError: "Last send {when} failed: {error}",
+  revPushSkipped: "{n} dates skipped — no per-person prices stored for them.",
   revRateMapTitle: "Which rate plan gets the price",
   revRateMapSub:
     "Revenue management moves ONE rate plan per room type — the master — and the room's other rate plans follow it at a fixed relationship. Use a percentage for discount tiers, which should scale with the master, and a fixed amount for supplements like breakfast, which a percentage would inflate as prices rise. Detect reads the relationships straight from the prices you already have loaded.",
@@ -1843,6 +1853,16 @@ const DE: Record<string, string> = {
   revRoomLadderIsRef: "Der Referenz-Zimmertyp.",
   revRoomLadderSteadyPct: "konstanter Prozentsatz ({n} Termine)",
   revRoomLadderSteadyAmt: "konstanter Betrag ({n} Termine)",
+  revPushTitle: "Preise an Channex senden",
+  revPushSub:
+    "Wenn dies aktiv ist, werden beim Anwenden einer Empfehlung die neuen Preise auch an Channex gesendet, das sie an Ihre verbundenen Kanäle weitergibt. Es werden nur die gerade geänderten Termine gesendet — inklusive aller Belegungen je Rate, damit personenbezogene Preise nicht verloren gehen.",
+  revPushEnable: "Angewendete Preise an Channex senden",
+  revPushWarn:
+    "Dies schreibt in Ihre Live-Raten. Wenn für diese Unterkunft auch ein PMS Raten an Channex sendet, gewinnt das zuletzt schreibende System — prüfen Sie das, bevor Sie es aktivieren. Es wird nichts gesendet, solange die Unterkunft auf der Konnektivitätsseite nicht Channex ausgewählt hat.",
+  revPushLastOk: "Letzte Übertragung {when}: {n} Ratenzeiträume akzeptiert.",
+  revPushLastSimulated: "Letzter Lauf {when}: {n} Ratenzeiträume vorbereitet, aber nicht gesendet (Senden aus oder Channex nicht ausgewählt).",
+  revPushLastError: "Letzte Übertragung {when} fehlgeschlagen: {error}",
+  revPushSkipped: "{n} Termine übersprungen — keine personenbezogenen Preise gespeichert.",
   revRateMapTitle: "Welcher Ratenplan den Preis erhält",
   revRateMapSub:
     "Das Revenue-Management verändert EINEN Ratenplan pro Zimmertyp — den Master — und die übrigen Ratenpläne des Zimmers folgen ihm in einem festen Verhältnis. Prozente eignen sich für Rabattstufen, die mit dem Master skalieren sollen; ein fester Betrag für Zuschläge wie Frühstück, die ein Prozentsatz mit steigenden Preisen aufblähen würde. „Erkennen“ liest die Verhältnisse direkt aus Ihren bereits geladenen Preisen.",
