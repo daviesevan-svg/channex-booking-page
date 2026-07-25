@@ -24,6 +24,10 @@ export interface CompareSettings {
   enabled: boolean;
   /** Our room id → Booking room ref. Rooms absent from here get no badge. */
   roomMap: Record<string, string>;
+  /** Booking's hotel id, to pin WHICH Booking.com channel the mapping is read
+   *  from when a property has more than one connection. Blank = infer it from
+   *  the room codes we've captured. */
+  bookingHotelId: string;
   minSavingPct: number;
   maxAgeHours: number;
 }
@@ -31,6 +35,7 @@ export interface CompareSettings {
 export const DEFAULT_COMPARE_SETTINGS: CompareSettings = {
   enabled: false,
   roomMap: {},
+  bookingHotelId: "",
   minSavingPct: DEFAULT_MIN_SAVING_PCT,
   maxAgeHours: DEFAULT_MAX_AGE_HOURS,
 };
@@ -61,6 +66,7 @@ export async function getCompareSettings(pid: string): Promise<CompareSettings> 
     return {
       enabled: Boolean(s.enabled),
       roomMap: cleanMap(s.roomMap),
+      bookingHotelId: typeof s.bookingHotelId === "string" ? s.bookingHotelId.trim() : "",
       minSavingPct: clampInt(s.minSavingPct, 1, 50, DEFAULT_MIN_SAVING_PCT),
       maxAgeHours: clampInt(s.maxAgeHours, 1, 720, DEFAULT_MAX_AGE_HOURS),
     };
@@ -74,6 +80,8 @@ export async function setCompareSettings(pid: string, patch: Partial<CompareSett
   const next: CompareSettings = {
     enabled: patch.enabled ?? current.enabled,
     roomMap: patch.roomMap ? cleanMap(patch.roomMap) : current.roomMap,
+    bookingHotelId:
+      patch.bookingHotelId !== undefined ? String(patch.bookingHotelId).trim() : current.bookingHotelId,
     minSavingPct:
       patch.minSavingPct !== undefined ? clampInt(patch.minSavingPct, 1, 50, current.minSavingPct) : current.minSavingPct,
     maxAgeHours:

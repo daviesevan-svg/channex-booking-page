@@ -14,6 +14,79 @@
 // hotel 36364). Where a code doesn't match anything we captured, the room is
 // reported unmatched rather than mapped to a guess.
 
+/** A Booking.com channel on the property, reduced to what identifies it. */
+export interface BookingChannel {
+  channelId: string;
+  title?: string;
+  /** Booking's hotel id from the channel settings. */
+  hotelId?: string;
+  isActive?: boolean;
+  ratePlans: ChannelRatePlan[];
+}
+
+/** How a channel was chosen, or why none could be. */
+export type ChannelPick =
+  /** The owner pinned a Booking hotel id and it matched. */
+  | { reason: "hotel_id"; chosen: BookingChannel }
+  /** Its mapped room codes match the rooms we've scraped — nothing else does. */
+  | { reason: "code_overlap"; chosen: BookingChannel }
+  /** Only one Booking.com channel exists, so there's nothing to disambiguate. */
+  | { reason: "only_one"; chosen: BookingChannel }
+  /** No Booking.com channel at all. */
+  | { reason: "none"; chosen: null }
+  /** A hotel id was pinned but no channel carries it. */
+  | { reason: "hotel_id_not_found"; chosen: null }
+  /** Several channels, and the scraped room codes don't single one out. */
+  | { reason: "ambiguous"; chosen: null };
+
+/** How many of a channel's mapped Booking room codes we have actually captured
+ *  prices for. This is what lets two Booking.com connections on one property be
+ *  told apart without asking: the right channel is the one whose rooms are the
+ *  rooms we're scraping. */
+export function codeOverlap(channel: BookingChannel, knownCodes: string[]): number {
+  const known = new Set(knownCodes);
+  const codes = new Set(
+    channel.ratePlans.map((r) => (r.roomTypeCode ?? "").trim()).filter(Boolean),
+  );
+  let n = 0;
+  for (const c of codes) if (known.has(c)) n++;
+  return n;
+}
+
+/** Chooses which Booking.com channel to read the mapping from.
+ *
+ *  A pinned hotel id always wins — it's the owner being explicit. Otherwise the
+ *  scraped room codes decide, which handles the common case of a property with
+ *  more than one Booking.com connection (a second listing, a legacy connection)
+ *  without making anyone dig ids out of Channex. A tie, or no overlap at all, is
+ *  reported as ambiguous rather than resolved by picking the first: reading the
+ *  wrong connection would map our rooms to another listing's rooms and quote a
+ *  completely unrelated price to a guest. */
+export function pickBookingChannel(
+  channels: BookingChannel[],
+  knownCodes: string[],
+  preferredHotelId?: string,
+): ChannelPick {
+  if (channels.length === 0) return { reason: "none", chosen: null };
+
+  const pinned = (preferredHotelId ?? "").trim();
+  if (pinned) {
+    const hit = channels.find((c) => (c.hotelId ?? "").trim() === pinned);
+    return hit ? { reason: "hotel_id", chosen: hit } : { reason: "hotel_id_not_found", chosen: null };
+  }
+
+  if (channels.length === 1) return { reason: "only_one", chosen: channels[0] };
+
+  const scored = channels
+    .map((c) => ({ channel: c, overlap: codeOverlap(c, knownCodes) }))
+    .sort((a, b) => b.overlap - a.overlap);
+  const best = scored[0];
+  const runnerUp = scored[1];
+  if (best.overlap === 0) return { reason: "ambiguous", chosen: null };
+  if (runnerUp && runnerUp.overlap === best.overlap) return { reason: "ambiguous", chosen: null };
+  return { reason: "code_overlap", chosen: best.channel };
+}
+
 /** One rate plan's Booking mapping, as stored on a Channex channel. */
 export interface ChannelRatePlan {
   /** OUR Channex rate-plan id. */

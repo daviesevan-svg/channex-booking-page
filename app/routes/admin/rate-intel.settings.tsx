@@ -76,7 +76,10 @@ export async function action({ request }: Route.ActionArgs) {
     // review — the owner still has to save the form for it to take effect.
     const today = todayISODate();
     const known = await ownOtaRooms(pid, today, isoAt(today, 365));
-    const imported = await importBookingRoomMap(pid, known.map((r) => r.roomRef));
+    // Honour a hotel id typed in the form but not yet saved, so the owner can pin
+    // the connection and import in one go.
+    const pinned = String(form.get("bookingHotelId") ?? "").trim();
+    const imported = await importBookingRoomMap(pid, known.map((r) => r.roomRef), pinned || undefined);
     return { imported };
   }
 
@@ -92,6 +95,7 @@ export async function action({ request }: Route.ActionArgs) {
     await setCompareSettings(pid, {
       enabled: form.get("compareEnabled") === "on",
       roomMap,
+      bookingHotelId: String(form.get("bookingHotelId") ?? ""),
       minSavingPct: Number(form.get("minSavingPct")),
       maxAgeHours: Number(form.get("maxAgeHours")),
     });
@@ -230,7 +234,7 @@ function DirectCompare({
   imported,
   busy,
 }: {
-  compare: { enabled: boolean; roomMap: Record<string, string>; minSavingPct: number; maxAgeHours: number };
+  compare: { enabled: boolean; roomMap: Record<string, string>; bookingHotelId: string; minSavingPct: number; maxAgeHours: number };
   ourRooms: { id: string; title: string }[];
   otaRooms: { roomRef: string; name: string; maxPersons: number | null }[];
   suggested: Record<string, string>;
@@ -239,6 +243,8 @@ function DirectCompare({
     roomMap: Record<string, string>;
     channelTitle?: string;
     hotelId?: string;
+    channels: { title?: string; hotelId?: string; isActive?: boolean; overlap: number }[];
+    pickedBy?: string;
     conflicts: { roomId: string; codes: string[] }[];
     dropped: { roomId: string; code: string }[];
     error?: string;
@@ -254,14 +260,19 @@ function DirectCompare({
     not_mapped: "riCompareImportNotMapped",
     no_match: "riCompareImportNoMatch",
     rates_unknown: "riCompareImportRatesUnknown",
+    ambiguous: "riCompareImportAmbiguous",
+    hotel_id_not_found: "riCompareImportHotelIdNotFound",
   } as const)[imported?.error ?? ""];
   // Anything else (Channex down, timeout, rejected key) is shown verbatim rather
   // than swallowed — a button that silently does nothing is worse than an error.
   const importErrorRaw = imported && !imported.ok && !importErrorKey ? imported.error : undefined;
 
+  // NOTE: no hidden `intent` field in this form. A hidden input appears BEFORE
+  // the buttons in the submitted data, so form.get("intent") returns it and the
+  // Import button silently saves instead of importing. Each button carries its
+  // own intent.
   return (
     <Form method="post" className="mt-8 flex flex-col gap-5">
-      <input type="hidden" name="intent" value="compare" />
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="font-serif text-[19px] font-semibold">{t("riCompareTitle")}</h2>
         <p className="mt-1 text-[13px] text-muted">{t("riCompareSub")}</p>
@@ -314,6 +325,38 @@ function DirectCompare({
                 </button>
               </div>
 
+              {/* Which Booking.com connection to read. Spilman has two, so the
+                  choice is real: an unpinned import infers it from the room codes
+                  we've scraped, and this field overrides that. */}
+              <label className="mt-3 block text-[13px] font-medium text-secondary">
+                {t("riCompareHotelId")}
+                <input
+                  type="text"
+                  name="bookingHotelId"
+                  inputMode="numeric"
+                  defaultValue={compare.bookingHotelId}
+                  placeholder={t("riCompareHotelIdPlaceholder")}
+                  className={`${FIELD} mt-1 block w-full max-w-[240px]`}
+                />
+                <span className="mt-1 block text-[12px] font-normal text-muted">{t("riCompareHotelIdSub")}</span>
+              </label>
+
+              {imported && imported.channels.length > 1 && (
+                <div className="mt-3 rounded-[10px] border border-line-alt bg-chip/40 px-4 py-3 text-[12.5px] text-secondary">
+                  <div className="font-semibold">{t("riCompareChannelsFound", { n: String(imported.channels.length) })}</div>
+                  <ul className="mt-1 flex flex-col gap-0.5">
+                    {imported.channels.map((c, i) => (
+                      <li key={`${c.hotelId ?? "?"}-${i}`}>
+                        {c.title || t("riCompareImportChannelFallback")}
+                        {c.hotelId ? ` · ${t("riCompareChannelHotelId", { id: c.hotelId })}` : ""}
+                        {` · ${t("riCompareChannelOverlap", { n: String(c.overlap) })}`}
+                        {imported.hotelId && c.hotelId === imported.hotelId ? ` — ${t("riCompareChannelUsed")}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {imported?.ok && (
                 <div className="mt-3 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12.5px] text-emerald-900">
                   <div className="font-semibold">
@@ -321,7 +364,11 @@ function DirectCompare({
                       n: String(Object.keys(imported.roomMap).length),
                       channel: imported.channelTitle || t("riCompareImportChannelFallback"),
                     })}
+                    {imported.hotelId ? ` (${t("riCompareChannelHotelId", { id: imported.hotelId })})` : ""}
                   </div>
+                  {imported.pickedBy === "code_overlap" && (
+                    <div className="mt-0.5">{t("riCompareImportPickedByCodes")}</div>
+                  )}
                   <div className="mt-0.5">{t("riCompareImportReview")}</div>
                 </div>
               )}
@@ -405,7 +452,7 @@ function DirectCompare({
 
       {otaRooms.length > 0 && (
         <div>
-          <button type="submit" disabled={busy} className="rounded-[10px] bg-accent px-6 py-2.5 text-[14px] font-semibold text-white disabled:opacity-60">
+          <button type="submit" name="intent" value="compare" disabled={busy} className="rounded-[10px] bg-accent px-6 py-2.5 text-[14px] font-semibold text-white disabled:opacity-60">
             {t("riSave")}
           </button>
         </div>
