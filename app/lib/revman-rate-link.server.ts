@@ -19,6 +19,10 @@ export interface RateLinkConfig {
   /** Push applied prices out to Channex. Off by default: it writes to live OTA
    *  inventory, so it's a deliberate per-property opt-in. */
   pushOnApply: boolean;
+  /** Room type the others are COMPARED against on the mapping page. Reference
+   *  only — room types are still priced on their own demand, so this doesn't
+   *  derive anything; it just shows the hotelier the shape of their rate board. */
+  referenceRoom?: string;
 }
 
 const EMPTY: RateLinkConfig = { masterByRoom: {}, links: {}, pushOnApply: false };
@@ -40,6 +44,7 @@ export async function getRateLinkConfig(pid: string): Promise<RateLinkConfig> {
       masterByRoom: { ...(c.masterByRoom ?? {}) },
       links,
       pushOnApply: c.pushOnApply === true,
+      referenceRoom: typeof c.referenceRoom === "string" && c.referenceRoom ? c.referenceRoom : undefined,
     };
   } catch {
     return { ...EMPTY };
@@ -68,6 +73,14 @@ export async function setRateLink(pid: string, roomId: string, rateId: string, l
   const key = cellKey(roomId, rateId);
   if (link === null) delete cfg.links[key];
   else cfg.links[key] = link;
+  await writeConfig(pid, cfg);
+}
+
+/** Chooses the room type others are compared against on the mapping page. */
+export async function setReferenceRoom(pid: string, roomId: string): Promise<void> {
+  const cfg = await getRateLinkConfig(pid);
+  if (!roomId) delete cfg.referenceRoom;
+  else cfg.referenceRoom = roomId;
   await writeConfig(pid, cfg);
 }
 
@@ -173,4 +186,103 @@ export async function applyDetectedLinks(
   }
   if (written > 0) await writeConfig(pid, cfg);
   return written;
+}
+
+// ---------------------------------------------------------------------------
+// Room-type relationships (informational).
+
+export interface RoomRelation {
+  roomId: string;
+  roomName?: string;
+  /** The rate the comparison used: the room's master when set, otherwise its
+   *  cheapest rate that night (so a room with no master still shows up). */
+  viaRateId?: string;
+  viaRateName?: string;
+  detected: DetectedLink;
+}
+
+/** The price used to represent a room on a date: its master rate when one is
+ *  nominated, else the cheapest rate priced that night. */
+function roomPriceOn(cells: Map<string, number>, masterId?: string): { rateId: string; price: number } | null {
+  if (masterId) {
+    const p = cells.get(masterId);
+    if (p && p > 0) return { rateId: masterId, price: p };
+  }
+  let best: { rateId: string; price: number } | null = null;
+  for (const [rateId, price] of cells) {
+    if (!(price > 0)) continue;
+    if (!best || price < best.price) best = { rateId, price };
+  }
+  return best;
+}
+
+/** How each room type's price compares to the reference room's, across the
+ *  window. Purely descriptive — nothing derives from it — so a hotelier can see
+ *  whether their room ladder is a consistent percentage, a consistent amount,
+ *  or drifting. Returns [] when there's no reference or only one room priced. */
+export async function detectRoomRelations(
+  pid: string,
+  from: string,
+  to: string,
+): Promise<{ referenceRoom?: string; referenceName?: string; relations: RoomRelation[] }> {
+  const [inventory, cfg, rooms, rates] = await Promise.all([
+    getInventory(pid, from, to),
+    getRateLinkConfig(pid),
+    getRooms(pid),
+    getRates(pid),
+  ]);
+  const roomNames = new Map(rooms.map((r) => [r.id, r.title]));
+  const rateNames = new Map(rates.map((r) => [r.id, r.title]));
+
+  // date → roomId → rateId → price
+  const byDate = new Map<string, Map<string, Map<string, number>>>();
+  const roomSamples = new Map<string, number>();
+  for (const [key, price] of Object.entries(inventory.prices)) {
+    if (!(price > 0)) continue;
+    const [roomId, rateId, date] = key.split("|");
+    let byRoom = byDate.get(date);
+    if (!byRoom) byDate.set(date, (byRoom = new Map()));
+    let cells = byRoom.get(roomId);
+    if (!cells) byRoom.set(roomId, (cells = new Map()));
+    cells.set(rateId, price);
+    roomSamples.set(roomId, (roomSamples.get(roomId) ?? 0) + 1);
+  }
+  if (roomSamples.size < 2) return { relations: [] };
+
+  // Default the reference to the most-priced room so the page is useful before
+  // anyone chooses one.
+  const referenceRoom =
+    cfg.referenceRoom && roomSamples.has(cfg.referenceRoom)
+      ? cfg.referenceRoom
+      : [...roomSamples.entries()].sort((a, b) => b[1] - a[1])[0][0];
+
+  const pairs = new Map<string, { master: number; rate: number }[]>();
+  const via = new Map<string, string>();
+  for (const byRoom of byDate.values()) {
+    const refCells = byRoom.get(referenceRoom);
+    if (!refCells) continue;
+    const ref = roomPriceOn(refCells, cfg.masterByRoom[referenceRoom]);
+    if (!ref) continue;
+    for (const [roomId, cells] of byRoom) {
+      if (roomId === referenceRoom) continue;
+      const own = roomPriceOn(cells, cfg.masterByRoom[roomId]);
+      if (!own) continue;
+      const list = pairs.get(roomId) ?? [];
+      list.push({ master: ref.price, rate: own.price });
+      pairs.set(roomId, list);
+      via.set(roomId, own.rateId);
+    }
+  }
+
+  const relations: RoomRelation[] = [...pairs.entries()]
+    .map(([roomId, list]) => ({
+      roomId,
+      roomName: roomNames.get(roomId),
+      viaRateId: via.get(roomId),
+      viaRateName: via.get(roomId) ? rateNames.get(via.get(roomId) as string) : undefined,
+      detected: detectLink(list),
+    }))
+    .sort((a, b) => (a.roomName ?? a.roomId).localeCompare(b.roomName ?? b.roomId));
+
+  return { referenceRoom, referenceName: roomNames.get(referenceRoom), relations };
 }

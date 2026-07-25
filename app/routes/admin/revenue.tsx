@@ -35,17 +35,7 @@ import {
 import { discoverCompetitors, type CandidateHotel } from "~/lib/revman-compset-discovery.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
-import {
-  applyDetectedLinks,
-  detectRateLinks,
-  getAriRatePairs,
-  getRateLinkConfig,
-  setRateLink,
-  setRateMaster,
-  type AriRatePair,
-  type RateLinkConfig,
-} from "~/lib/revman-rate-link.server";
-import { cellKey, type DetectedLink } from "~/lib/revman-rate-link";
+import { getRateLinkConfig } from "~/lib/revman-rate-link.server";
 import { creditTokens, getBalance, getLedger, type LedgerEntry } from "~/lib/revman-tokens.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { importLooksStalled } from "~/lib/revman";
@@ -124,11 +114,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       .join(", ");
   }
 
-  // Rate derivation: which rate plan RMS moves per room, and how the rest follow.
-  const rateTo = new Date(Date.parse(`${today}T00:00:00Z`) + 59 * 86_400_000).toISOString().slice(0, 10);
+  // Rate derivation lives on its own settings page; the dashboard only needs to
+  // know whether to link to it.
   const rateLinks = state ? await getRateLinkConfig(pid) : undefined;
-  const ratePairs = state && hasData ? await getAriRatePairs(pid, today, rateTo) : [];
-  const rateDetections = state && hasData ? await detectRateLinks(pid, today, rateTo) : {};
 
   // Rate-intelligence token wallet (comp-price capture is metered against it).
   const tokenBalance = state ? await getBalance(pid) : 0;
@@ -153,8 +141,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     tokenBalance,
     tokenLedger,
     rateLinks,
-    ratePairs,
-    rateDetections,
   };
 }
 
@@ -289,28 +275,6 @@ export async function action({ request }: Route.ActionArgs) {
         actor: email,
       });
       return { okKey: "revTokCredited" as const, tokenBalance: balance };
-    }
-    if (intent === "rateMaster") {
-      await setRateMaster(pid, String(form.get("roomId")), String(form.get("rateId") || ""));
-      return { okKey: "revSaved" as const };
-    }
-    if (intent === "rateLink") {
-      const mode = String(form.get("mode")) === "fixed" ? "fixed" : "percent";
-      const raw = String(form.get("value") || "").trim();
-      if (raw === "") {
-        await setRateLink(pid, String(form.get("roomId")), String(form.get("rateId")), null);
-        return { okKey: "revSaved" as const };
-      }
-      const value = Number(raw);
-      if (!Number.isFinite(value)) return { errorKey: "revRateLinkErr" as const };
-      await setRateLink(pid, String(form.get("roomId")), String(form.get("rateId")), { mode, value });
-      return { okKey: "revSaved" as const };
-    }
-    if (intent === "rateDetect") {
-      const today = todayISODate();
-      const to = new Date(Date.parse(`${today}T00:00:00Z`) + 59 * 86_400_000).toISOString().slice(0, 10);
-      const n = await applyDetectedLinks(pid, today, to, { overwrite: true });
-      return { okKey: "revRateDetected" as const, detectedCount: n };
     }
     if (intent === "disconnect") {
       await disconnectRevman(pid);
@@ -551,151 +515,6 @@ function PaceCalendar({
 
 /** Occupancy column chart with an optional dashed forecast tick per bar —
  *  hand-rolled like the analytics page. */
-/** Rate derivation: pick the rate plan revenue management moves for each room,
- *  and how that room's other rate plans follow it. Percentages suit discount
- *  tiers (they scale with the master); fixed amounts suit supplements like
- *  breakfast (a percentage would inflate them as the master rises). */
-function RateMapping({
-  cfg,
-  pairs,
-  detections,
-  currency,
-  busy,
-  t,
-}: {
-  cfg: RateLinkConfig;
-  pairs: AriRatePair[];
-  detections: Record<string, DetectedLink>;
-  currency?: string;
-  busy: boolean;
-  t: AdminT;
-}) {
-  const byRoom = new Map<string, AriRatePair[]>();
-  for (const p of pairs) {
-    const list = byRoom.get(p.roomId) ?? [];
-    list.push(p);
-    byRoom.set(p.roomId, list);
-  }
-  const field = "rounded-[7px] border border-line-alt bg-surface px-2 py-1 text-[12.5px]";
-
-  return (
-    <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="font-serif text-[18px] font-semibold">{t("revRateMapTitle")}</div>
-          <p className="mb-2 mt-1 max-w-[640px] text-[13px] text-muted">{t("revRateMapSub")}</p>
-        </div>
-        <Form method="post">
-          <input type="hidden" name="intent" value="rateDetect" />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-[9px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
-          >
-            {t("revRateDetect")}
-          </button>
-        </Form>
-      </div>
-
-      {byRoom.size === 0 ? (
-        <p className="mt-2 text-[13px] text-muted">{t("revRateMapNoPrices")}</p>
-      ) : (
-        <div className="mt-3 space-y-5">
-          {[...byRoom.entries()].map(([roomId, rates]) => {
-            const masterId = cfg.masterByRoom[roomId];
-            const roomName = rates[0].roomName ?? roomId.slice(0, 8);
-            return (
-              <div key={roomId} className="rounded-[10px] border border-line-alt p-4">
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                  <div className="text-[13.5px] font-semibold text-secondary">{roomName}</div>
-                  <Form method="post" className="flex items-end gap-2">
-                    <input type="hidden" name="intent" value="rateMaster" />
-                    <input type="hidden" name="roomId" value={roomId} />
-                    <label className="text-[12px] text-muted">
-                      {t("revRateMaster")}
-                      <select name="rateId" defaultValue={masterId ?? ""} className={`${field} mt-0.5 block`}>
-                        <option value="">{t("revRateNoMaster")}</option>
-                        {rates.map((r) => (
-                          <option key={r.rateId} value={r.rateId}>
-                            {r.rateName ?? r.rateId.slice(0, 8)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      type="submit"
-                      disabled={busy}
-                      className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
-                    >
-                      {t("revSave")}
-                    </button>
-                  </Form>
-                </div>
-
-                {!masterId ? (
-                  <p className="mt-2 text-[12.5px] text-muted">{t("revRateNoMasterHint")}</p>
-                ) : (
-                  <div className="mt-3 space-y-2">
-                    {rates
-                      .filter((r) => r.rateId !== masterId)
-                      .map((r) => {
-                        const key = cellKey(roomId, r.rateId);
-                        const link = cfg.links[key];
-                        const det = detections[key];
-                        return (
-                          <Form key={r.rateId} method="post" className="flex flex-wrap items-end gap-2 border-t border-line-alt pt-2">
-                            <input type="hidden" name="intent" value="rateLink" />
-                            <input type="hidden" name="roomId" value={roomId} />
-                            <input type="hidden" name="rateId" value={r.rateId} />
-                            <span className="min-w-[150px] flex-1 text-[12.5px] text-secondary">
-                              {r.rateName ?? r.rateId.slice(0, 8)}
-                            </span>
-                            <label className="text-[11.5px] text-muted">
-                              {t("revRateRelation")}
-                              <select name="mode" defaultValue={link?.mode ?? det?.suggested ?? "percent"} className={`${field} mt-0.5 block`}>
-                                <option value="percent">{t("revRateModePercent")}</option>
-                                <option value="fixed">{t("revRateModeFixed", { cur: currency ?? "" })}</option>
-                              </select>
-                            </label>
-                            <label className="text-[11.5px] text-muted">
-                              {t("revRateValue")}
-                              <input
-                                name="value"
-                                type="number"
-                                step="0.01"
-                                defaultValue={link?.value ?? (det?.suggested === "fixed" ? det?.fixed ?? "" : det?.percent ?? "")}
-                                className={`${field} mt-0.5 block w-24`}
-                              />
-                            </label>
-                            <button
-                              type="submit"
-                              disabled={busy}
-                              className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
-                            >
-                              {t("revSave")}
-                            </button>
-                            {det && det.samples > 0 && (
-                              <span className="text-[11px] text-faint">
-                                {t("revRateDetected", {
-                                  pct: String(det.percent ?? 0),
-                                  amt: String(det.fixed ?? 0),
-                                  n: String(det.samples),
-                                })}
-                              </span>
-                            )}
-                          </Form>
-                        );
-                      })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
-  );
-}
 
 function OccupancyChart({
   days,
@@ -1177,9 +996,7 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
       )}
       {actionData && "okKey" in actionData && actionData.okKey && (
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
-          {actionData.okKey === "revRateDetected" && "detectedCount" in actionData
-            ? t("revRateDetectedOk", { count: String(actionData.detectedCount) })
-            : actionData.okKey === "revSugApplied" && "applied" in actionData && actionData.applied
+          {actionData.okKey === "revSugApplied" && "applied" in actionData && actionData.applied
             ? t("revSugApplied", {
                 dates: String(actionData.applied.dates),
                 cells: String(actionData.applied.cells),
@@ -1506,14 +1323,13 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
           )}
 
           {loaderData.rateLinks && (
-            <RateMapping
-              cfg={loaderData.rateLinks}
-              pairs={loaderData.ratePairs}
-              detections={loaderData.rateDetections}
-              currency={kpis?.currency}
-              busy={busy}
-              t={t}
-            />
+            <p className="mt-6 text-[13px] text-muted">
+              {t("revRateMapLinkPrefix")}{" "}
+              <Link to="/admin/revenue/rate-mapping" className="text-accent underline">
+                {t("revRateMapTitle")}
+              </Link>
+              .
+            </p>
           )}
 
           {compSet && (
