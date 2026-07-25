@@ -178,6 +178,10 @@ const EN: Record<string, string> = {
   revSugReasonBelowMarket: "Demand supports a raise and you're priced below your competitors — raise harder.",
   revSugReasonAboveMarket: "Demand supports a raise, but you're already priced well above your competitors — smaller step.",
   revSugReasonCheapestHold: "Slow pace, but you're already the cheapest in your comp set — a further drop won't fix demand.",
+  revSugReasonNotFilling:
+    "Selling ahead of last year, but this date still isn't forecast to fill — holding rather than raising into rooms you need to sell.",
+  revSugReasonTightFill:
+    "This date is nearly full, so rate is the lever that's left.",
   revCompTitle: "Competitor set",
   revCompSub:
     "The nearby hotels you compete with, ranked by guest-review quality with your hotel slotted in. Pricing above a higher-ranked hotel usually costs you bookings — this is the pecking order to price against. Add competitors by hand; your own score is pre-filled from your guest reviews and editable. (Daily competitor prices come next.)",
@@ -1839,6 +1843,10 @@ const DE: Record<string, string> = {
   revSugReasonBelowMarket: "Die Nachfrage trägt eine Erhöhung und Sie liegen unter Ihren Wettbewerbern — stärker erhöhen.",
   revSugReasonAboveMarket: "Die Nachfrage trägt eine Erhöhung, aber Sie liegen bereits deutlich über Ihren Wettbewerbern — kleinerer Schritt.",
   revSugReasonCheapestHold: "Schwaches Tempo, aber Sie sind bereits die Günstigsten im Vergleichsset — eine weitere Senkung löst das nicht.",
+  revSugReasonNotFilling:
+    "Verkauft sich besser als im Vorjahr, aber dieser Termin wird voraussichtlich nicht voll — wir halten, statt bei noch freien Zimmern zu erhöhen.",
+  revSugReasonTightFill:
+    "Dieser Termin ist nahezu ausgebucht — der Preis ist der verbleibende Hebel.",
   revCompTitle: "Wettbewerber-Set",
   revCompSub:
     "Die nahegelegenen Hotels, mit denen Sie konkurrieren, sortiert nach Bewertungsqualität — Ihr Hotel eingereiht. Höher als ein besser platziertes Hotel zu bepreisen kostet meist Buchungen; dies ist die Rangfolge, an der Sie sich orientieren. Wettbewerber manuell hinzufügen; Ihr eigener Wert ist aus Ihren Gästebewertungen vorausgefüllt und editierbar. (Tägliche Wettbewerberpreise folgen als Nächstes.)",
