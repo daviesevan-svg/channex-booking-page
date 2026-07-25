@@ -17,6 +17,7 @@ import {
   nudgeCaptureJob,
 } from "~/lib/revman-comp-capture.server";
 import { getRoomPrices } from "~/lib/revman-room-prices.server";
+import { getCompareSettings } from "~/lib/direct-compare.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 import { formatMoney } from "~/lib/money";
@@ -37,13 +38,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const state = await getRevmanState(pid);
   if (!state) return { configured: true as const, singleUnit: false as const, connected: false as const };
 
-  const [set, settings, balance, propSettings, lastCap, job] = await Promise.all([
+  const [set, settings, balance, propSettings, lastCap, job, compare] = await Promise.all([
     getCompSet(pid),
     getCaptureSettings(pid),
     getBalance(pid),
     getSettings(pid),
     lastCapturedAt(pid),
     getCaptureJob(pid),
+    getCompareSettings(pid),
   ]);
   // Drive-by: while a capture job is running, each page load nudges the next
   // chunk (backup to the signed self-fetch chain).
@@ -98,6 +100,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     datesWithData,
     lastCap,
     settingsEnabled: settings.enabled,
+    // Status of the guest-facing "cheaper direct" badge, so this page shows
+    // whether it's live instead of leaving it buried a click away.
+    compare: {
+      enabled: compare.enabled,
+      mapped: Object.keys(compare.roomMap).length,
+    },
     job,
     roomsFor: roomsFor ?? null,
     rooms: [...roomNames].map(([roomRef, v]) => ({ roomRef, ...v })),
@@ -188,7 +196,7 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { hotels, dates, cells, currency, balance, horizon, datesWithData, lastCap, scrapflyOn, job } = loaderData;
+  const { hotels, dates, cells, currency, balance, horizon, datesWithData, lastCap, scrapflyOn, job, compare } = loaderData;
 
   // Poll while a capture job is running: revalidate every 4s so the table +
   // progress fill in live, and each load nudges the next chunk (loader).
@@ -222,11 +230,20 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
           <h1 className="font-serif text-[26px] font-semibold">{t("riTitle")}</h1>
           <p className="mt-1 text-[13.5px] text-muted">{t("riSubtitle")}</p>
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex items-end gap-4">
+          {/* Kept clear of the date inputs: sitting inside that group made this
+              navigation look like another filter control, and it got missed. */}
           <Link
             to="/admin/rate-intel/settings"
-            className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent"
+            className="flex items-center gap-1.5 py-2 text-[13px] font-semibold text-accent hover:underline"
           >
+            <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
+              <path
+                fillRule="evenodd"
+                d="M8.34 2.51a1.5 1.5 0 0 1 3.32 0l.16.72c.1.44.44.78.87.9.43.13.9.02 1.23-.29l.55-.5a1.5 1.5 0 0 1 2.35 1.9l-.38.64c-.23.39-.24.87-.02 1.26.22.4.63.65 1.08.67l.74.03a1.5 1.5 0 0 1 .58 2.88l-.68.29c-.41.18-.7.56-.76 1-.06.45.11.89.46 1.18l.57.48a1.5 1.5 0 0 1-1.66 2.45l-.7-.26a1.28 1.28 0 0 0-1.24.2c-.35.28-.53.72-.48 1.17l.09.73a1.5 1.5 0 0 1-2.79 1.02l-.38-.63a1.28 1.28 0 0 0-1.1-.62c-.45 0-.87.23-1.1.62l-.39.63a1.5 1.5 0 0 1-2.78-1.02l.08-.73a1.28 1.28 0 0 0-.47-1.17 1.28 1.28 0 0 0-1.25-.2l-.69.26a1.5 1.5 0 0 1-1.67-2.45l.57-.48c.35-.29.52-.73.46-1.18a1.28 1.28 0 0 0-.75-1l-.69-.29a1.5 1.5 0 0 1 .58-2.88l.75-.03c.45-.02.85-.27 1.07-.67.23-.39.22-.87-.01-1.26l-.38-.64a1.5 1.5 0 0 1 2.34-1.9l.55.5c.34.31.8.42 1.24.3.43-.13.76-.47.86-.91l.16-.72ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                clipRule="evenodd"
+              />
+            </svg>
             {t("riSettings")}
           </Link>
           <form method="post" className="flex flex-wrap items-end gap-2">
@@ -294,6 +311,21 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
           <span className="font-semibold">{fmtWhen(lastCap)}</span>
         </span>
         {balance < 1 && <span className="font-semibold text-amber-700">{t("riPausedBanner")}</span>}
+        {/* Whether the guest-facing badge is live. It's driven entirely by these
+            captures, so its state belongs here rather than only on the settings
+            page the owner may never open. */}
+        <span className="ml-auto">
+          <span className="text-muted">{t("riCompareStatus")}:</span>{" "}
+          {compare.enabled && compare.mapped > 0 ? (
+            <Link to="/admin/rate-intel/settings" className="font-semibold text-emerald-700 hover:underline">
+              {compare.mapped === 1 ? t("riCompareStatusOn1") : t("riCompareStatusOn", { n: String(compare.mapped) })}
+            </Link>
+          ) : (
+            <Link to="/admin/rate-intel/settings" className="font-semibold text-accent hover:underline">
+              {t("riCompareStatusOff")}
+            </Link>
+          )}
+        </span>
       </div>
 
       {hotels.length === 0 ? (
