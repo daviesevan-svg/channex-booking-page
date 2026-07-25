@@ -9,7 +9,7 @@
 // price already keeps one (rev_comp_price_hist), and room-level history would
 // multiply that by ~15 rows per hotel-day for a signal nothing reads yet.
 import { getDB } from "./config.server";
-import type { OtaBlock, OtaRoom, OtaStayPrice } from "./revman-room-prices";
+import type { OtaBlock, OtaRoom, OtaStayPrice, TaxBasis } from "./revman-room-prices";
 
 function db(): D1Database {
   const d = getDB();
@@ -35,6 +35,8 @@ async function ensureSchema(): Promise<void> {
         meal_plan TEXT,
         genius INTEGER NOT NULL DEFAULT 0,
         all_included INTEGER NOT NULL DEFAULT 0,
+        tax_basis TEXT,
+        shown_price_minor INTEGER,
         stays_json TEXT,
         flex_price_minor INTEGER,
         flex_meal_plan TEXT,
@@ -45,6 +47,14 @@ async function ensureSchema(): Promise<void> {
     ),
     db().prepare(`CREATE INDEX IF NOT EXISTS rev_ota_room_price_pid_date ON rev_ota_room_price (pid, date)`),
   ]);
+  // SQLite has no ADD COLUMN IF NOT EXISTS, so an existing table is widened
+  // best-effort: a "duplicate column" error just means the migration already ran.
+  for (const sql of [
+    `ALTER TABLE rev_ota_room_price ADD COLUMN tax_basis TEXT`,
+    `ALTER TABLE rev_ota_room_price ADD COLUMN shown_price_minor INTEGER`,
+  ]) {
+    await db().prepare(sql).run().catch(() => {});
+  }
   schemaReady = true;
 }
 
@@ -57,8 +67,14 @@ export interface RoomPriceRow {
   maxPersons: number | null;
   currency: string | null;
   blocksSeen: number | null;
-  /** Cheapest block, whatever its conditions. */
+  /** Cheapest block, whatever its conditions — ALL-IN (excluded taxes added
+   *  back), so it is comparable across dates and markets. */
   priceMinor: number;
+  /** What Booking displayed, for the audit trail. Null on rows captured before
+   *  all-in normalisation. */
+  shownPriceMinor: number | null;
+  /** Whether Booking's displayed price included taxes. Null on older rows. */
+  taxBasis: TaxBasis | null;
   mealPlan: string | null;
   genius: boolean;
   allIncluded: boolean;
@@ -70,16 +86,23 @@ export interface RoomPriceRow {
   capturedAt: string;
 }
 
-const staysJson = (stays: OtaStayPrice[]): string => JSON.stringify(stays.map((s) => [s.nights, s.totalMinor]));
+/** [nights, all-in, as-displayed]. The third element is optional so rows written
+ *  before all-in normalisation still parse. */
+const staysJson = (stays: OtaStayPrice[]): string =>
+  JSON.stringify(stays.map((s) => [s.nights, s.totalMinor, s.shownMinor]));
 
 function parseStays(raw: string | null): OtaStayPrice[] {
   if (!raw) return [];
   try {
-    const arr = JSON.parse(raw) as [number, number][];
+    const arr = JSON.parse(raw) as [number, number, number?][];
     return Array.isArray(arr)
       ? arr
           .filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]))
-          .map(([nights, totalMinor]) => ({ nights, totalMinor }))
+          .map(([nights, totalMinor, shownMinor]) => ({
+            nights,
+            totalMinor,
+            shownMinor: Number.isFinite(shownMinor) ? (shownMinor as number) : totalMinor,
+          }))
       : [];
   } catch {
     return [];
@@ -102,9 +125,9 @@ export async function writeRoomPrices(
   const insert = db().prepare(
     `INSERT INTO rev_ota_room_price
        (pid, comp_id, date, room_ref, room_name, max_persons, currency, blocks_seen,
-        price_minor, meal_plan, genius, all_included, stays_json,
+        price_minor, meal_plan, genius, all_included, tax_basis, shown_price_minor, stays_json,
         flex_price_minor, flex_meal_plan, flex_stays_json, captured_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   );
   for (const r of rooms) {
     const flex: OtaBlock | null = r.cheapestFlexible;
@@ -112,7 +135,7 @@ export async function writeRoomPrices(
       insert.bind(
         pid, compId, date, r.roomRef, r.name, r.maxPersons, r.currency, r.blocksSeen,
         r.cheapest.priceMinor, r.cheapest.mealPlan, r.cheapest.genius ? 1 : 0,
-        r.cheapest.allIncluded ? 1 : 0, staysJson(r.cheapest.stays),
+        r.cheapest.allIncluded ? 1 : 0, r.cheapest.taxBasis, r.cheapest.shownMinor, staysJson(r.cheapest.stays),
         flex?.priceMinor ?? null, flex?.mealPlan ?? null, flex ? staysJson(flex.stays) : null,
         capturedAt,
       ),
@@ -135,6 +158,8 @@ interface RoomPriceDbRow {
   mealPlan: string | null;
   genius: number;
   allIncluded: number;
+  taxBasis: string | null;
+  shownPriceMinor: number | null;
   staysJson: string | null;
   flexPriceMinor: number | null;
   flexMealPlan: string | null;
@@ -150,6 +175,8 @@ const toRow = (r: RoomPriceDbRow): RoomPriceRow => ({
   maxPersons: r.maxPersons,
   currency: r.currency,
   blocksSeen: r.blocksSeen,
+  shownPriceMinor: r.shownPriceMinor,
+  taxBasis: r.taxBasis === "incl" || r.taxBasis === "excl" || r.taxBasis === "unknown" ? r.taxBasis : null,
   priceMinor: r.priceMinor,
   mealPlan: r.mealPlan,
   genius: r.genius === 1,
@@ -163,7 +190,8 @@ const toRow = (r: RoomPriceDbRow): RoomPriceRow => ({
 
 const SELECT = `SELECT comp_id AS compId, date, room_ref AS roomRef, room_name AS roomName,
     max_persons AS maxPersons, currency, blocks_seen AS blocksSeen, price_minor AS priceMinor,
-    meal_plan AS mealPlan, genius, all_included AS allIncluded, stays_json AS staysJson,
+    meal_plan AS mealPlan, genius, all_included AS allIncluded,
+    tax_basis AS taxBasis, shown_price_minor AS shownPriceMinor, stays_json AS staysJson,
     flex_price_minor AS flexPriceMinor, flex_meal_plan AS flexMealPlan, flex_stays_json AS flexStaysJson,
     captured_at AS capturedAt
   FROM rev_ota_room_price`;

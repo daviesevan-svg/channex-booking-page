@@ -50,6 +50,7 @@ async function ensureSchema(): Promise<void> {
         date TEXT NOT NULL,
         price_minor INTEGER,
         currency TEXT,
+        tax_basis TEXT,
         captured_at TEXT NOT NULL,
         PRIMARY KEY (pid, comp_id, date)
       )`,
@@ -66,6 +67,7 @@ async function ensureSchema(): Promise<void> {
         date TEXT NOT NULL,
         price_minor INTEGER,
         currency TEXT,
+        tax_basis TEXT,
         captured_at TEXT NOT NULL,
         PRIMARY KEY (pid, comp_id, date, captured_at)
       )`,
@@ -78,6 +80,16 @@ async function ensureSchema(): Promise<void> {
        SELECT pid, comp_id, date, price_minor, currency, captured_at FROM rev_comp_price`,
     ),
   ]);
+  // SQLite has no ADD COLUMN IF NOT EXISTS; a duplicate-column error just means
+  // the migration already ran. tax_basis records whether the stored figure came
+  // from a tax-inclusive or a tax-exclusive Booking page, so a series can never
+  // silently mix the two again.
+  for (const sql of [
+    `ALTER TABLE rev_comp_price ADD COLUMN tax_basis TEXT`,
+    `ALTER TABLE rev_comp_price_hist ADD COLUMN tax_basis TEXT`,
+  ]) {
+    await db().prepare(sql).run().catch(() => {});
+  }
   schemaReady = true;
 }
 
@@ -526,18 +538,19 @@ async function captureHotelDate(
   await db().batch([
     db()
       .prepare(
-        `INSERT INTO rev_comp_price (pid, comp_id, date, price_minor, currency, captured_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO rev_comp_price (pid, comp_id, date, price_minor, currency, tax_basis, captured_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(pid, comp_id, date) DO UPDATE SET
-           price_minor = excluded.price_minor, currency = excluded.currency, captured_at = excluded.captured_at`,
+           price_minor = excluded.price_minor, currency = excluded.currency,
+           tax_basis = excluded.tax_basis, captured_at = excluded.captured_at`,
       )
-      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, capturedAt),
+      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, price?.taxBasis ?? null, capturedAt),
     db()
       .prepare(
-        `INSERT OR IGNORE INTO rev_comp_price_hist (pid, comp_id, date, price_minor, currency, captured_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT OR IGNORE INTO rev_comp_price_hist (pid, comp_id, date, price_minor, currency, tax_basis, captured_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
       )
-      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, capturedAt),
+      .bind(pid, hotel.id, date, price?.minor ?? null, price?.currency ?? null, price?.taxBasis ?? null, capturedAt),
   ]);
   return { charged: true };
 }
