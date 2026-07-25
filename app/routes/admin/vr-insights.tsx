@@ -25,6 +25,13 @@ import {
 } from "~/lib/vr-compset.server";
 import { discoverVrComps, type CandidateVrUnit } from "~/lib/vr-compset-discovery.server";
 import {
+  applyVrPriceSuggestions,
+  getVrGuards,
+  getVrPriceSuggestions,
+  setVrGuards,
+} from "~/lib/vr-price.server";
+import { guardsReady } from "~/lib/revman-price";
+import {
   enqueueVrCaptureJob,
   estimateVrCost,
   getMarketPace,
@@ -57,13 +64,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   // This page is the inverse of the RMS gate: single-unit ONLY.
   if (settings.singleUnit !== true) return { configured: true as const, singleUnit: false as const };
 
-  const [set, overrides, capSettings, balance, job, lastCap] = await Promise.all([
+  const [set, overrides, capSettings, balance, job, lastCap, guards] = await Promise.all([
     getVrCompSet(pid),
     getOverrides(pid),
     getVrCaptureSettings(pid),
     getBalance(pid),
     getVrCaptureJob(pid),
     lastVrCapturedAt(pid),
+    getVrGuards(pid),
   ]);
   const area = [settings.addressCity, settings.addressRegion, settings.addressCountry]
     .map((s) => (s ?? "").trim())
@@ -126,6 +134,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     currency,
     trackedCount: set.ranked.filter((u) => !u.isSelf && u.airbnbRef).length,
     cost: estimateVrCost(set.ranked.filter((u) => u.airbnbRef).length, capSettings),
+    guards,
+    guardsSet: guardsReady(guards),
+    suggestions: (await getVrPriceSuggestions(pid, today, guards)).filter(
+      // Only surface dates we can actually act on: a live suggestion, or a
+      // priced date so the host can see where they sit.
+      (s) => s.pct !== 0 || s.marketMedian !== null,
+    ),
   };
 }
 
@@ -134,7 +149,7 @@ export function meta() {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const pid = await currentPropertyId(request);
   if (!pid) return { error: "Select a property first." };
   const form = await request.formData();
@@ -212,6 +227,21 @@ export async function action({ request }: Route.ActionArgs) {
       if (!res.ok) return { error: res.error ?? "Could not start capture." };
       return { okKey: "vrCaptureStarted" as const };
     }
+    if (intent === "guards") {
+      await setVrGuards(pid, Number(form.get("minPrice")), Number(form.get("maxPrice")));
+      return { okKey: "vrSaved" as const };
+    }
+    if (intent === "applyPrice" || intent === "applyPriceAll") {
+      const guards = await getVrGuards(pid);
+      const today = todayISODate();
+      const dates =
+        intent === "applyPrice"
+          ? [String(form.get("date"))]
+          : (await getVrPriceSuggestions(pid, today, guards)).filter((s) => s.pct !== 0).map((s) => s.date);
+      const result = await applyVrPriceSuggestions(pid, dates, today, guards, { source: "revman", actor: email });
+      if (result.cells === 0) return { okKey: "vrSugNothing" as const };
+      return { okKey: "vrSugApplied" as const, applied: result };
+    }
     if (intent === "captureSettings") {
       await setVrCaptureSettings(pid, {
         enabled: form.get("enabled") === "on",
@@ -265,7 +295,8 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
   }
   if (!loaderData.singleUnit) return <FeatureUnavailable title={t("vrTitle")} body={t("vrSingleUnitOnly")} />;
 
-  const { set, area, scrapflyOn, capSettings, balance, job, lastCap, rows, currency, trackedCount, cost } = loaderData;
+  const { set, area, scrapflyOn, capSettings, balance, job, lastCap, rows, currency, trackedCount, cost, guards, guardsSet, suggestions } =
+    loaderData;
   const money = (minor: number) => formatMoney(minor / 100, currency);
   const PACE_STYLE: Record<string, string> = {
     ahead: "bg-rose-100 text-rose-800",
@@ -297,9 +328,14 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
           {t("vrAdded", { count: String("addedCount" in actionData ? actionData.addedCount : 0) })}
         </p>
       )}
-      {actionData && "okKey" in actionData && (actionData.okKey === "vrSaved" || actionData.okKey === "vrCaptureStarted") && (
+      {actionData && "okKey" in actionData && (actionData.okKey === "vrSaved" || actionData.okKey === "vrCaptureStarted" || actionData.okKey === "vrSugNothing") && (
         <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
           {t(actionData.okKey)}
+        </p>
+      )}
+      {actionData && "okKey" in actionData && actionData.okKey === "vrSugApplied" && "applied" in actionData && (
+        <p className="mb-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">
+          {t("vrSugApplied", { dates: String(actionData.applied.dates), cells: String(actionData.applied.cells) })}
         </p>
       )}
 
@@ -660,6 +696,147 @@ export default function VrInsights({ loaderData, actionData }: Route.ComponentPr
                   )}
                 </tbody>
               </table>
+            </div>
+          </>
+        )}
+      </section>
+
+      {/* Price suggestions */}
+      <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
+        <div className="font-serif text-[18px] font-semibold">{t("vrSugTitle")}</div>
+        <p className="mb-4 mt-1 max-w-[620px] text-[13px] text-muted">{t("vrSugSub")}</p>
+
+        <Form method="post" className="flex flex-wrap items-end gap-3 border-b border-line-alt pb-4">
+          <input type="hidden" name="intent" value="guards" />
+          <label className="text-[12px] text-secondary">
+            {t("vrSugGuardMin")}
+            <input
+              name="minPrice"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue={guards.minPrice ?? ""}
+              className="mt-1 block w-24 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]"
+            />
+          </label>
+          <label className="text-[12px] text-secondary">
+            {t("vrSugGuardMax")}
+            <input
+              name="maxPrice"
+              type="number"
+              min="1"
+              step="1"
+              defaultValue={guards.maxPrice ?? ""}
+              className="mt-1 block w-24 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px]"
+            />
+          </label>
+          <button type="submit" disabled={busy} className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-50">
+            {t("vrSave")}
+          </button>
+          {!guardsSet && <span className="pb-1.5 text-[12.5px] text-amber-700">{t("vrSugGuardsHint")}</span>}
+        </Form>
+
+        {suggestions.length === 0 ? (
+          <p className="mt-4 text-[13px] text-muted">{t("vrSugNoData")}</p>
+        ) : (
+          <>
+            <div className="mt-4 max-h-[430px] overflow-y-auto rounded-[10px] border border-line-alt">
+              <table className="w-full text-[13px]">
+                <thead className="sticky top-0 bg-surface-alt text-left text-[11.5px] uppercase tracking-[0.06em] text-muted">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">{t("vrColDate")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrColPace")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrSugColMarket")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrSugColOurs")}</th>
+                    <th className="px-3 py-2 font-semibold">{t("vrSugColTarget")}</th>
+                    <th className="px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {suggestions.map((s) => {
+                    const atTarget = s.target !== undefined && s.target === s.ownPrice;
+                    const actionable = s.pct !== 0 && s.ownPrice !== undefined && (!guardsSet || !atTarget);
+                    return (
+                      <tr key={s.date} className="border-t border-line-alt">
+                        <td className="whitespace-nowrap px-3 py-2 font-semibold">{fmtDate(s.date, "EEE d MMM", dl)}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {s.paceSignal === "unknown" ? (
+                            <span className="text-faint">—</span>
+                          ) : (
+                            <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${PACE_STYLE[s.paceSignal]}`}>
+                              {t(PACE_LABEL[s.paceSignal])}
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {s.marketMedian != null ? (
+                            <span title={s.marketCheapest != null ? t("vrSugCheapestTip", { p: money(s.marketCheapest * 100) }) : undefined}>
+                              {money(s.marketMedian * 100)}
+                            </span>
+                          ) : (
+                            <span className="text-faint">—</span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2">{s.ownPrice !== undefined ? money(s.ownPrice * 100) : "—"}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          {s.pct === 0 || s.ownPrice === undefined ? (
+                            <span className="text-muted" title={t(s.reasonKey)}>
+                              {s.ownBooked ? t("vrSugBooked") : t("vrSugHold")}
+                            </span>
+                          ) : atTarget ? (
+                            <span className="text-muted">✓ {t("vrSugAtTarget")}</span>
+                          ) : (
+                            <span title={t(s.reasonKey)}>
+                              {guardsSet && s.target !== undefined && <span className="mr-2 font-semibold">{money(s.target * 100)}</span>}
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${s.pct > 0 ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"}`}
+                              >
+                                {s.pct > 0 ? `+${s.pct}%` : `${s.pct}%`}
+                              </span>
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {actionable && (
+                            <Form method="post" className="inline">
+                              <input type="hidden" name="intent" value="applyPrice" />
+                              <input type="hidden" name="date" value={s.date} />
+                              <button
+                                type="submit"
+                                disabled={busy || !guardsSet}
+                                title={guardsSet ? undefined : t("vrSugGuardsHint")}
+                                className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold text-secondary hover:bg-chip disabled:opacity-50"
+                              >
+                                {t("vrSugApply")}
+                              </button>
+                            </Form>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-[12.5px] text-faint">
+                {t("vrSugCount", {
+                  count: String(
+                    suggestions.filter((s) => s.pct !== 0 && s.ownPrice !== undefined && (s.target === undefined || s.target !== s.ownPrice)).length,
+                  ),
+                })}
+              </span>
+              <Form method="post">
+                <input type="hidden" name="intent" value="applyPriceAll" />
+                <button
+                  type="submit"
+                  disabled={busy || !guardsSet || suggestions.every((s) => s.pct === 0 || s.ownPrice === undefined || s.target === s.ownPrice)}
+                  className="rounded-[10px] bg-accent px-4 py-2 text-[13.5px] font-semibold text-white disabled:opacity-60"
+                >
+                  {busyIntent === "applyPriceAll" ? t("vrSugApplying") : t("vrSugApplyAll")}
+                </button>
+              </Form>
             </div>
           </>
         )}
