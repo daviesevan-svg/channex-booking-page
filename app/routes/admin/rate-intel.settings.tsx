@@ -10,7 +10,9 @@ import { getCaptureSettings, setCaptureSettings } from "~/lib/revman-comp-captur
 import { getCompSet } from "~/lib/revman-compset.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { getRooms } from "~/lib/catalog.server";
-import { getCompareSettings, ownOtaRooms, setCompareSettings } from "~/lib/direct-compare.server";
+import { explainDirectCompare, getCompareSettings, ownOtaRooms, setCompareSettings } from "~/lib/direct-compare.server";
+import type { CompareExplain } from "~/lib/direct-compare.server";
+import { formatMoney } from "~/lib/money";
 import { importBookingRoomMap } from "~/lib/channex/bcom-mapping.server";
 import { suggestRoomMap } from "~/lib/direct-compare";
 import { todayISODate } from "~/lib/dates";
@@ -70,6 +72,17 @@ export async function action({ request }: Route.ActionArgs) {
   const pid = await currentPropertyId(request);
   if (!pid) return { error: "Select a property first." };
   const form = await request.formData();
+
+  if (String(form.get("intent")) === "compareCheck") {
+    const checkin = String(form.get("checkDate") ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkin)) return { checkError: true as const };
+    const explain = await explainDirectCompare(pid, {
+      checkin,
+      nights: Number(form.get("checkNights")) || 1,
+      adults: Number(form.get("checkAdults")) || 2,
+    });
+    return { explain, checkin };
+  }
 
   if (String(form.get("intent")) === "compareImport") {
     // Read-only pull of the property's Booking.com channel mapping. Presented for
@@ -218,6 +231,9 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
         otaRooms={loaderData.otaRooms}
         suggested={loaderData.suggested}
         imported={actionData && "imported" in actionData ? actionData.imported : undefined}
+        explain={actionData && "explain" in actionData ? actionData.explain : undefined}
+        checkin={actionData && "checkin" in actionData ? actionData.checkin : undefined}
+        checkError={actionData && "checkError" in actionData ? actionData.checkError : undefined}
         busy={busy}
       />
     </div>
@@ -226,18 +242,88 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
 
 /** Settings for the "cheaper direct" badge on the booking page. Separate form
  *  from the capture settings above so saving one never rewrites the other. */
+/** Per-room verdict for one stay: what the booking page would do, and why. */
+function CheckResult({ explain }: { explain: CompareExplain }) {
+  const t = useAdminT();
+  const money = (minor: number | null) => (minor == null ? "—" : formatMoney(minor / 100, explain.currency));
+  const reason = (row: CompareExplain["rows"][number]): string => {
+    if (row.savingPct !== undefined) return t("riCompareWhyShown", { pct: String(row.savingPct) });
+    const key = ({
+      unmapped: "riCompareWhyUnmapped",
+      no_rate: "riCompareWhyNoRate",
+      no_capture: "riCompareWhyNoCapture",
+      stay_not_sold: "riCompareWhyStayNotSold",
+      stale: "riCompareWhyStale",
+      currency_mismatch: "riCompareWhyCurrency",
+      not_all_in: "riCompareWhyNotAllIn",
+      not_cheaper: "riCompareWhyNotCheaper",
+      below_threshold: "riCompareWhyBelowThreshold",
+    } as const)[row.skip ?? "no_capture"];
+    return t(key, { pct: String(explain.minSavingPct), hours: String(explain.maxAgeHours) });
+  };
+
+  return (
+    <div className="mt-4">
+      {!explain.enabled && (
+        <p className="mb-2 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900">
+          {t("riCompareWhyDisabled")}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] text-[12.5px]">
+          <thead>
+            <tr className="border-b border-line-alt text-left text-muted">
+              <th className="py-1.5 pr-3 font-medium">{t("riCompareWhyRoom")}</th>
+              <th className="py-1.5 pr-3 text-right font-medium">{t("riCompareWhyDirect")}</th>
+              <th className="py-1.5 pr-3 text-right font-medium">{t("riCompareWhyBooking")}</th>
+              <th className="py-1.5 font-medium">{t("riCompareWhyVerdict")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {explain.rows.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-3 text-muted">{t("riCompareWhyNoRooms")}</td>
+              </tr>
+            )}
+            {explain.rows.map((row) => (
+              <tr key={row.roomId} className="border-b border-line-alt/60 last:border-0">
+                <td className="py-2 pr-3 font-medium text-secondary">
+                  {row.roomTitle}
+                  {row.otaRoomName && <span className="block text-[11.5px] font-normal text-muted">→ {row.otaRoomName}</span>}
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">{money(row.directTotalMinor)}</td>
+                <td className="py-2 pr-3 text-right tabular-nums">{money(row.otaTotalMinor)}</td>
+                <td className={`py-2 ${row.savingPct !== undefined ? "font-semibold text-emerald-700" : "text-muted"}`}>
+                  {reason(row)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-[11.5px] text-muted">{t("riCompareWhyFootnote", { n: String(explain.nights) })}</p>
+    </div>
+  );
+}
+
 function DirectCompare({
   compare,
   ourRooms,
   otaRooms,
   suggested,
   imported,
+  explain,
+  checkin,
+  checkError,
   busy,
 }: {
   compare: { enabled: boolean; roomMap: Record<string, string>; bookingHotelId: string; minSavingPct: number; maxAgeHours: number };
   ourRooms: { id: string; title: string }[];
   otaRooms: { roomRef: string; name: string; maxPersons: number | null }[];
   suggested: Record<string, string>;
+  explain?: CompareExplain;
+  checkin?: string;
+  checkError?: boolean;
   imported?: {
     ok: boolean;
     roomMap: Record<string, string>;
@@ -445,6 +531,40 @@ function DirectCompare({
 
             <div className="mt-5 rounded-[10px] border border-line-alt bg-chip/40 px-4 py-3 text-[12.5px] text-secondary">
               <span className="font-semibold">{t("riCompareHonestyTitle")}</span> {t("riCompareHonestyBody")}
+            </div>
+
+            {/* The badge is silent by design, which makes "nothing appeared"
+                impossible to diagnose. This runs the real comparison for a date
+                and reports the one reason per room. */}
+            <div className="mt-6 rounded-[10px] border border-line-alt p-4">
+              <div className="text-[13px] font-semibold text-secondary">{t("riCompareCheckTitle")}</div>
+              <p className="mt-0.5 text-[12.5px] text-muted">{t("riCompareCheckSub")}</p>
+              <div className="mt-3 flex flex-wrap items-end gap-2">
+                <label className="text-[11.5px] font-medium text-muted">
+                  {t("riCompareCheckDate")}
+                  <input type="date" name="checkDate" defaultValue={checkin ?? ""} className={`${FIELD} mt-0.5 block`} />
+                </label>
+                <label className="text-[11.5px] font-medium text-muted">
+                  {t("riCompareCheckNights")}
+                  <input type="number" name="checkNights" min={1} max={30} defaultValue={1} className={`${FIELD} mt-0.5 block w-[80px]`} />
+                </label>
+                <label className="text-[11.5px] font-medium text-muted">
+                  {t("riCompareCheckAdults")}
+                  <input type="number" name="checkAdults" min={1} max={10} defaultValue={2} className={`${FIELD} mt-0.5 block w-[80px]`} />
+                </label>
+                <button
+                  type="submit"
+                  name="intent"
+                  value="compareCheck"
+                  formNoValidate
+                  disabled={busy}
+                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[12.5px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {t("riCompareCheckRun")}
+                </button>
+              </div>
+              {checkError && <p className="mt-2 text-[12.5px] text-amber-800">{t("riCompareCheckBadDate")}</p>}
+              {explain && <CheckResult explain={explain} />}
             </div>
           </>
         )}
