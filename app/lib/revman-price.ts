@@ -91,7 +91,9 @@ export interface Suggestion {
     | "revSugReasonHold"
     | "revSugReasonBelowMarket"
     | "revSugReasonAboveMarket"
-    | "revSugReasonCheapestHold";
+    | "revSugReasonCheapestHold"
+    | "revSugReasonNotFilling"
+    | "revSugReasonTightFill";
 }
 
 /** Discounts are suppressed once total on-the-books occupancy (online +
@@ -99,6 +101,17 @@ export interface Suggestion {
  *  isn't cold (we just can't see its bookings) or is expected to fill
  *  anyway. */
 export const DISCOUNT_OCC_CEILING = 0.7;
+
+/** A raise needs evidence the date will actually get TIGHT, not just that it's
+ *  selling faster than last year. The pace score is a comparison against
+ *  history: a date can be "high demand" and still be forecast to finish with a
+ *  third of the rooms empty, and raising into that only costs conversion on
+ *  inventory we needed to sell. Below this forecast level we hold instead. */
+export const RAISE_FORECAST_FLOOR = 0.7;
+
+/** At or above this level the date is genuinely scarce, so rate is the only
+ *  lever left — worth a nudge even when the online pace looks behind. */
+export const TIGHT_FILL = 0.9;
 
 /** Rule table, evaluated top-down, then modulated by market position. Demand
  *  pushing above capacity earns the biggest lift; weak pace only discounts
@@ -131,11 +144,21 @@ function demandSuggestion(s: SuggestionInput): Suggestion {
   // Sold out (incl. offline): nothing left to price. Conservative hold — a
   // cancellation re-sells at the current rate.
   if (score === "sold_out") return { date: s.date, pct: 0, reasonKey: "revSugReasonSoldOut" };
-  // Filling up: online pace is behind, but the date is (nearly) full or
-  // forecast to fill — hold rather than discount.
-  if (score === "filling_up") return { date: s.date, pct: 0, reasonKey: "revSugReasonFullHold" };
+  // Filling up: the online pace is behind, but the date is (nearly) full or
+  // forecast to fill. That must never DISCOUNT — and when the date is actually
+  // tight, holding is wrong too: it's the strongest raise candidate there is,
+  // so a nearly-full date earns a nudge rather than nothing.
+  if (score === "filling_up") {
+    if (fc >= TIGHT_FILL || s.totalOnBooksPct >= TIGHT_FILL)
+      return { date: s.date, pct: 10, reasonKey: "revSugReasonTightFill" };
+    return { date: s.date, pct: 0, reasonKey: "revSugReasonFullHold" };
+  }
   if (score === "high_demand" && fc >= 0.8) return { date: s.date, pct: 15, reasonKey: "revSugReasonHot" };
-  if (score === "high_demand") return { date: s.date, pct: 10, reasonKey: "revSugReasonHigh" };
+  if (score === "high_demand" && (fc >= RAISE_FORECAST_FLOOR || s.totalOnBooksPct >= RAISE_FORECAST_FLOOR))
+    return { date: s.date, pct: 10, reasonKey: "revSugReasonHigh" };
+  // Selling faster than last year, but still not forecast to fill: pace alone
+  // isn't scarcity, so hold rather than price into empty rooms.
+  if (score === "high_demand") return { date: s.date, pct: 0, reasonKey: "revSugReasonNotFilling" };
   if (score === "steady_sales" && fc >= 0.85) return { date: s.date, pct: 5, reasonKey: "revSugReasonFilling" };
   const wantsDiscount =
     (score === "needs_attention" && dba >= 0 && dba <= 30) ||
