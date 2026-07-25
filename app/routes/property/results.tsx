@@ -21,6 +21,8 @@ import {
 import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, serializeExtrasState } from "~/lib/extras";
 import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
+import { directCompareBadges } from "~/lib/direct-compare.server";
+import type { DirectCompareBadge } from "~/lib/direct-compare";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getPageText, getSettings } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
@@ -151,6 +153,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     })),
   }));
 
+  // "Cheaper direct" badges: our all-in total per room against the Booking price
+  // captured for these dates. Off unless the property opted in, and silent for
+  // anything it can't stand behind (see direct-compare).
+  const directTotals: Record<string, number> = {};
+  for (const room of priced) {
+    const rates = ratePlansForParty(room, party);
+    if (rates.length === 0) continue;
+    const best = Math.min(...rates.map((rp) => rp.allInTotal ?? Number(rp.totalPrice)));
+    if (Number.isFinite(best) && best > 0) directTotals[room.id] = Math.round(best * 100);
+  }
+  const directCompare = await directCompareBadges(pid, { checkin, nights, currency, directTotals });
+
   const cartLines = await resolveCartByOccupancy(
     pid,
     { checkin, checkout, currency },
@@ -206,12 +220,49 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     extrasSum,
     text,
     jsonLd,
+    directCompare,
     singleUnit: settings.singleUnit ?? false,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
 }
 
 type EnrichedRoom = RoomWithRates & { fits: boolean };
+
+/** "Cheaper direct" panel above the price. Every claim it makes is checked
+ *  server-side (direct-compare); this only renders what survived. The Booking
+ *  price is shown struck through beside the saving so the guest can see the two
+ *  numbers rather than being asked to take the percentage on trust, and the
+ *  tooltip says when it was checked and what that rate includes. */
+function DirectSaving({ badge, currency }: { badge: DirectCompareBadge; currency: string }) {
+  const tr = useT();
+  const checked = new Date(badge.capturedAt);
+  const detail = [
+    tr.t("directCompareChecked", { when: format(checked, "d MMM, HH:mm") }),
+    badge.otaMealPlan ? tr.t("directCompareTheirMeal", { meal: badge.otaMealPlan }) : null,
+    badge.otaRefundable ? tr.t("directCompareTheirFlex") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <div
+      title={detail}
+      className="rounded-[10px] border border-[#bfe0c4] bg-[#e8f5ea] px-3 py-2 text-left"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[12.5px] text-secondary">{tr.t("directCompareOta")}</span>
+        <span className="text-[13px] text-muted-2 line-through">
+          {formatMoney(badge.otaPerNightMinor / 100, currency)}
+        </span>
+      </div>
+      <div className="mt-0.5 flex items-center gap-1.5">
+        <span className="h-[6px] w-[6px] flex-none rounded-full bg-[#2f7d3a]" aria-hidden="true" />
+        <span className="text-[13.5px] font-semibold text-[#1f6b2c]">
+          {tr.t("directCompareSave", { pct: String(badge.savingPct) })}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function RoomCard({
   room,
@@ -222,6 +273,7 @@ function RoomCard({
   channelId,
   qs,
   inCart,
+  compare,
 }: {
   room: EnrichedRoom;
   isBestMatch: boolean;
@@ -231,6 +283,7 @@ function RoomCard({
   channelId: string;
   qs: string;
   inCart: number;
+  compare?: DirectCompareBadge;
 }) {
   const tr = useT();
   const available = roomAvailability(room);
@@ -308,6 +361,7 @@ function RoomCard({
         </div>
       </div>
       <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
+        {compare && <DirectSaving badge={compare} currency={currency} />}
         {cheapest?.offer && (
           <div className="self-end rounded-full bg-[#ece6f0] px-2.5 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
             {cheapest.offer.name} · −{cheapest.offer.percent}%
@@ -481,7 +535,7 @@ function CartPanel({
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
-  const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
+  const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, directCompare, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -614,6 +668,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
                 channelId={params.channelId}
                 qs={qs}
                 inCart={counts.get(room.id) ?? 0}
+                compare={directCompare[room.id]}
               />
             ))}
           </div>

@@ -234,6 +234,6 @@ export function cheapestRoomPrice(rooms: OtaRoom[]): { minor: number; currency: 
 /** Booking's total for a stay of `nights` nights on this block, or null when
  *  Booking didn't offer that length (min/max stay). Never multiplies the
  *  one-night price out: a length Booking won't sell is not a price we can quote. */
-export function stayTotalMinor(block: OtaBlock, nights: number): number | null {
+export function stayTotalMinor(block: Pick<OtaBlock, "stays">, nights: number): number | null {
   return block.stays.find((s) => s.nights === nights)?.totalMinor ?? null;
 }

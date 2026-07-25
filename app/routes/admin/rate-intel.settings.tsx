@@ -9,7 +9,15 @@ import { getRevmanState } from "~/lib/revman.server";
 import { getCaptureSettings, setCaptureSettings } from "~/lib/revman-comp-capture.server";
 import { getCompSet } from "~/lib/revman-compset.server";
 import { getBalance } from "~/lib/revman-tokens.server";
+import { getRooms } from "~/lib/catalog.server";
+import { getCompareSettings, ownOtaRooms, setCompareSettings } from "~/lib/direct-compare.server";
+import { suggestRoomMap } from "~/lib/direct-compare";
+import { todayISODate } from "~/lib/dates";
 import { useAdminT } from "~/lib/admin-i18n";
+
+const DAY = 86_400_000;
+const isoAt = (base: string, add: number) =>
+  new Date(Date.parse(`${base}T00:00:00Z`) + add * DAY).toISOString().slice(0, 10);
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -20,9 +28,36 @@ export async function loader({ request }: Route.LoaderArgs) {
     return { configured: true as const, singleUnit: true as const, connected: false as const };
   const state = await getRevmanState(pid);
   if (!state) return { configured: true as const, singleUnit: false as const, connected: false as const };
-  const [settings, balance, set] = await Promise.all([getCaptureSettings(pid), getBalance(pid), getCompSet(pid)]);
+  const today = todayISODate();
+  const [settings, balance, set, compare, ourRooms, otaRooms] = await Promise.all([
+    getCaptureSettings(pid),
+    getBalance(pid),
+    getCompSet(pid),
+    getCompareSettings(pid),
+    getRooms(pid),
+    // A wide window so the picker still lists rooms when only far-out dates have
+    // been captured so far.
+    ownOtaRooms(pid, today, isoAt(today, 365)),
+  ]);
   const hotelCount = set.ranked.filter((h) => Boolean(h.bookingRef)).length;
-  return { configured: true as const, singleUnit: false as const, connected: true as const, settings, balance, hotelCount };
+  // Pre-select by name for any room the owner hasn't mapped yet — a suggestion to
+  // confirm, never applied on its own.
+  const suggested = suggestRoomMap(
+    ourRooms.filter((r) => !compare.roomMap[r.id]).map((r) => ({ id: r.id, title: r.title })),
+    otaRooms.filter((o) => !Object.values(compare.roomMap).includes(o.roomRef)),
+  );
+  return {
+    configured: true as const,
+    singleUnit: false as const,
+    connected: true as const,
+    settings,
+    balance,
+    hotelCount,
+    compare,
+    ourRooms: ourRooms.map((r) => ({ id: r.id, title: r.title })),
+    otaRooms,
+    suggested,
+  };
 }
 
 export function meta() {
@@ -34,6 +69,25 @@ export async function action({ request }: Route.ActionArgs) {
   const pid = await currentPropertyId(request);
   if (!pid) return { error: "Select a property first." };
   const form = await request.formData();
+
+  if (String(form.get("intent")) === "compare") {
+    // Each room's Booking counterpart arrives as map:<ourRoomId>; an empty value
+    // means "don't compare this room", which must clear a previous mapping.
+    const roomMap: Record<string, string> = {};
+    for (const [key, value] of form.entries()) {
+      if (!key.startsWith("map:")) continue;
+      const ref = String(value).trim();
+      if (ref) roomMap[key.slice(4)] = ref;
+    }
+    await setCompareSettings(pid, {
+      enabled: form.get("compareEnabled") === "on",
+      roomMap,
+      minSavingPct: Number(form.get("minSavingPct")),
+      maxAgeHours: Number(form.get("maxAgeHours")),
+    });
+    return { okKey: "riCompareSaved" as const };
+  }
+
   await setCaptureSettings(pid, {
     enabled: form.get("enabled") === "on",
     horizonDays: Number(form.get("horizonDays")),
@@ -143,6 +197,123 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
           </button>
         </div>
       </Form>
+
+      <DirectCompare
+        compare={loaderData.compare}
+        ourRooms={loaderData.ourRooms}
+        otaRooms={loaderData.otaRooms}
+        suggested={loaderData.suggested}
+        busy={busy}
+      />
     </div>
+  );
+}
+
+/** Settings for the "cheaper direct" badge on the booking page. Separate form
+ *  from the capture settings above so saving one never rewrites the other. */
+function DirectCompare({
+  compare,
+  ourRooms,
+  otaRooms,
+  suggested,
+  busy,
+}: {
+  compare: { enabled: boolean; roomMap: Record<string, string>; minSavingPct: number; maxAgeHours: number };
+  ourRooms: { id: string; title: string }[];
+  otaRooms: { roomRef: string; name: string; maxPersons: number | null }[];
+  suggested: Record<string, string>;
+  busy: boolean;
+}) {
+  const t = useAdminT();
+  const mappedCount = ourRooms.filter((r) => compare.roomMap[r.id]).length;
+
+  return (
+    <Form method="post" className="mt-8 flex flex-col gap-5">
+      <input type="hidden" name="intent" value="compare" />
+      <section className="rounded-[14px] border border-line bg-surface p-6">
+        <h2 className="font-serif text-[19px] font-semibold">{t("riCompareTitle")}</h2>
+        <p className="mt-1 text-[13px] text-muted">{t("riCompareSub")}</p>
+
+        {otaRooms.length === 0 ? (
+          <div className="mt-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+            {t("riCompareNoCapture")}
+          </div>
+        ) : (
+          <>
+            <label className="mt-5 flex items-center gap-3">
+              <input type="checkbox" name="compareEnabled" defaultChecked={compare.enabled} className="h-4 w-4" />
+              <span>
+                <span className="text-[14px] font-semibold">{t("riCompareEnabled")}</span>
+                <span className="block text-[12.5px] text-muted">{t("riCompareEnabledSub")}</span>
+              </span>
+            </label>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <label className="text-[13px] font-medium text-secondary">
+                {t("riCompareMinSaving")}
+                <input type="number" name="minSavingPct" min={1} max={50} defaultValue={compare.minSavingPct} className={`${FIELD} mt-1 block w-full`} />
+                <span className="mt-1 block text-[12px] text-muted">{t("riCompareMinSavingSub")}</span>
+              </label>
+              <label className="text-[13px] font-medium text-secondary">
+                {t("riCompareMaxAge")}
+                <input type="number" name="maxAgeHours" min={1} max={720} defaultValue={compare.maxAgeHours} className={`${FIELD} mt-1 block w-full`} />
+                <span className="mt-1 block text-[12px] text-muted">{t("riCompareMaxAgeSub")}</span>
+              </label>
+            </div>
+
+            <div className="mt-6">
+              <div className="text-[13px] font-semibold text-secondary">{t("riCompareMapTitle")}</div>
+              <p className="mt-0.5 text-[12.5px] text-muted">{t("riCompareMapSub")}</p>
+              <div className="mt-3 flex flex-col divide-y divide-line-alt rounded-[10px] border border-line-alt">
+                {ourRooms.map((room) => {
+                  const current = compare.roomMap[room.id] ?? "";
+                  const suggestion = suggested[room.id] ?? "";
+                  return (
+                    <div key={room.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-[160px] text-[13.5px] font-medium text-secondary">{room.title}</div>
+                      <div className="flex items-center gap-2">
+                        {!current && suggestion && (
+                          <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-secondary">
+                            {t("riCompareSuggested")}
+                          </span>
+                        )}
+                        <select
+                          name={`map:${room.id}`}
+                          defaultValue={current || suggestion}
+                          className={`${FIELD} min-w-[220px]`}
+                        >
+                          <option value="">{t("riCompareUnmapped")}</option>
+                          {otaRooms.map((o) => (
+                            <option key={o.roomRef} value={o.roomRef}>
+                              {o.name}
+                              {o.maxPersons ? ` · ${t("riRoomsSleeps", { n: String(o.maxPersons) })}` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-[12px] text-muted">
+                {t("riCompareMapped", { n: String(mappedCount), total: String(ourRooms.length) })}
+              </p>
+            </div>
+
+            <div className="mt-5 rounded-[10px] border border-line-alt bg-chip/40 px-4 py-3 text-[12.5px] text-secondary">
+              <span className="font-semibold">{t("riCompareHonestyTitle")}</span> {t("riCompareHonestyBody")}
+            </div>
+          </>
+        )}
+      </section>
+
+      {otaRooms.length > 0 && (
+        <div>
+          <button type="submit" disabled={busy} className="rounded-[10px] bg-accent px-6 py-2.5 text-[14px] font-semibold text-white disabled:opacity-60">
+            {t("riSave")}
+          </button>
+        </div>
+      )}
+    </Form>
   );
 }
