@@ -34,12 +34,16 @@ export interface Kpi {
   yoy: number | null;
 }
 
+// NOTE: no occupancy or RevPAR here, deliberately. rev_night only holds the
+// bookings that arrive through connected channels (OTAs + our own booking
+// page) — phone, walk-in and PMS-entered bookings never reach it. Metrics with
+// a CAPACITY denominator therefore understate reality by whatever share of
+// business is offline, which made them worse than useless. Total occupancy IS
+// available, but only where ARI availability lets us infer the offline share:
+// see getInferredDemand and the pace calendar.
 export interface KpiSet {
   adrMinor: Kpi;
   revenueMinor: Kpi;
-  /** 0..1 (can exceed 1 if roomCount is set too low). */
-  occupancy: Kpi;
-  revparMinor: Kpi;
   roomNights: Kpi;
   avgLos: Kpi;
 }
@@ -91,10 +95,7 @@ const toAgg = (row: Record<string, unknown> | undefined): RangeAgg => ({
 const pct = (cur: number, prev: number): number | null =>
   prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
 
-function kpiSet(cur: RangeAgg, wow: RangeAgg, yoy: RangeAgg, roomCount: number, days: number): KpiSet {
-  const capacity = Math.max(1, roomCount) * Math.max(1, days);
-  const occ = (a: RangeAgg) => a.nights / capacity;
-  const revpar = (a: RangeAgg) => a.revenueMinor / capacity;
+function kpiSet(cur: RangeAgg, wow: RangeAgg, yoy: RangeAgg): KpiSet {
   const kpi = (f: (a: RangeAgg) => number): Kpi => ({
     value: f(cur),
     wow: pct(f(cur), f(wow)),
@@ -103,8 +104,6 @@ function kpiSet(cur: RangeAgg, wow: RangeAgg, yoy: RangeAgg, roomCount: number, 
   return {
     adrMinor: kpi((a) => a.adrMinor),
     revenueMinor: kpi((a) => a.revenueMinor),
-    occupancy: kpi(occ),
-    revparMinor: kpi(revpar),
     roomNights: kpi((a) => a.nights),
     avgLos: kpi((a) => a.avgLos),
   };
@@ -146,15 +145,11 @@ export async function getRevmanKpis(pid: string, todayISO: string, roomCount: nu
       toAgg(tCur.results[0] as Record<string, unknown>),
       toAgg(tWow.results[0] as Record<string, unknown>),
       toAgg(tYoy.results[0] as Record<string, unknown>),
-      roomCount,
-      1,
     ),
     month: kpiSet(
       toAgg(mCur.results[0] as Record<string, unknown>),
       toAgg(mWow.results[0] as Record<string, unknown>),
       toAgg(mYoy.results[0] as Record<string, unknown>),
-      roomCount,
-      rangeDays(monthFrom, monthTo),
     ),
     monthOccupancy: (perDate.results as { date: string; nights: number }[]).map((r) => ({
       date: r.date,

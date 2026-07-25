@@ -515,12 +515,16 @@ function OccupancyChart({
   today,
   forecastLabel,
   offlineLabel,
+  onlineLabel,
+  totalLabel,
 }: {
   days: { date: string; nights: number; forecast?: number; offline?: number }[];
   roomCount: number;
   today: string;
   forecastLabel: string;
   offlineLabel: string;
+  onlineLabel: string;
+  totalLabel: string;
 }) {
   const dl = useAdminDateLocale();
   const cap = Math.max(1, roomCount);
@@ -556,12 +560,17 @@ function OccupancyChart({
                 />
               )}
               <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-[8px] border border-line bg-surface px-2.5 py-1.5 text-[11.5px] text-secondary shadow-sm group-hover:block">
-                <span className="font-semibold">{fmtDate(d.date, "EEE d MMM", dl)}</span> · {d.nights}/{cap} ·{" "}
-                {pctText(d.nights / cap)}
+                {/* No bare online/capacity percentage: rev_night misses offline
+                    bookings, so that ratio reads as occupancy while understating
+                    it. A percentage is only shown once the inferred offline
+                    share makes it a real total. */}
+                <span className="font-semibold">{fmtDate(d.date, "EEE d MMM", dl)}</span> · {d.nights}{" "}
+                {onlineLabel}
                 {offline > 0 && !past && (
                   <>
                     <br />
-                    {offlineLabel}: {offline} · {pctText((d.nights + offline) / cap)}
+                    {offlineLabel}: {offline} · {totalLabel} {d.nights + offline}/{cap} ·{" "}
+                    {pctText((d.nights + offline) / cap)}
                   </>
                 )}
                 {d.forecast !== undefined && !past && (
@@ -1055,9 +1064,14 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
           )}
           {kpis ? (
             <>
-              <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("revTodayTitle")}</h2>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <KpiTile label={t("revKpiOccupancy")} value={pctText(kpis.today.occupancy.value)} kpi={kpis.today.occupancy} t={t} />
+              {/* These KPIs cover only the bookings we receive through connected
+                  channels, so anything with a CAPACITY denominator (occupancy,
+                  RevPAR) would read far too low and is deliberately not shown
+                  here — total occupancy, including inferred offline bookings,
+                  lives on the pace calendar and chart below. */}
+              <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("revTodayTitle")}</h2>
+              <p className="mb-3 max-w-[640px] text-[12.5px] text-muted">{t("revKpiOnlineScope")}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
                 <KpiTile label={t("revKpiAdr")} value={money(kpis.today.adrMinor.value, kpis.currency)} kpi={kpis.today.adrMinor} t={t} />
                 <KpiTile label={t("revKpiRevenue")} value={money(kpis.today.revenueMinor.value, kpis.currency)} kpi={kpis.today.revenueMinor} t={t} />
               </div>
@@ -1065,9 +1079,7 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
               <h2 className="mb-2 mt-6 font-serif text-[18px] font-semibold">{t("revMonthTitle")}</h2>
               <div className="grid gap-3 sm:grid-cols-3">
                 <KpiTile label={t("revKpiRevenue")} value={money(kpis.month.revenueMinor.value, kpis.currency)} kpi={kpis.month.revenueMinor} t={t} />
-                <KpiTile label={t("revKpiOccupancy")} value={pctText(kpis.month.occupancy.value)} kpi={kpis.month.occupancy} t={t} />
                 <KpiTile label={t("revKpiAdr")} value={money(kpis.month.adrMinor.value, kpis.currency)} kpi={kpis.month.adrMinor} t={t} />
-                <KpiTile label={t("revKpiRevpar")} value={money(kpis.month.revparMinor.value, kpis.currency)} kpi={kpis.month.revparMinor} t={t} />
                 <KpiTile label={t("revKpiRoomNights")} value={String(kpis.month.roomNights.value)} kpi={kpis.month.roomNights} t={t} />
                 <KpiTile
                   label={t("revKpiAvgLos")}
@@ -1103,6 +1115,8 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                   today={loaderData.today}
                   forecastLabel={t("revForecast")}
                   offlineLabel={t("revOffline")}
+                  onlineLabel={t("revOnlineNights")}
+                  totalLabel={t("revTotalOnBooks")}
                 />
               </section>
 
@@ -1118,6 +1132,8 @@ export default function AdminRevenue({ loaderData, actionData }: Route.Component
                     today={loaderData.today}
                     forecastLabel={t("revForecast")}
                     offlineLabel={t("revOffline")}
+                    onlineLabel={t("revOnlineNights")}
+                    totalLabel={t("revTotalOnBooks")}
                   />
                   {forecast.some((f) => f.offlineOnBooks > 0) && (
                     <p className="mb-0 mt-3 text-[12px] text-faint">{t("revOfflineLegend")}</p>
