@@ -11,6 +11,7 @@ import { getCompSet } from "~/lib/revman-compset.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { getRooms } from "~/lib/catalog.server";
 import { getCompareSettings, ownOtaRooms, setCompareSettings } from "~/lib/direct-compare.server";
+import { importBookingRoomMap } from "~/lib/channex/bcom-mapping.server";
 import { suggestRoomMap } from "~/lib/direct-compare";
 import { todayISODate } from "~/lib/dates";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -69,6 +70,15 @@ export async function action({ request }: Route.ActionArgs) {
   const pid = await currentPropertyId(request);
   if (!pid) return { error: "Select a property first." };
   const form = await request.formData();
+
+  if (String(form.get("intent")) === "compareImport") {
+    // Read-only pull of the property's Booking.com channel mapping. Presented for
+    // review — the owner still has to save the form for it to take effect.
+    const today = todayISODate();
+    const known = await ownOtaRooms(pid, today, isoAt(today, 365));
+    const imported = await importBookingRoomMap(pid, known.map((r) => r.roomRef));
+    return { imported };
+  }
 
   if (String(form.get("intent")) === "compare") {
     // Each room's Booking counterpart arrives as map:<ourRoomId>; an empty value
@@ -203,6 +213,7 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
         ourRooms={loaderData.ourRooms}
         otaRooms={loaderData.otaRooms}
         suggested={loaderData.suggested}
+        imported={actionData && "imported" in actionData ? actionData.imported : undefined}
         busy={busy}
       />
     </div>
@@ -216,16 +227,37 @@ function DirectCompare({
   ourRooms,
   otaRooms,
   suggested,
+  imported,
   busy,
 }: {
   compare: { enabled: boolean; roomMap: Record<string, string>; minSavingPct: number; maxAgeHours: number };
   ourRooms: { id: string; title: string }[];
   otaRooms: { roomRef: string; name: string; maxPersons: number | null }[];
   suggested: Record<string, string>;
+  imported?: {
+    ok: boolean;
+    roomMap: Record<string, string>;
+    channelTitle?: string;
+    hotelId?: string;
+    conflicts: { roomId: string; codes: string[] }[];
+    dropped: { roomId: string; code: string }[];
+    error?: string;
+  };
   busy: boolean;
 }) {
   const t = useAdminT();
   const mappedCount = ourRooms.filter((r) => compare.roomMap[r.id]).length;
+  const roomTitle = (id: string) => ourRooms.find((r) => r.id === id)?.title ?? id;
+  const importErrorKey = ({
+    not_connected: "riCompareImportNotConnected",
+    no_channel: "riCompareImportNoChannel",
+    not_mapped: "riCompareImportNotMapped",
+    no_match: "riCompareImportNoMatch",
+    rates_unknown: "riCompareImportRatesUnknown",
+  } as const)[imported?.error ?? ""];
+  // Anything else (Channex down, timeout, rejected key) is shown verbatim rather
+  // than swallowed — a button that silently does nothing is worse than an error.
+  const importErrorRaw = imported && !imported.ok && !importErrorKey ? imported.error : undefined;
 
   return (
     <Form method="post" className="mt-8 flex flex-col gap-5">
@@ -262,24 +294,88 @@ function DirectCompare({
             </div>
 
             <div className="mt-6">
-              <div className="text-[13px] font-semibold text-secondary">{t("riCompareMapTitle")}</div>
-              <p className="mt-0.5 text-[12.5px] text-muted">{t("riCompareMapSub")}</p>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-semibold text-secondary">{t("riCompareMapTitle")}</div>
+                  <p className="mt-0.5 text-[12.5px] text-muted">{t("riCompareMapSub")}</p>
+                </div>
+                {/* Reads the property's Booking.com channel mapping from Channex.
+                    formNoValidate + its own intent so it can't be mistaken for a
+                    save, and nothing is stored until the owner saves below. */}
+                <button
+                  type="submit"
+                  name="intent"
+                  value="compareImport"
+                  formNoValidate
+                  disabled={busy}
+                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[12.5px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {t("riCompareImport")}
+                </button>
+              </div>
+
+              {imported?.ok && (
+                <div className="mt-3 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[12.5px] text-emerald-900">
+                  <div className="font-semibold">
+                    {t("riCompareImportOk", {
+                      n: String(Object.keys(imported.roomMap).length),
+                      channel: imported.channelTitle || t("riCompareImportChannelFallback"),
+                    })}
+                  </div>
+                  <div className="mt-0.5">{t("riCompareImportReview")}</div>
+                </div>
+              )}
+              {imported && !imported.ok && importErrorKey && (
+                <div className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-900">
+                  {t(importErrorKey)}
+                </div>
+              )}
+              {importErrorRaw && (
+                <div className="mt-3 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[12.5px] text-red-800">
+                  {t("riCompareImportFailed")} {importErrorRaw}
+                </div>
+              )}
+              {imported && imported.conflicts.length > 0 && (
+                <div className="mt-2 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-900">
+                  {t("riCompareImportConflicts", { rooms: imported.conflicts.map((c) => roomTitle(c.roomId)).join(", ") })}
+                </div>
+              )}
+              {imported && imported.dropped.length > 0 && (
+                <div className="mt-2 rounded-[10px] border border-line-alt bg-chip/40 px-4 py-3 text-[12.5px] text-secondary">
+                  {t("riCompareImportDropped", { rooms: imported.dropped.map((d) => roomTitle(d.roomId)).join(", ") })}
+                </div>
+              )}
+
               <div className="mt-3 flex flex-col divide-y divide-line-alt rounded-[10px] border border-line-alt">
                 {ourRooms.map((room) => {
                   const current = compare.roomMap[room.id] ?? "";
                   const suggestion = suggested[room.id] ?? "";
+                  const fromChannex = imported?.roomMap[room.id] ?? "";
+                  // Channex's own mapping outranks a name guess and the stored
+                  // value, since it's what actually feeds Booking.
+                  const value = fromChannex || current || suggestion;
                   return (
                     <div key={room.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                       <div className="min-w-[160px] text-[13.5px] font-medium text-secondary">{room.title}</div>
                       <div className="flex items-center gap-2">
-                        {!current && suggestion && (
-                          <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-secondary">
-                            {t("riCompareSuggested")}
+                        {fromChannex ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                            {t("riCompareFromChannex")}
                           </span>
+                        ) : (
+                          !current &&
+                          suggestion && (
+                            <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-secondary">
+                              {t("riCompareSuggested")}
+                            </span>
+                          )
                         )}
                         <select
+                          // Remount when the pre-filled value changes, so an
+                          // import actually moves the visible selection.
+                          key={value}
                           name={`map:${room.id}`}
-                          defaultValue={current || suggestion}
+                          defaultValue={value}
                           className={`${FIELD} min-w-[220px]`}
                         >
                           <option value="">{t("riCompareUnmapped")}</option>
