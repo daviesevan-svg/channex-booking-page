@@ -151,7 +151,9 @@ export async function action({ request }: Route.ActionArgs) {
     const rangeTo = isIso(to) ? to : isoAt(today, settings.horizonDays - 1);
     // Resumable job: chunks hop across invocations (self-fetch chain + this
     // page's poll), so a week/month completes past the Worker time cap.
-    const res = await enqueueCaptureJob(pid, rangeFrom, rangeTo, email);
+    const res = await enqueueCaptureJob(pid, rangeFrom, rangeTo, email, {
+      force: form.get("force") === "on",
+    });
     if (!res.ok) return { error: res.error ?? "Could not start capture." };
     return { okKey: "riCaptureStarted" as const };
   }
@@ -260,6 +262,12 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
             <label className="text-[11px] font-medium text-muted">
               {t("riTo")}
               <input type="date" name="to" defaultValue={dates[dates.length - 1]} className="mt-0.5 block rounded-[8px] border border-line-alt bg-surface px-2 py-1.5 text-[13px]" />
+            </label>
+            {/* Without this a date inside its freshness window silently skips,
+                which looks exactly like the capture doing nothing. */}
+            <label className="flex items-center gap-1.5 pb-1.5 text-[11.5px] font-medium text-muted" title={t("riForceHint")}>
+              <input type="checkbox" name="force" className="h-3.5 w-3.5" />
+              {t("riForce")}
             </label>
             <button
               type="submit"

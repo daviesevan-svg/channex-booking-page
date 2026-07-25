@@ -241,6 +241,11 @@ interface CaptureJob {
   done: number; // hotel-dates finished (captured or skipped-fresh)
   spent: number; // tokens actually charged
   status: "running" | "done" | "paused" | "error";
+  /** Re-price every date in range even if it was captured minutes ago. Costs a
+   *  token per hotel-date, so it is never the default — but without it a date
+   *  inside its freshness window cannot be refreshed at all, which leaves an
+   *  owner stuck when a capture was wrong or the parser has since improved. */
+  force?: boolean;
   /** Why a paused job stopped: out of tokens, or the scraping provider is out of
    *  credits / rate-limited. */
   reason?: "no_tokens" | "provider";
@@ -275,6 +280,7 @@ async function putJob(pid: string, job: CaptureJob): Promise<void> {
 
 export interface CaptureJobView {
   status: CaptureJob["status"];
+  force?: boolean;
   reason?: CaptureJob["reason"];
   done: number;
   total: number;
@@ -287,7 +293,7 @@ export interface CaptureJobView {
 export async function getCaptureJob(pid: string): Promise<CaptureJobView | null> {
   const j = await getJob(pid);
   if (!j) return null;
-  return { status: j.status, reason: j.reason, done: j.done, total: j.total, spent: j.spent, from: j.from, to: j.to };
+  return { status: j.status, force: j.force, reason: j.reason, done: j.done, total: j.total, spent: j.spent, from: j.from, to: j.to };
 }
 
 /** Creates (or replaces) a capture job over [fromISO, toISO] and kicks the first
@@ -297,6 +303,7 @@ export async function enqueueCaptureJob(
   fromISO: string,
   toISO: string,
   actor: string,
+  opts: { force?: boolean } = {},
 ): Promise<{ ok: boolean; error?: string }> {
   await ensureSchema();
   if (!isScrapflyConfigured()) return { ok: false, error: "Scrapfly not configured." };
@@ -336,6 +343,7 @@ export async function enqueueCaptureJob(
     done: 0,
     spent: 0,
     status: "running",
+    force: opts.force === true,
     actor,
     startedAt: now,
     progressAt: now,
@@ -427,7 +435,8 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
       const hotel = job.hotels[job.hi];
       const daysAhead = Math.round((Date.parse(`${date}T00:00:00Z`) - todayMs) / DAY);
       const last = fresh.get(`${hotel.id}|${date}`);
-      if (!(last && now - last < freshnessMs(daysAhead, settings))) batch.push({ date, hotel });
+      const isFresh = !job.force && last !== undefined && now - last < freshnessMs(daysAhead, settings);
+      if (!isFresh) batch.push({ date, hotel });
       job.done++;
       job.hi++;
       if (job.hi >= job.hotels.length) {
