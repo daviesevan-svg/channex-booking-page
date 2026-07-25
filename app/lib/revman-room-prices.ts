@@ -119,11 +119,34 @@ function currencyOf(text: string | undefined): string | null {
   return m ? (CURRENCY_BY_SYMBOL[m[0]] ?? null) : null;
 }
 
-/** Amount of a Booking price string in minor units ("£1,180" → 118000). */
-function amountMinor(text: string | undefined): number | null {
+/** Parses a Booking price string into minor units, in ANY locale's number
+ *  format. Booking renders the price in the market's own convention, so the same
+ *  amount arrives as "£1,101" or "€1.101" — and assuming one convention silently
+ *  corrupts the other by a factor of 1000. Observed live: a €1.101 two-night
+ *  total stored as €1.10.
+ *
+ *  The separators can't be told apart by character, so they're told apart by
+ *  position: a final group of 1–2 digits is a decimal fraction, a final group of
+ *  3 is thousands grouping. Money never has three decimal places, and thousands
+ *  groups are always exactly three, so this is unambiguous either way. */
+export function parseMoneyMinor(text: string | undefined): number | null {
   if (!text) return null;
-  const n = parseFloat(text.replace(/[^\d.,]/g, "").replace(/,/g, ""));
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null;
+  const digits = text.replace(/[^\d.,]/g, "");
+  if (!digits) return null;
+  const cut = Math.max(digits.lastIndexOf("."), digits.lastIndexOf(","));
+  let whole = digits;
+  let fraction = "";
+  if (cut >= 0) {
+    const tail = digits.slice(cut + 1);
+    if (/^\d{1,2}$/.test(tail)) {
+      whole = digits.slice(0, cut);
+      fraction = tail.padEnd(2, "0");
+    }
+  }
+  const wholeDigits = whole.replace(/[.,]/g, "");
+  if (!wholeDigits && !fraction) return null;
+  const minor = Number(wholeDigits || "0") * 100 + Number(fraction || "0");
+  return Number.isFinite(minor) && minor > 0 ? minor : null;
 }
 
 const decode = (s: string): string =>
@@ -134,11 +157,21 @@ const decode = (s: string): string =>
  *  within a unit, which guards against the raw field being quoted in a different
  *  currency than the one we asked for. */
 function blockPriceMinor(raw: unknown, display: string | undefined): number | null {
-  const shown = amountMinor(display);
+  const shown = parseMoneyMinor(display);
   const exact = typeof raw === "string" || typeof raw === "number" ? Math.round(Number(raw) * 100) : null;
   if (exact === null || !Number.isFinite(exact) || exact <= 0) return shown;
   if (shown === null) return exact;
-  return Math.abs(exact - shown) <= 100 ? exact : shown;
+  // Agree to within a unit: the raw field wins, since it carries the pennies the
+  // display rounds away.
+  if (Math.abs(exact - shown) <= 100) return exact;
+  // Wildly apart: that is a parse artifact, not a currency difference, and the
+  // DISPLAY string is the fragile one — it carries symbols and locale grouping,
+  // while the raw field is a plain machine number. Preferring the display here is
+  // what let a mis-parsed "€1.101" (110) beat a correct 110080 in production.
+  if (shown > exact * 3 || shown * 3 < exact) return exact;
+  // Plausibly a different currency than the one we asked for (the original reason
+  // for this check) — then the display is what a shopper actually sees.
+  return shown;
 }
 
 interface RawBlock {
