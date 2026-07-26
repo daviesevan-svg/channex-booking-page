@@ -306,6 +306,45 @@ export async function sendCollectionMembershipEmail(args: {
   }
 }
 
+/** Tells a collection's operators that a property has asked to join.
+ *
+ *  Operator-facing, so unlike sendCollectionMembershipEmail it does NOT adopt
+ *  the property's sender name — an email that arrived "from Spilman Hotel" about
+ *  Spilman Hotel's own request reads like a spoof. The property's accent is used
+ *  for the tint only, and the sender stays the platform default. */
+export async function sendCollectionRequestEmail(args: {
+  /** The REQUESTING property — used for the visual tint, not for identity. */
+  pid: string;
+  to: string[];
+  propertyName: string;
+  propertyLocation?: string;
+  collectionName: string;
+  reviewUrl: string;
+}): Promise<{ sent: boolean }> {
+  if (args.to.length === 0) return { sent: false };
+  try {
+    const settings = await getSettings(args.pid);
+    const where = args.propertyLocation ? ` (${args.propertyLocation})` : "";
+    return await sendEmail({
+      to: args.to,
+      subject: `${args.propertyName} would like to join ${args.collectionName}`,
+      html: renderSimpleEmail({
+        hotelName: args.collectionName,
+        accent: accentHex(settings),
+        heading: `A property has asked to join ${args.collectionName}`,
+        body:
+          `${args.propertyName}${where} has asked to be listed in ${args.collectionName}.\n\n` +
+          `Nothing appears on your collection page until you approve it. You can see how much of the coming ` +
+          `year they have rooms for sale before deciding.`,
+        cta: { label: "Review the request", url: args.reviewUrl },
+      }),
+    });
+  } catch (e) {
+    console.log(`[email] sendCollectionRequestEmail failed: ${e instanceof Error ? e.message : e}`);
+    return { sent: false };
+  }
+}
+
 /** Guest cancellation confirmation + (opt-in) host cancellation notification. */
 export async function sendCancellationEmails(pid: string, booking: BookingRecord, origin: string): Promise<void> {
   try {
