@@ -11,6 +11,8 @@ import {
 import { getConfig } from "~/lib/config.server";
 import { FONT_PAIRS, isThemeId, THEMES } from "~/lib/content";
 import { getVisibleProperties } from "~/lib/properties.server";
+import { propertyActivity } from "~/lib/property-activity.server";
+import { activityLevel, type PropertyActivity } from "~/lib/property-activity";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -22,6 +24,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // The properties this user can add to the collection, with the name + whether
   // each has map coordinates (needed for the map pins on the public page).
   const props = await getVisibleProperties(request);
+  // Whether each property is actually trading, so a dormant one doesn't get
+  // added and then show "no availability" to every guest who clicks it.
+  // Batched: one grouped query for the whole list, not one per row.
+  const activity = await propertyActivity(props.map((p) => p.id));
   const properties = await Promise.all(
     props.map(async (p) => {
       const [ov, settings] = await Promise.all([getOverrides(p.id), getSettings(p.id)]);
@@ -29,6 +35,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         id: p.id,
         name: ov.hotelName || p.name,
         hasGeo: Boolean(settings.latitude && settings.longitude),
+        activity: activity.get(p.id) ?? null,
       };
     }),
   );
@@ -72,6 +79,35 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 export function meta() {
   return [{ title: "Admin · Edit collection" }];
+}
+
+/** How much of the coming year a property has rooms for sale, and whether
+ *  anyone is still maintaining it. A low percentage is shown plainly rather than
+ *  warned about — a hotel that closes for the winter is seasonal, not dead, and
+ *  a destination collection wants it. Only the two unambiguous problems get a
+ *  flag: never connected, and untouched for months. */
+function Trading({ activity }: { activity: PropertyActivity | null }) {
+  const t = useAdminT();
+  if (!activity) return null;
+  const level = activityLevel(activity, Date.now());
+  if (level === "unknown") {
+    return (
+      <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted" title={t("coTradingUnknownHelp")}>
+        {t("coTradingUnknown")}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+        level === "stale" ? "bg-amber-100 text-amber-800" : "bg-chip text-secondary"
+      }`}
+      title={level === "stale" ? t("coTradingStaleHelp") : t("coTradingOpenHelp")}
+    >
+      {t("coTradingOpen", { pct: String(activity.openPct) })}
+      {level === "stale" ? ` · ${t("coTradingStale")}` : ""}
+    </span>
+  );
 }
 
 export default function AdminCollection({ loaderData, actionData }: Route.ComponentProps) {
@@ -186,6 +222,7 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
                     defaultChecked={selected.has(p.id)}
                   />
                   <span className="flex-1 text-[14px] font-semibold text-ink">{p.name}</span>
+                  <Trading activity={p.activity} />
                   {!p.hasGeo && (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
                       {t("coNoMapPin")}
