@@ -13,6 +13,8 @@ import { FONT_PAIRS, isThemeId, THEMES } from "~/lib/content";
 import { getVisibleProperties } from "~/lib/properties.server";
 import { propertyActivity } from "~/lib/property-activity.server";
 import { browseDirectory, type DirectoryEntry } from "~/lib/collection-directory.server";
+import { sendCollectionMembershipEmail } from "~/lib/email.server";
+import { getProperty } from "~/lib/properties.server";
 import {
   addMemberByCollection,
   endMembership,
@@ -57,11 +59,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const externalActivity = await propertyActivity(externalIds);
   const external = await Promise.all(
     externalIds.map(async (id) => {
-      const ov = await getOverrides(id);
+      // The display name can live in either place: an override if the owner has
+      // set one, otherwise the registry. Falling back to the id alone showed a
+      // raw UUID for any property without an override.
+      const [ov, ref] = await Promise.all([getOverrides(id), getProperty(id)]);
       const member = collection.members.find((m) => m.propertyId === id)!;
       return {
         id,
-        name: ov.hotelName || id,
+        name: ov.hotelName || ref?.name || id,
         status: member.status,
         initiatedBy: member.initiatedBy,
         activity: externalActivity.get(id) ?? null,
@@ -95,6 +100,37 @@ const MODES: MembershipMode[] = ["private", "official", "curated", "open"];
 const modeOf = (v: FormDataEntryValue | null): MembershipMode =>
   MODES.includes(String(v) as MembershipMode) ? (String(v) as MembershipMode) : "private";
 
+/** Tells a property what just happened to its listing. Best-effort: an add must
+ *  not fail because mail is down, but it must be ATTEMPTED — an immediate add is
+ *  only fair if the property finds out about it. Ownerless properties (legacy /
+ *  unclaimed) have no account to write to, so they're skipped and logged. */
+async function notifyProperty(
+  propertyId: string,
+  kind: "added" | "invited" | "approved" | "declined",
+  collection: { name: string; slug: string },
+): Promise<void> {
+  try {
+    const prop = await getProperty(propertyId);
+    if (!prop?.owner) {
+      console.log(`[collections] no owner for ${propertyId}; skipping ${kind} notice`);
+      return;
+    }
+    const appUrl = getConfig().appUrl.replace(/\/+$/, "");
+    const ov = await getOverrides(propertyId);
+    await sendCollectionMembershipEmail({
+      pid: propertyId,
+      to: prop.owner,
+      kind,
+      propertyName: ov.hotelName || prop.name,
+      collectionName: collection.name,
+      collectionUrl: `${appUrl}/c/${collection.slug}`,
+      manageUrl: `${appUrl}/admin/collections`,
+    });
+  } catch (e) {
+    console.log(`[collections] ${kind} notice failed for ${propertyId}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
 /** Active members outside the operator's own properties. The save form can't
  *  represent them, so they're re-added to the reconciled list rather than being
  *  silently dropped. */
@@ -120,15 +156,24 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   if (intent === "addMember") {
-    const res = await addMemberByCollection(params.slug, String(form.get("propertyId") || ""));
-    return "error" in res ? { errorKey: `coAddErr_${res.error}` as const } : { okKey: `coAdded_${res.status}` as const };
+    const propertyId = String(form.get("propertyId") || "");
+    const res = await addMemberByCollection(params.slug, propertyId);
+    if ("error" in res) return { errorKey: `coAddErr_${res.error}` as const };
+    const c = (await getVisibleCollections(request)).find((x) => x.slug === params.slug);
+    if (c) await notifyProperty(propertyId, res.status === "invited" ? "invited" : "added", c);
+    return { okKey: `coAdded_${res.status}` as const };
   }
   if (intent === "removeMember") {
     await endMembership(params.slug, String(form.get("propertyId") || ""));
     return { okKey: "coRemoved" as const };
   }
   if (intent === "approveRequest" || intent === "declineRequest") {
-    await resolveMembership(params.slug, String(form.get("propertyId") || ""), intent === "approveRequest");
+    const propertyId = String(form.get("propertyId") || "");
+    const approved = intent === "approveRequest";
+    if (await resolveMembership(params.slug, propertyId, approved)) {
+      const c = (await getVisibleCollections(request)).find((x) => x.slug === params.slug);
+      if (c) await notifyProperty(propertyId, approved ? "approved" : "declined", c);
+    }
     return { okKey: "coRequestResolved" as const };
   }
 

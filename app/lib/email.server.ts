@@ -9,6 +9,18 @@
 // PROD: SparkPost has no shared sandbox sender, so EMAIL_FROM must be on a
 // SparkPost-verified sending domain. EU accounts must set SPARKPOST_API_URL to
 // https://api.eu.sparkpost.com.
+//
+// NO RECIPIENT TRACKING, and that is a property of this file. `sendEmail` sets
+// `open_tracking: false` and `click_tracking: false` on every transmission.
+// Because they are sent explicitly per-transmission they override whatever the
+// SparkPost account defaults are, so nobody can switch tracking on for us from
+// the dashboard. Our own HTML contains no <img>, no remote CSS and no script, so
+// there is nowhere for a pixel to hide, and links are written plain — never
+// wrapped through a redirector and never tagged with campaign parameters.
+//
+// Keep it that way: EVERY email must go out through `sendEmail`. A second
+// fetch to a mail API somewhere else in the codebase would quietly opt us back
+// into a vendor's defaults.
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
@@ -214,6 +226,82 @@ export async function sendTeamInviteEmail(
     });
   } catch (e) {
     console.log(`[email] sendTeamInviteEmail failed: ${e instanceof Error ? e.message : e}`);
+    return { sent: false };
+  }
+}
+
+/** Tells a property it has been listed in someone else's collection.
+ *
+ *  This is what makes an immediate add fair. A `curated` collection can list a
+ *  property without asking first, so the property has to actually LEARN about
+ *  it — an in-admin badge they might never look at isn't good enough.
+ *
+ *  Deliberately does not name the operator: the collection's own name and its
+ *  public page are enough to decide, and passing one customer's email address
+ *  to another isn't ours to do. */
+export async function sendCollectionMembershipEmail(args: {
+  pid: string;
+  to: string;
+  kind: "added" | "invited" | "approved" | "declined";
+  propertyName: string;
+  collectionName: string;
+  collectionUrl: string;
+  manageUrl: string;
+}): Promise<{ sent: boolean }> {
+  try {
+    const [settings, ov] = await Promise.all([getSettings(args.pid), getOverrides(args.pid)]);
+    const hotelName = ov.hotelName || args.propertyName;
+    const copy = {
+      added: {
+        subject: `${args.propertyName} is now listed in ${args.collectionName}`,
+        heading: `${args.propertyName} has been added to a collection`,
+        body:
+          `${args.propertyName} is now shown on the ${args.collectionName} collection page (${args.collectionUrl}).\n\n` +
+          `You didn't need to do anything, and you don't have to stay. You can remove your property at any time, ` +
+          `or refuse the collection so it can't add you again.`,
+        label: "Manage your listings",
+      },
+      invited: {
+        subject: `${args.collectionName} has invited ${args.propertyName}`,
+        heading: `An invitation to join ${args.collectionName}`,
+        body:
+          `${args.collectionName} would like to list ${args.propertyName} on its collection page (${args.collectionUrl}).\n\n` +
+          `Nothing is shown until you accept. If you'd rather not, decline and nothing happens.`,
+        label: "Review the invitation",
+      },
+      approved: {
+        subject: `${args.propertyName} has joined ${args.collectionName}`,
+        heading: `Your request was approved`,
+        body:
+          `${args.propertyName} is now listed on the ${args.collectionName} collection page (${args.collectionUrl}).\n\n` +
+          `You can remove your property at any time.`,
+        label: "Manage your listings",
+      },
+      declined: {
+        subject: `${args.collectionName} declined your request`,
+        heading: `Your request wasn't accepted`,
+        body:
+          `${args.collectionName} has declined the request to list ${args.propertyName}.\n\n` +
+          `Collections choose their own members, so this isn't a reflection on your property.`,
+        label: "Browse collections",
+      },
+    }[args.kind];
+
+    return await sendEmail({
+      to: args.to,
+      subject: copy.subject,
+      from: senderFrom(settings, getConfig()),
+      replyTo: settings.emailReplyTo,
+      html: renderSimpleEmail({
+        hotelName,
+        accent: accentHex(settings),
+        heading: copy.heading,
+        body: copy.body,
+        cta: { label: copy.label, url: args.manageUrl },
+      }),
+    });
+  } catch (e) {
+    console.log(`[email] sendCollectionMembershipEmail failed: ${e instanceof Error ? e.message : e}`);
     return { sent: false };
   }
 }
