@@ -354,3 +354,134 @@ export async function updateCollection(
 export async function deleteCollection(slug: string): Promise<void> {
   await getConfigKV()?.delete(keyFor(normalizeSlug(slug)));
 }
+
+// ── Membership ───────────────────────────────────────────────────────────────
+// Joining needs both sides; leaving needs one. The asymmetry between the two
+// entry paths is deliberate and is about how bad the mistake is. A property
+// appearing in one extra collection is small and reversible in a click, so a
+// `curated` collection may add it straight away. A wrong property on a curated
+// destination page breaks the page for everyone who visits meanwhile, so a
+// request to join always waits for the operator.
+
+export type AddOutcome =
+  | { ok: true; status: "active" | "invited" }
+  | { error: "not_found" | "private" | "blocked" | "already" };
+
+const activeOrWaiting = (s: MemberStatus) => s === "active" || s === "invited" || s === "requested";
+
+/** The operator adds a property. In `curated`/`open` it goes live immediately
+ *  and the property can remove itself; in `official` it waits for the property
+ *  to accept. `private` collections can only ever hold the operator's own
+ *  properties, which is handled by the caller's own scoping — reaching here at
+ *  all is a misuse, so it's refused rather than silently allowed. */
+export async function addMemberByCollection(slug: string, propertyId: string): Promise<AddOutcome> {
+  const c = await readOne(normalizeSlug(slug));
+  if (!c) return { error: "not_found" };
+  if (c.membershipMode === "private") return { error: "private" };
+
+  const existing = c.members.find((m) => m.propertyId === propertyId);
+  // A property that has refused this collection isn't asked again by adding.
+  if (existing?.status === "declined") return { error: "blocked" };
+  if (existing && activeOrWaiting(existing.status)) return { error: "already" };
+
+  const now = new Date().toISOString();
+  const status: MemberStatus = c.membershipMode === "official" ? "invited" : "active";
+  const member: CollectionMember = {
+    propertyId,
+    status,
+    initiatedBy: "collection",
+    createdAt: now,
+    activatedAt: status === "active" ? now : undefined,
+  };
+  c.members = [...c.members.filter((m) => m.propertyId !== propertyId), member];
+  await writeOne(c);
+  return { ok: true, status };
+}
+
+export type RequestOutcome =
+  | { ok: true; status: "requested" | "active" }
+  | { error: "not_found" | "not_open" | "already" };
+
+/** A property asks to join. Only `open` admits without review — the curation is
+ *  the operator's product, so `curated` queues a request and `official` and
+ *  `private` don't accept them at all. */
+export async function requestToJoin(slug: string, propertyId: string): Promise<RequestOutcome> {
+  const c = await readOne(normalizeSlug(slug));
+  if (!c) return { error: "not_found" };
+  if (c.membershipMode === "private" || c.membershipMode === "official") return { error: "not_open" };
+
+  const existing = c.members.find((m) => m.propertyId === propertyId);
+  if (existing && activeOrWaiting(existing.status)) return { error: "already" };
+
+  const now = new Date().toISOString();
+  const status: MemberStatus = c.membershipMode === "open" ? "active" : "requested";
+  c.members = [
+    ...c.members.filter((m) => m.propertyId !== propertyId),
+    {
+      propertyId,
+      status,
+      initiatedBy: "property",
+      createdAt: now,
+      activatedAt: status === "active" ? now : undefined,
+    },
+  ];
+  await writeOne(c);
+  return { ok: true, status };
+}
+
+/** Moves a waiting membership to its conclusion. Used by the operator on a
+ *  `requested` row and by the property on an `invited` one — the same two
+ *  outcomes either way, so one function serves both sides. */
+export async function resolveMembership(
+  slug: string,
+  propertyId: string,
+  accept: boolean,
+): Promise<boolean> {
+  const c = await readOne(normalizeSlug(slug));
+  const m = c?.members.find((x) => x.propertyId === propertyId);
+  if (!c || !m || (m.status !== "invited" && m.status !== "requested")) return false;
+
+  const now = new Date().toISOString();
+  Object.assign(
+    m,
+    accept
+      ? { status: "active" as const, activatedAt: now, endedAt: undefined }
+      : { status: "declined" as const, endedAt: now },
+  );
+  await writeOne(c);
+  return true;
+}
+
+/** Ends a membership. `block` marks it declined so the collection can't simply
+ *  re-add the property; a plain leave allows a later invitation. Either side may
+ *  call this — leaving never needs the other party's agreement. */
+export async function endMembership(slug: string, propertyId: string, block = false): Promise<boolean> {
+  const c = await readOne(normalizeSlug(slug));
+  const m = c?.members.find((x) => x.propertyId === propertyId);
+  if (!c || !m) return false;
+  m.status = block ? "declined" : "left";
+  m.endedAt = new Date().toISOString();
+  await writeOne(c);
+  return true;
+}
+
+export interface PropertyMembership {
+  collection: Collection;
+  member: CollectionMember;
+}
+
+/** Every collection touching any of `propertyIds`, from the PROPERTY's point of
+ *  view — what it's listed in, what it's been invited to, and what it has asked
+ *  to join. This is what makes an immediate add fair: the property can always
+ *  see where it appears and take itself out. */
+export async function membershipsForProperties(propertyIds: string[]): Promise<PropertyMembership[]> {
+  if (propertyIds.length === 0) return [];
+  const ids = new Set(propertyIds);
+  const out: PropertyMembership[] = [];
+  for (const collection of await readAll()) {
+    for (const member of collection.members) {
+      if (ids.has(member.propertyId) && activeOrWaiting(member.status)) out.push({ collection, member });
+    }
+  }
+  return out;
+}

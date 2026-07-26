@@ -12,6 +12,13 @@ import { getConfig } from "~/lib/config.server";
 import { FONT_PAIRS, isThemeId, THEMES } from "~/lib/content";
 import { getVisibleProperties } from "~/lib/properties.server";
 import { propertyActivity } from "~/lib/property-activity.server";
+import { browseDirectory, type DirectoryEntry } from "~/lib/collection-directory.server";
+import {
+  addMemberByCollection,
+  endMembership,
+  resolveMembership,
+  type MembershipMode,
+} from "~/lib/collections.server";
 import { activityLevel, type PropertyActivity } from "~/lib/property-activity";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -40,8 +47,62 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     }),
   );
 
+  // Members the operator does NOT own. They can't appear as checkboxes above
+  // (that list is scoped to the operator's own properties), so they get their
+  // own read-only list — and the action must be careful not to drop them.
+  const ownIds = new Set(props.map((p) => p.id));
+  const externalIds = collection.members
+    .filter((m) => m.status !== "left" && m.status !== "declined" && !ownIds.has(m.propertyId))
+    .map((m) => m.propertyId);
+  const externalActivity = await propertyActivity(externalIds);
+  const external = await Promise.all(
+    externalIds.map(async (id) => {
+      const ov = await getOverrides(id);
+      const member = collection.members.find((m) => m.propertyId === id)!;
+      return {
+        id,
+        name: ov.hotelName || id,
+        status: member.status,
+        initiatedBy: member.initiatedBy,
+        activity: externalActivity.get(id) ?? null,
+      };
+    }),
+  );
+
+  // The directory is only meaningful once a collection accepts outsiders.
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q")?.trim() ?? "";
+  const directory =
+    collection.membershipMode === "private"
+      ? []
+      : await browseDirectory({
+          q,
+          // Own properties are already offered as checkboxes above. Of the rest,
+          // hide current and waiting members, and ones that have DECLINED — but
+          // keep showing a property that merely left, because `addMemberByCollection`
+          // allows re-adding it and hiding it here would make that unreachable.
+          exclude: new Set([
+            ...ownIds,
+            ...collection.members.filter((m) => m.status !== "left").map((m) => m.propertyId),
+          ]),
+        });
+
   const appUrl = getConfig().appUrl.replace(/\/+$/, "");
-  return { collection, properties, appUrl };
+  return { collection, properties, external, directory, q, appUrl };
+}
+
+const MODES: MembershipMode[] = ["private", "official", "curated", "open"];
+const modeOf = (v: FormDataEntryValue | null): MembershipMode =>
+  MODES.includes(String(v) as MembershipMode) ? (String(v) as MembershipMode) : "private";
+
+/** Active members outside the operator's own properties. The save form can't
+ *  represent them, so they're re-added to the reconciled list rather than being
+ *  silently dropped. */
+async function externalActiveIds(request: Request, slug: string): Promise<string[]> {
+  const c = (await getVisibleCollections(request)).find((x) => x.slug === slug);
+  if (!c) return [];
+  const ownIds = new Set((await getVisibleProperties(request)).map((p) => p.id));
+  return c.members.filter((m) => m.status === "active" && !ownIds.has(m.propertyId)).map((m) => m.propertyId);
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -58,6 +119,19 @@ export async function action({ params, request }: Route.ActionArgs) {
     return redirect("/admin/collections");
   }
 
+  if (intent === "addMember") {
+    const res = await addMemberByCollection(params.slug, String(form.get("propertyId") || ""));
+    return "error" in res ? { errorKey: `coAddErr_${res.error}` as const } : { okKey: `coAdded_${res.status}` as const };
+  }
+  if (intent === "removeMember") {
+    await endMembership(params.slug, String(form.get("propertyId") || ""));
+    return { okKey: "coRemoved" as const };
+  }
+  if (intent === "approveRequest" || intent === "declineRequest") {
+    await resolveMembership(params.slug, String(form.get("propertyId") || ""), intent === "approveRequest");
+    return { okKey: "coRequestResolved" as const };
+  }
+
   const themeRaw = String(form.get("theme") || "").trim();
   const res = await updateCollection(params.slug, {
     name: String(form.get("name") || ""),
@@ -66,7 +140,13 @@ export async function action({ params, request }: Route.ActionArgs) {
     heading: String(form.get("heading") || ""),
     intro: String(form.get("intro") || ""),
     phone: String(form.get("phone") || ""),
-    propertyIds: form.getAll("propertyIds").map(String),
+    membershipMode: modeOf(form.get("membershipMode")),
+    // The checkbox list only offers the operator's OWN properties, so a plain
+    // save would mark every external member as having left. Carry them through.
+    propertyIds: [
+      ...form.getAll("propertyIds").map(String),
+      ...(await externalActiveIds(request, params.slug)),
+    ],
     theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as never) : undefined,
     customColor: String(form.get("customColor") || ""),
     customBg: String(form.get("customBg") || ""),
@@ -111,7 +191,7 @@ function Trading({ activity }: { activity: PropertyActivity | null }) {
 }
 
 export default function AdminCollection({ loaderData, actionData }: Route.ComponentProps) {
-  const { collection: c, properties, appUrl } = loaderData;
+  const { collection: c, properties, external, directory, q, appUrl } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const host = appUrl.replace(/^https?:\/\//, "");
@@ -201,6 +281,20 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
         {/* Properties */}
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("coPropertiesTitle")}</div>
+          <label className="mb-5 block text-[13px] font-semibold text-secondary">
+            {t("coModeLabel")}
+            <select
+              name="membershipMode"
+              defaultValue={c.membershipMode}
+              className="mt-1 block w-full max-w-[420px] rounded-[9px] border border-line-alt bg-surface px-3 py-2 text-[14px] font-normal"
+            >
+              {(["private", "official", "curated", "open"] as const).map((m) => (
+                <option key={m} value={m}>{t(`coMode_${m}`)}</option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[12px] font-normal text-muted">{t(`coModeHelp_${c.membershipMode}`)}</span>
+          </label>
+
           <p className="mb-4 text-[13px] text-muted">
             {t("coPropertiesIntroBefore")}{" "}
             <Link to="/admin/general" className="font-semibold text-accent hover:underline">{t("coPropertiesIntroLink")}</Link>
@@ -282,6 +376,90 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
           </button>
         </div>
       </Form>
+
+      {/* Membership beyond the operator's own properties. Kept outside the save
+          form: these are immediate actions, and nesting them would make the
+          hidden save intent win over each button's own. */}
+      {c.membershipMode !== "private" && (
+        <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="font-serif text-[19px] font-semibold">{t("coMembersTitle")}</h2>
+          <p className="mt-1 text-[13px] text-muted">{t(`coModeHelp_${c.membershipMode}`)}</p>
+
+          {external.length > 0 && (
+            <div className="mt-4 flex flex-col gap-2">
+              {external.map((m) => (
+                <div key={m.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+                  <span className="flex-1 text-[14px] font-semibold text-ink">{m.name}</span>
+                  <Trading activity={m.activity} />
+                  {m.status !== "active" && (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
+                      {t(`coStatus_${m.status}`)}
+                    </span>
+                  )}
+                  {m.status === "requested" ? (
+                    // Two distinct intents rather than one intent plus a hidden
+                    // accept flag: a submit button's own name/value is the only
+                    // thing that reliably says which button was pressed.
+                    <Form method="post" className="flex gap-2">
+                      <input type="hidden" name="propertyId" value={m.id} />
+                      <button type="submit" name="intent" value="approveRequest" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                        {t("coApprove")}
+                      </button>
+                      <button type="submit" name="intent" value="declineRequest" className="rounded-[9px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:border-accent">
+                        {t("coDecline")}
+                      </button>
+                    </Form>
+                  ) : (
+                    <Form method="post">
+                      <input type="hidden" name="propertyId" value={m.id} />
+                      <button type="submit" name="intent" value="removeMember" className="text-[12.5px] font-semibold text-[#c0392b] hover:underline">
+                        {t("coRemoveMember")}
+                      </button>
+                    </Form>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Search is a GET so a result list can be linked and reloaded. */}
+          <Form method="get" className="mt-5 flex flex-wrap gap-2">
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder={t("coDirSearchPlaceholder")}
+              className="min-w-[260px] flex-1 rounded-[9px] border border-line-alt bg-surface px-3 py-2 text-[14px]"
+            />
+            <button type="submit" className="rounded-[9px] border border-line-alt bg-surface px-4 py-2 text-[13px] font-semibold text-secondary hover:border-accent hover:text-accent">
+              {t("coDirSearch")}
+            </button>
+          </Form>
+
+          {directory.length === 0 ? (
+            <p className="mt-4 text-[13px] text-muted">{t("coDirNone")}</p>
+          ) : (
+            <div className="mt-4 flex flex-col gap-2">
+              {directory.map((d: DirectoryEntry) => (
+                <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt px-4 py-3">
+                  <span className="text-[14px] font-semibold text-ink">{d.name}</span>
+                  {d.location && <span className="text-[12.5px] text-muted">{d.location}</span>}
+                  {d.propertyType && (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{d.propertyType}</span>
+                  )}
+                  <span className="flex-1" />
+                  <Trading activity={d.activity} />
+                  <Form method="post">
+                    <input type="hidden" name="propertyId" value={d.id} />
+                    <button type="submit" name="intent" value="addMember" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                      {c.membershipMode === "official" ? t("coInvite") : t("coAdd")}
+                    </button>
+                  </Form>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <Form
         method="post"

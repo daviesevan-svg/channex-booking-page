@@ -25,6 +25,11 @@ export interface PropertyRef {
   /** Teammate emails the owner has invited to co-manage this property. They get
    *  full edit access to it, but can't manage the team, delete, or transfer it. */
   members?: string[];
+  /** Discoverable in the directory collection operators browse. Opt-OUT — unset
+   *  means listed. Only content already public on the property's own booking
+   *  page is exposed there, and never a contact address, so the directory can't
+   *  be harvested as a lead list. */
+  directoryListed?: boolean;
 }
 
 const KEY = "properties";
@@ -266,6 +271,19 @@ export async function setPropertyPublic(id: string, isPublic: boolean): Promise<
   const p = list.find((x) => x.id === id);
   if (p) {
     p.public = isPublic;
+    await write(list);
+  }
+}
+
+/** Toggles whether a property appears in the directory collection operators
+ *  browse. Opt-OUT rather than opt-in: what the directory shows is already
+ *  public on the property's own booking page, and an empty directory makes the
+ *  feature pointless. */
+export async function setPropertyDirectoryListed(id: string, listed: boolean): Promise<void> {
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (p) {
+    p.directoryListed = listed;
     await write(list);
   }
 }
