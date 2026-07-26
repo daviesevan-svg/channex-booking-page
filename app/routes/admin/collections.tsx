@@ -7,13 +7,18 @@ import {
   canAccessCollection,
   createCollection,
   deleteCollection,
+  collectionOperatorEmails,
   endMembership,
+  getCollectionBySlug,
   getVisibleCollections,
+  joinableCollections,
   membershipsForProperties,
+  requestToJoin,
   resolveMembership,
 } from "~/lib/collections.server";
 import { getConfig } from "~/lib/config.server";
-import { getOverrides } from "~/lib/overrides.server";
+import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { sendCollectionRequestEmail } from "~/lib/email.server";
 import { getVisibleProperties } from "~/lib/properties.server";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -42,8 +47,16 @@ export async function loader({ request }: Route.LoaderArgs) {
       status: m.member.status,
     }));
 
+  // Collections your properties could ask to join. Only curated and open accept
+  // requests, so invite-only ones aren't offered — a button that always fails is
+  // worse than no button.
+  const joinable = (await joinableCollections([...myIds], operated)).map((j) => ({
+    ...j,
+    options: j.eligiblePropertyIds.map((id) => ({ id, name: names.get(id) ?? id })),
+  }));
+
   const appUrl = getConfig().appUrl.replace(/\/+$/, "");
-  return { collections, listings, appUrl };
+  return { collections, listings, joinable, appUrl };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -62,6 +75,36 @@ export async function action({ request }: Route.ActionArgs) {
     const slug = String(form.get("slug") || "");
     if (await canAccessCollection(request, slug)) await deleteCollection(slug);
     return redirect("/admin/collections");
+  }
+
+  if (intent === "requestJoin") {
+    const slug = String(form.get("slug") || "");
+    const propertyId = String(form.get("propertyId") || "");
+    const mine = (await getVisibleProperties(request)).find((p) => p.id === propertyId);
+    if (!mine) return redirect("/admin/collections");
+    const res = await requestToJoin(slug, propertyId);
+    if ("error" in res) return { error: null, requestErrorKey: `coReqErr_${res.error}` as const };
+    // Only a pending request needs the operator's attention; an `open` collection
+    // has already admitted them, so there is nothing to review.
+    if (res.status === "requested") {
+      const [ov, settings, to, col] = await Promise.all([
+        getOverrides(propertyId),
+        getSettings(propertyId),
+        collectionOperatorEmails(slug),
+        getCollectionBySlug(slug),
+      ]);
+      const appUrl = getConfig().appUrl.replace(/\/+$/, "");
+      const location = [settings.addressCity, settings.addressCountry].filter(Boolean).join(", ");
+      await sendCollectionRequestEmail({
+        pid: propertyId,
+        to,
+        propertyName: ov.hotelName || mine.name,
+        propertyLocation: location || undefined,
+        collectionName: col?.name ?? slug,
+        reviewUrl: `${appUrl}/admin/collections/${slug}`,
+      });
+    }
+    return { error: null, requestOkKey: `coReq_${res.status}` as const };
   }
 
   // Property-side actions. Scoped to properties this user can actually manage,
@@ -86,7 +129,7 @@ export function meta() {
 }
 
 export default function AdminCollections({ loaderData, actionData }: Route.ComponentProps) {
-  const { collections, listings, appUrl } = loaderData;
+  const { collections, listings, joinable, appUrl } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const host = appUrl.replace(/^https?:\/\//, "");
@@ -198,6 +241,65 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
                   )}
                 </Form>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Ask to be listed somewhere. Invite-only and private collections aren't
+          here — offering a request that always fails is worse than not offering
+          one. An `open` collection lists you straight away, so its button says so. */}
+      {joinable.length > 0 && (
+        <section className="mb-8 rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="font-serif text-[18px] font-semibold">{t("coJoinTitle")}</h2>
+          <p className="mt-1 text-[13px] text-muted">{t("coJoinIntro")}</p>
+
+          {actionData && "requestOkKey" in actionData && actionData.requestOkKey && (
+            <p className="mt-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13px] text-emerald-800">
+              {t(actionData.requestOkKey)}
+            </p>
+          )}
+          {actionData && "requestErrorKey" in actionData && actionData.requestErrorKey && (
+            <p className="mt-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+              {t(actionData.requestErrorKey)}
+            </p>
+          )}
+
+          <div className="mt-4 flex flex-col gap-2">
+            {joinable.map((j) => (
+              <Form
+                key={j.slug}
+                method="post"
+                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13.5px]"
+              >
+                <input type="hidden" name="slug" value={j.slug} />
+                <Link to={`/c/${j.slug}`} target="_blank" className="font-semibold text-ink hover:text-accent">
+                  {j.name}
+                </Link>
+                {j.destination && <span className="text-muted">{j.destination}</span>}
+                <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
+                  {t(j.memberCount === 1 ? "coJoinMembers_one" : "coJoinMembers_other", { n: String(j.memberCount) })}
+                </span>
+                <span className="flex-1" />
+                {/* One row per collection, so which property is asking has to be
+                    chosen here rather than inferred. */}
+                <select
+                  name="propertyId"
+                  className="rounded-[9px] border border-line-alt bg-surface px-2 py-1.5 text-[12.5px]"
+                >
+                  {j.options.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  name="intent"
+                  value="requestJoin"
+                  className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white"
+                >
+                  {j.mode === "open" ? t("coJoinNow") : t("coJoinAsk")}
+                </button>
+              </Form>
             ))}
           </div>
         </section>

@@ -470,6 +470,62 @@ export interface PropertyMembership {
   member: CollectionMember;
 }
 
+export interface JoinableCollection {
+  slug: string;
+  name: string;
+  destination?: string;
+  mode: MembershipMode;
+  /** Active members — a bare count, which is what a property weighing up
+   *  whether a collection is worth joining actually needs. */
+  memberCount: number;
+  /** Which of the caller's properties could still ask. A property already in,
+   *  already waiting, or that previously declined is not offered. */
+  eligiblePropertyIds: string[];
+}
+
+/** Collections a property could ask to join.
+ *
+ *  Only `curated` and `open` accept requests at all — `official` is invite-only
+ *  and `private` doesn't admit outsiders, so neither is listed here. `official`
+ *  is a deliberate omission rather than an oversight: offering a request button
+ *  that always fails is worse than not offering one. */
+export async function joinableCollections(
+  myPropertyIds: string[],
+  operatedSlugs: Set<string> = new Set(),
+): Promise<JoinableCollection[]> {
+  if (myPropertyIds.length === 0) return [];
+  const out: JoinableCollection[] = [];
+  for (const c of await readAll()) {
+    if (c.membershipMode !== "curated" && c.membershipMode !== "open") continue;
+    if (c.directoryListed === false) continue;
+    // Your own collections are managed directly; don't ask yourself.
+    if (operatedSlugs.has(c.slug)) continue;
+
+    const taken = new Set(
+      c.members.filter((m) => m.status !== "left").map((m) => m.propertyId),
+    );
+    const eligiblePropertyIds = myPropertyIds.filter((id) => !taken.has(id));
+    if (eligiblePropertyIds.length === 0) continue;
+
+    out.push({
+      slug: c.slug,
+      name: c.name,
+      destination: c.destination,
+      mode: c.membershipMode,
+      memberCount: c.members.filter((m) => m.status === "active").length,
+      eligiblePropertyIds,
+    });
+  }
+  return out.sort((a, b) => b.memberCount - a.memberCount || a.name.localeCompare(b.name));
+}
+
+/** Emails that should hear about a collection's membership activity. */
+export async function collectionOperatorEmails(slug: string): Promise<string[]> {
+  const c = await readOne(normalizeSlug(slug));
+  if (!c) return [];
+  return [...new Set([c.owner, ...(c.operators ?? [])].filter((e): e is string => Boolean(e)))];
+}
+
 /** Every collection touching any of `propertyIds`, from the PROPERTY's point of
  *  view — what it's listed in, what it's been invited to, and what it has asked
  *  to join. This is what makes an immediate add fair: the property can always
