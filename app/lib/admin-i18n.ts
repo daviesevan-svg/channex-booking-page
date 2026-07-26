@@ -729,6 +729,15 @@ const EN: Record<string, string> = {
   coPropertiesIntroAfter: ".",
   coNoProperties: "You have no properties to add yet.",
   coNoMapPin: "no map pin",
+  coTradingOpen: "{pct}% open",
+  coTradingOpenHelp:
+    "Share of the next 365 days with rooms for sale. A low figure isn't a fault — a property that closes for the off-season is seasonal, not inactive.",
+  coTradingStale: "not updated",
+  coTradingStaleHelp:
+    "No availability update received in over four months. The listing may no longer be maintained, so the figures beside it could be out of date.",
+  coTradingUnknown: "not connected",
+  coTradingUnknownHelp:
+    "This property has never sent availability, so there is nothing to measure. That is different from being fully booked or closed.",
   coThemeTitle: "Theme",
   coColourTheme: "Colour theme",
   coCustomOption: "Custom…",
@@ -2172,6 +2181,15 @@ const DE: Record<string, string> = {
   coPropertiesIntroAfter: " fest.",
   coNoProperties: "Sie haben noch keine Unterkünfte zum Hinzufügen.",
   coNoMapPin: "kein Kartenpin",
+  coTradingOpen: "{pct}% offen",
+  coTradingOpenHelp:
+    "Anteil der nächsten 365 Tage mit buchbaren Zimmern. Ein niedriger Wert ist kein Mangel – ein Haus mit Winterpause ist saisonal, nicht inaktiv.",
+  coTradingStale: "nicht aktualisiert",
+  coTradingStaleHelp:
+    "Seit über vier Monaten keine Verfügbarkeits-Aktualisierung erhalten. Der Eintrag wird möglicherweise nicht mehr gepflegt, die Werte daneben können veraltet sein.",
+  coTradingUnknown: "nicht verbunden",
+  coTradingUnknownHelp:
+    "Diese Unterkunft hat noch nie Verfügbarkeiten gesendet, es gibt also nichts zu messen. Das ist etwas anderes als ausgebucht oder geschlossen.",
   coThemeTitle: "Design",
   coColourTheme: "Farbschema",
   coCustomOption: "Benutzerdefiniert…",
