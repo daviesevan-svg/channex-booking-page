@@ -25,8 +25,6 @@ export default [
   route("api/mapping_details", "routes/api.mapping_details.tsx"),
   route("api/changes", "routes/api.changes.tsx"),
   route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
-  // Internal (HMAC-signed) self-invocation target for chunked revman imports.
-  route("api/revman-capture-continue", "routes/api.revman-capture-continue.tsx"),
 
   // Public REST API (v1), authenticated by per-property API keys.
   route("v1/openapi.json", "routes/api.v1.openapi.tsx"),
@@ -74,8 +72,6 @@ export default [
     route("inventory", "routes/admin/inventory.tsx"),
     route("reviews", "routes/admin/reviews.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
-    route("rate-intel", "routes/admin/rate-intel.tsx"),
-    route("rate-intel/settings", "routes/admin/rate-intel.settings.tsx"),
     route("ari-log", "routes/admin/ari-log.tsx"),
     route("taxes", "routes/admin/taxes.tsx"),
     route("promotions", "routes/admin/promotions.tsx"),

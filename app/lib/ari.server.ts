@@ -84,8 +84,11 @@ export async function ensureSchema(): Promise<void> {
   schemaReady = true;
 }
 
-/** Who made an ARI change — a signed-in admin (their email), Channex, or the
- *  revenue manager's price suggestions (applied by an admin). */
+/** Who made an ARI change — a signed-in admin (their email) or Channex.
+ *
+ *  `"revman"` is LEGACY: revenue management was removed, so nothing writes it
+ *  any more. It stays in the union so historical rows still render as what they
+ *  actually were, rather than being relabelled as a person's edit. */
 export interface AriActor {
   source: "user" | "channex" | "revman";
   /** Display label: the user's email, or "Channex". */
