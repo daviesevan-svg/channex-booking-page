@@ -196,15 +196,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       items: [
         { to: "/admin/inventory", label: t("navInventory") },
         { to: "/admin/analytics", label: t("navAnalytics") },
-        // Revenue management is hidden for single-unit properties (see loader):
-        // its occupancy/ADR/pace maths and Booking.com comp set assume a
-        // multi-room hotel.
-        ...(singleUnit
-          ? []
-          : [
-              { to: "/admin/revenue", label: t("navRevenue") },
-              { to: "/admin/rate-intel", label: t("navRateIntel") },
-            ]),
+        // Price checking is hidden for single-unit properties (see loader): the
+        // Booking.com room mapping it relies on assumes a multi-room hotel.
+        ...(singleUnit ? [] : [{ to: "/admin/rate-intel", label: t("navRateIntel") }]),
         { to: "/admin/ari-log", label: t("navChangeLog") },
         { to: "/admin/bookings", label: t("navBookings") },
         { to: "/admin/reviews", label: t("navReviews") },

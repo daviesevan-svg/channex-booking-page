@@ -8,7 +8,6 @@ import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
 import { pruneAri } from "../app/lib/ari.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
-import { scheduledRevmanImport } from "../app/lib/revman.server";
 import { scheduledCompCapture } from "../app/lib/revman-comp-capture.server";
 
 /** Must match the quarter-hourly entry in wrangler.jsonc `triggers.crons`. */
@@ -57,7 +56,5 @@ export default {
     ctx.waitUntil(refreshAllMatchStatuses().catch((e) => console.log(`[cron] refreshAllMatchStatuses failed: ${e}`)));
     // Review requests: checkout-evening ask + up to two reminders per booking.
     ctx.waitUntil(scheduledReviewRequests().catch((e) => console.log(`[cron] scheduledReviewRequests failed: ${e}`)));
-    // Revenue management: pull new/changed Channex bookings for connected properties.
-    ctx.waitUntil(scheduledRevmanImport().catch((e) => console.log(`[cron] scheduledRevmanImport failed: ${e}`)));
   },
 } satisfies ExportedHandler<Env>;

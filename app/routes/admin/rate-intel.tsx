@@ -197,7 +197,7 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
         <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("riTitle")}</h1>
         <p className="text-[14px] text-muted">
           {t("riConnectPrefix")}{" "}
-          <Link to="/admin/revenue" className="text-accent underline">{t("navRevenue")}</Link>.
+          <Link to="/admin/rate-intel/settings" className="text-accent underline">{t("riSettings")}</Link>.
         </p>
       </div>
     );
@@ -343,7 +343,7 @@ export default function RateIntel({ loaderData, actionData }: Route.ComponentPro
 
       {hotels.length === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-8 text-center text-[13.5px] text-muted">
-          {t("riNoCompSet")} <Link to="/admin/revenue" className="text-accent underline">{t("navRevenue")}</Link>.
+          {t("riNoCompSet")} <Link to="/admin/rate-intel/settings" className="text-accent underline">{t("riSettings")}</Link>.
         </div>
       ) : datesWithData === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-8 text-center">
