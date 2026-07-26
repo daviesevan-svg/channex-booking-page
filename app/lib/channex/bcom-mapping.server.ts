@@ -8,7 +8,8 @@
 // owner saves the form.
 import { getConfig } from "../config.server";
 import { getRevmanChannexAuth } from "../revman.server";
-import { getAriRatePairs } from "../revman-rate-link.server";
+import { getInventory } from "../ari.server";
+import { getRooms, getRates } from "../catalog.server";
 import {
   codeOverlap,
   composeRoomMap,
@@ -19,6 +20,39 @@ import {
 
 /** Channex's Booking.com channel identifier. */
 const BOOKING_CHANNEL = "BookingCom";
+
+export interface AriRatePair {
+  roomId: string;
+  rateId: string;
+  /** Dates in the window this (room, rate) carried a price on. */
+  samples: number;
+  /** Human labels when the local catalogue knows these ids. */
+  roomName?: string;
+  rateName?: string;
+}
+
+/** Every (room, rate) combination that carries prices in the window. The channel
+ *  mapping is matched against what the property really sells, not against the
+ *  catalogue's intent — a rate plan with no prices on the books can't be the one
+ *  Booking is selling. */
+async function getAriRatePairs(pid: string, from: string, to: string): Promise<AriRatePair[]> {
+  const [inventory, rooms, rates] = await Promise.all([getInventory(pid, from, to), getRooms(pid), getRates(pid)]);
+  const roomNames = new Map(rooms.map((r) => [r.id, r.title]));
+  const rateNames = new Map(rates.map((r) => [r.id, r.title]));
+
+  const counts = new Map<string, number>();
+  for (const [key, price] of Object.entries(inventory.prices)) {
+    if (!(price > 0)) continue;
+    const [roomId, rateId] = key.split("|");
+    counts.set(`${roomId}|${rateId}`, (counts.get(`${roomId}|${rateId}`) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([k, samples]) => {
+      const [roomId, rateId] = k.split("|");
+      return { roomId, rateId, samples, roomName: roomNames.get(roomId), rateName: rateNames.get(rateId) };
+    })
+    .sort((a, b) => (a.roomName ?? a.roomId).localeCompare(b.roomName ?? b.roomId) || b.samples - a.samples);
+}
 
 /** A Booking.com channel we found, for the owner to see what was considered. */
 export interface FoundChannel {

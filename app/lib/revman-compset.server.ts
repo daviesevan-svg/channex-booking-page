@@ -215,6 +215,17 @@ export async function setSelfRating(
     .run();
 }
 
+/** Points the price capture at our own Booking.com listing. Separate from
+ *  setSelfRating because that clears the rating fields it isn't given, and this
+ *  is the one thing an owner sets by hand. Pass "" to stop capturing. */
+export async function setSelfBookingRef(pid: string, ref: string): Promise<void> {
+  await ensureSelfRow(pid);
+  await db()
+    .prepare(`UPDATE rev_comp SET booking_ref = ? WHERE pid = ? AND is_self = 1`)
+    .bind(ref.trim() || null, pid)
+    .run();
+}
+
 /** Removes a competitor. The self row can't be removed (guarded). */
 export async function removeCompetitor(pid: string, compId: string): Promise<void> {
   await ensureSchema();

@@ -5,9 +5,10 @@ import { FeatureUnavailable } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
-import { getRevmanState } from "~/lib/revman.server";
+import { connectRevman, disconnectRevman, getRevmanState } from "~/lib/revman.server";
 import { getCaptureSettings, setCaptureSettings } from "~/lib/revman-comp-capture.server";
-import { getCompSet } from "~/lib/revman-compset.server";
+import { getCompSet, setSelfBookingRef } from "~/lib/revman-compset.server";
+import { canonicalBookingRef } from "~/lib/revman-compset-discovery.server";
 import { getBalance } from "~/lib/revman-tokens.server";
 import { getRooms } from "~/lib/catalog.server";
 import { explainDirectCompare, getCompareSettings, ownOtaRooms, setCompareSettings } from "~/lib/direct-compare.server";
@@ -43,6 +44,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     ownOtaRooms(pid, today, isoAt(today, 365)),
   ]);
   const hotelCount = set.ranked.filter((h) => Boolean(h.bookingRef)).length;
+  const selfRef = set.ranked.find((h) => h.isSelf)?.bookingRef ?? "";
   // Pre-select by name for any room the owner hasn't mapped yet — a suggestion to
   // confirm, never applied on its own.
   const suggested = suggestRoomMap(
@@ -57,6 +59,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     balance,
     hotelCount,
     compare,
+    selfRef,
     ourRooms: ourRooms.map((r) => ({ id: r.id, title: r.title })),
     otaRooms,
     suggested,
@@ -72,6 +75,38 @@ export async function action({ request }: Route.ActionArgs) {
   const pid = await currentPropertyId(request);
   if (!pid) return { error: "Select a property first." };
   const form = await request.formData();
+
+  // The Channex credential lives here because it is what lets us read the
+  // property's Booking.com room mapping (see channex/bcom-mapping.server). It is
+  // stored encrypted and used read-only.
+  if (String(form.get("intent")) === "connect") {
+    const apiKey = String(form.get("apiKey") || "").trim();
+    if (!apiKey) return { errorKey: "revErrNoKey" as const };
+    const channexPropertyId = String(form.get("channexPropertyId") || "") || undefined;
+    try {
+      const result = await connectRevman(pid, apiKey, channexPropertyId);
+      // More than one property behind the key — ask which, carrying the key so
+      // the owner doesn't paste it twice.
+      if (result.pickFrom) return { pick: result.pickFrom, apiKey };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Something went wrong. Try again." };
+    }
+    return { okKey: "revConnected" as const };
+  }
+
+  if (String(form.get("intent")) === "disconnect") {
+    await disconnectRevman(pid);
+    return { okKey: "revDisconnected" as const };
+  }
+
+  // Which Booking.com page is ours. Stored as the canonical path so a pasted URL
+  // with tracking query params or a locale segment still matches what we scrape.
+  if (String(form.get("intent")) === "listing") {
+    const raw = String(form.get("bookingUrl") ?? "").trim();
+    if (raw && !/booking\.com\/hotel\//i.test(raw)) return { errorKey: "riListingBadUrl" as const };
+    await setSelfBookingRef(pid, raw ? canonicalBookingRef(raw) : "");
+    return { okKey: "riListingSaved" as const };
+  }
 
   if (String(form.get("intent")) === "compareCheck") {
     const checkin = String(form.get("checkDate") ?? "").trim();
@@ -133,19 +168,84 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
 
   if (loaderData.configured && loaderData.singleUnit)
     return <FeatureUnavailable title={t("revSingleUnitTitle")} body={t("revSingleUnitBody")} />;
+  // Connecting Channex is the first step: the key is what lets us read the
+  // property's Booking.com room mapping, without which nothing can be compared.
   if (!loaderData.configured || !loaderData.connected) {
+    const pick =
+      actionData && "pick" in actionData && actionData.pick
+        ? { options: actionData.pick, apiKey: actionData.apiKey }
+        : undefined;
     return (
-      <div>
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("riSettingsTitle")}</h1>
-        <p className="text-[14px] text-muted">
-          {t("riConnectPrefix")}{" "}
-          <Link to="/admin/revenue" className="text-accent underline">{t("navRevenue")}</Link>.
-        </p>
+      <div className="max-w-[640px]">
+        <div className="mb-1 text-[13px]">
+          <Link to="/admin/rate-intel" className="text-accent hover:underline">← {t("riBack")}</Link>
+        </div>
+        <h1 className="font-serif text-[26px] font-semibold">{t("riSettingsTitle")}</h1>
+
+        {actionData && "error" in actionData && actionData.error && (
+          <p className="mt-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
+            {actionData.error}
+          </p>
+        )}
+        {actionData && "errorKey" in actionData && actionData.errorKey && (
+          <p className="mt-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
+            {t(actionData.errorKey)}
+          </p>
+        )}
+
+        <section className="mt-5 rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="font-serif text-[19px] font-semibold">{t("revConnectTitle")}</h2>
+          <p className="mt-2 text-[13.5px] leading-relaxed text-muted">{t("riConnectBody")}</p>
+          <p className="mt-2 text-[12.5px] leading-relaxed text-faint">{t("revKeyStorageNote")}</p>
+
+          {pick ? (
+            <Form method="post" className="mt-5">
+              <input type="hidden" name="intent" value="connect" />
+              <input type="hidden" name="apiKey" value={pick.apiKey} />
+              <p className="mb-3 text-[13.5px] text-secondary">{t("revPickBody")}</p>
+              <div className="flex flex-col gap-2">
+                {pick.options.map((p) => (
+                  <label
+                    key={p.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[14px]"
+                  >
+                    <input type="radio" name="channexPropertyId" value={p.id} required className="accent-accent" />
+                    <span className="font-semibold text-ink">{p.title}</span>
+                    <span className="text-[12px] text-faint">{p.id}</span>
+                  </label>
+                ))}
+              </div>
+              <button
+                type="submit"
+                disabled={busy}
+                className="mt-4 rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                {t("revConnectCta")}
+              </button>
+            </Form>
+          ) : (
+            <Form method="post" className="mt-5">
+              <input type="hidden" name="intent" value="connect" />
+              <label className="block text-[13px] font-semibold text-secondary">
+                {t("revKeyLabel")}
+                <input name="apiKey" required autoComplete="off" className={`${FIELD} mt-1 block w-full`} />
+              </label>
+              <p className="mt-1.5 text-[12px] text-faint">{t("revKeyHelp")}</p>
+              <button
+                type="submit"
+                disabled={busy}
+                className="mt-4 rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white disabled:opacity-60"
+              >
+                {t("revConnectCta")}
+              </button>
+            </Form>
+          )}
+        </section>
       </div>
     );
   }
 
-  const { settings, hotelCount } = loaderData;
+  const { settings, hotelCount, selfRef } = loaderData;
   // Rough monthly burn: (near dates daily + far dates every farCadence) × hotels
   // priced (one token per hotel per day).
   const far = Math.max(0, settings.horizonDays - settings.nearDays);
@@ -163,8 +263,37 @@ export default function RateIntelSettings({ loaderData, actionData }: Route.Comp
       {actionData && "okKey" in actionData && actionData.okKey && (
         <p className="mt-4 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-[13.5px] text-emerald-800">{t(actionData.okKey)}</p>
       )}
+      {actionData && "errorKey" in actionData && actionData.errorKey && (
+        <p className="mt-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">{t(actionData.errorKey)}</p>
+      )}
 
       <Form method="post" className="mt-5 flex flex-col gap-5">
+        {/* Everything downstream — capture, mapping, the badge — needs to know
+            which Booking.com page is this property's. */}
+        <section className="rounded-[14px] border border-line bg-surface p-6">
+          <div className="text-[14px] font-semibold">{t("riListingTitle")}</div>
+          <p className="mt-0.5 text-[12.5px] text-muted">{t("riListingSub")}</p>
+          <div className="mt-3 flex flex-wrap items-end gap-2">
+            <input
+              name="bookingUrl"
+              defaultValue={selfRef ? `https://www.booking.com${selfRef}` : ""}
+              placeholder="https://www.booking.com/hotel/gb/example.html"
+              className={`${FIELD} min-w-[300px] flex-1`}
+            />
+            <button
+              type="submit"
+              name="intent"
+              value="listing"
+              formNoValidate
+              disabled={busy}
+              className="rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[12.5px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+            >
+              {t("riListingSave")}
+            </button>
+          </div>
+          {!selfRef && <p className="mt-2 text-[12.5px] text-amber-800">{t("riListingMissing")}</p>}
+        </section>
+
         <section className="rounded-[14px] border border-line bg-surface p-6">
           <label className="flex items-center gap-3">
             <input type="checkbox" name="enabled" defaultChecked={settings.enabled} className="h-4 w-4" />
@@ -577,6 +706,23 @@ function DirectCompare({
           </button>
         </div>
       )}
+
+      {/* Forgetting the key stops the mapping import and the badge; the owner can
+          paste it again at any time, so this is reversible. */}
+      <section className="rounded-[14px] border border-line bg-surface p-6">
+        <div className="text-[13px] font-semibold text-secondary">{t("riDisconnectTitle")}</div>
+        <p className="mt-0.5 max-w-[460px] text-[12.5px] text-muted">{t("riDisconnectBody")}</p>
+        <button
+          type="submit"
+          name="intent"
+          value="disconnect"
+          formNoValidate
+          disabled={busy}
+          className="mt-3 rounded-[10px] border border-line-alt bg-surface px-4 py-2 text-[12.5px] font-semibold text-secondary hover:border-red-300 hover:text-red-700 disabled:opacity-60"
+        >
+          {t("riDisconnectCta")}
+        </button>
+      </section>
     </Form>
   );
 }
