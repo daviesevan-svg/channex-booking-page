@@ -17,7 +17,7 @@
 // and repeated "update now" clicks don't double-spend.
 import { waitUntil } from "cloudflare:workers";
 
-import { getConfig, getConfigKV, getDB } from "./config.server";
+import { getConfigKV, getDB } from "./config.server";
 import { getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 import { getRevmanState } from "./revman.server";
@@ -222,9 +222,12 @@ const MAX_RANGE_DAYS = 365;
  *  Discovery plan, 20 on Pro); 4 stays safely under Discovery while cutting
  *  wall-time ~4× vs one-at-a-time. */
 const CONCURRENCY = 4;
-/** Waves run per continuation before chaining the next (bounds per-invocation
- *  wall time: ~WAVES × one scrape ≈ 2 × ~13s here). */
-const WAVES_PER_CHUNK = 2;
+/** How long one continuation keeps working before handing back. A request-handler
+ *  invocation stays short so the page stays responsive; a cron invocation gets a
+ *  long budget, because a scheduled handler is allowed minutes of wall time and
+ *  that is what lets a job finish with nobody watching. */
+const BUDGET_INTERACTIVE_MS = 45_000;
+const BUDGET_CRON_MS = 9 * 60_000;
 /** If a job's progress was touched more recently than this, a drive-by nudge
  *  assumes a runner is alive and skips (so polls don't duplicate the chain). */
 const CHUNK_ACTIVE_MS = 90_000;
@@ -353,19 +356,22 @@ export async function enqueueCaptureJob(
   return { ok: true };
 }
 
-/** Fire-and-forget self-fetch so the next chunk runs in a fresh invocation with
- *  fresh limits (signed with the session secret; the page poll is the backup). */
+/** Starts working the job in the BACKGROUND of the current invocation.
+ *
+ *  This used to be a signed self-fetch to /api/revman-capture-continue, so that
+ *  each chunk got a fresh invocation. In production that chain did not carry:
+ *  capture only ever advanced while an admin had the page open, and a 116-unit
+ *  job sat unfinished overnight. A Worker calling its own public hostname is a
+ *  fragile way to schedule work — it depends on APP_URL, on the route resolving
+ *  back to this Worker, and on subrequest limits.
+ *
+ *  Running the work under waitUntil instead keeps it in-process: no hostname, no
+ *  HMAC, no extra hop. The runner claim inside continueCaptureJob still makes a
+ *  concurrent page nudge or cron tick safe. */
 function kickCaptureContinuation(pid: string): void {
-  const work = (async () => {
-    const { hmacSha256Hex } = await import("./hmac.server");
-    const sig = await hmacSha256Hex(getConfig().sessionSecret, `revcap-continue:${pid}`);
-    const base = getConfig().appUrl.replace(/\/+$/, "");
-    await fetch(`${base}/api/revman-capture-continue`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pid, sig }),
-    });
-  })().catch((err) => console.log(`[revcap] continuation kick failed for ${pid}: ${err}`));
+  const work = continueCaptureJob(pid, { budgetMs: BUDGET_INTERACTIVE_MS }).catch((err) =>
+    console.log(`[revcap] continuation failed for ${pid}: ${err}`),
+  );
   try {
     waitUntil(work);
   } catch {
@@ -375,7 +381,10 @@ function kickCaptureContinuation(pid: string): void {
 
 /** Processes one CHUNK_UNITS-sized slice of the current job and chains the next.
  *  `onlyIfStale` is the page-poll drive-by: skips when a runner looks alive. */
-export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: boolean } = {}): Promise<void> {
+export async function continueCaptureJob(
+  pid: string,
+  opts: { onlyIfStale?: boolean; budgetMs?: number } = {},
+): Promise<void> {
   const job = await getJob(pid);
   if (!job || job.status !== "running") return;
   if (opts.onlyIfStale && Date.now() - Date.parse(job.progressAt) < CHUNK_ACTIVE_MS) return;
@@ -416,9 +425,11 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
   }
 
   const now = Date.now();
+  const budgetMs = opts.budgetMs ?? BUDGET_INTERACTIVE_MS;
+  const until = now + budgetMs;
   let paused = false;
   let pauseReason: "no_tokens" | "provider" | undefined;
-  for (let wave = 0; wave < WAVES_PER_CHUNK && job.di < job.dates.length && !paused; wave++) {
+  while (job.di < job.dates.length && !paused && Date.now() < until) {
     if (await superseded()) return;
     const balance = await getBalance(pid);
     if (balance < 1) {
@@ -468,7 +479,9 @@ export async function continueCaptureJob(pid: string, opts: { onlyIfStale?: bool
   job.status = paused ? "paused" : job.di >= job.dates.length ? "done" : "running";
   job.progressAt = new Date().toISOString();
   await putJob(pid, job);
-  if (job.status === "running") kickCaptureContinuation(pid);
+  // Deliberately no re-kick here: this invocation already worked to its budget.
+  // Whatever is left is picked up by the quarter-hourly cron (long budget, so an
+  // unattended job finishes) or by the page poll while someone is watching.
 }
 
 /** Drive-by nudge from the page poll — keeps the chain moving even if the signed
@@ -589,9 +602,13 @@ export async function scheduledCompCapture(): Promise<void> {
       if (!settings.enabled) continue;
       if ((await getBalance(p.id)) < 1) continue; // paused; email handled elsewhere
       const job = await getJob(p.id);
-      const active = job && job.status === "running" && Date.now() - Date.parse(job.progressAt) < CHUNK_ACTIVE_MS;
-      if (active) {
-        await continueCaptureJob(p.id); // keep an in-flight job moving
+      // RESUME an unfinished job rather than replacing it, however stale it looks.
+      // Replacing one loses its cursor and — worse — its `force` flag, so a forced
+      // re-price interrupted by a deploy would silently finish as a no-op with
+      // every remaining date skipped as "fresh". The runner claim inside
+      // continueCaptureJob keeps this safe against a concurrent page nudge.
+      if (job && job.status === "running" && job.di < job.dates.length) {
+        await continueCaptureJob(p.id, { budgetMs: BUDGET_CRON_MS });
       } else {
         const now = Date.now();
         await enqueueCaptureJob(p.id, iso(now), iso(now + (settings.horizonDays - 1) * DAY), "cron");

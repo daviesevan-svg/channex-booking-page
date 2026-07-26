@@ -11,6 +11,9 @@ import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { scheduledRevmanImport } from "../app/lib/revman.server";
 import { scheduledCompCapture } from "../app/lib/revman-comp-capture.server";
 
+/** Must match the quarter-hourly entry in wrangler.jsonc `triggers.crons`. */
+const QUARTER_HOURLY = "*/15 * * * *";
+
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
   import.meta.env.MODE,
@@ -27,7 +30,20 @@ export default {
   // and keeps the previous snapshot if Channex can't be reached; (3) prune ARI
   // rows outside the useful window (past dates + >730 days out) so D1 stays
   // bounded.
-  async scheduled(_controller, _env, ctx) {
+  // TWO schedules (see wrangler.jsonc). The six-hourly one does the heavy and
+  // outbound-facing work. The quarter-hourly one runs ONLY rate-intelligence
+  // capture, which needs to come back often to carry a long job to completion —
+  // running Google ARI pushes or review-request emails that often would be
+  // wrong. The quarter-hourly expression also fires at every six-hourly time,
+  // so capture is covered there too.
+  async scheduled(controller, _env, ctx) {
+    if (controller.cron === QUARTER_HOURLY) {
+      // Rate intelligence: resume any unfinished capture, or start the due one.
+      // A scheduled invocation may run for minutes, which is what lets a job
+      // finish with nobody watching the admin page.
+      ctx.waitUntil(scheduledCompCapture().catch((e) => console.log(`[cron] scheduledCompCapture failed: ${e}`)));
+      return;
+    }
     ctx.waitUntil(scheduledGoogleAriSync());
     ctx.waitUntil(refreshMergedGoogleFeed());
     ctx.waitUntil(refreshMergedVrFeed());
@@ -43,8 +59,5 @@ export default {
     ctx.waitUntil(scheduledReviewRequests().catch((e) => console.log(`[cron] scheduledReviewRequests failed: ${e}`)));
     // Revenue management: pull new/changed Channex bookings for connected properties.
     ctx.waitUntil(scheduledRevmanImport().catch((e) => console.log(`[cron] scheduledRevmanImport failed: ${e}`)));
-    // Rate intelligence: capture due competitor/own prices for properties with
-    // automatic capture enabled (metered against their token wallet).
-    ctx.waitUntil(scheduledCompCapture().catch((e) => console.log(`[cron] scheduledCompCapture failed: ${e}`)));
   },
 } satisfies ExportedHandler<Env>;
