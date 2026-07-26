@@ -73,7 +73,7 @@
 	// Google Hotels ARI re-sync: every 6h, re-push all ARI-enabled properties
 	// (backstop to the change-driven + admin-edit pushes). See workers/app.ts.
 	"triggers": {
-		"crons": ["0 */6 * * *", "*/15 * * * *"]
+		"crons": ["0 */6 * * *"]
 	},
 	"observability": {
 		"enabled": true

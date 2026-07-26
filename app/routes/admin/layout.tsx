@@ -35,10 +35,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     isSuperadmin: superadmin,
     canManageCurrent,
     testMode,
-    // Single-unit (apartment) properties don't get revenue management: its
-    // occupancy/ADR/pace/forecast maths assume a multi-room inventory, and the
-    // competitor set is a Booking.com hotel set — neither fits one rental.
-    singleUnit: settings.singleUnit === true,
     lang: langParam(request),
     languages: enabledLanguages(settings),
     adminLang: adminLangFromRequest(request),
@@ -173,7 +169,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, properties, isSuperadmin, canManageCurrent, testMode, singleUnit, lang, languages, adminLang } =
+  const { email, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -196,9 +192,6 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       items: [
         { to: "/admin/inventory", label: t("navInventory") },
         { to: "/admin/analytics", label: t("navAnalytics") },
-        // Price checking is hidden for single-unit properties (see loader): the
-        // Booking.com room mapping it relies on assumes a multi-room hotel.
-        ...(singleUnit ? [] : [{ to: "/admin/rate-intel", label: t("navRateIntel") }]),
         { to: "/admin/ari-log", label: t("navChangeLog") },
         { to: "/admin/bookings", label: t("navBookings") },
         { to: "/admin/reviews", label: t("navReviews") },
