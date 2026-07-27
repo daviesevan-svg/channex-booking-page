@@ -10,12 +10,8 @@ import { deleteRate, getRate, getRooms, saveRate, type CatalogRate, type Occupan
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import {
   CARD_HANDLINGS,
-  CARD_HANDLING_LABEL,
   DEPOSIT_TYPES,
-  DEPOSIT_TYPE_LABEL,
   PAYMENT_TIMINGS,
-  PAYMENT_TIMING_LABEL,
-  PENALTY_LABEL,
   PENALTY_TYPES,
   describePolicy,
   ratePolicyOf,
@@ -344,8 +340,8 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             <label className="block text-[13px] font-semibold text-secondary">
               {t("rtPayTiming")}
               <select name="payTiming" value={payTiming} onChange={(e) => setPayTiming(e.target.value)} className={FIELD_INPUT}>
-                {PAYMENT_TIMINGS.map((t) => (
-                  <option key={t} value={t}>{PAYMENT_TIMING_LABEL[t]}</option>
+                {PAYMENT_TIMINGS.map((v) => (
+                  <option key={v} value={v}>{t(`rtOptTiming_${v}`)}</option>
                 ))}
               </select>
             </label>
@@ -353,7 +349,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               {t("rtCardHandling")}
               <select name="cardHandling" defaultValue={pol.payment.card} className={FIELD_INPUT}>
                 {CARD_HANDLINGS.map((c) => (
-                  <option key={c} value={c}>{CARD_HANDLING_LABEL[c]}</option>
+                  <option key={c} value={c}>{t(`rtOptCard_${c}`)}</option>
                 ))}
               </select>
             </label>
@@ -361,7 +357,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               {t("rtDepositType")} <span className="font-normal text-faint">{t("rtDepositTypeHint")}</span>
               <select name="depositType" defaultValue={pol.payment.deposit?.type ?? "percent"} disabled={payTiming !== "deposit"} className={disabledInput}>
                 {DEPOSIT_TYPES.map((d) => (
-                  <option key={d} value={d}>{DEPOSIT_TYPE_LABEL[d]}</option>
+                  <option key={d} value={d}>{t(`rtOptDeposit_${d}`)}</option>
                 ))}
               </select>
             </label>
@@ -536,7 +532,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                   {t("rtLateCharge")} <span className="font-normal text-faint">{t("rtLateChargeHint")}</span>
                   <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
                     {PENALTY_TYPES.map((p) => (
-                      <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
+                      <option key={p} value={p}>{t(`rtOptPenalty_${p}`)}</option>
                     ))}
                   </select>
                 </label>
@@ -559,7 +555,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               {t("rtNoShowCharge")}
               <select name="noShowPenalty" value={noShowPenalty} onChange={(e) => setNoShowPenalty(e.target.value)} className={FIELD_INPUT}>
                 {PENALTY_TYPES.map((p) => (
-                  <option key={p} value={p}>{PENALTY_LABEL[p]}</option>
+                  <option key={p} value={p}>{t(`rtOptPenalty_${p}`)}</option>
                 ))}
               </select>
             </label>
