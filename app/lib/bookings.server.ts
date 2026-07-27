@@ -243,6 +243,18 @@ export async function getBooking(pid: string, id: string): Promise<BookingRecord
   return row ? (JSON.parse(row.json) as BookingRecord) : undefined;
 }
 
+/** By the guest-facing reference. The API exposes this alongside id lookup
+ *  because `POST /v1/bookings` hands back a REFERENCE, so it's what a caller —
+ *  or an AI agent checking whether the guest has paid yet — actually holds. */
+export async function getBookingByReference(pid: string, reference: string): Promise<BookingRecord | undefined> {
+  await ready(pid);
+  const row = await db()
+    .prepare(`SELECT json FROM booking WHERE pid=? AND reference=?`)
+    .bind(pid, reference.trim().toUpperCase())
+    .first<Row>();
+  return row ? (JSON.parse(row.json) as BookingRecord) : undefined;
+}
+
 /** All bookings made with a given email (newest first). */
 export async function getBookingsByEmail(pid: string, email: string): Promise<BookingRecord[]> {
   await ready(pid);
