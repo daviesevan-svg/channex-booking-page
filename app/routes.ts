@@ -26,6 +26,10 @@ export default [
   route("api/changes", "routes/api.changes.tsx"),
   route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
 
+  // Model Context Protocol endpoint — same per-property API key as /v1, so an AI
+  // agent can search availability and book without driving a browser.
+  route("mcp", "routes/mcp.tsx"),
+
   // Public REST API (v1), authenticated by per-property API keys.
   route("v1/openapi.json", "routes/api.v1.openapi.tsx"),
   route("v1/properties", "routes/api.v1.properties.tsx"),
