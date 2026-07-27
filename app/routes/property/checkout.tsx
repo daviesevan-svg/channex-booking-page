@@ -28,6 +28,7 @@ import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { createCheckoutSession } from "~/lib/stripe.server";
@@ -299,6 +300,17 @@ export async function action({ params, request }: Route.ActionArgs) {
   const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
 
   const g = parsed.data;
+
+  // Throttle booking creation per client. Nothing else guards this: the endpoint
+  // is deliberately anonymous (a guest has no account), and every booking
+  // decrements availability and pushes to Channex — so an unthrottled loop could
+  // empty a hotel's calendar across every channel it sells on. Generous enough
+  // that a real guest fumbling the form never notices.
+  if (!(await rateLimit(`book:${pid}:${clientKey(request)}`, 10, 600))) {
+    console.log(`[checkout] booking rate limit hit pid=${pid} client=${clientKey(request)}`);
+    return { rateLimited: true as const };
+  }
+
   const config = getConfig();
   // Live vs test booking is controlled from admin General settings; an unsaved
   // setting falls back to the ALLOW_LIVE_BOOKING env var. (settings loaded above.)
@@ -432,11 +444,15 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   // Stripe is needed to charge a deposit/prepay (mode=payment) or to save a
   // guarantee card for a pay-at-hotel rate that asks for one (mode=setup).
-  const needsGuarantee = due === 0 && policy.payment.card === "guarantee";
+  // Every card policy wants a card — CardHandling is guarantee or
+  // charge_at_booking, never "none". So when nothing is due today we still run
+  // Stripe in setup mode to put a card on file. Testing only for "guarantee"
+  // meant a rate set to charge-at-booking with nothing due today collected
+  // NOTHING, so its non-refundable and no-show terms were unenforceable.
   const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
   // A due fully covered by the voucher needs no charge (and no guarantee card —
   // the stay is paid); the remainder, if any, goes through Stripe as usual.
-  const stripeMode: "payment" | "setup" | null = dueAfterVoucher > 0 ? "payment" : needsGuarantee ? "setup" : null;
+  const stripeMode: "payment" | "setup" = dueAfterVoucher > 0 ? "payment" : "setup";
 
   // Only take a real payment in LIVE mode. In test mode the booking is
   // simulated and pushed nowhere, so charging would take money for a booking
@@ -724,6 +740,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       {bookingError && (
         <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
           {bookingError}
+        </div>
+      )}
+
+      {actionData?.rateLimited && (
+        <div className="mb-6 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">
+          {tr.t("bookingThrottled")}
         </div>
       )}
 

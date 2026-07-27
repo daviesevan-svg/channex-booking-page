@@ -31,6 +31,7 @@ import type { AppliedPromo } from "~/lib/promotions";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { stashPending } from "~/lib/pending-bookings.server";
+import { rateLimit } from "~/lib/rate-limit.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
 
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
@@ -148,6 +149,12 @@ export async function action({ request }: Route.ActionArgs) {
   const auth = await authenticateApiKey(request);
   if (auth instanceof Response) return auth;
   const { pid, mode } = auth;
+  // Per-key throttle. An API key is accountable, so this is looser than the
+  // anonymous guest path — it exists to stop a looping integration from eating a
+  // property's inventory, not to police a caller.
+  if (!(await rateLimit(`apibook:${pid}:${auth.keyId}`, 60, 600))) {
+    return apiError(429, "rate_limited", "Too many bookings created too quickly. Slow down and retry shortly.");
+  }
   const kv = getConfigKV();
   const idemKey = request.headers.get("Idempotency-Key");
   const idemStore = idemKey ? `idem:${pid}:${idemKey}` : null;
@@ -306,8 +313,10 @@ export async function action({ request }: Route.ActionArgs) {
   });
 
   const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
-  const needsGuarantee = due === 0 && policy.payment.card === "guarantee";
-  const stripeMode: "payment" | "setup" | null = due > 0 ? "payment" : needsGuarantee ? "setup" : null;
+  // Any card policy wants a card (CardHandling is guarantee or charge_at_booking,
+  // never "none"), so nothing-due still runs setup mode. Testing only for
+  // "guarantee" let charge-at-booking with nothing due collect nothing at all.
+  const stripeMode: "payment" | "setup" = due > 0 ? "payment" : "setup";
 
   const respond = async (status: number, bodyOut: unknown) => {
     if (idemStore && kv) await kv.put(idemStore, JSON.stringify({ status, body: bodyOut }), { expirationTtl: 24 * 3600 });
