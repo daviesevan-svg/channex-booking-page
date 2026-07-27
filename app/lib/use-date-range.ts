@@ -90,6 +90,31 @@ export function useDateRange({
   const minArrival = minCheckin ? parseISO(minCheckin) : today;
   const floor = isBefore(minArrival, today) ? today : minArrival;
 
+  // Longest stay we'll look ahead for when testing whether an arrival is even
+  // possible. Dates with no loaded availability read as open, so the walk stops
+  // on the first sold night in practice; this only bounds the pathological case.
+  const MAX_LOOKAHEAD_NIGHTS = 370;
+
+  // Can a guest actually ARRIVE on this date? Not the same question as "is this
+  // night for sale". A date whose run of available nights is shorter than its own
+  // minimum stay is a dead end: the guest picks it, gets told to choose a
+  // check-out N nights later, and every date that would satisfy that is sold.
+  //
+  // So walk forward from `date` while nights are available and look for a stay
+  // length that both meets the minimum AND lands on a day you're allowed to
+  // depart. If none exists, the date can't start a booking.
+  const arrivalAllowed = (date: Date) => {
+    if (isSold(date) || ctaSet.has(iso(date))) return false;
+    const need = minStayFor(date);
+    let nights = 0;
+    while (!isSold(addDays(date, nights))) {
+      nights++;
+      if (nights >= need && !ctdSet.has(iso(addDays(date, nights)))) return true;
+      if (nights >= MAX_LOOKAHEAD_NIGHTS) break;
+    }
+    return false;
+  };
+
   // A sold-out night can still be a valid CHECK-OUT (you don't sleep there):
   // true when picking a check-out, `date` is after check-in, meets min-stay,
   // isn't closed-to-departure, and every night in between is available.
@@ -179,11 +204,18 @@ export function useDateRange({
         // First sold night after an available run — you can still check out here.
         const prev = addDays(date, -1);
         const checkoutBoundary = sold && !isSold(prev) && !isBefore(prev, today);
-        const disabled = tooEarly ? true : asCheckout ? false : sold;
+        // Whether clicking this date would set a CHECK-IN — the same test
+        // handleDay uses. The arrival constraint must only apply then: while a
+        // check-out is being chosen, an available date has to stay clickable so
+        // handleDay can explain why it doesn't work.
+        const asArrival = !checkin || !!checkout || !isBefore(checkin, date);
+        const arrivalBlocked = asArrival && !sold && !arrivalAllowed(date);
+        const disabled = tooEarly ? true : asCheckout ? false : sold || arrivalBlocked;
         let title: string | undefined;
         if (!tooEarly) {
           if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
+          else if (arrivalBlocked) title = tr.t("minStayUnreachable", { n: minStayFor(date) });
         }
         const isCheckin = !!checkin && differenceInCalendarDays(date, checkin) === 0;
         const isCheckout = !!checkout && differenceInCalendarDays(date, checkout) === 0;
