@@ -23,6 +23,8 @@ import {
   type RatePolicy,
 } from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { getConfig } from "~/lib/config.server";
+import { getSettings } from "~/lib/overrides.server";
 
 /** Build the structured policy from form field getters — shared by the save
  *  action and the editor's live preview. Disabled inputs simply read as "". */
@@ -83,7 +85,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const isNew = params.rateId === "new";
   const rate = isNew ? null : await getRate(propertyId, params.rateId);
   if (!isNew && !rate) throw redirect("/admin/rates");
-  return { isNew, rate, rooms: rooms.map((r) => ({ id: r.id, title: r.title })) };
+  // Whether a card can be taken at all. Penalties on a rate are only
+  // enforceable if there's something on file to charge.
+  const settings = await getSettings(propertyId);
+  const canTakeCard = Boolean(settings.stripeAccountId && getConfig().stripeSecretKey);
+  return { isNew, rate, canTakeCard, rooms: rooms.map((r) => ({ id: r.id, title: r.title })) };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -189,7 +195,7 @@ export function meta() {
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
-  const { isNew, rate, rooms } = loaderData;
+  const { isNew, rate, rooms, canTakeCard } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -324,6 +330,16 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <p className="mb-3 text-[13px] text-muted">
             {t("rtPaymentIntro")}
           </p>
+
+          {/* A penalty you can't charge is a term you can't enforce. Warn where
+              the hotelier can act on it rather than letting the guest agree to
+              something that quietly means nothing. */}
+          {!canTakeCard && (!refundable || noShowPenalty !== "none") && (
+            <p className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+              <span className="font-semibold">{t("rtNoCardWarnTitle")}</span> {t("rtNoCardWarnBody")}{" "}
+              <Link to="/admin/payments" className="font-semibold underline">{t("rtNoCardWarnLink")}</Link>
+            </p>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block text-[13px] font-semibold text-secondary">
               {t("rtPayTiming")}

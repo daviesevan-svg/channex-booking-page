@@ -1067,6 +1067,10 @@ const EN: Record<string, string> = {
   rtPricesTitle: "Nightly price per room",
   rtPricesIntro: "This rate applies to every room you price below — leave a room blank to not offer it there. Occupancy is taken from each room’s settings. Prices in your property currency.",
   rtPaymentTitle: "Payment",
+  rtNoCardWarnTitle: "This rate's penalties can't be enforced.",
+  rtNoCardWarnBody:
+    "It charges for a late cancellation or a no-show, but card payments aren't set up, so no card is taken and there's nothing to charge. Guests will still agree to the terms.",
+  rtNoCardWarnLink: "Set up payments",
   rtPaymentIntro: "How and when the guest pays. This drives the checkout breakdown and policy text — it doesn’t charge cards (no payment gateway is connected yet).",
   rtPayTiming: "Payment timing",
   rtCardHandling: "Card handling",
@@ -2574,6 +2578,10 @@ const DE: Record<string, string> = {
   rtPricesTitle: "Übernachtungspreis pro Zimmer",
   rtPricesIntro: "Diese Rate gilt für jedes Zimmer, das Sie unten bepreisen — lassen Sie ein Zimmer leer, um sie dort nicht anzubieten. Die Belegung ergibt sich aus den Einstellungen des jeweiligen Zimmers. Preise in Ihrer Unterkunftswährung.",
   rtPaymentTitle: "Zahlung",
+  rtNoCardWarnTitle: "Die Gebühren dieser Rate sind nicht durchsetzbar.",
+  rtNoCardWarnBody:
+    "Sie berechnet eine späte Stornierung oder ein Nichterscheinen, aber Kartenzahlungen sind nicht eingerichtet – es wird keine Karte erfasst und es gibt nichts zu belasten. Gäste stimmen den Bedingungen dennoch zu.",
+  rtNoCardWarnLink: "Zahlungen einrichten",
   rtPaymentIntro: "Wie und wann der Gast zahlt. Dies steuert die Aufschlüsselung im Checkout und den Bedingungstext — es werden keine Karten belastet (noch kein Zahlungsanbieter angebunden).",
   rtPayTiming: "Zahlungszeitpunkt",
   rtCardHandling: "Kartenhandhabung",
