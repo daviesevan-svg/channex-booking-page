@@ -364,7 +364,23 @@ export async function action({ request }: Route.ActionArgs) {
       return apiError(502, "payment_error", "Couldn't start the payment session. Please try again.");
     }
     if (!url) return apiError(502, "payment_error", "Couldn't start the payment session. Please try again.");
-    return respond(201, { data: { reference, status: "pending_payment", amount_due: due, currency }, payment_url: url });
+    // `amount_due: 0` with a payment_url looks contradictory unless we say why:
+    // a guarantee-card hold takes card details without charging anything. A
+    // caller relaying this to a guest needs to know which it is.
+    return respond(201, {
+      data: {
+        reference,
+        status: "pending_payment",
+        amount_due: due,
+        currency,
+        payment_reason: due > 0 ? "payment_due" : "card_guarantee",
+        payment_note:
+          due > 0
+            ? `The guest pays ${due} ${currency} on the payment_url to confirm this booking.`
+            : "Nothing is charged. The guest confirms this booking by entering card details on the payment_url as a guarantee.",
+      },
+      payment_url: url,
+    });
   }
 
   // No online payment needed — create the booking now.

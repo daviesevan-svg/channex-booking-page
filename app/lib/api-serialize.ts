@@ -8,6 +8,10 @@ import type { BookingRecord } from "./bookings.server";
 import type { SiteSettings } from "./content";
 import type { Extra } from "./extras";
 import type { PropertyOverrides } from "./overrides.server";
+import { computePricing, type TaxConfig } from "./pricing";
+import { describePolicy, ratePolicyOf } from "./rate-policy";
+import { roomCapacity } from "./occupancy";
+import type { GateReason } from "./catalog.server";
 
 /** Everything an external booking frontend needs to render a branded property:
  *  display content (localizable via ?lang=), contact + location, stay logistics,
@@ -112,18 +116,61 @@ export function serializeRoom(r: CatalogRoom) {
   };
 }
 
-function serializeRatePlan(rp: RatePlan) {
+/** Context needed to price a rate all-in and describe its policy. */
+export interface StayContext {
+  nights: number;
+  adults: number;
+  children: number;
+  checkin: string;
+  taxConfig: TaxConfig;
+  /** Rate definitions by id, for the policy summary. */
+  policyByRateId: Map<string, ReturnType<typeof describePolicy>>;
+}
+
+function serializeRatePlan(rp: RatePlan, room: RoomWithRates, ctx?: StayContext) {
+  const base = Number(rp.totalPrice);
+  // The ALL-IN total, which is the number a caller should quote. `total_price` is
+  // the room only; taxes, fees and the cleaning fee land on top, so quoting it
+  // alone understates the bill — and an AI agent reading this payload has no
+  // other way to know that.
+  const allIn =
+    ctx && Number.isFinite(base)
+      ? Math.round(
+          computePricing(
+            {
+              base,
+              nights: ctx.nights,
+              adults: ctx.adults,
+              children: ctx.children,
+              rooms: 1,
+              cleaningFee: room.cleaningFee ?? 0,
+              taxableExtras: 0,
+              checkin: ctx.checkin,
+            },
+            ctx.taxConfig,
+          ).total * 100,
+        ) / 100
+      : null;
+  const policy = ctx?.policyByRateId.get(rp.parentRatePlanId ?? rp.id) ?? null;
   return {
     id: rp.id,
     parent_rate_id: rp.parentRatePlanId ?? rp.id,
     title: rp.title,
     meal_plan: rp.mealPlan ?? null,
     currency: rp.currency ?? null,
+    /** Room only, before taxes and fees. */
     total_price: rp.totalPrice,
+    /** Everything the guest pays for this room: taxes, fees and cleaning included. */
+    total_price_all_in: allIn === null ? null : allIn.toFixed(2),
+    /** All-in, divided by nights — for "£x a night" without the caller guessing. */
+    per_night_all_in: allIn === null || !ctx?.nights ? null : (Math.round((allIn / ctx.nights) * 100) / 100).toFixed(2),
+    nights: ctx?.nights ?? null,
     available: rp.availability ?? null,
     occupancy: rp.occupancy,
     refundable: rp.refundable ?? null,
     free_cancel_until: rp.freeCancelUntilISO ?? null,
+    /** Plain sentences, the same ones the guest is shown at checkout. */
+    policy_summary: policy ? { payment: policy.payment, cancellation: policy.cancellation, no_show: policy.noShow || null } : null,
     description: rp.description ?? null,
     inclusions: rp.inclusions ?? [],
     offer: rp.offer ? { name: rp.offer.name, percent: rp.offer.percent, original_total_price: rp.offer.originalTotalPrice } : null,
@@ -131,7 +178,8 @@ function serializeRatePlan(rp: RatePlan) {
 }
 
 /** Priced rooms+rates for a chosen stay (GET /v1/availability). */
-export function serializeAvailabilityRoom(r: RoomWithRates) {
+export function serializeAvailabilityRoom(r: RoomWithRates, ctx?: StayContext) {
+  const { maxAdults, capacity } = roomCapacity(r);
   return {
     id: r.id,
     title: r.title,
@@ -140,8 +188,41 @@ export function serializeAvailabilityRoom(r: RoomWithRates) {
     facilities: r.facilities ?? [],
     amenities: r.amenities ?? [],
     cleaning_fee: r.cleaningFee ?? 0,
-    rates: r.ratePlans.map(serializeRatePlan),
+    /** So a caller can judge party fit without inferring it from the rates. */
+    max_adults: maxAdults,
+    sleeps: capacity,
+    rates: r.ratePlans.map((rp) => serializeRatePlan(rp, r, ctx)),
   };
+}
+
+/** Rooms and rates that exist but weren't offered, and why. Without this a caller
+ *  can only see that something is absent — the same silent-vanish problem the
+ *  date picker had. `min_stay` carries the nights needed so a caller can propose
+ *  a stay that would actually work. */
+export function serializeGateReason(g: GateReason) {
+  return {
+    room_id: g.roomId,
+    room_title: g.roomTitle,
+    rate_id: g.rateId ?? null,
+    rate_title: g.rateTitle ?? null,
+    reason: g.reason,
+    min_nights: g.minNights ?? null,
+    message:
+      g.reason === "sold_out"
+        ? "No availability for these dates."
+        : g.reason === "stop_sell"
+          ? "Closed for sale on one or more of these nights."
+          : g.reason === "min_stay"
+            ? `Needs a minimum stay of ${g.minNights ?? "more"} nights.`
+            : g.reason === "closed_to_arrival"
+              ? "Arrivals are not accepted on the check-in date."
+              : "Departures are not accepted on the check-out date.",
+  };
+}
+
+/** Policy sentences per rate id, built once for a whole availability response. */
+export function policyMap(rates: CatalogRate[]): Map<string, ReturnType<typeof describePolicy>> {
+  return new Map(rates.map((r) => [r.id, describePolicy(ratePolicyOf(r))]));
 }
 
 /** Rate plan definitions + policy (GET /v1/rates). */
