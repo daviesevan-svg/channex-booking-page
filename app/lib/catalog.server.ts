@@ -208,6 +208,18 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
     .filter((rt) => rt.rate_plans.length > 0);
 }
 
+/** Why a room or rate was withheld for a stay. Emitted only when a caller asks
+ *  for it (see `getCatalogRooms` opts.reasons). `min_stay` carries the nights
+ *  required so a caller can suggest a stay that would work. */
+export interface GateReason {
+  roomId: string;
+  roomTitle: string;
+  rateId?: string;
+  rateTitle?: string;
+  reason: "sold_out" | "stop_sell" | "min_stay" | "closed_to_arrival" | "closed_to_departure";
+  minNights?: number;
+}
+
 // ---- public read: build RoomWithRates from the catalog ----
 /** The catalog as `RoomWithRates[]` for a given stay. Each night is priced from
  *  the D1 ARI (falling back to the rate's base nightly price), and availability
@@ -219,9 +231,14 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
 export async function getCatalogRooms(
   pid: string,
   query: RoomsQuery = {},
-  opts: { gate?: boolean } = {},
+  opts: { gate?: boolean; reasons?: GateReason[] } = {},
 ): Promise<RoomWithRates[]> {
   const gate = opts.gate ?? false;
+  // Collected rather than returned: a room whose every rate is gated out is
+  // dropped from the result entirely, so there is nowhere left to hang the
+  // explanation. The guest UI ignores this; the API uses it to tell a caller
+  // WHY something isn't bookable instead of having it silently vanish.
+  const note = (r: GateReason) => opts.reasons?.push(r);
   const [rooms, rates, promotions] = await Promise.all([
     getRooms(pid),
     getRates(pid),
@@ -268,6 +285,7 @@ export async function getCatalogRooms(
         roomAvail = Math.min(roomAvail, inv.availability[`${room.id}|${d}`] ?? 0);
       }
       const soldOut = gate && nightDates.length > 0 && roomAvail <= 0;
+      if (soldOut) note({ roomId: room.id, roomTitle: room.title, reason: "sold_out" });
       const availForRate = Number.isFinite(roomAvail) ? roomAvail : 99;
 
       const ratePlans = soldOut
@@ -281,11 +299,24 @@ export async function getCatalogRooms(
               // consolidated imported rate differs from our single `r.id`.
               const k = (d: string) => `${room.id}|${rateChannexId(r, room.id)}|${d}`;
               if (gate) {
-                if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) return null;
+                const where = { roomId: room.id, roomTitle: room.title, rateId: r.id, rateTitle: r.title };
+                if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) {
+                  note({ ...where, reason: "stop_sell" });
+                  return null;
+                }
                 const minStay = (checkinDate && inv.restrictions[k(checkinDate)]?.minStay) || 1;
-                if (nights < minStay) return null;
-                if (checkinDate && inv.restrictions[k(checkinDate)]?.cta) return null; // closed to arrival
-                if (checkoutDate && inv.restrictions[k(checkoutDate)]?.ctd) return null; // closed to departure
+                if (nights < minStay) {
+                  note({ ...where, reason: "min_stay", minNights: minStay });
+                  return null;
+                }
+                if (checkinDate && inv.restrictions[k(checkinDate)]?.cta) {
+                  note({ ...where, reason: "closed_to_arrival" });
+                  return null; // closed to arrival
+                }
+                if (checkoutDate && inv.restrictions[k(checkoutDate)]?.ctd) {
+                  note({ ...where, reason: "closed_to_departure" });
+                  return null; // closed to departure
+                }
               }
               // Per-person pricing: adjust each night for the searched party. With
               // no adults given, price at the rate's default occupancy (no delta).

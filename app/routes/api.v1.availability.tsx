@@ -1,8 +1,9 @@
 import type { Route } from "./+types/api.v1.availability";
 import { authenticateApiKey, apiError } from "~/lib/api-auth.server";
-import { getCatalogRooms } from "~/lib/catalog.server";
+import { getCatalogRooms, getRates, type GateReason } from "~/lib/catalog.server";
 import { getSettings } from "~/lib/overrides.server";
-import { serializeAvailabilityRoom } from "~/lib/api-serialize";
+import { policyMap, serializeAvailabilityRoom, serializeGateReason } from "~/lib/api-serialize";
+import { taxConfigFrom } from "~/lib/pricing";
 
 // GET /v1/availability?checkin=&checkout=&adults=&children_ages=
 // Priced, bookable rooms + rates for a chosen stay (the results screen).
@@ -25,11 +26,43 @@ export async function loader({ request }: Route.LoaderArgs) {
     : Array.from({ length: Math.max(0, parseInt(url.searchParams.get("children") ?? "0", 10) || 0) }, () => 8);
 
   // Currency is the property's own (no conversion); never a client param.
-  const currency = (await getSettings(auth.pid)).currency || "GBP";
-  const rooms = await getCatalogRooms(
-    auth.pid,
-    { checkinDate: checkin, checkoutDate: checkout, currency, adults, childrenAge },
-    { gate: true },
+  const settings = await getSettings(auth.pid);
+  const currency = settings.currency || "GBP";
+  const nights = Math.max(
+    1,
+    Math.round((Date.parse(`${checkout}T00:00:00Z`) - Date.parse(`${checkin}T00:00:00Z`)) / 86_400_000),
   );
-  return Response.json({ checkin, checkout, currency, data: rooms.map(serializeAvailabilityRoom) });
+
+  // Collect why anything was withheld, so an absent room is explained rather
+  // than just missing.
+  const reasons: GateReason[] = [];
+  const [rooms, rates] = await Promise.all([
+    getCatalogRooms(
+      auth.pid,
+      { checkinDate: checkin, checkoutDate: checkout, currency, adults, childrenAge },
+      { gate: true, reasons },
+    ),
+    getRates(auth.pid),
+  ]);
+
+  const ctx = {
+    nights,
+    adults,
+    children: childrenAge.length,
+    checkin,
+    taxConfig: taxConfigFrom(settings),
+    policyByRateId: policyMap(rates),
+  };
+
+  return Response.json({
+    checkin,
+    checkout,
+    nights,
+    currency,
+    /** `total_price` on each rate is room-only; `total_price_all_in` is what the
+     *  guest pays. Quote the all-in figure. */
+    price_basis: "total_price is room-only; total_price_all_in includes taxes, fees and cleaning",
+    data: rooms.map((r) => serializeAvailabilityRoom(r, ctx)),
+    unavailable: reasons.map(serializeGateReason),
+  });
 }
