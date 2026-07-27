@@ -792,8 +792,21 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 )}
               </div>
             )}
+            {/* `collectsCard` is false for two unrelated reasons: the policy has
+                nothing due now, OR this property simply isn't set up to take
+                payment (not live, no Stripe). Only the first justifies telling a
+                guest they'll settle up at the hotel — in the second the policy may
+                well be full prepayment, and promising otherwise is a claim we
+                can't stand behind. So the copy follows the POLICY, not our own
+                configuration state. */}
             <p className="mb-[18px] text-sm leading-[1.55] text-muted">
-              {!collectsCard ? tr.t("noCardNote") : cardCharged ? tr.t("cardChargedNote") : tr.t("cardGuaranteeNote")}
+              {collectsCard
+                ? cardCharged
+                  ? tr.t("cardChargedNote")
+                  : tr.t("cardGuaranteeNote")
+                : policy.payment.timing === "pay_at_hotel"
+                  ? tr.t("payAtHotelNote")
+                  : tr.t("payArrangedNote")}
             </p>
 
             {mixedCancellation ? (
