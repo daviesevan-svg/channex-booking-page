@@ -12,6 +12,7 @@ import { Link } from "react-router";
 
 import type { Translator } from "~/lib/i18n";
 import { SECTION_DEFS, numberSetting, type SiteSection } from "~/lib/sections";
+import { RichText } from "~/components/rich-text";
 import type { ResolvedGalleryImage } from "~/lib/gallery";
 import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
@@ -165,7 +166,9 @@ export function VouchersSection({
     <div className="mt-12 flex max-w-[920px] flex-wrap items-center justify-between gap-4 rounded-[18px] border border-line bg-surface px-7 py-6">
       <div>
         <h2 className="mb-1 font-serif text-[22px] font-semibold">{sectionHeading(section, tr)}</h2>
-        <p className="max-w-[520px] text-[14px] leading-[1.55] text-muted">{body}</p>
+        <div className="max-w-[520px]">
+          <RichText text={body} className="text-[14px] leading-[1.55] text-muted" />
+        </div>
       </div>
       <button
         type="button"
@@ -265,9 +268,9 @@ export function RoomsSection({
     <div className="mt-12 scroll-mt-24" id="rooms">
       <h2 className="mb-2 font-serif text-[24px] font-semibold">{sectionHeading(section, tr)}</h2>
       {intro && (
-        <p className="mb-5 max-w-[620px] whitespace-pre-line text-[15px] leading-[1.6] text-muted">
-          {intro}
-        </p>
+        <div className="mb-5 max-w-[620px]">
+          <RichText text={intro} className="text-[15px] leading-[1.6] text-muted" />
+        </div>
       )}
       <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${intro ? "" : "mt-5"}`}>
         {shown.map((room) => (
@@ -338,9 +341,7 @@ export function RichTextSection({
   const copy = (
     <div>
       {heading && <h2 className="mb-3 font-serif text-[24px] font-semibold">{heading}</h2>}
-      {body && (
-        <p className="whitespace-pre-line text-[16px] leading-[1.7] text-secondary">{body}</p>
-      )}
+      {body && <RichText text={body} className="text-[16px] leading-[1.7] text-secondary" />}
     </div>
   );
 

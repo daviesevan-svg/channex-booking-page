@@ -169,8 +169,9 @@ Registry in `app/lib/sections.ts` (pure — type, label, settings schema,
 defaults). Components in `app/components/sections/`.
 
 **Rich text takes no raw HTML.** A small allowlist renderer: bold, italic, link,
-list, heading. An injection hole on a hotel's own domain, on a site that also
-takes card details, is not a trade worth making for markup convenience.
+list. An injection hole on a hotel's own domain, on a site that also takes card
+details, is not a trade worth making for markup convenience. Built — see
+*Simple formatting* below.
 
 ---
 
@@ -323,6 +324,38 @@ Both the home page and every extra page render through **one** `SectionList` and
 load their data through **one** `loadSectionData`, which loads only what the
 sections present actually need. With the website off, that same switch renders
 the legacy booking-page layout — so there is no second code path to drift.
+
+#### Simple formatting
+
+Prose fields take `**bold**`, `*italic*`, `[label](https://…)`, `- ` bullet lists
+and `1. ` numbered lists. Fields opt in with `rich: true` on the field def, which
+also drives the syntax hint in the editor — nobody guesses that asterisks do
+anything.
+
+`rich-text.ts` parses to a **tree** and `rich-text.tsx` renders that tree as React
+elements. There is no `dangerouslySetInnerHTML` anywhere in the path and there
+must never be: the tree has four inline shapes and three block shapes, so a
+hotel's copy *cannot express* anything else. "No injection" is a property of the
+code's structure, not of getting escaping right. Raw HTML in the box comes out as
+visible, inert text, and a `[label](javascript:…)` never becomes a link because
+only `https?` can match the link branch.
+
+The parser is deliberately conservative, because a lot of copy already exists and
+none of it was written with a formatter in mind:
+
+- `_` means nothing — far too common in slugs, emails and filenames to claim.
+- `*italic*` must open and close on a non-space, so `5 * 3 metres` is untouched.
+- `**` is tried before `*` at the same position, so `**x**` is bold.
+- A numbered list keeps the hotel's own first number via `<ol start>`.
+- Paragraphs keep their single newlines (`whitespace-pre-line`), so a hotel that
+  has never typed a marker gets exactly the line breaks it already had.
+
+That last point is the contract worth protecting: **marker-free text must round
+trip byte-for-byte as one text node.** `isPlainText` exists to assert it.
+
+Not applied to the hero intro or the highlights on Website → Home. Those are
+short ledes shared with the plain booking page, and the hero's spacing is
+load-bearing (see the split-layout fix); they can be added later.
 
 #### Section pictures
 

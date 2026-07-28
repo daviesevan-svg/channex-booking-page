@@ -94,6 +94,9 @@ export interface SectionFieldDef {
   kind: FieldKind;
   /** Text fields live in the per-language copy map; everything else in settings. */
   localized?: boolean;
+  /** Accepts **bold**, *italic*, links and lists (see `rich-text.ts`). Prose
+   *  fields only — a heading with a bullet list in it isn't a heading. */
+  rich?: boolean;
   options?: string[];
   min?: number;
   max?: number;
@@ -153,7 +156,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     headingKey: "secRoomsHeadingDefault",
     fields: [
       HEADING,
-      { key: "intro", kind: "textarea", localized: true },
+      { key: "intro", kind: "textarea", localized: true, rich: true },
       { key: "limit", kind: "number", min: 1, max: 24, default: 6 },
     ],
   },
@@ -175,7 +178,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     headingKey: "secMapHeadingDefault",
     fields: [
       HEADING,
-      { key: "directions", kind: "textarea", localized: true },
+      { key: "directions", kind: "textarea", localized: true, rich: true },
       { key: "zoom", kind: "number", min: 10, max: 19, default: 15 },
     ],
   },
@@ -185,7 +188,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     headingKey: "secContactHeadingDefault",
     fields: [
       HEADING,
-      { key: "intro", kind: "textarea", localized: true },
+      { key: "intro", kind: "textarea", localized: true, rich: true },
       { key: "showForm", kind: "boolean", default: true },
     ],
   },
@@ -203,14 +206,14 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     type: "vouchers",
     labelKey: "secVouchers",
     headingKey: "vouchersTeaser",
-    fields: [HEADING, { key: "body", kind: "textarea", localized: true }],
+    fields: [HEADING, { key: "body", kind: "textarea", localized: true, rich: true }],
   },
   richText: {
     type: "richText",
     labelKey: "secRichText",
     fields: [
       HEADING,
-      { key: "body", kind: "textarea", localized: true },
+      { key: "body", kind: "textarea", localized: true, rich: true },
       { key: "align", kind: "select", options: ["left", "center"], default: "left" },
       // Which side the pictures sit on. Ignored when the section has none, and
       // it's why `align` only applies to a text-only block — centred copy beside

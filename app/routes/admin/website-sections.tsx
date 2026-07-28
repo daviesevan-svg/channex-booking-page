@@ -401,9 +401,16 @@ function Editor({
                         <label key={f.key} className="block text-[13px] font-semibold text-secondary">
                           {label}
                           {f.kind === "textarea" ? (
-                            <textarea rows={3} {...common} />
+                            <textarea rows={f.rich ? 5 : 3} {...common} />
                           ) : (
                             <input {...common} />
+                          )}
+                          {/* Nobody guesses that asterisks do anything, so the
+                              syntax is spelled out next to the box that takes it. */}
+                          {f.rich && (
+                            <span className="mt-1 block text-[11.5px] font-normal leading-[1.5] text-muted-2">
+                              {t("secRichHint")}
+                            </span>
                           )}
                         </label>
                       );

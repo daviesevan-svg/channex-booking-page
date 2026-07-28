@@ -10,6 +10,7 @@ import { useFetcher } from "react-router";
 
 import type { Translator } from "~/lib/i18n";
 import { Diamond } from "~/components/sections";
+import { RichText } from "~/components/rich-text";
 
 const FIELD =
   "mt-1.5 w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-accent";
@@ -46,9 +47,9 @@ export function ContactSection({
     <div className="mt-12 scroll-mt-24" id="contact">
       <h2 className="mb-2 font-serif text-[24px] font-semibold">{heading}</h2>
       {intro && (
-        <p className="mb-6 max-w-[620px] whitespace-pre-line text-[15px] leading-[1.6] text-muted">
-          {intro}
-        </p>
+        <div className="mb-6 max-w-[620px]">
+          <RichText text={intro} className="text-[15px] leading-[1.6] text-muted" />
+        </div>
       )}
 
       <div

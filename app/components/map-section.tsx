@@ -12,6 +12,7 @@
 
 import { useState } from "react";
 
+import { RichText } from "~/components/rich-text";
 import { loadGoogleMaps } from "~/lib/google-maps-client";
 import type { Translator } from "~/lib/i18n";
 
@@ -96,7 +97,11 @@ export function MapSection({
       {(address || directions) && (
         <div className="mb-5 max-w-[620px] text-[15px] leading-[1.6] text-muted">
           {address && <p className="whitespace-pre-line">{address}</p>}
-          {directions && <p className="mt-2 whitespace-pre-line">{directions}</p>}
+          {directions && (
+            <div className="mt-2">
+              <RichText text={directions} />
+            </div>
+          )}
         </div>
       )}
 
