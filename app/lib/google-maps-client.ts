@@ -42,6 +42,40 @@ function ensureMaps(key: string) {
   return g();
 }
 
+let mapsReadyPromise: Promise<void> | null = null;
+
+/**
+ * Resolve once the Map/Marker constructors are actually usable. Memoised, so
+ * several components on a page share ONE script load.
+ *
+ * Call this only when a map is really about to be drawn: a Maps JS load is a
+ * billable "dynamic map" event, so anything that renders a map on page view
+ * bills every visitor, whether or not they cared about the location.
+ */
+export function loadGoogleMaps(key: string): Promise<void> {
+  if (typeof window === "undefined") return Promise.reject(new Error("no window"));
+  if (mapsReadyPromise) return mapsReadyPromise;
+  const g = ensureMaps(key);
+  // A bad or referrer-blocked key HANGS: the script fetches fine, auth fails
+  // internally, and the ready callback never fires — so neither `onerror` nor
+  // importLibrary ever settles (same trap geocodeAddress guards below). Without
+  // a timeout the caller waits on a grey box for ever instead of being able to
+  // show a fallback.
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("Google Maps did not respond — check the key.")), 10000),
+  );
+  mapsReadyPromise = Promise.race([
+    Promise.all([g.maps.importLibrary("maps"), g.maps.importLibrary("marker")]).then(
+      () => undefined,
+    ),
+    timeout,
+  ]).catch((e) => {
+    mapsReadyPromise = null; // let a remount retry
+    throw e;
+  });
+  return mapsReadyPromise;
+}
+
 /** Geocode a free-form address to coordinates (browser only). Returns null when
  *  Google finds no match. Throws on load/auth failures — the caller shows a
  *  friendly message. Requires the Geocoding API to be enabled on the key's

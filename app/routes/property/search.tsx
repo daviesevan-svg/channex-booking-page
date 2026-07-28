@@ -11,6 +11,7 @@ import { useT } from "~/lib/i18n";
 import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
+import { getConfig } from "~/lib/config.server";
 import { getGalleryFor } from "~/lib/gallery.server";
 import {
   getBookingCutoff,
@@ -22,7 +23,7 @@ import { normalizeFacilities } from "~/lib/content";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability, getRooms } from "~/lib/catalog.server";
 import { getRenderSections } from "~/lib/site.server";
-import { settingOf } from "~/lib/sections";
+import { numberSetting, settingOf } from "~/lib/sections";
 import {
   FacilitiesSection,
   GallerySection,
@@ -31,7 +32,9 @@ import {
   RichTextSection,
   RoomsSection,
   VouchersSection,
+  sectionHeading,
 } from "~/components/sections";
+import { MapSection } from "~/components/map-section";
 import { getPublicReviews } from "~/lib/reviews.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { earliestCheckinDate } from "~/lib/dates";
@@ -61,6 +64,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // With the website layer off this returns the booking page's long-standing
   // section order, so that page is exactly what it always was.
   const sections = await getRenderSections(pid, lang, settings.websiteEnabled ?? false);
+  // Coordinates and the Maps key only travel when a map section exists. The key
+  // is a referrer-restricted browser key, but there's no reason to put it on
+  // pages that can't use it.
+  const lat = parseFloat(settings.latitude ?? "");
+  const lng = parseFloat(settings.longitude ?? "");
+  const hasMap = sections.some((x) => x.type === "map") && Number.isFinite(lat) && Number.isFinite(lng);
+  const map = hasMap
+    ? { lat, lng, mapKey: getConfig().googleMapKey ?? "" }
+    : null;
   // Only pay for the room list when a section actually renders it.
   const rooms = sections.some((x) => x.type === "rooms")
     ? (await getRooms(pid).catch(() => [])).map((r) => ({
@@ -84,6 +96,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // a raw slug; free-text lines are shown as typed.
     facilities: normalizeFacilities(settings.facilities ?? []),
     facilitiesExtra,
+    map,
     sections,
     rooms,
   };
@@ -95,7 +108,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
-  const { facilities, facilitiesExtra, sections, rooms } = loaderData;
+  const { facilities, facilitiesExtra, sections, rooms, map } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -349,6 +362,23 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             onOpen={() => navigate(`/${params.channelId}/vouchers`)}
           />
         );
+      case "map":
+        // No coordinates, no map — a location section pointing at 0,0 in the
+        // Atlantic is worse than no location section.
+        return map ? (
+          <MapSection
+            key={section.id}
+            heading={sectionHeading(section, tr)}
+            directions={section.text?.directions}
+            address={property.address}
+            lat={map.lat}
+            lng={map.lng}
+            zoom={numberSetting(section, "zoom", 15)}
+            mapKey={map.mapKey}
+            hotelName={hotelName}
+            tr={tr}
+          />
+        ) : null;
       case "richText":
         return <RichTextSection key={section.id} section={section} />;
     }
