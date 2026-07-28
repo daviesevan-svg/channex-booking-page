@@ -94,6 +94,7 @@ const EN: Record<string, string> = {
   navSettings: "Settings",
   navWebsite: "Website",
   navGallery: "Gallery",
+  navFacilities: "Facilities",
   navEmails: "Emails",
   navInventory: "Inventory",
   navAnalytics: "Analytics",
@@ -198,6 +199,21 @@ const EN: Record<string, string> = {
   galMoveDown: "Move down",
   galDelete: "Delete",
   galAddPropertyFirst: "Add a property first to manage its gallery.",
+
+  // -- facilities (fac*) --
+  facTitle: "Facilities",
+  facIntro:
+    "What the property itself offers. Shown to guests below the booking form, and emitted in the structured data search engines read.",
+  facChooseTitle: "Choose facilities",
+  facChooseHint:
+    "These are translated for you in every guest language, so the tick list is shared across language tabs — only the free text below is per language.",
+  facExtraTitle: "Anything else",
+  facExtraHint: "One per line, in the language you are editing. Shown to guests exactly as typed.",
+  facExtraPlaceholder: "Honesty bar\nLibrary\nSea-view roof terrace",
+  facCopyFromGoogle: "Copy from Google amenities",
+  facCopyFromGoogleHint:
+    "{n} of the Google Vacation Rentals amenities you have set match a facility that is not ticked yet.",
+  facAddPropertyFirst: "Add a property first to manage its facilities.",
   homeRemoveImage: "Remove custom image",
 
   // -- property page --
@@ -1634,6 +1650,7 @@ const DE: Record<string, string> = {
   navSettings: "Einstellungen",
   navWebsite: "Website",
   navGallery: "Galerie",
+  navFacilities: "Ausstattung",
   navEmails: "E-Mails",
   navInventory: "Verfügbarkeit",
   navAnalytics: "Analysen",
@@ -1738,6 +1755,22 @@ const DE: Record<string, string> = {
   galMoveDown: "Nach unten",
   galDelete: "Löschen",
   galAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Galerie zu verwalten.",
+
+  // -- facilities (fac*) --
+  facTitle: "Ausstattung",
+  facIntro:
+    "Was die Unterkunft selbst bietet. Gästen unter dem Buchungsformular angezeigt und in den strukturierten Daten ausgegeben, die Suchmaschinen lesen.",
+  facChooseTitle: "Ausstattung wählen",
+  facChooseHint:
+    "Diese werden für jede Gästesprache übersetzt, daher gilt die Auswahlliste für alle Sprach-Tabs — nur der freie Text unten ist sprachabhängig.",
+  facExtraTitle: "Sonstiges",
+  facExtraHint:
+    "Eines pro Zeile, in der Sprache, die Sie gerade bearbeiten. Gästen genau so angezeigt, wie eingegeben.",
+  facExtraPlaceholder: "Vertrauensbar\nBibliothek\nDachterrasse mit Meerblick",
+  facCopyFromGoogle: "Aus Google-Ausstattung übernehmen",
+  facCopyFromGoogleHint:
+    "{n} der von Ihnen gesetzten Google-Vacation-Rentals-Ausstattungsmerkmale entsprechen einer noch nicht angehakten Ausstattung.",
+  facAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Ausstattung zu verwalten.",
   homeRemoveImage: "Eigenes Bild entfernen",
 
   // -- property page --
@@ -3178,6 +3211,7 @@ const PT: Record<string, string> = {
   navSettings: "Configurações",
   navWebsite: "Site",
   navGallery: "Galeria",
+  navFacilities: "Instalações",
   navEmails: "E-mails",
   navInventory: "Inventário",
   navAnalytics: "Análises",
@@ -3281,6 +3315,22 @@ const PT: Record<string, string> = {
   galMoveDown: "Mover para baixo",
   galDelete: "Eliminar",
   galAddPropertyFirst: "Adicione primeiro uma propriedade para gerir a sua galeria.",
+
+  // -- facilities (fac*) --
+  facTitle: "Instalações",
+  facIntro:
+    "O que a propriedade em si oferece. Mostrado aos hóspedes abaixo do formulário de reserva e incluído nos dados estruturados que os motores de busca leem.",
+  facChooseTitle: "Escolher instalações",
+  facChooseHint:
+    "Estas são traduzidas em todos os idiomas dos hóspedes, por isso a lista é partilhada entre os separadores de idioma — só o texto livre abaixo é por idioma.",
+  facExtraTitle: "Mais alguma coisa",
+  facExtraHint:
+    "Uma por linha, no idioma que está a editar. Mostrado aos hóspedes exatamente como escrito.",
+  facExtraPlaceholder: "Bar de honra\nBiblioteca\nTerraço com vista para o mar",
+  facCopyFromGoogle: "Copiar das comodidades Google",
+  facCopyFromGoogleHint:
+    "{n} das comodidades do Google Vacation Rentals que definiu correspondem a uma instalação ainda não assinalada.",
+  facAddPropertyFirst: "Adicione primeiro uma propriedade para gerir as suas instalações.",
   homeRemoveImage: "Remover imagem personalizada",
 
   // -- property page --

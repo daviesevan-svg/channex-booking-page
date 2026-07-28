@@ -69,6 +69,7 @@ export default [
     route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
     route("gallery", "routes/admin/gallery.tsx"),
+    route("facilities", "routes/admin/facilities.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),
     route("rooms", "routes/admin/rooms.tsx"),
     route("rooms/:roomId", "routes/admin/room.tsx"),
