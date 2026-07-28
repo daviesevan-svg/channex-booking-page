@@ -88,6 +88,9 @@ export async function saveOverrides(
 interface SiteContent {
   search?: SearchContent;
   pages?: Record<string, Record<string, string>>;
+  /** Free-text facility lines, one per entry. The curated facility KEYS live in
+   *  settings (language-independent); only these need translating. */
+  facilitiesExtra?: string[];
 }
 const contentKey = (pid: string) => `content:${pid}`;
 const contentMap = (pid: string) =>
@@ -173,6 +176,24 @@ export async function savePageContent(
   const entry = m[lang] ?? {};
   entry.pages = { ...(entry.pages ?? {}), [pageId]: data };
   m[lang] = entry;
+  await writeJson(contentKey(pid), m);
+}
+
+/** Free-text facility lines for `lang`, falling back to the default language as
+ *  a whole list — a partial translation of a list reads worse than the original,
+ *  so this one does NOT merge line by line the way single fields do. */
+export async function getFacilitiesExtra(pid: string, lang = DEFAULT_LANG): Promise<string[]> {
+  const m = await contentMap(pid);
+  const loc = m[lang]?.facilitiesExtra;
+  if (loc && loc.length) return loc;
+  return m[DEFAULT_LANG]?.facilitiesExtra ?? [];
+}
+export async function getFacilitiesExtraRaw(pid: string, lang: string): Promise<string[]> {
+  return (await contentMap(pid))[lang]?.facilitiesExtra ?? [];
+}
+export async function saveFacilitiesExtra(pid: string, lang: string, lines: string[]): Promise<void> {
+  const m = await contentMap(pid);
+  m[lang] = { ...(m[lang] ?? {}), facilitiesExtra: lines.length ? lines : undefined };
   await writeJson(contentKey(pid), m);
 }
 

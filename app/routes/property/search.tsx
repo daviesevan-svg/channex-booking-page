@@ -11,7 +11,13 @@ import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/li
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getGalleryFor } from "~/lib/gallery.server";
-import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
+import {
+  getBookingCutoff,
+  getFacilitiesExtra,
+  getSearchContent,
+  getSettings,
+} from "~/lib/overrides.server";
+import { facilityLabelKey, normalizeFacilities } from "~/lib/content";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
 import { getPublicReviews } from "~/lib/reviews.server";
@@ -26,7 +32,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates, cutoff, reviews, hasVouchers, gallery] = await Promise.all([
+  const [content, closedDates, cutoff, reviews, hasVouchers, gallery, settings, facilitiesExtra] =
+    await Promise.all([
     getSearchContent(pid, lang),
     getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
@@ -36,6 +43,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getPublicReviews(pid).catch(() => ({ average: 0, count: 0, reviews: [] })),
     getActiveVoucherProducts(pid).then((v) => v.length > 0).catch(() => false),
     getGalleryFor(pid, lang).catch(() => []), // fail open, like the rest
+    getSettings(pid),
+    getFacilitiesExtra(pid, lang).catch(() => []),
   ]);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
@@ -46,6 +55,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     reviews,
     hasVouchers,
     gallery,
+    // Normalized here so an unknown key can never reach the page and render as
+    // a raw slug; free-text lines are shown as typed.
+    facilities: normalizeFacilities(settings.facilities ?? []),
+    facilitiesExtra,
   };
 }
 
@@ -60,6 +73,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
+  const { facilities, facilitiesExtra } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -223,6 +237,27 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           </div>
         ))}
       </div>
+
+      {/* facilities — curated keys render translated; free-text lines as typed */}
+      {(facilities.length > 0 || facilitiesExtra.length > 0) && (
+        <div className="mt-12 max-w-[920px]">
+          <h2 className="mb-5 font-serif text-[24px] font-semibold">{tr.t("facilitiesHeading")}</h2>
+          <ul className="grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            {facilities.map((key) => (
+              <li key={key} className="flex items-start gap-3 text-[15px]">
+                <Diamond className="mt-[7px]" size={7} />
+                {tr.t(facilityLabelKey(key))}
+              </li>
+            ))}
+            {facilitiesExtra.map((line, i) => (
+              <li key={`x${i}`} className="flex items-start gap-3 text-[15px]">
+                <Diamond className="mt-[7px]" size={7} />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* guest reviews — shown once there's at least one public review */}
       {reviews.count > 0 && reviews.reviews.length > 0 && (

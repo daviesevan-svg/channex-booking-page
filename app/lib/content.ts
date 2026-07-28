@@ -202,6 +202,60 @@ export const VR_AMENITY_ENUMS: { key: string; label: string; options: string[] }
 
 export const VR_AMENITY_KEYS = new Set(VR_AMENITIES.map((a) => a.key));
 
+// ---- Property facilities (guest-facing display) ----
+//
+// Deliberately SEPARATE from VR_AMENITIES above. That list is Google's
+// controlled vocabulary for the Vacation Rentals feed — a feed contract, only
+// valid for single-unit properties, and changing it changes what we send
+// Google. This list is display copy for the guest pages and a website, and
+// applies to every property. Keeping them apart means neither can be broken by
+// an edit meant for the other; the admin offers a one-way copy for the overlap.
+//
+// Curated (not free text) because each key is a translated label in every guest
+// language. Anything not covered here goes in the per-language free-text lines.
+export const PROPERTY_FACILITIES = [
+  "wifi",
+  "parking",
+  "freeParking",
+  "evCharging",
+  "pool",
+  "spa",
+  "sauna",
+  "hotTub",
+  "gym",
+  "restaurant",
+  "bar",
+  "breakfast",
+  "roomService",
+  "airConditioning",
+  "reception24h",
+  "luggageStorage",
+  "laundry",
+  "meetingRooms",
+  "garden",
+  "terrace",
+  "beachAccess",
+  "airportShuttle",
+  "familyFriendly",
+  "petFriendly",
+  "accessible",
+  "nonSmoking",
+] as const;
+
+export type PropertyFacility = (typeof PROPERTY_FACILITIES)[number];
+
+const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES);
+
+/** Keep only known keys, in catalogue order — so a stale form can't inject a
+ *  key with no translated label (which would render as the raw key). */
+export function normalizeFacilities(input: string[]): PropertyFacility[] {
+  const chosen = new Set(input.filter((k) => FACILITY_KEYS.has(k)));
+  return PROPERTY_FACILITIES.filter((k) => chosen.has(k));
+}
+
+/** The i18n key for a facility label, in both the guest and admin dictionaries. */
+export const facilityLabelKey = (key: string) => `fac_${key}`;
+
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
@@ -218,6 +272,9 @@ export interface SiteSettings {
   /** Hide the text hotel name in the header when a logo is set — for logos that
    *  already contain the name. Ignored when there's no logo. */
   logoHideName?: boolean;
+  /** Guest-facing property facilities — keys from PROPERTY_FACILITIES. Free-text
+   *  extras live per language in the content store (they need translating). */
+  facilities?: string[];
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;
   privacyUrl?: string;

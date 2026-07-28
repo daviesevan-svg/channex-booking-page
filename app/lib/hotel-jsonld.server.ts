@@ -9,8 +9,10 @@
 // Built in loaders only (this is a .server module); the route component renders
 // the returned plain object inside a <script type="application/ld+json">.
 import { getConfig } from "./config.server";
+import { facilityLabelKey, normalizeFacilities } from "./content";
 import { getGalleryFor } from "./gallery.server";
-import { getOverrides, getSettings } from "./overrides.server";
+import { getFacilitiesExtra, getOverrides, getSettings } from "./overrides.server";
+import { makeTranslator } from "./i18n";
 
 /** schema.org wants absolute URLs; our image paths are site-relative (/images/…). */
 function absoluteUrl(path: string): string {
@@ -66,15 +68,19 @@ interface HotelInfo {
   checkoutTime: string;
   /** Absolute URLs — the property gallery, else the cover photo. */
   images: string[];
+  /** Facility names in the page's language, curated then free-text. */
+  amenities: string[];
 }
 
 async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
-  const [settings, overrides, gallery] = await Promise.all([
+  const [settings, overrides, gallery, extra] = await Promise.all([
     getSettings(pid),
     getOverrides(pid, lang),
     // Fail open: a missing gallery must never cost us the rest of the payload.
     getGalleryFor(pid, lang).catch(() => []),
+    getFacilitiesExtra(pid, lang).catch(() => []),
   ]);
+  const tr = makeTranslator(lang);
   const photos = gallery.length
     ? gallery.slice(0, MAX_JSONLD_IMAGES).map((g) => g.url)
     : settings.coverImage
@@ -82,6 +88,10 @@ async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
       : [];
   return {
     images: photos.map(absoluteUrl),
+    amenities: [
+      ...normalizeFacilities(settings.facilities ?? []).map((k) => tr.t(facilityLabelKey(k))),
+      ...extra,
+    ],
     identifier: pid,
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
@@ -112,6 +122,13 @@ function baseHotel(info: HotelInfo): Record<string, unknown> {
   if (info.country) addr.addressCountry = info.country;
   if (Object.keys(addr).length > 1) hotel.address = addr;
   if (info.images.length) hotel.image = info.images;
+  if (info.amenities.length) {
+    hotel.amenityFeature = info.amenities.map((name) => ({
+      "@type": "LocationFeatureSpecification",
+      name,
+      value: true,
+    }));
+  }
   return hotel;
 }
 
