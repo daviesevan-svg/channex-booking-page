@@ -18,9 +18,19 @@ import {
   getSearchContent,
   getSettings,
 } from "~/lib/overrides.server";
-import { facilityLabelKey, normalizeFacilities } from "~/lib/content";
+import { normalizeFacilities } from "~/lib/content";
 import { resolvePropertyId } from "~/lib/properties.server";
-import { getCalendarAvailability } from "~/lib/catalog.server";
+import { getCalendarAvailability, getRooms } from "~/lib/catalog.server";
+import { getRenderSections } from "~/lib/site.server";
+import {
+  FacilitiesSection,
+  GallerySection,
+  HighlightsSection,
+  ReviewsSection,
+  RichTextSection,
+  RoomsSection,
+  VouchersSection,
+} from "~/components/sections";
 import { getPublicReviews } from "~/lib/reviews.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { earliestCheckinDate } from "~/lib/dates";
@@ -47,6 +57,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getSettings(pid),
     getFacilitiesExtra(pid, lang).catch(() => []),
   ]);
+  // With the website layer off this returns the booking page's long-standing
+  // section order, so that page is exactly what it always was.
+  const sections = await getRenderSections(pid, lang, settings.websiteEnabled ?? false);
+  // Only pay for the room list when a section actually renders it.
+  const rooms = sections.some((x) => x.type === "rooms")
+    ? (await getRooms(pid).catch(() => [])).map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        photo: r.images[0],
+        maxGuests: r.maxGuests,
+      }))
+    : [];
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
   return {
@@ -60,16 +83,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // a raw slug; free-text lines are shown as typed.
     facilities: normalizeFacilities(settings.facilities ?? []),
     facilitiesExtra,
+    sections,
+    rooms,
   };
-}
-
-function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
-  return (
-    <span
-      className={`inline-block flex-none rounded-[1px] bg-accent ${className}`}
-      style={{ width: size, height: size, transform: "rotate(45deg)" }}
-    />
-  );
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -78,7 +94,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
-  const { facilities, facilitiesExtra } = loaderData;
+  const { facilities, facilitiesExtra, sections, rooms } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -147,8 +163,11 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     navigate(`/${params.channelId}/rooms?${qs.toString()}`);
   }
 
-  return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
+  // The hero stays inline: it owns the search form's state (dates, guests,
+  // promo, calendar), and lifting it out would mean threading all of that
+  // through the section renderer for nothing.
+  const hero = (
+    <div key="hero">
       <div className="max-w-[680px]">
         <div className="eyebrow mb-[18px]">{eyebrow}</div>
         <h1 className="mb-[18px] font-serif text-[56px] font-medium leading-[1.05] tracking-[-0.02em]">
@@ -159,8 +178,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         </p>
       </div>
 
-      {/* search card */}
-      <div className="relative max-w-[920px]">
+      {/* search card — `#book` is the anchor the room cards jump to */}
+      <div className="relative max-w-[920px]" id="book">
         <div
           className="flex flex-wrap items-stretch gap-1.5 rounded-[18px] border border-line bg-surface p-3.5"
           style={{ boxShadow: "var(--shadow-card)" }}
@@ -200,7 +219,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             disabled={searching}
             className="min-h-16 flex-none cursor-pointer rounded-[12px] bg-accent px-[34px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
-            {searching ? "Searching…" : searchButton}
+            {searching ? tr.t("searching") : searchButton}
           </button>
         </div>
 
@@ -213,7 +232,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           onClick={() => setShowPromo((v) => !v)}
           className="flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-accent"
         >
-          <span className="text-[18px] leading-none text-accent">{showPromo ? "−" : "+"}</span>
+          <span className="text-[18px] leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
           {promoText}
         </button>
         {showPromo && (
@@ -224,138 +243,70 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               if (e.key === "Enter") searchRooms();
             }}
             placeholder={promoPlaceholder}
-            autoComplete="off"
             className="mt-2 block w-[240px] max-w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
           />
         )}
       </div>
+    </div>
+  );
 
-      {/* highlights */}
-      <div className="mt-12 grid max-w-[920px] grid-cols-1 gap-[18px] sm:grid-cols-3">
-        {highlights.map((h, i) => (
-          <div key={i} className="flex items-start gap-3.5">
-            <Diamond className="mt-1.5" />
-            <div>
-              <div className="mb-0.5 text-[15px] font-semibold">{h.title}</div>
-              <div className="text-sm leading-[1.5] text-muted">{h.description}</div>
-            </div>
-          </div>
-        ))}
-      </div>
+  function renderSection(section: (typeof sections)[number]) {
+    switch (section.type) {
+      case "hero":
+        return hero;
+      case "highlights":
+        return <HighlightsSection key={section.id} highlights={highlights} />;
+      case "rooms":
+        return <RoomsSection key={section.id} section={section} tr={tr} rooms={rooms} />;
+      case "gallery":
+        return (
+          <GallerySection
+            key={section.id}
+            section={section}
+            tr={tr}
+            gallery={gallery}
+            hotelName={hotelName}
+            fallbackPhoto={heroPhoto}
+          />
+        );
+      case "facilities":
+        return (
+          <FacilitiesSection
+            key={section.id}
+            section={section}
+            tr={tr}
+            facilities={facilities}
+            facilitiesExtra={facilitiesExtra}
+          />
+        );
+      case "reviews":
+        return (
+          <ReviewsSection
+            key={section.id}
+            section={section}
+            tr={tr}
+            reviews={reviews}
+            hotelName={hotelName}
+          />
+        );
+      case "vouchers":
+        return (
+          <VouchersSection
+            key={section.id}
+            section={section}
+            tr={tr}
+            hasVouchers={hasVouchers}
+            onOpen={() => navigate(`/${params.channelId}/vouchers`)}
+          />
+        );
+      case "richText":
+        return <RichTextSection key={section.id} section={section} />;
+    }
+  }
 
-      {/* facilities — curated keys render translated; free-text lines as typed */}
-      {(facilities.length > 0 || facilitiesExtra.length > 0) && (
-        <div className="mt-12 max-w-[920px]">
-          <h2 className="mb-5 font-serif text-[24px] font-semibold">{tr.t("facilitiesHeading")}</h2>
-          <ul className="grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {facilities.map((key) => (
-              <li key={key} className="flex items-start gap-3 text-[15px]">
-                <Diamond className="mt-[7px]" size={7} />
-                {tr.t(facilityLabelKey(key))}
-              </li>
-            ))}
-            {facilitiesExtra.map((line, i) => (
-              <li key={`x${i}`} className="flex items-start gap-3 text-[15px]">
-                <Diamond className="mt-[7px]" size={7} />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* guest reviews — shown once there's at least one public review */}
-      {reviews.count > 0 && reviews.reviews.length > 0 && (
-        <div className="mt-12 max-w-[920px]">
-          <div className="mb-5 flex items-baseline gap-3">
-            <h2 className="font-serif text-[24px] font-semibold">{tr.t("guestReviews")}</h2>
-            <span className="text-[14px] text-secondary">
-              <span style={{ color: "#f5b301" }}>★</span>{" "}
-              <span className="font-semibold text-ink">{reviews.average}</span>/5 · {reviews.count}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
-            {reviews.reviews.map((r) => (
-              <div key={r.id} className="rounded-[14px] border border-line bg-surface p-5">
-                <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <span className="text-[14px] font-semibold">{r.guestName}</span>
-                  <span className="text-[13px]" style={{ color: "#f5b301", letterSpacing: 1 }} aria-label={`${r.stars}/5`}>
-                    {"★".repeat(r.stars)}
-                    <span style={{ color: "#ddd5c8" }}>{"★".repeat(5 - r.stars)}</span>
-                  </span>
-                </div>
-                <p className="text-[14px] leading-[1.6] text-secondary">{r.publicText}</p>
-                {r.response?.text && (
-                  <div className="mt-3 border-l-2 border-line-alt pl-3">
-                    <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-2">
-                      {tr.t("hotelResponse", { hotel: hotelName })}
-                    </div>
-                    <p className="mt-0.5 text-[13px] leading-[1.55] text-muted">{r.response.text}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* voucher shop teaser — shown while the property has vouchers on sale */}
-      {hasVouchers && (
-        <div className="mt-12 flex max-w-[920px] flex-wrap items-center justify-between gap-4 rounded-[18px] border border-line bg-surface px-7 py-6">
-          <div>
-            <h2 className="mb-1 font-serif text-[22px] font-semibold">{tr.t("vouchersTeaser")}</h2>
-            <p className="max-w-[520px] text-[14px] leading-[1.55] text-muted">{tr.t("vouchersTeaserBody")}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => navigate(`/${params.channelId}/vouchers`)}
-            className="flex-none cursor-pointer rounded-[12px] border border-accent px-6 py-3 text-[15px] font-semibold text-accent hover:bg-accent-soft"
-          >
-            {tr.t("vouchersTeaserCta")}
-          </button>
-        </div>
-      )}
-
-      {/* property gallery — falls back to the single ambiance image when the
-          hotel hasn't uploaded a gallery yet */}
-      {gallery.length > 0 ? (
-        <div className="mt-12">
-          <h2 className="mb-5 font-serif text-[24px] font-semibold">{tr.t("photoGallery")}</h2>
-          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
-            {gallery.map((photo) => (
-              <figure key={photo.id}>
-                <div className="aspect-[4/3] overflow-hidden rounded-[14px] bg-surface-alt">
-                  <img
-                    src={photo.url}
-                    alt={photo.alt ?? hotelName}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                {photo.caption && (
-                  <figcaption className="mt-1.5 text-[12.5px] leading-[1.45] text-muted">
-                    {photo.caption}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="relative mt-12 h-[300px] overflow-hidden rounded-[18px]">
-          {heroPhoto ? (
-            <img src={heroPhoto} alt={hotelName} className="h-full w-full object-cover" />
-          ) : (
-            <div
-              className="h-full w-full"
-              style={{
-                background:
-                  "repeating-linear-gradient(135deg,#efe7da,#efe7da 13px,#e7ddcc 13px,#e7ddcc 26px)",
-              }}
-            />
-          )}
-        </div>
-      )}
+  return (
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
+      {sections.map(renderSection)}
     </main>
   );
 }

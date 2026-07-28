@@ -231,7 +231,8 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       id: "website",
       title: t("navWebsite"),
       items: [
-        { to: "/admin/website", label: t("navWebsiteGeneral") },
+        { to: "/admin/website", label: t("navWebsiteGeneral"), end: true },
+        { to: "/admin/website/sections", label: t("navSections") },
         { to: "/admin/gallery", label: t("navGallery") },
         { to: "/admin/facilities", label: t("navFacilities") },
         { to: "/admin/home", label: t("navHome") },

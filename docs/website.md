@@ -304,9 +304,10 @@ A new **Website** group in the nav, absorbing the existing Content group:
 ```
 Website
   General          opt in, address, custom domain          (built)
+  Sections         home-page section editor                (built)
   Gallery          property photos                         (built)
   Facilities       property facilities                     (built)
-  Pages            list, add, reorder; section editor per page
+  Pages            extra pages beyond home — not built yet
   Navigation       menu + footer
   Theme & style    extends the existing theme controls
   Booking screens  today's home / results / detail / checkout editors
@@ -330,8 +331,8 @@ roughly doubles the build and is the easiest thing to add later.
 
 | | Scope | Value |
 |---|---|---|
-| **1** | Gallery, facilities, per-page SEO, `<title>` fix | Useful on its own — better cards, better structured data — even if the website never ships |
-| **2** | Section engine + 6 core sections, home page only, opt-in | The real v1. A one-page hotel site |
+| **1** ✅ | Gallery, facilities, per-page SEO, `<title>` fix | Useful on its own — better cards, better structured data — even if the website never ships |
+| **2** ✅ | Section engine + 8 sections, home page only, opt-in | The real v1. A one-page hotel site |
 | **3** | Multi-page, nav, footer, templates | A website product |
 | **4** | Custom domains | Makes it sellable |
 | **5** | Remaining sections, live preview | Polish |
