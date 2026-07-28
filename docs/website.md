@@ -162,7 +162,7 @@ the base language, so a half-translated site renders complete rather than blank.
 | `vouchers` | voucher catalog | heading |
 | `map` | lat/lng, address | heading, zoom, directions copy. Click-to-load (see below) |
 | `faq` | — | question/answer pairs |
-| `contact` | phone, email, address | heading, form on/off |
+| `contact` | phone, email, address, check-in/out | heading, intro, form on/off |
 | `cta` | — | heading, text, button + target |
 
 Registry in `app/lib/sections.ts` (pure — type, label, settings schema,
@@ -197,6 +197,27 @@ out identical.
 ---
 
 ## 5. Routing
+
+### The contact section and its form
+
+Details (address, phone, email, check-in/out) come from Property details and are
+plain `tel:` / `mailto:` links — the half that always works.
+
+The form is a convenience on top, and a public form that emails a hotel is a
+spam vector, so it is deliberately narrow:
+
+- rate limited to 5/hour per IP per property, before any recipient lookup
+- honeypot field; a filled one is answered `ok` and dropped, because telling a
+  bot it failed just invites a retry
+- name/email/message capped at 100/200/2000 chars
+- the subject line is built entirely from our own text plus the hotel's name —
+  guest input never reaches a mail header (a newline there is header injection)
+- the body goes through `renderSimpleEmail`, which escapes it
+- `replyTo` is the guest, so the hotel can just hit reply
+
+The form hides itself when there is no `hostNotifyEmail` / `emailReplyTo` /
+contact email to deliver to — the same choice the action makes, so it can't
+show a thank-you for a message that went nowhere.
 
 ### The map section and Google billing
 

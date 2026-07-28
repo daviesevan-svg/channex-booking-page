@@ -16,6 +16,7 @@ import { getGalleryFor } from "~/lib/gallery.server";
 import {
   getBookingCutoff,
   getFacilitiesExtra,
+  getOverrides,
   getSearchContent,
   getSettings,
 } from "~/lib/overrides.server";
@@ -35,6 +36,7 @@ import {
   sectionHeading,
 } from "~/components/sections";
 import { MapSection } from "~/components/map-section";
+import { ContactSection } from "~/components/contact-section";
 import { getPublicReviews } from "~/lib/reviews.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { earliestCheckinDate } from "~/lib/dates";
@@ -73,6 +75,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const map = hasMap
     ? { lat, lng, mapKey: getConfig().googleMapKey ?? "" }
     : null;
+  const wantsContact = sections.some((x) => x.type === "contact");
+  const contactOverrides = wantsContact ? await getOverrides(pid, lang) : null;
+  const contact = {
+    address: contactOverrides?.address,
+    phone: contactOverrides?.phone,
+    email: contactOverrides?.email,
+    checkinTime: settings.checkinTime,
+    checkoutTime: settings.checkoutTime,
+    // Mirrors the action's own choice of recipient, so the form is only offered
+    // when a submission would actually reach someone.
+    canReceive: Boolean(
+      settings.hostNotifyEmail || settings.emailReplyTo || contactOverrides?.email,
+    ),
+  };
   // Only pay for the room list when a section actually renders it.
   const rooms = sections.some((x) => x.type === "rooms")
     ? (await getRooms(pid).catch(() => [])).map((r) => ({
@@ -97,6 +113,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     facilities: normalizeFacilities(settings.facilities ?? []),
     facilitiesExtra,
     map,
+    contact,
     sections,
     rooms,
   };
@@ -108,7 +125,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
-  const { facilities, facilitiesExtra, sections, rooms, map } = loaderData;
+  const { facilities, facilitiesExtra, sections, rooms, map, contact } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -379,6 +396,20 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             tr={tr}
           />
         ) : null;
+      case "contact":
+        return (
+          <ContactSection
+            key={section.id}
+            heading={sectionHeading(section, tr)}
+            intro={section.text?.intro}
+            details={contact}
+            // Nothing to deliver to: show the details and drop the form rather
+            // than accepting messages that go nowhere.
+            showForm={settingOf(section, "showForm", true) && contact.canReceive}
+            channelId={params.channelId}
+            tr={tr}
+          />
+        );
       case "richText":
         return <RichTextSection key={section.id} section={section} />;
     }

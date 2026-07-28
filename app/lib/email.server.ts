@@ -345,6 +345,40 @@ export async function sendCollectionRequestEmail(args: {
   }
 }
 
+/** Contact-form enquiry, host-facing. The guest's name, address and message are
+ *  untrusted: they go through `renderSimpleEmail`, whose body is escaped, and
+ *  NEVER into the subject — a newline in a mail header is header injection.
+ *  `replyTo` is the guest, so the hotel can just hit reply. */
+export async function sendContactEmail(args: {
+  pid: string;
+  to: string;
+  hotelName: string;
+  guestName: string;
+  guestEmail: string;
+  message: string;
+}): Promise<{ sent: boolean }> {
+  try {
+    const settings = await getSettings(args.pid);
+    return await sendEmail({
+      to: args.to,
+      // Fixed text plus the hotel's own name — nothing the sender controls.
+      subject: `Website enquiry — ${args.hotelName}`,
+      replyTo: args.guestEmail,
+      html: renderSimpleEmail({
+        hotelName: args.hotelName,
+        accent: accentHex(settings),
+        heading: "New enquiry from your website",
+        body:
+          `${args.guestName} <${args.guestEmail}> wrote:\n\n${args.message}\n\n` +
+          `Reply to this email to answer them directly.`,
+      }),
+    });
+  } catch (e) {
+    console.log(`[email] sendContactEmail failed: ${e instanceof Error ? e.message : e}`);
+    return { sent: false };
+  }
+}
+
 /** Guest cancellation confirmation + (opt-in) host cancellation notification. */
 export async function sendCancellationEmails(pid: string, booking: BookingRecord, origin: string): Promise<void> {
   try {

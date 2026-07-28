@@ -283,6 +283,8 @@ const EN: Record<string, string> = {
   secGallery: "Photo gallery",
   secFacilities: "Facilities",
   secMap: "Location map",
+  secContact: "Contact",
+  secField_showForm: "Show a contact form",
   secReviews: "Guest reviews",
   secVouchers: "Gift vouchers",
   secRichText: "Text block",
@@ -305,6 +307,7 @@ const EN: Record<string, string> = {
   secDefault_reviews: "Guest reviews",
   secDefault_vouchers: "Give the gift of a stay",
   secDefault_map: "Find us",
+  secDefault_contact: "Get in touch",
 
   // -- website footer (ft*) --
   ftTitle: "Footer",
@@ -1972,6 +1975,8 @@ const DE: Record<string, string> = {
   secGallery: "Fotogalerie",
   secFacilities: "Ausstattung",
   secMap: "Standortkarte",
+  secContact: "Kontakt",
+  secField_showForm: "Kontaktformular anzeigen",
   secReviews: "Gästebewertungen",
   secVouchers: "Gutscheine",
   secRichText: "Textblock",
@@ -1994,6 +1999,7 @@ const DE: Record<string, string> = {
   secDefault_reviews: "Gästebewertungen",
   secDefault_vouchers: "Verschenken Sie einen Aufenthalt",
   secDefault_map: "So finden Sie uns",
+  secDefault_contact: "Kontakt aufnehmen",
 
   // -- website footer (ft*) --
   ftTitle: "Fußzeile",
@@ -3665,6 +3671,8 @@ const PT: Record<string, string> = {
   secGallery: "Galeria de fotos",
   secFacilities: "Instalações",
   secMap: "Mapa da localização",
+  secContact: "Contacto",
+  secField_showForm: "Mostrar formulário de contacto",
   secReviews: "Avaliações dos hóspedes",
   secVouchers: "Vales de oferta",
   secRichText: "Bloco de texto",
@@ -3687,6 +3695,7 @@ const PT: Record<string, string> = {
   secDefault_reviews: "Avaliações dos hóspedes",
   secDefault_vouchers: "Ofereça uma estadia",
   secDefault_map: "Como chegar",
+  secDefault_contact: "Fale connosco",
 
   // -- website footer (ft*) --
   ftTitle: "Rodapé",
