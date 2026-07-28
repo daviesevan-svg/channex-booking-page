@@ -18,6 +18,7 @@ import {
   type SectionType,
   type SiteSection,
 } from "~/lib/sections";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadSectionImage } from "~/lib/images.server";
 import {
   addSectionImages,
@@ -110,7 +111,8 @@ export async function action({ request }: Route.ActionArgs) {
 
     sections.push({ id, type: t, hidden: form.get(`h:${id}`) === "on", settings, images });
   }
-  await savePageSections(propertyId, pageId, sections);
+  // Removing a picture is this save, so the dropped urls come back from it.
+  queueImageCleanup(propertyId, await savePageSections(propertyId, pageId, sections));
 
   // Save copy AFTER the structure, so saveSiteCopy prunes against the layout
   // that was just written rather than the one it replaced.

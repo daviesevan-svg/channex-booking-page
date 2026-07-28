@@ -8,6 +8,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
 import { MAX_GALLERY_IMAGES, type GalleryText } from "~/lib/gallery";
 import { addImages, getGallery, removeImage, saveGalleryLang } from "~/lib/gallery.server";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadGalleryImage } from "~/lib/images.server";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -71,7 +72,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const remove = String(form.get("remove") ?? "");
   if (remove) {
-    await removeImage(propertyId, remove);
+    queueImageCleanup(propertyId, await removeImage(propertyId, remove));
     return { removed: true as const };
   }
   return { ok: true as const };

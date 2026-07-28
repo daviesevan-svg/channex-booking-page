@@ -14,6 +14,7 @@ import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { langParam } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 import { MAX_PAGES, slugifyPage } from "~/lib/pages";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { createPage, deletePage, listPages, updatePage } from "~/lib/site.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -65,7 +66,8 @@ export async function action({ request }: Route.ActionArgs) {
     return "error" in result ? { error: result.error } : { ok: true as const };
   }
   if (intent === "delete" && id) {
-    await deletePage(propertyId, id);
+    // The deleted page was the only thing referencing its section pictures.
+    queueImageCleanup(propertyId, await deletePage(propertyId, id));
     return { ok: true as const };
   }
   return { error: "Unknown action." };

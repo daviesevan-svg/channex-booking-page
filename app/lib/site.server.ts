@@ -329,12 +329,29 @@ export async function updatePage(
   return { ok: true };
 }
 
-/** Delete a page and every scrap of text it owned, in every language. */
-export async function deletePage(pid: string, pageId: string): Promise<void> {
+/** The picture urls a set of sections points at. */
+const imageUrlsOf = (sections: SiteSection[]): string[] =>
+  sections.flatMap((s) => (s.images ?? []).map((i) => i.url));
+
+/** Every picture url this property's pages still reference, for the image
+ *  garbage collector. Normalized, so a picture on a section type that can't have
+ *  one doesn't count — `pagesOf` drops it on read, so nothing renders it. */
+export async function siteImageUrls(pid: string): Promise<string[]> {
+  return pagesOf(await read(pid)).flatMap((p) => imageUrlsOf(p.sections));
+}
+
+/**
+ * Delete a page and every scrap of text it owned, in every language.
+ *
+ * Returns the picture urls that went with it, for `queueImageCleanup` — the page
+ * was the only thing referencing them, so nothing else will ever remove the R2
+ * objects.
+ */
+export async function deletePage(pid: string, pageId: string): Promise<string[]> {
   const config = await read(pid);
   const pages = pagesOf(config);
   const page = pages.find((p) => p.id === pageId);
-  if (!page || isHome(page)) return;
+  if (!page || isHome(page)) return [];
 
   const dead = new Set(pageCopyKeys(page));
   const copy: Record<string, Record<string, string>> = {};
@@ -342,24 +359,36 @@ export async function deletePage(pid: string, pageId: string): Promise<void> {
     copy[lang] = Object.fromEntries(Object.entries(map).filter(([k]) => !dead.has(k)));
   }
   await write(pid, { ...config, pages: pages.filter((p) => p.id !== pageId), copy });
+  return imageUrlsOf(page.sections);
 }
 
-/** Replace one page's structure. Text is untouched — reordering or hiding a
- *  section must never drop what's written in it. */
+/**
+ * Replace one page's structure. Text is untouched — reordering or hiding a
+ * section must never drop what's written in it.
+ *
+ * Returns the picture urls this save dropped, for `queueImageCleanup`. Removing
+ * a picture IS this save (the editor drops it from its own state, see
+ * `addSectionImages`), so diffing the stored structure against the incoming one
+ * is the only place a deleted picture can be noticed.
+ */
 export async function savePageSections(
   pid: string,
   pageId: string,
   sections: SiteSection[],
-): Promise<void> {
+): Promise<string[]> {
   const config = await read(pid);
   const pages = pagesOf(config);
-  if (!pages.some((p) => p.id === pageId)) return;
-  await write(pid, {
-    ...config,
-    pages: pages.map((p) =>
-      p.id === pageId ? { ...p, sections: normalizeSections(sections, isHome(p)) } : p,
-    ),
-  });
+  const before = pages.find((p) => p.id === pageId);
+  if (!before) return [];
+  const next = pages.map((p) =>
+    p.id === pageId ? { ...p, sections: normalizeSections(sections, isHome(p)) } : p,
+  );
+  await write(pid, { ...config, pages: next });
+
+  // Compare against the NORMALIZED result, not the raw input: a picture
+  // normalizeSections threw away is just as orphaned as one the editor removed.
+  const kept = new Set(imageUrlsOf(next.find((p) => p.id === pageId)!.sections));
+  return imageUrlsOf(before.sections).filter((url) => !kept.has(url));
 }
 
 /**

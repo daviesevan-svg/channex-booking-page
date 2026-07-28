@@ -11,6 +11,7 @@ import {
   saveHeroImage,
   saveSearchContent,
 } from "~/lib/overrides.server";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadHomeImage } from "~/lib/images.server";
 import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
@@ -56,6 +57,8 @@ export async function action({ request }: Route.ActionArgs) {
 
   const upload = form.get("heroUpload");
   const file = upload instanceof File && upload.size > 0 ? upload : null;
+  // Replacing or clearing the hero orphans the file that was there.
+  const previousHero = await getHeroImage(propertyId);
   try {
     if (form.get("removeHero")) {
       await saveHeroImage(propertyId, null);
@@ -64,6 +67,9 @@ export async function action({ request }: Route.ActionArgs) {
     }
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Image upload failed." };
+  }
+  if (previousHero && previousHero !== (await getHeroImage(propertyId))) {
+    queueImageCleanup(propertyId, [previousHero]);
   }
   return { ok: true };
 }
