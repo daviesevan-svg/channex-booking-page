@@ -70,6 +70,7 @@ export default [
     route("home", "routes/admin/home.tsx"),
     route("website", "routes/admin/website.tsx"),
     route("website/sections", "routes/admin/website-sections.tsx"),
+    route("website/pages", "routes/admin/website-pages.tsx"),
     route("website/footer", "routes/admin/website-footer.tsx"),
     route("gallery", "routes/admin/gallery.tsx"),
     route("facilities", "routes/admin/facilities.tsx"),
@@ -128,5 +129,10 @@ export default [
     route("manage/voucher/:code", "routes/property/manage-voucher.tsx"),
     route("manage/:id", "routes/property/manage-booking.tsx"),
     route("review/:bookingId", "routes/property/review.tsx"),
+    // Extra website pages ("about", "dining"). MUST stay last: it matches any
+    // single segment, and only React Router's static-beats-dynamic ranking keeps
+    // the funnel routes above from being read as page slugs. An unknown slug
+    // 404s from the loader. See RESERVED_PAGE_SLUGS in app/lib/pages.ts.
+    route(":pageSlug", "routes/property/page.tsx"),
   ]),
 ] satisfies RouteConfig;

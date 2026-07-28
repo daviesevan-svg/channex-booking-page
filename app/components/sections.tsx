@@ -13,7 +13,10 @@ import { Link } from "react-router";
 import type { Translator } from "~/lib/i18n";
 import { SECTION_DEFS, numberSetting, type SiteSection } from "~/lib/sections";
 import type { ResolvedGalleryImage } from "~/lib/gallery";
+import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
+
+export type { ReviewView };
 
 /** A section's own heading, else the translated default for its type. */
 export function sectionHeading(
@@ -94,14 +97,6 @@ export function FacilitiesSection({
 }
 
 // ------------------------------------------------------------------- reviews
-
-export interface ReviewView {
-  id: string;
-  guestName: string;
-  stars: number;
-  publicText: string;
-  response?: { text?: string } | null;
-}
 
 export function ReviewsSection({
   section,
