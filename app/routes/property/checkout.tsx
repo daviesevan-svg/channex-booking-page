@@ -7,6 +7,7 @@ import { jsonLdHtml } from "~/lib/jsonld";
 import { z } from "zod";
 
 import type { Route } from "./+types/checkout";
+import { Trans } from "~/components/trans";
 import { pageMeta } from "~/lib/page-meta";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
@@ -621,6 +622,25 @@ export function meta({ matches }: Route.MetaArgs) {
   return pageMeta(matches, { titleKey: "metaCheckout", noindex: true });
 }
 
+/** Terms / privacy reference: a link when the hotel has set a URL, otherwise
+ *  plain emphasis — the sentence has to read either way, since these documents
+ *  are named whether or not a URL exists. */
+function LegalRef({ url, label }: { url?: string | null; label: string }) {
+  return url ? (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="font-semibold text-accent underline"
+    >
+      {label}
+    </a>
+  ) : (
+    <span className="font-semibold">{label}</span>
+  );
+}
+
+
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
@@ -1022,19 +1042,19 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 onChange={(e) => { setAgree(e.target.checked); setConsentError(false); }}
                 className={checkboxCls}
               />
+              {/* One translatable sentence with the two links as placeholders —
+                  the previous version concatenated English fragments in JSX,
+                  which can't be translated (word order moves, and in German the
+                  verb goes last). */}
               <span>
-                I agree to the booking conditions, the cancellation policy shown above, and the{" "}
-                {termsUrl ? (
-                  <a href={termsUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline">Terms &amp; Conditions</a>
-                ) : (
-                  <span className="font-semibold">Terms &amp; Conditions</span>
-                )}{" "}
-                and{" "}
-                {privacyUrl ? (
-                  <a href={privacyUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-accent underline">Privacy Policy</a>
-                ) : (
-                  <span className="font-semibold">Privacy Policy</span>
-                )}.
+                <Trans
+                  tr={tr}
+                  k="consentAgree"
+                  parts={{
+                    terms: <LegalRef url={termsUrl} label={tr.t("termsLink")} />,
+                    privacy: <LegalRef url={privacyUrl} label={tr.t("privacyLink")} />,
+                  }}
+                />
               </span>
             </label>
 
@@ -1059,12 +1079,16 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 onChange={(e) => setMarketing(e.target.checked)}
                 className={checkboxCls}
               />
-              <span>Send me offers and news{hotelName ? ` from ${hotelName}` : ""}.</span>
+              <span>
+                {hotelName
+                  ? tr.t("marketingOptInFrom", { hotel: hotelName })
+                  : tr.t("marketingOptIn")}
+              </span>
             </label>
 
             {showConsentError && (
               <p className="text-[12.5px] font-medium text-red-600">
-                Please tick the required boxes to continue.
+                {tr.t("consentRequired")}
               </p>
             )}
           </div>
