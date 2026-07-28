@@ -68,6 +68,7 @@ export default [
     route("webhooks", "routes/admin/webhooks.tsx"),
     route("portal", "routes/admin/portal.tsx"),
     route("home", "routes/admin/home.tsx"),
+    route("website", "routes/admin/website.tsx"),
     route("gallery", "routes/admin/gallery.tsx"),
     route("facilities", "routes/admin/facilities.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),
