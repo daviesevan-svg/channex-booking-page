@@ -282,6 +282,7 @@ const EN: Record<string, string> = {
   secRooms: "Rooms",
   secGallery: "Photo gallery",
   secFacilities: "Facilities",
+  secMap: "Location map",
   secReviews: "Guest reviews",
   secVouchers: "Gift vouchers",
   secRichText: "Text block",
@@ -290,6 +291,8 @@ const EN: Record<string, string> = {
   secField_body: "Text",
   secField_limit: "How many to show",
   secField_minStars: "Minimum stars",
+  secField_directions: "How to find us",
+  secField_zoom: "Zoom level",
   secField_align: "Alignment",
   secField_layout: "Layout",
   secOpt_split: "Text beside a photo",
@@ -301,6 +304,7 @@ const EN: Record<string, string> = {
   secDefault_facilities: "Facilities",
   secDefault_reviews: "Guest reviews",
   secDefault_vouchers: "Give the gift of a stay",
+  secDefault_map: "Find us",
 
   // -- website footer (ft*) --
   ftTitle: "Footer",
@@ -1967,6 +1971,7 @@ const DE: Record<string, string> = {
   secRooms: "Zimmer",
   secGallery: "Fotogalerie",
   secFacilities: "Ausstattung",
+  secMap: "Standortkarte",
   secReviews: "Gästebewertungen",
   secVouchers: "Gutscheine",
   secRichText: "Textblock",
@@ -1975,6 +1980,8 @@ const DE: Record<string, string> = {
   secField_body: "Text",
   secField_limit: "Anzahl anzeigen",
   secField_minStars: "Mindestbewertung",
+  secField_directions: "So finden Gäste Sie",
+  secField_zoom: "Zoomstufe",
   secField_align: "Ausrichtung",
   secField_layout: "Layout",
   secOpt_split: "Text neben einem Foto",
@@ -1986,6 +1993,7 @@ const DE: Record<string, string> = {
   secDefault_facilities: "Ausstattung",
   secDefault_reviews: "Gästebewertungen",
   secDefault_vouchers: "Verschenken Sie einen Aufenthalt",
+  secDefault_map: "So finden Sie uns",
 
   // -- website footer (ft*) --
   ftTitle: "Fußzeile",
@@ -3656,6 +3664,7 @@ const PT: Record<string, string> = {
   secRooms: "Quartos",
   secGallery: "Galeria de fotos",
   secFacilities: "Instalações",
+  secMap: "Mapa da localização",
   secReviews: "Avaliações dos hóspedes",
   secVouchers: "Vales de oferta",
   secRichText: "Bloco de texto",
@@ -3664,6 +3673,8 @@ const PT: Record<string, string> = {
   secField_body: "Texto",
   secField_limit: "Quantos mostrar",
   secField_minStars: "Estrelas mínimas",
+  secField_directions: "Como encontrar-nos",
+  secField_zoom: "Nível de zoom",
   secField_align: "Alinhamento",
   secField_layout: "Disposição",
   secOpt_split: "Texto ao lado de uma foto",
@@ -3675,6 +3686,7 @@ const PT: Record<string, string> = {
   secDefault_facilities: "Instalações",
   secDefault_reviews: "Avaliações dos hóspedes",
   secDefault_vouchers: "Ofereça uma estadia",
+  secDefault_map: "Como chegar",
 
   // -- website footer (ft*) --
   ftTitle: "Rodapé",

@@ -160,7 +160,7 @@ the base language, so a half-translated site renders complete rather than blank.
 | `offers` | promotions | heading |
 | `extras` | extras catalog | heading |
 | `vouchers` | voucher catalog | heading |
-| `map` | lat/lng, address | heading, zoom, directions copy |
+| `map` | lat/lng, address | heading, zoom, directions copy. Click-to-load (see below) |
 | `faq` | — | question/answer pairs |
 | `contact` | phone, email, address | heading, form on/off |
 | `cta` | — | heading, text, button + target |
@@ -197,6 +197,27 @@ out identical.
 ---
 
 ## 5. Routing
+
+### The map section and Google billing
+
+A Maps JS load is billed per map, so a map that draws itself on page view
+charges for every visitor — including everyone who never looks at it. The
+section instead shows a **generic drawn map** (inline SVG; a Static Maps image
+of the real location would be billable too) with a "Show map" button, and only
+fetches Google on the click.
+
+The address and a `maps.google.com/maps/dir` directions link are always shown
+and cost nothing, which is what most guests actually want — so the click, and
+the charge, is the exception rather than the default.
+
+Two failure modes, both handled, because they're different:
+- A key that Google never answers for **hangs** — `importLibrary` and `onerror`
+  both stay pending. `loadGoogleMaps` races a 10s timeout.
+- A key Google **rejects** resolves normally and then renders nothing. The only
+  signal is the `gm_authFailure` global.
+
+Either way the section falls back to the placeholder with a plain message, and
+the directions link is rendered outside that branch so it survives both.
 
 ### Footer
 
