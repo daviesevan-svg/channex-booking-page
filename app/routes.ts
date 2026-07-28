@@ -112,6 +112,8 @@ export default [
     route("rooms/:roomId", "routes/property/detail.tsx"),
     // Website room page (no dates needed) — distinct from the dated funnel step.
     route("room/:roomId", "routes/property/room.tsx"),
+    // Contact-form submission (POST only; GET redirects home).
+    route("contact", "routes/property/contact.tsx"),
     route("extras", "routes/property/extras.tsx"),
     route("vouchers", "routes/property/vouchers.tsx"),
     route("vouchers/complete", "routes/property/vouchers-complete.tsx"),

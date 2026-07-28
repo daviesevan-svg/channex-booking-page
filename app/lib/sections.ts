@@ -16,6 +16,7 @@ export const SECTION_TYPES = [
   "gallery",
   "facilities",
   "map",
+  "contact",
   "reviews",
   "vouchers",
   "richText",
@@ -138,6 +139,16 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
       { key: "zoom", kind: "number", min: 10, max: 19, default: 15 },
     ],
   },
+  contact: {
+    type: "contact",
+    labelKey: "secContact",
+    headingKey: "secContactHeadingDefault",
+    fields: [
+      HEADING,
+      { key: "intro", kind: "textarea", localized: true },
+      { key: "showForm", kind: "boolean", default: true },
+    ],
+  },
   reviews: {
     type: "reviews",
     labelKey: "secReviews",
@@ -187,6 +198,7 @@ export const DEFAULT_WEBSITE_SECTIONS: SiteSection[] = [
   { id: "gallery", type: "gallery" },
   { id: "facilities", type: "facilities" },
   { id: "map", type: "map" },
+  { id: "contact", type: "contact" },
   { id: "reviews", type: "reviews" },
   { id: "vouchers", type: "vouchers" },
 ];
