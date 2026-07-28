@@ -303,14 +303,20 @@ A new **Website** group in the nav, absorbing the existing Content group:
 
 ```
 Website
+  General          opt in, address, custom domain          (built)
+  Gallery          property photos                         (built)
+  Facilities       property facilities                     (built)
   Pages            list, add, reorder; section editor per page
   Navigation       menu + footer
   Theme & style    extends the existing theme controls
-  Gallery          property photos
-  Facilities       property facilities
-  Domain           custom hostname status + instructions
   Booking screens  today's home / results / detail / checkout editors
 ```
+
+`CUSTOM_HOSTNAME_TARGET` is read from the environment and is deliberately NOT
+pinned in `wrangler.jsonc` `vars` — it isn't chosen yet, and an empty pinned var
+re-applies on every deploy and would wipe a dashboard value. While it is unset,
+the General page says custom domains aren't available rather than printing a
+target that wouldn't work.
 
 The section editor is the bulk of the UI work: add, reorder, hide, and a
 settings form per section type, times 14 types, times 8 locales for the copy.

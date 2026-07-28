@@ -93,6 +93,7 @@ const EN: Record<string, string> = {
   navOperations: "Operations",
   navSettings: "Settings",
   navWebsite: "Website",
+  navWebsiteGeneral: "General",
   navGallery: "Gallery",
   navFacilities: "Facilities",
   navEmails: "Emails",
@@ -214,6 +215,49 @@ const EN: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} of the Google Vacation Rentals amenities you have set match a facility that is not ticked yet.",
   facAddPropertyFirst: "Add a property first to manage its facilities.",
+
+  // -- website general (web*) --
+  webTitle: "Website",
+  webIntro:
+    "Turn the booking engine into a full website for this property, and point your own domain at it.",
+  webAddPropertyFirst: "Add a property first to set up its website.",
+  webEnableTitle: "Your website",
+  webEnableDesc:
+    "With this off, your address shows the booking search page exactly as it does today. With it on, it shows a website home page and the search box becomes part of it. The booking flow itself never changes.",
+  webEnableLabel: "Enable website",
+  webEnableLabelDesc: "You can turn this off again at any time — nothing you have entered is deleted.",
+  webNotBuiltYet:
+    "Page building isn't here yet, so turning this on doesn't change what guests see. It records the choice and unlocks the settings below. Your photos and facilities already appear on your booking page.",
+  webAddressTitle: "Address",
+  webAddressHint: "Where your booking page and website live today.",
+  webViewSite: "View ↗",
+  webSlugHint: "To change the last part of the address, go to",
+  webDomainTitle: "Custom domain",
+  webDomainIntro:
+    "Use your own web address instead. Your booking pages keep working exactly as they do now — same pages, your domain.",
+  webDomainLabel: "Your domain",
+  webDomainUnavailable:
+    "Custom domains aren't switched on for this deployment yet. You can save your domain here now, and the DNS record you need will appear once they are.",
+  webDnsTitle: "DNS record",
+  webDnsHint:
+    "Add this record at whoever manages your domain — your registrar or web host. It usually takes a few minutes to take effect, occasionally a few hours.",
+  webDnsType: "Type",
+  webDnsName: "Name",
+  webDnsValue: "Points to",
+  webApexNote:
+    "If this is your root domain (no “www”), most DNS providers won't allow a CNAME there. Use “www” and set a redirect from the root, or move your DNS to Cloudflare, which can do it.",
+  webCheckDns: "Check DNS",
+  webChecking: "Checking…",
+  webCheckDnsHint: "Looks up what your domain points to right now.",
+  webDnsPointsHere: "Your domain points here. The DNS side is done.",
+  webDnsPointsElsewhere:
+    "Your domain currently points to {found}, not {expected}. Update the record and check again.",
+  webDnsResolvesNoCname:
+    "Your domain resolves to {addresses} but has no CNAME. If your DNS is on Cloudflare this is normal (it hides the CNAME). Otherwise the record isn't in place yet.",
+  webDnsNotFound: "That domain doesn't resolve yet. If you've just added the record, give it a few minutes.",
+  webDnsCheckFailed: "Couldn't check right now: {reason}",
+  webDnsNotLiveYet:
+    "We still need to activate the hostname on our side before it serves your pages — that part isn't automatic yet.",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Admin",
@@ -1662,6 +1706,7 @@ const DE: Record<string, string> = {
   navOperations: "Betrieb",
   navSettings: "Einstellungen",
   navWebsite: "Website",
+  navWebsiteGeneral: "Allgemein",
   navGallery: "Galerie",
   navFacilities: "Ausstattung",
   navEmails: "E-Mails",
@@ -1784,6 +1829,51 @@ const DE: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} der von Ihnen gesetzten Google-Vacation-Rentals-Ausstattungsmerkmale entsprechen einer noch nicht angehakten Ausstattung.",
   facAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Ausstattung zu verwalten.",
+
+  // -- website general (web*) --
+  webTitle: "Website",
+  webIntro:
+    "Machen Sie aus der Buchungsmaschine eine vollständige Website für diese Unterkunft und richten Sie Ihre eigene Domain darauf.",
+  webAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Website einzurichten.",
+  webEnableTitle: "Ihre Website",
+  webEnableDesc:
+    "Ausgeschaltet zeigt Ihre Adresse weiterhin genau die heutige Buchungssuche. Eingeschaltet zeigt sie eine Website-Startseite, in der die Suche eingebettet ist. Am Buchungsablauf selbst ändert sich nichts.",
+  webEnableLabel: "Website aktivieren",
+  webEnableLabelDesc:
+    "Sie können dies jederzeit wieder ausschalten — nichts, was Sie eingegeben haben, wird gelöscht.",
+  webNotBuiltYet:
+    "Der Seiteneditor ist noch nicht verfügbar; das Einschalten ändert also noch nichts für Gäste. Es merkt sich Ihre Entscheidung und schaltet die Einstellungen unten frei. Ihre Fotos und Ausstattung erscheinen bereits auf Ihrer Buchungsseite.",
+  webAddressTitle: "Adresse",
+  webAddressHint: "Wo Ihre Buchungsseite und Website heute erreichbar sind.",
+  webViewSite: "Ansehen ↗",
+  webSlugHint: "Um den letzten Teil der Adresse zu ändern, gehen Sie zu",
+  webDomainTitle: "Eigene Domain",
+  webDomainIntro:
+    "Verwenden Sie stattdessen Ihre eigene Webadresse. Ihre Buchungsseiten funktionieren genau wie bisher — dieselben Seiten, Ihre Domain.",
+  webDomainLabel: "Ihre Domain",
+  webDomainUnavailable:
+    "Eigene Domains sind für diese Installation noch nicht freigeschaltet. Sie können Ihre Domain hier bereits speichern; der benötigte DNS-Eintrag erscheint, sobald sie es sind.",
+  webDnsTitle: "DNS-Eintrag",
+  webDnsHint:
+    "Legen Sie diesen Eintrag dort an, wo Ihre Domain verwaltet wird — bei Ihrem Registrar oder Webhoster. Meist dauert es wenige Minuten, gelegentlich einige Stunden.",
+  webDnsType: "Typ",
+  webDnsName: "Name",
+  webDnsValue: "Zeigt auf",
+  webApexNote:
+    "Wenn dies Ihre Root-Domain ist (ohne „www“), erlauben die meisten DNS-Anbieter dort keinen CNAME. Verwenden Sie „www“ und richten Sie eine Weiterleitung von der Root-Domain ein, oder verlegen Sie Ihr DNS zu Cloudflare, das dies unterstützt.",
+  webCheckDns: "DNS prüfen",
+  webChecking: "Wird geprüft…",
+  webCheckDnsHint: "Prüft, worauf Ihre Domain gerade zeigt.",
+  webDnsPointsHere: "Ihre Domain zeigt hierher. Die DNS-Seite ist erledigt.",
+  webDnsPointsElsewhere:
+    "Ihre Domain zeigt derzeit auf {found}, nicht auf {expected}. Passen Sie den Eintrag an und prüfen Sie erneut.",
+  webDnsResolvesNoCname:
+    "Ihre Domain löst zu {addresses} auf, hat aber keinen CNAME. Wenn Ihr DNS bei Cloudflare liegt, ist das normal (der CNAME wird dort verborgen). Andernfalls ist der Eintrag noch nicht gesetzt.",
+  webDnsNotFound:
+    "Diese Domain löst noch nicht auf. Wenn Sie den Eintrag gerade erst angelegt haben, warten Sie ein paar Minuten.",
+  webDnsCheckFailed: "Prüfung derzeit nicht möglich: {reason}",
+  webDnsNotLiveYet:
+    "Wir müssen den Hostnamen auf unserer Seite noch aktivieren, bevor er Ihre Seiten ausliefert — das läuft noch nicht automatisch.",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Verwaltung",
@@ -3236,6 +3326,7 @@ const PT: Record<string, string> = {
   navOperations: "Operações",
   navSettings: "Configurações",
   navWebsite: "Site",
+  navWebsiteGeneral: "Geral",
   navGallery: "Galeria",
   navFacilities: "Instalações",
   navEmails: "E-mails",
@@ -3357,6 +3448,51 @@ const PT: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} das comodidades do Google Vacation Rentals que definiu correspondem a uma instalação ainda não assinalada.",
   facAddPropertyFirst: "Adicione primeiro uma propriedade para gerir as suas instalações.",
+
+  // -- website general (web*) --
+  webTitle: "Site",
+  webIntro:
+    "Transforme o motor de reservas num site completo para esta propriedade e aponte o seu próprio domínio para ele.",
+  webAddPropertyFirst: "Adicione primeiro uma propriedade para configurar o seu site.",
+  webEnableTitle: "O seu site",
+  webEnableDesc:
+    "Com isto desligado, o seu endereço mostra a página de pesquisa de reservas tal como hoje. Ligado, mostra uma página inicial de site com a pesquisa integrada. O processo de reserva em si não muda.",
+  webEnableLabel: "Ativar site",
+  webEnableLabelDesc:
+    "Pode voltar a desligar a qualquer momento — nada do que introduziu é eliminado.",
+  webNotBuiltYet:
+    "O editor de páginas ainda não existe, por isso ativar não altera o que os hóspedes veem. Regista a sua escolha e desbloqueia as definições abaixo. As suas fotos e instalações já aparecem na página de reservas.",
+  webAddressTitle: "Endereço",
+  webAddressHint: "Onde a sua página de reservas e o seu site estão hoje.",
+  webViewSite: "Ver ↗",
+  webSlugHint: "Para alterar a última parte do endereço, vá a",
+  webDomainTitle: "Domínio próprio",
+  webDomainIntro:
+    "Use antes o seu próprio endereço web. As suas páginas de reserva continuam a funcionar exatamente como agora — as mesmas páginas, no seu domínio.",
+  webDomainLabel: "O seu domínio",
+  webDomainUnavailable:
+    "Os domínios próprios ainda não estão ativos nesta instalação. Pode guardar já aqui o seu domínio; o registo DNS necessário aparecerá quando estiverem.",
+  webDnsTitle: "Registo DNS",
+  webDnsHint:
+    "Crie este registo em quem gere o seu domínio — o seu registador ou alojamento web. Normalmente demora alguns minutos, por vezes algumas horas.",
+  webDnsType: "Tipo",
+  webDnsName: "Nome",
+  webDnsValue: "Aponta para",
+  webApexNote:
+    "Se este for o seu domínio de raiz (sem “www”), a maioria dos fornecedores de DNS não permite um CNAME aí. Use “www” e configure um redirecionamento a partir da raiz, ou mude o seu DNS para a Cloudflare, que o consegue fazer.",
+  webCheckDns: "Verificar DNS",
+  webChecking: "A verificar…",
+  webCheckDnsHint: "Consulta para onde o seu domínio aponta neste momento.",
+  webDnsPointsHere: "O seu domínio aponta para aqui. A parte de DNS está feita.",
+  webDnsPointsElsewhere:
+    "O seu domínio aponta atualmente para {found}, e não para {expected}. Atualize o registo e verifique novamente.",
+  webDnsResolvesNoCname:
+    "O seu domínio resolve para {addresses} mas não tem CNAME. Se o seu DNS estiver na Cloudflare isto é normal (o CNAME fica oculto). Caso contrário, o registo ainda não está criado.",
+  webDnsNotFound:
+    "Esse domínio ainda não resolve. Se acabou de criar o registo, aguarde alguns minutos.",
+  webDnsCheckFailed: "Não foi possível verificar agora: {reason}",
+  webDnsNotLiveYet:
+    "Ainda precisamos de ativar o nome de anfitrião do nosso lado antes de servir as suas páginas — essa parte ainda não é automática.",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Administração",

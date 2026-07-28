@@ -67,6 +67,12 @@ export interface AppConfig extends ChannexConfig {
   googleTravelPartnerSaEmail?: string;
   /** The service account's PEM private key (may contain literal \n from the JSON). */
   googleTravelPartnerSaKey?: string;
+  /** Cloudflare for SaaS CNAME target — the hostname a hotel points their own
+   *  domain at. Deliberately NOT pinned in wrangler.jsonc `vars`: it isn't
+   *  chosen yet, and an empty pinned var would wipe a dashboard value on every
+   *  deploy. Unset = the admin page says custom domains aren't available yet
+   *  rather than printing a target that wouldn't work. */
+  customHostnameTarget?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -100,6 +106,7 @@ export function getConfig(): AppConfig {
     // Never empty: an empty HMAC key throws in the Workers runtime.
     sessionSecret: read("SESSION_SECRET") || DEFAULT_SESSION_SECRET,
     appUrl: read("APP_URL", "http://localhost:5173"),
+    customHostnameTarget: read("CUSTOM_HOSTNAME_TARGET") || undefined,
     stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
     stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
     stripeWebhookSecret: read("STRIPE_WEBHOOK_SECRET") || undefined,

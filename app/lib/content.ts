@@ -272,6 +272,16 @@ export interface SiteSettings {
   /** Hide the text hotel name in the header when a logo is set — for logos that
    *  already contain the name. Ignored when there's no logo. */
   logoHideName?: boolean;
+  // ----- Website -----
+  /** Opt in to the website layer. Off (default) = `/:channelId` is the booking
+   *  search page exactly as before; on = it renders the website home page and
+   *  the search box becomes a section of it. Turning it off restores the old
+   *  page — nothing is destroyed either way. */
+  websiteEnabled?: boolean;
+  /** The hotel's own hostname, e.g. "www.spilmanhotel.co.uk". Stored once they
+   *  enter it; pointing DNS and activating the hostname are separate steps, so
+   *  a value here does NOT mean the domain is serving. */
+  websiteDomain?: string;
   /** Guest-facing property facilities — keys from PROPERTY_FACILITIES. Free-text
    *  extras live per language in the content store (they need translating). */
   facilities?: string[];
