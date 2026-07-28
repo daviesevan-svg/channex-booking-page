@@ -11,6 +11,7 @@ import { useT } from "~/lib/i18n";
 import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
+import { formatAddress } from "~/lib/address";
 import { getConfig } from "~/lib/config.server";
 import { getGalleryFor } from "~/lib/gallery.server";
 import {
@@ -72,21 +73,36 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lat = parseFloat(settings.latitude ?? "");
   const lng = parseFloat(settings.longitude ?? "");
   const hasMap = sections.some((x) => x.type === "map") && Number.isFinite(lat) && Number.isFinite(lng);
-  const map = hasMap
-    ? { lat, lng, mapKey: getConfig().googleMapKey ?? "" }
-    : null;
   const wantsContact = sections.some((x) => x.type === "contact");
-  const contactOverrides = wantsContact ? await getOverrides(pid, lang) : null;
+
+  // The street line is per-language free text; city / region / postcode /
+  // country are structured on settings. Both sections need the whole thing —
+  // showing the street line alone was the bug.
+  const wantsAddress = wantsContact || hasMap;
+  const addr = wantsAddress ? await getOverrides(pid, lang) : null;
+  const fullAddress = wantsAddress
+    ? formatAddress({
+        address: addr?.address,
+        city: settings.addressCity,
+        region: settings.addressRegion,
+        postalCode: settings.addressPostalCode,
+        country: settings.addressCountry,
+      })
+    : "";
+
+  const map = hasMap
+    ? { lat, lng, mapKey: getConfig().googleMapKey ?? "", address: fullAddress || undefined }
+    : null;
   const contact = {
-    address: contactOverrides?.address,
-    phone: contactOverrides?.phone,
-    email: contactOverrides?.email,
+    address: fullAddress || undefined,
+    phone: addr?.phone,
+    email: addr?.email,
     checkinTime: settings.checkinTime,
     checkoutTime: settings.checkoutTime,
     // Mirrors the action's own choice of recipient, so the form is only offered
     // when a submission would actually reach someone.
     canReceive: Boolean(
-      settings.hostNotifyEmail || settings.emailReplyTo || contactOverrides?.email,
+      settings.hostNotifyEmail || settings.emailReplyTo || addr?.email,
     ),
   };
   // Only pay for the room list when a section actually renders it.
@@ -387,7 +403,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             key={section.id}
             heading={sectionHeading(section, tr)}
             directions={section.text?.directions}
-            address={property.address}
+            address={map.address}
             lat={map.lat}
             lng={map.lng}
             zoom={numberSetting(section, "zoom", 15)}
