@@ -11,6 +11,7 @@ import {
   langFromRequest,
   LANG_COOKIE,
 } from "~/lib/content";
+import { formatAddress } from "~/lib/address";
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
@@ -63,7 +64,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     languages: enabledLanguages(settings),
     websiteRooms: chrome?.hasRoomsSection ?? false,
     footer: chrome?.footer ?? null,
-    contact: { address: overrides.address, phone: overrides.phone, email: overrides.email },
+    contact: {
+      // Full postal address, not just the street line — same fix as the map and
+      // contact sections.
+      address: formatAddress({
+        address: overrides.address,
+        city: settings.addressCity,
+        region: settings.addressRegion,
+        postalCode: settings.addressPostalCode,
+        country: settings.addressCountry,
+      }),
+      phone: overrides.phone,
+      email: overrides.email,
+    },
     termsUrl: settings.termsUrl ?? null,
     privacyUrl: settings.privacyUrl ?? null,
   };
