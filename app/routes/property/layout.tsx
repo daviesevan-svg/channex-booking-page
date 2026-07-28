@@ -136,10 +136,14 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   };
   const step = useStep(params.channelId);
   const base = `/${params.channelId}`;
-  // Only the landing page shows the "Manage booking" and "Admin" links, to keep
-  // the search/checkout/manage screens focused.
+  // The "Manage booking" / "Gift vouchers" links belong on pages a guest is
+  // BROWSING, not on the funnel steps, which stay focused. That's the landing
+  // page plus the website's room pages — a room page is somewhere you look
+  // around, so hiding the nav there would be a dead end with only Back.
   const { pathname } = useLocation();
-  const isHome = pathname.replace(/\/$/, "") === base;
+  const here = pathname.replace(/\/$/, "");
+  const isHome = here === base;
+  const isBrowsing = isHome || here.startsWith(`${base}/room/`);
 
   const context: PropertyOutletContext = { property, currency, hotelName, lang };
   const navigation = useNavigation();
@@ -206,12 +210,12 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             {languages.length > 1 && (
               <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
             )}
-            {isHome && hasVouchers && (
+            {isBrowsing && hasVouchers && (
               <Link to={`${base}/vouchers`} className="hover:text-accent">
                 {tr.t("vouchersTitle")}
               </Link>
             )}
-            {isHome && (
+            {isBrowsing && (
               <Link to={`${base}/manage`} className="hover:text-accent">
                 {tr.t("manageBooking")}
               </Link>

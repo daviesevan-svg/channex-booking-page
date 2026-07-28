@@ -109,6 +109,8 @@ export default [
     index("routes/property/search.tsx"),
     route("rooms", "routes/property/results.tsx"),
     route("rooms/:roomId", "routes/property/detail.tsx"),
+    // Website room page (no dates needed) — distinct from the dated funnel step.
+    route("room/:roomId", "routes/property/room.tsx"),
     route("extras", "routes/property/extras.tsx"),
     route("vouchers", "routes/property/vouchers.tsx"),
     route("vouchers/complete", "routes/property/vouchers-complete.tsx"),

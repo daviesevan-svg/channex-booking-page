@@ -8,6 +8,8 @@
 // The markup is lifted verbatim from the booking landing page, so with the
 // website layer off the page renders exactly what it always did.
 
+import { Link } from "react-router";
+
 import type { Translator } from "~/lib/i18n";
 import { SECTION_DEFS, numberSetting, type SiteSection } from "~/lib/sections";
 import type { ResolvedGalleryImage } from "~/lib/gallery";
@@ -253,7 +255,12 @@ export interface RoomCardView {
   maxGuests: number;
 }
 
-export function RoomsSection({ section, tr, rooms }: Common & { rooms: RoomCardView[] }) {
+export function RoomsSection({
+  section,
+  tr,
+  rooms,
+  channelId,
+}: Common & { rooms: RoomCardView[]; channelId: string }) {
   const limit = numberSetting(section, "limit", 6);
   const shown = rooms.slice(0, limit);
   if (!shown.length) return null;
@@ -304,12 +311,12 @@ export function RoomsSection({ section, tr, rooms }: Common & { rooms: RoomCardV
               {/* No price here on purpose: a nightly rate depends on dates, and
                   a "from" figure with no dates and no taxes would be a number
                   we'd have to walk back at checkout. */}
-              <a
-                href="#book"
+              <Link
+                to={`/${channelId}/room/${room.id}`}
                 className="mt-auto inline-block self-start rounded-[10px] border border-accent px-4 py-2 text-[14px] font-semibold text-accent hover:bg-accent-soft"
               >
                 {tr.t("secRoomsCta")}
-              </a>
+              </Link>
             </div>
           </div>
         ))}

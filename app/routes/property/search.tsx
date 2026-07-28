@@ -257,7 +257,15 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       case "highlights":
         return <HighlightsSection key={section.id} highlights={highlights} />;
       case "rooms":
-        return <RoomsSection key={section.id} section={section} tr={tr} rooms={rooms} />;
+        return (
+          <RoomsSection
+            key={section.id}
+            section={section}
+            tr={tr}
+            rooms={rooms}
+            channelId={params.channelId}
+          />
+        );
       case "gallery":
         return (
           <GallerySection
