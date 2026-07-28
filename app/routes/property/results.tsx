@@ -7,6 +7,7 @@ import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "rea
 import { jsonLdHtml } from "~/lib/jsonld";
 
 import type { Route } from "./+types/results";
+import { pageMeta } from "~/lib/page-meta";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import {
@@ -478,6 +479,10 @@ function CartPanel({
       </button>
     </aside>
   );
+}
+
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaRooms", descKey: "metaDescRooms" });
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {

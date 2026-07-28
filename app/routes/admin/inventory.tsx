@@ -3,6 +3,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -206,8 +207,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Inventory" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navInventory" });
 }
 
 const cellInput =

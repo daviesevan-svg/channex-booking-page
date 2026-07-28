@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/onboard-channex";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin, setSessionProperty } from "~/lib/auth.server";
@@ -166,8 +167,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Onboard from Channex" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtOnboard" });
 }
 
 export default function OnboardChannex({ actionData }: Route.ComponentProps) {

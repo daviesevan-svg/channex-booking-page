@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import type { Route } from "./+types/brand-kit";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { buildBrandKit } from "~/lib/brand-kit.server";
@@ -14,8 +15,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { configured: true as const, ...kit };
 }
 
-export function meta() {
-  return [{ title: "Admin · Brand kit" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navBrandKit" });
 }
 
 function CopyButton({ text, label }: { text: string; label?: string }) {

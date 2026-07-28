@@ -5,6 +5,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/voucher";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
@@ -206,8 +207,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Admin · Voucher ${loaderData.voucher.code}` : "Admin · Voucher" }];
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  return adminMeta(matches, {
+    key: "mtVoucher",
+    vars: { code: loaderData?.voucher.code ?? "" },
+  });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

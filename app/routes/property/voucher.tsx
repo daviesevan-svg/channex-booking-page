@@ -4,6 +4,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/voucher";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -70,8 +71,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }, { name: "robots", content: "noindex" }];
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  return pageMeta(matches, {
+    titleKey: "metaVoucher",
+    vars: { code: loaderData?.voucher.code ?? "" },
+    noindex: true,
+  });
 }
 
 const STATUS_STYLE: Record<string, string> = {

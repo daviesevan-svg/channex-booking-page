@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/room";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -82,8 +83,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirect("/admin/rooms");
 }
 
-export function meta() {
-  return [{ title: "Admin · Room" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtRoom" });
 }
 
 export default function AdminRoom({ loaderData, actionData }: Route.ComponentProps) {

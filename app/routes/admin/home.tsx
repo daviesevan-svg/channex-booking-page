@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/home";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_PROMO_PLACEHOLDER, langParam, pickLang, searchDefaults, type SearchContent } from "~/lib/content";
@@ -67,8 +68,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Home page" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navHome" });
 }
 
 

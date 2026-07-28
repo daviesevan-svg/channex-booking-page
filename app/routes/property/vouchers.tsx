@@ -3,6 +3,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/vouchers";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -35,8 +36,8 @@ export async function loader({ params }: Route.LoaderArgs) {
   return { products: out };
 }
 
-export function meta() {
-  return [{ title: "Gift vouchers" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaVouchers", descKey: "metaDescVouchers" });
 }
 
 export default function Vouchers({ loaderData, params }: Route.ComponentProps) {

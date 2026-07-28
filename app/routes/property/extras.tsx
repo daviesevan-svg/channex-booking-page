@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/extras";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { parseCart } from "~/lib/cart";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
@@ -88,8 +89,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Enhance your stay" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaExtras", noindex: true });
 }
 
 // ---- small UI pieces ----

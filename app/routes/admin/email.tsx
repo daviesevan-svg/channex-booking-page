@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/email";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { emailDef, langParam, pickLang } from "~/lib/content";
@@ -91,8 +92,22 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { ok: true as const, message: "Saved." };
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: `Admin · ${loaderData?.label ?? "Email"}` }];
+/** Same as the page editor: the sidebar name beats the def's English label. */
+const EMAIL_NAV_KEY: Record<string, string> = {
+  booking_confirmation: "navEmailBookingConfirmation",
+  host_notification: "navEmailHostNotification",
+  booking_cancellation: "navEmailBookingCancellation",
+  cancellation_notification: "navEmailCancellationNotification",
+  booking_failed: "navEmailBookingFailed",
+  review_request: "navEmailReviewRequest",
+};
+
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  const navKey = loaderData ? EMAIL_NAV_KEY[loaderData.template] : undefined;
+  return adminMeta(matches, {
+    key: navKey ?? "mtEmail",
+    text: navKey ? undefined : loaderData?.label,
+  });
 }
 
 export default function AdminEmail({ loaderData, actionData }: Route.ComponentProps) {

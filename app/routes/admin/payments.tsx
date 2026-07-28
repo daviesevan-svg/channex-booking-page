@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/payments";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
@@ -66,8 +67,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Payments" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navPayments" });
 }
 
 export default function AdminPayments({ loaderData, actionData }: Route.ComponentProps) {

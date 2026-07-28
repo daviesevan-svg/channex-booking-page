@@ -7,6 +7,7 @@ import { jsonLdHtml } from "~/lib/jsonld";
 import { z } from "zod";
 
 import type { Route } from "./+types/checkout";
+import { pageMeta } from "~/lib/page-meta";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
 import { holdGiftAmount, lookupVoucherGuarded, releaseGiftHold } from "~/lib/vouchers.server";
@@ -614,6 +615,10 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="font-semibold">{value}</span>
     </div>
   );
+}
+
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaCheckout", noindex: true });
 }
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {

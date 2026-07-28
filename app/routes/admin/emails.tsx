@@ -1,6 +1,7 @@
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/emails";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { EMAIL_TEMPLATES } from "~/lib/content";
@@ -34,8 +35,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true as const };
 }
 
-export function meta() {
-  return [{ title: "Admin · Emails" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navEmails" });
 }
 
 const toggleRow = "flex items-center justify-between gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3";

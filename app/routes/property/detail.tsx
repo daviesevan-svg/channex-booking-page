@@ -7,6 +7,7 @@ import { jsonLdHtml } from "~/lib/jsonld";
 import { Lightbox } from "~/components/lightbox";
 
 import type { Route } from "./+types/detail";
+import { pageMeta } from "~/lib/page-meta";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
@@ -189,6 +190,17 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
 }
 
 type DetailRate = RoomWithRates["ratePlans"][number];
+
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  const room = loaderData?.room;
+  return pageMeta(matches, {
+    titleKey: "metaDetail",
+    descKey: "metaDescDetail",
+    // The room's own copy beats the generic sentence when it has any.
+    descText: room?.description,
+    vars: { room: room?.title ?? "" },
+  });
+}
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;

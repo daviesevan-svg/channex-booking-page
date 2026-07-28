@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/rates";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -29,8 +30,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Admin · Rates" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navRates" });
 }
 
 export default function AdminRates({ loaderData }: Route.ComponentProps) {

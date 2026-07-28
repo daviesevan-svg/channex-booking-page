@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
+import { adminMeta } from "~/lib/page-meta";
 import { geocodeAddress } from "~/lib/google-maps-client";
 import { getConfig } from "~/lib/config.server";
 import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
@@ -109,8 +110,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Property details" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navPropertyDetails" });
 }
 
 export default function AdminProperty({ loaderData, actionData }: Route.ComponentProps) {

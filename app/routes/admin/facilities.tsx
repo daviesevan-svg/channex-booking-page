@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/facilities";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import {
@@ -95,8 +96,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true as const };
 }
 
-export function meta() {
-  return [{ title: "Admin · Facilities" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "facTitle" });
 }
 
 export default function AdminFacilities({ loaderData, actionData }: Route.ComponentProps) {

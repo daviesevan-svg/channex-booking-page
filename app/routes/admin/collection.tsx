@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/collection";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import {
@@ -202,8 +203,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirect(`/admin/collections/${res.collection.slug}`);
 }
 
-export function meta() {
-  return [{ title: "Admin · Edit collection" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtEditCollection" });
 }
 
 /** How much of the coming year a property has rooms for sale, and whether

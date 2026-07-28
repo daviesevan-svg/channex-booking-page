@@ -5,6 +5,7 @@ import { Form, Link, redirect, useNavigation, useSearchParams } from "react-rout
 import { useEffect, useState } from "react";
 
 import type { Route } from "./+types/vouchers";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { useAdminDateLocale, useAdminT, type AdminT } from "~/lib/admin-i18n";
@@ -364,8 +365,8 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/vouchers");
 }
 
-export function meta() {
-  return [{ title: "Admin · Vouchers" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navVouchers" });
 }
 
 function summary(p: VoucherProduct, currency: string, t: AdminT): string {

@@ -214,6 +214,19 @@ const EN: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} of the Google Vacation Rentals amenities you have set match a facility that is not ticked yet.",
   facAddPropertyFirst: "Add a property first to manage its facilities.",
+
+  // -- page titles (mt*) — the browser tab, in the admin's language --
+  mtAdmin: "Admin",
+  mtBooking: "Booking",
+  mtCollectionAnalytics: "Collection analytics",
+  mtEditCollection: "Edit collection",
+  mtSignIn: "Sign in",
+  mtOnboard: "Onboard from Channex",
+  mtRate: "Rate",
+  mtRoom: "Room",
+  mtEmail: "Email",
+  mtPage: "Page",
+  mtVoucher: "Voucher {code}",
   homeRemoveImage: "Remove custom image",
 
   // -- property page --
@@ -1771,6 +1784,19 @@ const DE: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} der von Ihnen gesetzten Google-Vacation-Rentals-Ausstattungsmerkmale entsprechen einer noch nicht angehakten Ausstattung.",
   facAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Ausstattung zu verwalten.",
+
+  // -- page titles (mt*) — the browser tab, in the admin's language --
+  mtAdmin: "Verwaltung",
+  mtBooking: "Buchung",
+  mtCollectionAnalytics: "Kollektions-Analysen",
+  mtEditCollection: "Kollektion bearbeiten",
+  mtSignIn: "Anmelden",
+  mtOnboard: "Von Channex übernehmen",
+  mtRate: "Rate",
+  mtRoom: "Zimmer",
+  mtEmail: "E-Mail",
+  mtPage: "Seite",
+  mtVoucher: "Gutschein {code}",
   homeRemoveImage: "Eigenes Bild entfernen",
 
   // -- property page --
@@ -3331,6 +3357,19 @@ const PT: Record<string, string> = {
   facCopyFromGoogleHint:
     "{n} das comodidades do Google Vacation Rentals que definiu correspondem a uma instalação ainda não assinalada.",
   facAddPropertyFirst: "Adicione primeiro uma propriedade para gerir as suas instalações.",
+
+  // -- page titles (mt*) — the browser tab, in the admin's language --
+  mtAdmin: "Administração",
+  mtBooking: "Reserva",
+  mtCollectionAnalytics: "Análises da coleção",
+  mtEditCollection: "Editar coleção",
+  mtSignIn: "Iniciar sessão",
+  mtOnboard: "Importar do Channex",
+  mtRate: "Tarifa",
+  mtRoom: "Quarto",
+  mtEmail: "E-mail",
+  mtPage: "Página",
+  mtVoucher: "Vale {code}",
   homeRemoveImage: "Remover imagem personalizada",
 
   // -- property page --

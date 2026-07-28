@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/rate";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -185,8 +186,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return isNew ? redirect(`/admin/rates/${rate.id}`) : { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Rate" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtRate" });
 }
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {

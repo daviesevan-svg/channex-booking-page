@@ -2,6 +2,7 @@ import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/confirmation";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { cartCoverage, parseCart } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
@@ -121,6 +122,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     childrenAge: occ.childrenAge,
     text: await getPageText(pid, "confirmation", lang),
   };
+}
+
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaConfirmation", noindex: true });
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {

@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/portal";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -21,8 +22,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Customer Portal" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navPortal" });
 }
 
 function Deadline({

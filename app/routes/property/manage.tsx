@@ -1,6 +1,7 @@
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage";
+import { pageMeta } from "~/lib/page-meta";
 import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import {
@@ -76,8 +77,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { notFound: true };
 }
 
-export function meta() {
-  return [{ title: "Manage your booking" }, { name: "robots", content: "noindex" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaManage", noindex: true });
 }
 
 export default function Manage({ loaderData, actionData, params }: Route.ComponentProps) {

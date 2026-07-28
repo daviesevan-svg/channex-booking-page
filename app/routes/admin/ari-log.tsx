@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Form, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/ari-log";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, rateChannexId } from "~/lib/catalog.server";
@@ -57,8 +58,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
-export function meta() {
-  return [{ title: "Admin · Change log" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navChangeLog" });
 }
 
 const FIELD_LABEL: Record<string, string> = {

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/connectivity";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
@@ -52,8 +53,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "That system can't be connected yet." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Connectivity" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navConnectivity" });
 }
 
 /** "Last update received" note. Formatted on the client so it's in the

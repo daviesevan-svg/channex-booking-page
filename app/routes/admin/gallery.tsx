@@ -2,6 +2,7 @@ import { Form, useNavigation } from "react-router";
 import { useState } from "react";
 
 import type { Route } from "./+types/gallery";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
@@ -76,8 +77,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true as const };
 }
 
-export function meta() {
-  return [{ title: "Admin · Gallery" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "galTitle" });
 }
 
 export default function AdminGallery({ loaderData, actionData }: Route.ComponentProps) {
