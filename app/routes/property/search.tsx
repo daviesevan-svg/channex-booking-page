@@ -10,6 +10,7 @@ import { useT } from "~/lib/i18n";
 import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
+import { getGalleryFor } from "~/lib/gallery.server";
 import { getBookingCutoff, getSearchContent } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
@@ -25,7 +26,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates, cutoff, reviews, hasVouchers] = await Promise.all([
+  const [content, closedDates, cutoff, reviews, hasVouchers, gallery] = await Promise.all([
     getSearchContent(pid, lang),
     getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
@@ -34,10 +35,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // Fail open too — the landing page must render even if D1 hiccups.
     getPublicReviews(pid).catch(() => ({ average: 0, count: 0, reviews: [] })),
     getActiveVoucherProducts(pid).then((v) => v.length > 0).catch(() => false),
+    getGalleryFor(pid, lang).catch(() => []), // fail open, like the rest
   ]);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
-  return { closedDates, content, earliestCheckin: earliestCheckinDate(cutoff, now), reviews, hasVouchers };
+  return {
+    closedDates,
+    content,
+    earliestCheckin: earliestCheckinDate(cutoff, now),
+    reviews,
+    hasVouchers,
+    gallery,
+  };
 }
 
 function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
@@ -50,7 +59,7 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates, content, earliestCheckin, reviews, hasVouchers } = loaderData;
+  const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -267,20 +276,46 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         </div>
       )}
 
-      {/* ambiance image */}
-      <div className="relative mt-12 h-[300px] overflow-hidden rounded-[18px]">
-        {heroPhoto ? (
-          <img src={heroPhoto} alt={hotelName} className="h-full w-full object-cover" />
-        ) : (
-          <div
-            className="h-full w-full"
-            style={{
-              background:
-                "repeating-linear-gradient(135deg,#efe7da,#efe7da 13px,#e7ddcc 13px,#e7ddcc 26px)",
-            }}
-          />
-        )}
-      </div>
+      {/* property gallery — falls back to the single ambiance image when the
+          hotel hasn't uploaded a gallery yet */}
+      {gallery.length > 0 ? (
+        <div className="mt-12">
+          <h2 className="mb-5 font-serif text-[24px] font-semibold">{tr.t("photoGallery")}</h2>
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+            {gallery.map((photo) => (
+              <figure key={photo.id}>
+                <div className="aspect-[4/3] overflow-hidden rounded-[14px] bg-surface-alt">
+                  <img
+                    src={photo.url}
+                    alt={photo.alt ?? hotelName}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                {photo.caption && (
+                  <figcaption className="mt-1.5 text-[12.5px] leading-[1.45] text-muted">
+                    {photo.caption}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="relative mt-12 h-[300px] overflow-hidden rounded-[18px]">
+          {heroPhoto ? (
+            <img src={heroPhoto} alt={hotelName} className="h-full w-full object-cover" />
+          ) : (
+            <div
+              className="h-full w-full"
+              style={{
+                background:
+                  "repeating-linear-gradient(135deg,#efe7da,#efe7da 13px,#e7ddcc 13px,#e7ddcc 26px)",
+              }}
+            />
+          )}
+        </div>
+      )}
     </main>
   );
 }
