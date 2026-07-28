@@ -455,8 +455,13 @@ export async function getCalendarAvailability(
   pid: string,
   from: string,
   to: string,
+  /** Limit to one room — the room page's calendar answers "when is THIS room
+   *  free?", which is a different question from the search calendar's "when is
+   *  anything free?". Same gate either way, so the two can't disagree. */
+  opts: { roomId?: string } = {},
 ): Promise<ClosedDates> {
-  const [rooms, rates, inv] = await Promise.all([getRooms(pid), getRates(pid), getInventory(pid, from, to)]);
+  const [allRooms, rates, inv] = await Promise.all([getRooms(pid), getRates(pid), getInventory(pid, from, to)]);
+  const rooms = opts.roomId ? allRooms.filter((r) => r.id === opts.roomId) : allRooms;
   const ratesByRoom = new Map<string, CatalogRate[]>();
   for (const r of rates) {
     if (!r.active) continue;

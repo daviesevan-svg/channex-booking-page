@@ -152,7 +152,7 @@ the base language, so a half-translated site renders complete rather than blank.
 |---|---|---|
 | `hero` | hero image, name | heading, intro, image, height, overlay, **booking widget on/off** |
 | `booking` | live catalog | heading, inline or card |
-| `rooms` | `CatalogRoom` | heading, which/how many, grid or carousel, show "from" price |
+| `rooms` | `CatalogRoom` | heading, intro, how many. Cards link to a room page |
 | `gallery` | **new** gallery | heading, grid or masonry |
 | `facilities` | **new** facilities | heading, columns |
 | `richText` | — | heading, body, image, image side |
@@ -197,6 +197,23 @@ out identical.
 ---
 
 ## 5. Routing
+
+### Room pages
+
+`/:channelId/room/:roomId` is the website's room page: photos, description,
+what's in the room, the rate names, and an always-on availability calendar for
+that room alone. It needs no dates, which is why it can't be the existing
+`rooms/:roomId` — that one is the funnel's dated rate-selection step and
+redirects home without dates.
+
+Picking a range on the room calendar hands off to `rooms/:roomId?checkin=…`, so
+the funnel is entered with dates already chosen. The calendar shares
+`CalendarMonths` with the search popover, so it can't drift from the booking
+gate; per-room availability comes from `getCalendarAvailability(…, { roomId })`,
+the same function the search calendar uses.
+
+The room page 404s when the website layer is off — there's no website for it to
+belong to.
 
 ### Phase 1 — shared domain, no routing change
 
