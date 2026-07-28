@@ -9,6 +9,15 @@
 import { getConfigKV } from "./config.server";
 import { DEFAULT_LANG } from "./content";
 import {
+  FOOTER_COPY_ID,
+  footerBlurbKey,
+  footerLinkKey,
+  normalizeFooter,
+  SOCIAL_LABEL,
+  type ResolvedFooter,
+  type SiteFooter,
+} from "./footer";
+import {
   DEFAULT_WEBSITE_SECTIONS,
   LEGACY_SECTIONS,
   normalizeSections,
@@ -34,7 +43,12 @@ async function read(pid: string): Promise<SiteConfig> {
   if (!raw) return empty();
   try {
     const parsed = JSON.parse(raw) as Partial<SiteConfig>;
-    return { pages: parsed.pages ?? [], copy: parsed.copy ?? {} };
+    return {
+      pages: parsed.pages ?? [],
+      copy: parsed.copy ?? {},
+      footer: parsed.footer,
+      footerCopy: parsed.footerCopy ?? {},
+    };
   } catch {
     return empty();
   }
@@ -126,4 +140,90 @@ export async function saveSiteCopy(
     next[k] = trimmed;
   }
   await write(pid, { ...config, copy: { ...config.copy, [lang]: next } });
+}
+
+// ---------------------------------------------------------------- footer
+
+/** Raw footer structure + one language's text, for the editor. */
+export async function getFooterRaw(
+  pid: string,
+  lang: string,
+): Promise<{ footer: SiteFooter; text: Record<string, string>; baseText: Record<string, string> }> {
+  const config = await read(pid);
+  return {
+    footer: normalizeFooter(config.footer),
+    text: config.footerCopy?.[lang] ?? {},
+    baseText: lang === DEFAULT_LANG ? {} : (config.footerCopy?.[DEFAULT_LANG] ?? {}),
+  };
+}
+
+/** Guest-facing: the footer with text resolved for `lang`, per field, falling
+ *  back to the default language so a half-translated footer still reads. */
+export async function getFooterFor(pid: string, lang: string): Promise<ResolvedFooter> {
+  const config = await read(pid);
+  const footer = normalizeFooter(config.footer);
+  const base = config.footerCopy?.[DEFAULT_LANG] ?? {};
+  const loc = config.footerCopy?.[lang] ?? {};
+  const pick = (key: string) => (loc[key] || base[key] || "").trim();
+
+  return {
+    showContact: footer.showContact !== false,
+    blurb: pick(footerBlurbKey()) || undefined,
+    social: Object.entries(footer.social ?? {}).map(([platform, url]) => ({
+      platform: platform as keyof typeof SOCIAL_LABEL,
+      label: SOCIAL_LABEL[platform as keyof typeof SOCIAL_LABEL],
+      url: url as string,
+    })),
+    // An unlabelled link would render as an empty anchor nobody can see, so a
+    // link with no label in any language is dropped rather than shown blank.
+    links: (footer.links ?? [])
+      .map((l) => ({ label: pick(footerLinkKey(l.id)), url: l.url }))
+      .filter((l) => l.label),
+  };
+}
+
+/** Save footer structure and ONE language's text together. */
+export async function saveFooter(
+  pid: string,
+  lang: string,
+  footer: SiteFooter,
+  text: Record<string, string>,
+): Promise<void> {
+  const config = await read(pid);
+  const next = normalizeFooter(footer);
+  const liveLinks = new Set((next.links ?? []).map((l) => l.id));
+  const LINK_PREFIX = `${FOOTER_COPY_ID}.link_`;
+  const isDeadLink = (key: string) =>
+    key.startsWith(LINK_PREFIX) && !liveLinks.has(key.slice(LINK_PREFIX.length));
+
+  const cleaned: Record<string, string> = {};
+  for (const [k, v] of Object.entries(text)) {
+    const trimmed = v.trim();
+    if (!trimmed || isDeadLink(k)) continue;
+    cleaned[k] = trimmed;
+  }
+
+  // The link list is shared across languages, so removing a link on one tab has
+  // to drop its label in EVERY language — otherwise the other languages keep an
+  // orphaned label for a link that no longer exists.
+  const copy: Record<string, Record<string, string>> = {};
+  for (const [l, map] of Object.entries(config.footerCopy ?? {})) {
+    if (l === lang) continue;
+    copy[l] = Object.fromEntries(Object.entries(map).filter(([k]) => !isDeadLink(k)));
+  }
+  copy[lang] = cleaned;
+
+  await write(pid, { ...config, footer: next, footerCopy: copy });
+}
+
+/** One KV read for everything the layout needs on every website page. */
+export async function getSiteChrome(
+  pid: string,
+  lang: string,
+): Promise<{ hasRoomsSection: boolean; footer: ResolvedFooter }> {
+  const [sections, footer] = await Promise.all([
+    getRenderSections(pid, lang, true),
+    getFooterFor(pid, lang),
+  ]);
+  return { hasRoomsSection: sections.some((s) => s.type === "rooms"), footer };
 }

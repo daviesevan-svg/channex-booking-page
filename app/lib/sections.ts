@@ -7,6 +7,8 @@
 // user-supplied is ever evaluated — which matters on a page that also takes
 // card details.
 
+import type { SiteFooter } from "./footer";
+
 export const SECTION_TYPES = [
   "hero",
   "highlights",
@@ -43,6 +45,14 @@ export interface SiteConfig {
    *  copy lives per language, so translating can never reorder or delete a
    *  section. */
   copy: Record<string, Record<string, string>>;
+  /** Footer structure. Chrome on every page, so it sits beside `pages` rather
+   *  than inside one. */
+  footer?: SiteFooter;
+  /** The footer's per-language text, in its OWN namespace. Saving a language of
+   *  `copy` replaces that whole language map (the sections editor renders every
+   *  section, so a replace is right there) — sharing one map would mean the
+   *  sections editor silently wiped the footer's text and vice versa. */
+  footerCopy?: Record<string, Record<string, string>>;
 }
 
 // ---- field definitions ----

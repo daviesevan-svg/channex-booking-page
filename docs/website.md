@@ -198,6 +198,21 @@ out identical.
 
 ## 5. Routing
 
+### Footer
+
+Chrome on every website page, so it lives beside `pages` in `site:{pid}` rather
+than inside one. Its per-language text sits in its OWN namespace
+(`footerCopy`), because saving a language of `copy` replaces that whole map —
+the sections editor renders every section so a replace is right there, but
+sharing one map would mean each editor silently wiped the other's text.
+
+Built-in links (rooms, vouchers, manage, terms, privacy) are derived live in the
+layout, not stored, so they can't go stale. Social platforms are a fixed
+allowlist and every URL is http(s)-only.
+
+Hidden on checkout and confirmation, matching the header nav — a footer full of
+exits is the same risk at the worst moment.
+
 ### Room pages
 
 `/:channelId/room/:roomId` is the website's room page: photos, description,
@@ -322,6 +337,7 @@ A new **Website** group in the nav, absorbing the existing Content group:
 Website
   General          opt in, address, custom domain          (built)
   Sections         home-page section editor                (built)
+  Footer           blurb, contact, social, extra links     (built)
   Gallery          property photos                         (built)
   Facilities       property facilities                     (built)
   Pages            extra pages beyond home — not built yet
