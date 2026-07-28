@@ -2,6 +2,7 @@ import { fmtDate } from "~/lib/dates";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/bookings";
+import { adminMeta } from "~/lib/page-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -16,8 +17,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { configured: true as const, bookings: await getBookings(propertyId) };
 }
 
-export function meta() {
-  return [{ title: "Admin · Bookings" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navBookings" });
 }
 
 export default function AdminBookings({ loaderData }: Route.ComponentProps) {

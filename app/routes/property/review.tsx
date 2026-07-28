@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/review";
+import { pageMeta } from "~/lib/page-meta";
 import { getBooking } from "~/lib/bookings.server";
 import { getReviewByBooking, upsertReview } from "~/lib/reviews.server";
 import { REVIEW_CATEGORIES, type ReviewCategory } from "~/lib/reviews";
@@ -67,8 +68,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { ok: true as const };
 }
 
-export function meta() {
-  return [{ title: "Review your stay" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaReview", noindex: true });
 }
 
 /** Accessible 1–5 star picker backed by a hidden input (no JS = keyboardable

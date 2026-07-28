@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/booking";
+import { adminMeta } from "~/lib/page-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
@@ -157,8 +158,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Booking" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtBooking" });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

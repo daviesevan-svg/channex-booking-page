@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/collections";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
 import {
@@ -124,8 +125,8 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/collections");
 }
 
-export function meta() {
-  return [{ title: "Admin · Collections" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navCollections" });
 }
 
 export default function AdminCollections({ loaderData, actionData }: Route.ComponentProps) {

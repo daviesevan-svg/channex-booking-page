@@ -1,6 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/team";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
@@ -52,8 +53,8 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/team");
 }
 
-export function meta() {
-  return [{ title: "Admin · Team" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navTeam" });
 }
 
 export default function AdminTeam({ loaderData }: Route.ComponentProps) {

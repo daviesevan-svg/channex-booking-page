@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/google-hotels";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
@@ -103,8 +104,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Google Hotels" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navGoogle" });
 }
 
 export default function AdminGoogleHotels({ loaderData, actionData }: Route.ComponentProps) {

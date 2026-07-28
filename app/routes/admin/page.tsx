@@ -1,6 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/page";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pageDef, pickLang } from "~/lib/content";
@@ -27,8 +28,22 @@ export async function action({ params, request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: `Admin · ${loaderData?.label ?? "Page"}` }];
+/** The def's `label` is English; the sidebar already has a translated name for
+ *  each of these, so prefer that and fall back to the label. */
+const PAGE_NAV_KEY: Record<string, string> = {
+  results: "navResults",
+  detail: "navRoomDetail",
+  extras: "navExtras",
+  checkout: "navCheckout",
+  confirmation: "navConfirmation",
+};
+
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  const navKey = loaderData ? PAGE_NAV_KEY[loaderData.page] : undefined;
+  return adminMeta(matches, {
+    key: navKey ?? "mtPage",
+    text: navKey ? undefined : loaderData?.label,
+  });
 }
 
 export default function AdminPage({ loaderData, actionData }: Route.ComponentProps) {

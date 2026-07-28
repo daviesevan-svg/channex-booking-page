@@ -6,6 +6,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/reviews";
+import { adminMeta } from "~/lib/page-meta";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { listReviews, setReviewResponse } from "~/lib/reviews.server";
@@ -42,8 +43,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Reviews" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navReviews" });
 }
 
 function StarRow({ n, size = 15 }: { n: number; size?: number }) {

@@ -1,6 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/login";
+import { adminMeta } from "~/lib/page-meta";
 import {
   canSignIn,
   createMagicToken,
@@ -31,8 +32,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { ok: true };
 }
 
-export function meta() {
-  return [{ title: "Admin · Sign in" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "mtSignIn" });
 }
 
 export default function Login({ actionData, loaderData }: Route.ComponentProps) {

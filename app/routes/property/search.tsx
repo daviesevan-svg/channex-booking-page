@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/search";
+import { pageMeta } from "~/lib/page-meta";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
@@ -69,6 +70,10 @@ function Diamond({ size = 9, className = "" }: { size?: number; className?: stri
       style={{ width: size, height: size, transform: "rotate(45deg)" }}
     />
   );
+}
+
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaHome", descKey: "metaDescHome" });
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {

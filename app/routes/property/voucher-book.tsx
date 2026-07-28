@@ -7,6 +7,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import { format, parseISO, addDays } from "date-fns";
 
 import type { Route } from "./+types/voucher-book";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
@@ -87,8 +88,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirect(`/${params.channelId}/voucher/${v.code}?booked=1`);
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Book — ${loaderData.title}` : "Book your stay" }, { name: "robots", content: "noindex" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaVoucherBook", noindex: true });
 }
 
 export default function VoucherBook({ loaderData, actionData, params }: Route.ComponentProps) {

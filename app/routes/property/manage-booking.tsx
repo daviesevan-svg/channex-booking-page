@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage-booking";
+import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking } from "~/lib/booking-finalize.server";
@@ -102,8 +103,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirect(`/${params.channelId}/manage/${params.id}`);
 }
 
-export function meta() {
-  return [{ title: "Your booking" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return pageMeta(matches, { titleKey: "metaBooking", noindex: true });
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {

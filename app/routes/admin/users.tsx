@@ -1,6 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/users";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import { getProperties } from "~/lib/properties.server";
@@ -65,8 +66,8 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/users");
 }
 
-export function meta() {
-  return [{ title: "Admin · Users" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navUsers" });
 }
 
 function fmtDate(ms: number, lang: string): string {

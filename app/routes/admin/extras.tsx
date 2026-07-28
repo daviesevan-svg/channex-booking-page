@@ -1,6 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/extras";
+import { adminMeta } from "~/lib/page-meta";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
@@ -178,8 +179,8 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/extras");
 }
 
-export function meta() {
-  return [{ title: "Admin · Extras" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navExtras" });
 }
 
 function priceSummary(e: Extra, currency: string, t: AdminT): string {

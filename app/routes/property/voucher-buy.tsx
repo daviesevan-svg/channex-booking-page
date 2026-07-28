@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/voucher-buy";
+import { pageMeta } from "~/lib/page-meta";
 import { Lightbox } from "~/components/lightbox";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
@@ -209,8 +210,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   throw redirect(sessionUrl);
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData?.product.title ?? "Voucher" }];
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  return pageMeta(matches, {
+    titleKey: "metaVoucherBuy",
+    vars: { product: loaderData?.product.title ?? "" },
+  });
 }
 
 /** The rotated-square brand motif, used as eyebrow accent and list bullet. */

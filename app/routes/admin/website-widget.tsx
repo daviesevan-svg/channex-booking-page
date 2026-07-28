@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website-widget";
+import { adminMeta } from "~/lib/page-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
@@ -57,8 +58,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { applied: true as const };
 }
 
-export function meta() {
-  return [{ title: "Admin · Website widget" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navWidget" });
 }
 
 export default function WebsiteWidget({ loaderData, actionData }: Route.ComponentProps) {

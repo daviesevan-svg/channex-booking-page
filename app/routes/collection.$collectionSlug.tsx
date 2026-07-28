@@ -15,6 +15,7 @@ import {
   langFromRequest,
 } from "~/lib/content";
 import { makeTranslator } from "~/lib/i18n";
+import { truncate } from "~/lib/page-meta";
 import { formatMoney } from "~/lib/money";
 import {
   childrenAgeParam,
@@ -256,8 +257,21 @@ export async function action({ params, request }: Route.ActionArgs) {
   return new Response(null, { status: 204 });
 }
 
-export function meta() {
-  return [{ title: "Choose where you'll stay" }];
+export function meta({ loaderData }: Route.MetaArgs) {
+  // A public destination page, so it gets a real title: the collection's own
+  // name rather than the generic line it used to carry. This route has its own
+  // `lang` (there's no property layout above it), so it translates directly.
+  if (!loaderData) return [{ title: "Roompanda" }];
+  const tr = makeTranslator(loaderData.lang);
+  const vars = { name: loaderData.destination || loaderData.name };
+  return [
+    { title: tr.t("metaCollection", vars) },
+    {
+      name: "description",
+      // The curator's own intro beats our boilerplate when they've written one.
+      content: truncate(loaderData.intro || tr.t("metaDescCollection", vars)),
+    },
+  ];
 }
 
 function Diamond({ size = 8 }: { size?: number }) {

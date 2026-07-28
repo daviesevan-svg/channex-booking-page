@@ -1,6 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/analytics";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSearchAnalytics } from "~/lib/search-analytics.server";
@@ -27,8 +28,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { configured: true as const, days, data };
 }
 
-export function meta() {
-  return [{ title: "Admin · Search analytics" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navAnalytics" });
 }
 
 const countryName = (code: string, unknown: string) =>

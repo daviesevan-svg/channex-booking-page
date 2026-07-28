@@ -8,6 +8,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage-voucher";
+import { pageMeta } from "~/lib/page-meta";
 import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
@@ -154,8 +155,12 @@ export async function action({ params, request }: Route.ActionArgs) {
   return null;
 }
 
-export function meta({ loaderData }: Route.MetaArgs) {
-  return [{ title: loaderData ? `Voucher ${loaderData.voucher.code}` : "Voucher" }, { name: "robots", content: "noindex" }];
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  return pageMeta(matches, {
+    titleKey: "metaVoucher",
+    vars: { code: loaderData?.voucher.code ?? "" },
+    noindex: true,
+  });
 }
 
 const STATUS_STYLE: Record<string, string> = {

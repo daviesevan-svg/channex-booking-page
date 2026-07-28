@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/webhooks";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { addWebhook, isSafeWebhookUrl, listWebhooks, removeWebhook } from "~/lib/webhooks.server";
@@ -39,8 +40,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · Webhooks" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navWebhooks" });
 }
 
 export default function AdminWebhooks({ loaderData, actionData }: Route.ComponentProps) {

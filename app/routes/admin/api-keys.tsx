@@ -1,6 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/api-keys";
+import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { issueApiKey, listApiKeys, revokeApiKey, type ApiKeyMode } from "~/lib/api-auth.server";
@@ -37,8 +38,8 @@ export async function action({ request }: Route.ActionArgs) {
   return { error: "Unknown action." };
 }
 
-export function meta() {
-  return [{ title: "Admin · API keys" }];
+export function meta({ matches }: Route.MetaArgs) {
+  return adminMeta(matches, { key: "navApiKeys" });
 }
 
 export default function AdminApiKeys({ loaderData, actionData }: Route.ComponentProps) {
