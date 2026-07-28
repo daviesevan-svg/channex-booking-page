@@ -63,6 +63,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lang,
     languages: enabledLanguages(settings),
     websiteRooms: chrome?.hasRoomsSection ?? false,
+    // Extra pages the hotel put in the menu, and every extra page's slug — the
+    // second is what tells the layout it's ON a website page, so the browsing
+    // nav stays visible even on a page deliberately kept out of the menu.
+    navPages: chrome?.navPages ?? [],
+    pageSlugs: chrome?.pageSlugs ?? [],
     footer: chrome?.footer ?? null,
     contact: {
       // Full postal address, not just the street line — same fix as the map and
@@ -143,7 +148,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, footer, contact, termsUrl, privacyUrl } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, contact, termsUrl, privacyUrl } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -171,7 +176,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const { pathname, hash } = useLocation();
   const here = pathname.replace(/\/$/, "");
   const isHome = here === base;
-  const isBrowsing = isHome || here.startsWith(`${base}/room/`);
+  // An extra website page is somewhere a guest looks around, like a room page —
+  // so the browsing nav belongs there too.
+  const onWebsitePage = pageSlugs.some((s) => here === `${base}/${s}`);
+  const isBrowsing = isHome || onWebsitePage || here.startsWith(`${base}/room/`);
 
   // React Router doesn't scroll to a #fragment on navigation, so the "Rooms"
   // link would change the URL and sit still. Sections carry scroll-mt for the
@@ -251,6 +259,12 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 {tr.t("roomsNav")}
               </Link>
             )}
+            {isBrowsing &&
+              navPages.map((p) => (
+                <Link key={p.slug} to={`${base}/${p.slug}`} className="hover:text-accent">
+                  {p.label}
+                </Link>
+              ))}
             {isBrowsing && hasVouchers && (
               <Link to={`${base}/vouchers`} className="hover:text-accent">
                 {tr.t("vouchersTitle")}
@@ -282,6 +296,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           hotelName={hotelName}
           links={[
             ...(websiteRooms ? [{ label: tr.t("roomsNav"), to: `${base}#rooms` }] : []),
+            ...navPages.map((p) => ({ label: p.label, to: `${base}/${p.slug}` })),
             ...(hasVouchers ? [{ label: tr.t("vouchersTitle"), to: `${base}/vouchers` }] : []),
             { label: tr.t("manageBooking"), to: `${base}/manage` },
             ...(termsUrl ? [{ label: tr.t("termsLink"), to: termsUrl, external: true }] : []),

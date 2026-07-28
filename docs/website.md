@@ -287,9 +287,42 @@ page. Extra pages are a dynamic sibling of the existing static children:
 ```
 
 React Router ranks static above dynamic, so `/spilman/rooms` still hits
-`results.tsx`. Page slugs must be validated on save against the funnel names —
-otherwise a hotel creates a page called "rooms" that can never be reached.
-Mirror the existing `RESERVED_SLUGS` approach.
+`results.tsx`. Page slugs are validated on save against the funnel names
+(`RESERVED_PAGE_SLUGS` in `pages.ts`, mirroring `RESERVED_SLUGS`) — otherwise a
+hotel creates a page called "rooms" that can never be reached.
+
+#### Identity, and why copy is scoped
+
+A page's identity is its `id`, never its slug: renaming "about" to "our-story"
+has to keep the copy already written in eight languages, and a slug is exactly
+the thing a hotel changes its mind about. `page_{id}.title` /
+`page_{id}.metaDescription` hold the per-language page text, in the same shared
+copy map as the sections'.
+
+Two consequences, both load-bearing:
+
+- **Section ids carry the page.** Built-ins are named after their type so copy
+  survives a remove-and-re-add, but the copy map is global — a bare `richText`
+  on two pages would be one shared heading. Home keeps the bare type (that's
+  what's already stored); every other page gets `${type}_${pageId}`.
+- **Saving copy is scoped to the page that was edited.** Replacing a whole
+  language map — which is what the single-page version did — would wipe every
+  other page's text the moment a hotel saved the home page. `saveSiteCopy` now
+  replaces only the keys the edited page owns, and drops keys owned by no live
+  page at all, so deleting a page or a section doesn't leave copy behind.
+
+Deleting a page purges its copy in **every** language, not just the one on
+screen.
+
+Extra pages take the same sections as home minus the two marked `homeOnly`: the
+hero (it owns the search form's state) and highlights (its copy lives in
+Website → Home, so a second one would just repeat the same three lines). The
+page's title renders as the `<h1>`; sections carry their own top margin.
+
+Both the home page and every extra page render through **one** `SectionList` and
+load their data through **one** `loadSectionData`, which loads only what the
+sections present actually need. With the website off, that same switch renders
+the legacy booking-page layout — so there is no second code path to drift.
 
 ### Phase 2 — custom domain
 
@@ -382,8 +415,8 @@ Website
   Footer           blurb, contact, social, extra links     (built)
   Gallery          property photos                         (built)
   Facilities       property facilities                     (built)
-  Pages            extra pages beyond home — not built yet
-  Navigation       menu + footer
+  Pages            extra pages beyond home                 (built)
+  Navigation       per-page "show in menu" — a full editor isn't built
   Theme & style    extends the existing theme controls
   Booking screens  today's home / results / detail / checkout editors
 ```
@@ -408,7 +441,7 @@ roughly doubles the build and is the easiest thing to add later.
 |---|---|---|
 | **1** ✅ | Gallery, facilities, per-page SEO, `<title>` fix | Useful on its own — better cards, better structured data — even if the website never ships |
 | **2** ✅ | Section engine + 8 sections, home page only, opt-in | The real v1. A one-page hotel site |
-| **3** | Multi-page, nav, footer, templates | A website product |
+| **3** | Multi-page, nav, footer, templates | A website product — pages, nav and footer done; **templates still to do** |
 | **4** | Custom domains | Makes it sellable |
 | **5** | Remaining sections, live preview | Polish |
 

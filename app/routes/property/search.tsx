@@ -11,35 +11,13 @@ import { useT } from "~/lib/i18n";
 import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
-import { formatAddress } from "~/lib/address";
-import { getConfig } from "~/lib/config.server";
-import { getGalleryFor } from "~/lib/gallery.server";
-import {
-  getBookingCutoff,
-  getFacilitiesExtra,
-  getOverrides,
-  getSearchContent,
-  getSettings,
-} from "~/lib/overrides.server";
-import { normalizeFacilities } from "~/lib/content";
+import { getBookingCutoff, getSearchContent, getSettings } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
-import { getCalendarAvailability, getRooms } from "~/lib/catalog.server";
+import { getCalendarAvailability } from "~/lib/catalog.server";
 import { getRenderSections } from "~/lib/site.server";
-import { numberSetting, settingOf } from "~/lib/sections";
-import {
-  FacilitiesSection,
-  GallerySection,
-  HighlightsSection,
-  ReviewsSection,
-  RichTextSection,
-  RoomsSection,
-  VouchersSection,
-  sectionHeading,
-} from "~/components/sections";
-import { MapSection } from "~/components/map-section";
-import { ContactSection } from "~/components/contact-section";
-import { getPublicReviews } from "~/lib/reviews.server";
-import { getActiveVoucherProducts } from "~/lib/vouchers.server";
+import { loadSectionData } from "~/lib/section-data.server";
+import { settingOf } from "~/lib/sections";
+import { SectionList } from "~/components/section-list";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
@@ -50,88 +28,34 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
-  const [content, closedDates, cutoff, reviews, hasVouchers, gallery, settings, facilitiesExtra] =
-    await Promise.all([
+  const [content, closedDates, cutoff, settings] = await Promise.all([
     getSearchContent(pid, lang),
     getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
       () => null, // fail open: a calendar data hiccup shouldn't break the page
     ),
     getBookingCutoff(pid),
-    // Fail open too — the landing page must render even if D1 hiccups.
-    getPublicReviews(pid).catch(() => ({ average: 0, count: 0, reviews: [] })),
-    getActiveVoucherProducts(pid).then((v) => v.length > 0).catch(() => false),
-    getGalleryFor(pid, lang).catch(() => []), // fail open, like the rest
     getSettings(pid),
-    getFacilitiesExtra(pid, lang).catch(() => []),
   ]);
   // With the website layer off this returns the booking page's long-standing
   // section order, so that page is exactly what it always was.
   const sections = await getRenderSections(pid, lang, settings.websiteEnabled ?? false);
-  // Coordinates and the Maps key only travel when a map section exists. The key
-  // is a referrer-restricted browser key, but there's no reason to put it on
-  // pages that can't use it.
-  const lat = parseFloat(settings.latitude ?? "");
-  const lng = parseFloat(settings.longitude ?? "");
-  const hasMap = sections.some((x) => x.type === "map") && Number.isFinite(lat) && Number.isFinite(lng);
-  const wantsContact = sections.some((x) => x.type === "contact");
-
-  // The street line is per-language free text; city / region / postcode /
-  // country are structured on settings. Both sections need the whole thing —
-  // showing the street line alone was the bug.
-  const wantsAddress = wantsContact || hasMap;
-  const addr = wantsAddress ? await getOverrides(pid, lang) : null;
-  const fullAddress = wantsAddress
-    ? formatAddress({
-        address: addr?.address,
-        city: settings.addressCity,
-        region: settings.addressRegion,
-        postalCode: settings.addressPostalCode,
-        country: settings.addressCountry,
-      })
-    : "";
-
-  const map = hasMap
-    ? { lat, lng, mapKey: getConfig().googleMapKey ?? "", address: fullAddress || undefined }
-    : null;
-  const contact = {
-    address: fullAddress || undefined,
-    phone: addr?.phone,
-    email: addr?.email,
-    checkinTime: settings.checkinTime,
-    checkoutTime: settings.checkoutTime,
-    // Mirrors the action's own choice of recipient, so the form is only offered
-    // when a submission would actually reach someone.
-    canReceive: Boolean(
-      settings.hostNotifyEmail || settings.emailReplyTo || addr?.email,
-    ),
-  };
-  // Only pay for the room list when a section actually renders it.
-  const rooms = sections.some((x) => x.type === "rooms")
-    ? (await getRooms(pid).catch(() => [])).map((r) => ({
-        id: r.id,
-        title: r.title,
-        description: r.description,
-        photo: r.images[0],
-        maxGuests: r.maxGuests,
-      }))
-    : [];
+  // Everything the sections need, loaded only for the sections present. The hero
+  // image is already in hand, so it's passed in rather than read twice.
+  const data = await loadSectionData(
+    pid,
+    lang,
+    sections,
+    settings,
+    content.heroImage || undefined,
+  );
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
   return {
     closedDates,
     content,
     earliestCheckin: earliestCheckinDate(cutoff, now),
-    reviews,
-    hasVouchers,
-    gallery,
-    // Normalized here so an unknown key can never reach the page and render as
-    // a raw slug; free-text lines are shown as typed.
-    facilities: normalizeFacilities(settings.facilities ?? []),
-    facilitiesExtra,
-    map,
-    contact,
     sections,
-    rooms,
+    data,
   };
 }
 
@@ -140,8 +64,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
-  const { closedDates, content, earliestCheckin, reviews, hasVouchers, gallery } = loaderData;
-  const { facilities, facilitiesExtra, sections, rooms, map, contact } = loaderData;
+  const { closedDates, content, earliestCheckin, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -198,7 +121,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const heroSection = sections.find((s) => s.type === "hero");
   const heroSplit =
     heroSection && settingOf(heroSection, "layout", "split") === "split"
-      ? heroPhoto || gallery[0]?.url
+      ? heroPhoto || data.gallery[0]?.url
       : undefined;
 
   function searchRooms() {
@@ -338,102 +261,17 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     </div>
   );
 
-  function renderSection(section: (typeof sections)[number]) {
-    switch (section.type) {
-      case "hero":
-        return hero;
-      case "highlights":
-        return <HighlightsSection key={section.id} highlights={highlights} />;
-      case "rooms":
-        return (
-          <RoomsSection
-            key={section.id}
-            section={section}
-            tr={tr}
-            rooms={rooms}
-            channelId={params.channelId}
-          />
-        );
-      case "gallery":
-        return (
-          <GallerySection
-            key={section.id}
-            section={section}
-            tr={tr}
-            gallery={gallery}
-            hotelName={hotelName}
-            fallbackPhoto={heroPhoto}
-          />
-        );
-      case "facilities":
-        return (
-          <FacilitiesSection
-            key={section.id}
-            section={section}
-            tr={tr}
-            facilities={facilities}
-            facilitiesExtra={facilitiesExtra}
-          />
-        );
-      case "reviews":
-        return (
-          <ReviewsSection
-            key={section.id}
-            section={section}
-            tr={tr}
-            reviews={reviews}
-            hotelName={hotelName}
-          />
-        );
-      case "vouchers":
-        return (
-          <VouchersSection
-            key={section.id}
-            section={section}
-            tr={tr}
-            hasVouchers={hasVouchers}
-            onOpen={() => navigate(`/${params.channelId}/vouchers`)}
-          />
-        );
-      case "map":
-        // No coordinates, no map — a location section pointing at 0,0 in the
-        // Atlantic is worse than no location section.
-        return map ? (
-          <MapSection
-            key={section.id}
-            heading={sectionHeading(section, tr)}
-            directions={section.text?.directions}
-            address={map.address}
-            lat={map.lat}
-            lng={map.lng}
-            zoom={numberSetting(section, "zoom", 15)}
-            mapKey={map.mapKey}
-            hotelName={hotelName}
-            tr={tr}
-          />
-        ) : null;
-      case "contact":
-        return (
-          <ContactSection
-            key={section.id}
-            heading={sectionHeading(section, tr)}
-            intro={section.text?.intro}
-            details={contact}
-            // Nothing to deliver to: show the details and drop the form rather
-            // than accepting messages that go nowhere.
-            showForm={settingOf(section, "showForm", true) && contact.canReceive}
-            channelId={params.channelId}
-            tr={tr}
-          />
-        );
-      case "richText":
-        return <RichTextSection key={section.id} section={section} />;
-    }
-  }
-
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
-      {sections.map(renderSection)}
+      <SectionList
+        sections={sections}
+        data={data}
+        tr={tr}
+        channelId={params.channelId}
+        hotelName={hotelName}
+        hero={hero}
+        highlights={highlights}
+      />
     </main>
   );
 }

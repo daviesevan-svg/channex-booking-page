@@ -5,8 +5,9 @@ import type { Route } from "./+types/website-sections";
 import { adminMeta } from "~/lib/page-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
+import { langParam, pickLang } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
+import { HOME_PAGE_ID, PAGE_TEXT_FIELDS, pageTextKey, sectionIdFor } from "~/lib/pages";
 import {
   addableTypes,
   SECTION_DEFS,
@@ -14,12 +15,7 @@ import {
   type SectionType,
   type SiteSection,
 } from "~/lib/sections";
-import {
-  getHomeSections,
-  getSiteCopyRaw,
-  saveHomeSections,
-  saveSiteCopy,
-} from "~/lib/site.server";
+import { getPageEditor, listPages, savePageSections, saveSiteCopy } from "~/lib/site.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -29,20 +25,26 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const [sections, text, baseText, settings] = await Promise.all([
-    getHomeSections(propertyId),
-    getSiteCopyRaw(propertyId, lang),
-    lang === DEFAULT_LANG
-      ? Promise.resolve({} as Record<string, string>)
-      : getSiteCopyRaw(propertyId, DEFAULT_LANG),
+  // ?page=<id> edits an extra page; no parameter means the home page, which is
+  // what this screen has always been.
+  const pageId = new URL(request.url).searchParams.get("page") || HOME_PAGE_ID;
+  const [editor, settings, pages] = await Promise.all([
+    getPageEditor(propertyId, pageId, lang),
     getSettings(propertyId),
+    listPages(propertyId, lang),
   ]);
+  // A deleted page's bookmark must not silently edit the home page instead.
+  if (!editor) throw new Response("Page not found", { status: 404 });
+
   return {
     configured: true as const,
     lang,
-    sections,
-    text,
-    baseText,
+    pageId,
+    isHome: editor.isHome,
+    pageTitle: pages.find((p) => p.id === pageId)?.title ?? "",
+    sections: editor.page.sections,
+    text: editor.text,
+    baseText: editor.baseText,
     websiteEnabled: settings.websiteEnabled ?? false,
   };
 }
@@ -54,6 +56,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const form = await request.formData();
   const lang = pickLang(String(form.get("lang") ?? ""));
+  const pageId = String(form.get("pageId") ?? "") || HOME_PAGE_ID;
 
   // Order and identity travel together in one field per section, so the
   // ordering can't drift out of step with a parallel list of types.
@@ -86,7 +89,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
     sections.push({ id, type: t, hidden: form.get(`h:${id}`) === "on", settings });
   }
-  await saveHomeSections(propertyId, sections);
+  await savePageSections(propertyId, pageId, sections);
 
   // Save copy AFTER the structure, so saveSiteCopy prunes against the layout
   // that was just written rather than the one it replaced.
@@ -96,7 +99,7 @@ export async function action({ request }: Route.ActionArgs) {
     const [, id, field] = k.split(":");
     if (id && field) text[`${id}.${field}`] = String(v);
   }
-  await saveSiteCopy(propertyId, lang, text);
+  await saveSiteCopy(propertyId, lang, pageId, text);
   return { ok: true as const };
 }
 
@@ -118,13 +121,17 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, sections, text, baseText, websiteEnabled } = loaderData;
+  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled } = loaderData;
   return (
     <Editor
-      // Remount on a saved change so the uncontrolled inputs pick up the new
-      // order and any pruned copy, rather than keeping stale DOM state.
-      key={`${lang}:${sections.map((s) => s.id).join(",")}`}
+      // Remount on a saved change (or a switch to another page) so the
+      // uncontrolled inputs pick up the new order and any pruned copy, rather
+      // than keeping stale DOM state.
+      key={`${pageId}:${lang}:${sections.map((s) => s.id).join(",")}`}
       lang={lang}
+      pageId={pageId}
+      isHome={isHome}
+      pageTitle={pageTitle}
       initial={sections}
       text={text}
       baseText={baseText}
@@ -138,6 +145,9 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
 
 function Editor({
   lang,
+  pageId,
+  isHome,
+  pageTitle,
   initial,
   text,
   baseText,
@@ -147,6 +157,9 @@ function Editor({
   t,
 }: {
   lang: string;
+  pageId: string;
+  isHome: boolean;
+  pageTitle: string;
   initial: SiteSection[];
   text: Record<string, string>;
   baseText: Record<string, string>;
@@ -168,27 +181,41 @@ function Editor({
   const remove = (id: string) => setList(list.filter((s) => s.id !== id));
   const add = () => {
     if (!adding) return;
-    const def = SECTION_DEFS[adding];
-    // Built-ins keep their type as the id so copy written before a removal
-    // comes back with it; a repeat gets a fresh id.
-    const id = def.repeatable && list.some((s) => s.type === adding) ? crypto.randomUUID() : adding;
+    // Built-ins keep their type in the id so copy written before a removal comes
+    // back with it; the id also carries the page, because the copy map is shared
+    // and an About heading must not land on the home page's.
+    const id = sectionIdFor(
+      adding,
+      pageId,
+      list.map((s) => s.id),
+    );
     setList([...list, { id, type: adding, hidden: false, settings: {} }]);
     setAdding("");
   };
 
-  const canAdd = addableTypes(list);
+  const canAdd = addableTypes(list, isHome);
 
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("secTitle")}</h1>
+        <h1 className="font-serif text-[26px] font-semibold">
+          {isHome ? t("secTitle") : pageTitle || t("wpUntitled")}
+        </h1>
         {saved && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
             {t("saved")}
           </span>
         )}
       </div>
-      <p className="mb-6 text-[14px] text-muted">{t("secIntro")}</p>
+      <p className="mb-6 text-[14px] text-muted">{isHome ? t("secIntro") : t("wpSectionsIntro")}</p>
+
+      {!isHome && (
+        <p className="mb-5 text-[13px]">
+          <Link to="/admin/website/pages" className="font-semibold text-accent hover:underline">
+            ← {t("navPages")}
+          </Link>
+        </p>
+      )}
 
       {!websiteEnabled && (
         <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12.5px] leading-[1.55] text-[#7a6636]">
@@ -201,6 +228,37 @@ function Editor({
 
       <Form method="post" className="flex flex-col gap-4">
         <input type="hidden" name="lang" value={lang} />
+        <input type="hidden" name="pageId" value={pageId} />
+
+        {/* The page's own name and search-result description. Per language, so
+            they live here beside the rest of the translated copy rather than on
+            the Pages screen, which has no language tabs. */}
+        {!isHome && (
+          <div className="rounded-[14px] border border-line bg-surface p-5">
+            <div className="mb-3 font-serif text-[18px] font-semibold">{t("wpPageDetails")}</div>
+            <div className="flex flex-col gap-3">
+              {PAGE_TEXT_FIELDS.map((field) => {
+                const tKey = pageTextKey(pageId, field);
+                const common = {
+                  name: `t:page_${pageId}:${field}`,
+                  defaultValue: text[tKey] ?? "",
+                  placeholder: baseText[tKey] ?? "",
+                  className: FIELD_INPUT,
+                };
+                return (
+                  <label key={field} className="block text-[13px] font-semibold text-secondary">
+                    {t(`wpField_${field}`)}
+                    {field === "metaDescription" ? (
+                      <textarea rows={2} maxLength={200} {...common} />
+                    ) : (
+                      <input maxLength={80} {...common} />
+                    )}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {list.map((section, i) => {
           const def = SECTION_DEFS[section.type];

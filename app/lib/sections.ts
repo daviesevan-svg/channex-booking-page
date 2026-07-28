@@ -34,10 +34,22 @@ export interface SiteSection {
   settings?: Record<string, string | number | boolean>;
 }
 
+/** A section with its localized text merged in for one language. Lives here
+ *  rather than beside the loader so client components can name the type without
+ *  importing a `*.server` module (an unused one still breaks the client build). */
+export interface ResolvedSection extends SiteSection {
+  text: Record<string, string>;
+}
+
 export interface SitePage {
-  /** "" is the home page. Only the home page exists today; the array shape is
-   *  here so extra pages are additive rather than a migration. */
+  /** Stable identity, so renaming the slug keeps the copy written under it.
+   *  The home page's id is always "home" (see `HOME_PAGE_ID`). */
+  id: string;
+  /** "" is the home page; otherwise the last URL segment ("about", "dining"). */
   slug: string;
+  /** Show this page in the header nav and the footer's link list. A page can be
+   *  off the menu and still be linked to by hand. */
+  nav?: boolean;
   sections: SiteSection[];
 }
 
@@ -87,6 +99,13 @@ export interface SectionDef {
   /** Can't be removed. The hero carries the search form — a home page without
    *  it is a booking engine you can't book from. */
   required?: boolean;
+  /**
+   * Home page only. Two reasons, both real: the hero owns the search form's
+   * state, and both of these read their copy from Website → Home, which is a
+   * single set of fields — a second copy on another page would show the same
+   * words, which is not what "add a section" looks like it does.
+   */
+  homeOnly?: boolean;
 }
 
 const HEADING: SectionFieldDef = { key: "heading", kind: "text", localized: true };
@@ -100,12 +119,14 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     // one place to edit them.
     fields: [{ key: "layout", kind: "select", options: ["split", "wide"], default: "split" }],
     required: true,
+    homeOnly: true,
   },
   highlights: {
     type: "highlights",
     labelKey: "secHighlights",
     // Also from Website → Home — the three short selling points.
     fields: [],
+    homeOnly: true,
   },
   rooms: {
     type: "rooms",
@@ -226,20 +247,28 @@ export function numberSetting(section: SiteSection, key: string, fallback: numbe
   return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-/** Drop anything a hand-edited or out-of-date KV value could contain: unknown
- *  types, duplicate ids, and duplicates of a section that can't repeat. */
-export function normalizeSections(input: SiteSection[]): SiteSection[] {
+/**
+ * Drop anything a hand-edited or out-of-date KV value could contain: unknown
+ * types, duplicate ids, and duplicates of a section that can't repeat.
+ *
+ * `home` is false for an extra page, which changes two things: home-only
+ * sections are dropped rather than rendered with the home page's copy, and the
+ * hero isn't force-inserted — an About page doesn't need a search form.
+ */
+export function normalizeSections(input: SiteSection[], home = true): SiteSection[] {
   const seenIds = new Set<string>();
   const seenTypes = new Set<SectionType>();
   const out: SiteSection[] = [];
   for (const s of input) {
     if (!s || !SECTION_TYPES.includes(s.type)) continue;
+    if (!home && SECTION_DEFS[s.type].homeOnly) continue;
     if (!s.id || seenIds.has(s.id)) continue;
     if (!SECTION_DEFS[s.type].repeatable && seenTypes.has(s.type)) continue;
     seenIds.add(s.id);
     seenTypes.add(s.type);
     out.push({ id: s.id, type: s.type, hidden: s.hidden === true, settings: s.settings ?? {} });
   }
+  if (!home) return out;
   // A required section can never be dropped or hidden, however the list arrived
   // — a saved layout without the hero would be a home page you can't book from.
   for (const [type, def] of Object.entries(SECTION_DEFS) as [SectionType, SectionDef][]) {
@@ -252,7 +281,15 @@ export function normalizeSections(input: SiteSection[]): SiteSection[] {
 }
 
 /** Which types can still be added to a page. */
-export function addableTypes(sections: SiteSection[]): SectionType[] {
+export function addableTypes(sections: SiteSection[], home = true): SectionType[] {
   const used = new Set(sections.map((s) => s.type));
-  return SECTION_TYPES.filter((t) => SECTION_DEFS[t].repeatable || !used.has(t));
+  return SECTION_TYPES.filter((t) => {
+    const def = SECTION_DEFS[t];
+    if (!home && def.homeOnly) return false;
+    return def.repeatable || !used.has(t);
+  });
 }
+
+/** What an extra page starts with: one block of text the hotel then writes.
+ *  Anything else is a deliberate addition rather than something to delete. */
+export const DEFAULT_PAGE_SECTIONS: SectionType[] = ["richText"];
