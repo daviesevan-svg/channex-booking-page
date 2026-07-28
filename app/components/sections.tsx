@@ -267,7 +267,7 @@ export function RoomsSection({
   const intro = section.text?.intro?.trim();
 
   return (
-    <div className="mt-12">
+    <div className="mt-12 scroll-mt-24" id="rooms">
       <h2 className="mb-2 font-serif text-[24px] font-semibold">{sectionHeading(section, tr)}</h2>
       {intro && (
         <p className="mb-5 max-w-[620px] whitespace-pre-line text-[15px] leading-[1.6] text-muted">
@@ -280,7 +280,11 @@ export function RoomsSection({
             key={room.id}
             className="flex flex-col overflow-hidden rounded-[16px] border border-line bg-surface"
           >
-            <div className="aspect-[3/2] bg-surface-alt">
+            {/* flex-none + overflow-hidden are load-bearing: this box is a flex
+                item, so its default `min-height: auto` lets a tall photo push it
+                past the 3/2 ratio. Landscape photos looked fine and portrait
+                ones didn't, which is why the cards came out uneven. */}
+            <div className="aspect-[3/2] w-full flex-none overflow-hidden bg-surface-alt">
               {room.photo ? (
                 <img
                   src={room.photo}

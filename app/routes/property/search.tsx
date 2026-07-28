@@ -125,10 +125,14 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     if (occupancy.childrenAge.length) sp.set("childrenAge", occupancy.childrenAge.join(","));
     else sp.delete("childrenAge");
     const qs = sp.toString();
+    // Keep any #fragment: this runs on mount, and dropping it would wipe the
+    // anchor the "Rooms" nav link just navigated to — so a reload or a copied
+    // URL wouldn't come back to the section.
+    const hash = window.location.hash;
     window.history.replaceState(
       window.history.state,
       "",
-      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+      `${window.location.pathname}${qs ? `?${qs}` : ""}${hash}`,
     );
   }, [dates.checkinIso, dates.checkoutIso, occupancy]);
   const navigation = useNavigation();
