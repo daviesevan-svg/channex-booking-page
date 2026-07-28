@@ -14,6 +14,7 @@ const COPY_KEYS = [
   "settings",
   "overrides",
   "content",
+  "gallery",
   "email_content",
   "catalog_rooms",
   "catalog_rates",

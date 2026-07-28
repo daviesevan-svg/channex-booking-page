@@ -92,7 +92,8 @@ const EN: Record<string, string> = {
   // -- chrome: nav --
   navOperations: "Operations",
   navSettings: "Settings",
-  navPages: "Pages",
+  navWebsite: "Website",
+  navGallery: "Gallery",
   navEmails: "Emails",
   navInventory: "Inventory",
   navAnalytics: "Analytics",
@@ -181,6 +182,22 @@ const EN: Record<string, string> = {
   homeFeatureImage: "Feature image",
   homeFeatureImageHint: "The large image near the bottom of the landing page. Shared across all languages.",
   homeImageFormats: "JPG or PNG, up to 8MB.",
+
+  // -- gallery (gal*) --
+  galTitle: "Gallery",
+  galIntro:
+    "Photos of the property itself — shown to guests below the booking form, and the set a website page draws on. Room photos are managed on each room.",
+  galAdd: "Add photos",
+  galAddHint: "{used} of {max} used. You can choose several files at once.",
+  galUpload: "Upload",
+  galEmpty: "No photos yet. Upload a few to get started.",
+  galAlt: "Alt text",
+  galAltPlaceholder: "Describe the photo for screen readers",
+  galCaption: "Caption",
+  galMoveUp: "Move up",
+  galMoveDown: "Move down",
+  galDelete: "Delete",
+  galAddPropertyFirst: "Add a property first to manage its gallery.",
   homeRemoveImage: "Remove custom image",
 
   // -- property page --
@@ -1615,7 +1632,8 @@ const DE: Record<string, string> = {
   // -- chrome: nav --
   navOperations: "Betrieb",
   navSettings: "Einstellungen",
-  navPages: "Seiten",
+  navWebsite: "Website",
+  navGallery: "Galerie",
   navEmails: "E-Mails",
   navInventory: "Verfügbarkeit",
   navAnalytics: "Analysen",
@@ -1704,6 +1722,22 @@ const DE: Record<string, string> = {
   homeFeatureImage: "Großes Bild",
   homeFeatureImageHint: "Das große Bild im unteren Bereich der Startseite. Gilt für alle Sprachen.",
   homeImageFormats: "JPG oder PNG, bis zu 8 MB.",
+
+  // -- gallery (gal*) --
+  galTitle: "Galerie",
+  galIntro:
+    "Fotos der Unterkunft selbst — Gästen unter dem Buchungsformular angezeigt und Grundlage für eine Website-Seite. Zimmerfotos werden beim jeweiligen Zimmer verwaltet.",
+  galAdd: "Fotos hinzufügen",
+  galAddHint: "{used} von {max} belegt. Sie können mehrere Dateien auf einmal auswählen.",
+  galUpload: "Hochladen",
+  galEmpty: "Noch keine Fotos. Laden Sie ein paar hoch, um zu beginnen.",
+  galAlt: "Alternativtext",
+  galAltPlaceholder: "Beschreiben Sie das Foto für Screenreader",
+  galCaption: "Bildunterschrift",
+  galMoveUp: "Nach oben",
+  galMoveDown: "Nach unten",
+  galDelete: "Löschen",
+  galAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Galerie zu verwalten.",
   homeRemoveImage: "Eigenes Bild entfernen",
 
   // -- property page --
@@ -3142,7 +3176,8 @@ const PT: Record<string, string> = {
   // -- chrome: nav --
   navOperations: "Operações",
   navSettings: "Configurações",
-  navPages: "Páginas",
+  navWebsite: "Site",
+  navGallery: "Galeria",
   navEmails: "E-mails",
   navInventory: "Inventário",
   navAnalytics: "Análises",
@@ -3230,6 +3265,22 @@ const PT: Record<string, string> = {
   homeFeatureImage: "Imagem de destaque",
   homeFeatureImageHint: "A imagem grande junto ao fim da página de entrada. Partilhada por todos os idiomas.",
   homeImageFormats: "JPG ou PNG, até 8 MB.",
+
+  // -- gallery (gal*) --
+  galTitle: "Galeria",
+  galIntro:
+    "Fotos da propriedade em si — mostradas aos hóspedes abaixo do formulário de reserva e base para uma página do site. As fotos dos quartos são geridas em cada quarto.",
+  galAdd: "Adicionar fotos",
+  galAddHint: "{used} de {max} utilizadas. Pode escolher vários ficheiros de uma vez.",
+  galUpload: "Carregar",
+  galEmpty: "Ainda não há fotos. Carregue algumas para começar.",
+  galAlt: "Texto alternativo",
+  galAltPlaceholder: "Descreva a foto para leitores de ecrã",
+  galCaption: "Legenda",
+  galMoveUp: "Mover para cima",
+  galMoveDown: "Mover para baixo",
+  galDelete: "Eliminar",
+  galAddPropertyFirst: "Adicione primeiro uma propriedade para gerir a sua galeria.",
   homeRemoveImage: "Remover imagem personalizada",
 
   // -- property page --

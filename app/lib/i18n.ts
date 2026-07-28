@@ -379,6 +379,7 @@ const EN: Dict = {
   reviewThanksTitle: "Thank you!",
   reviewThanksBody: "Your review has been submitted. You can revisit this page to update it.",
   guestReviews: "Guest reviews",
+  photoGallery: "Photo gallery",
   hotelResponse: "Response from {hotel}",
   reviewStarsRequired: "Please choose an overall rating.",
 };
@@ -689,6 +690,7 @@ const FR: Dict = {
   reviewThanksTitle: "Merci !",
   reviewThanksBody: "Votre avis a bien été envoyé. Vous pouvez revenir sur cette page pour le modifier.",
   guestReviews: "Avis des voyageurs",
+  photoGallery: "Galerie photos",
   hotelResponse: "Réponse de {hotel}",
   reviewStarsRequired: "Veuillez choisir une note globale.",
 };
@@ -999,6 +1001,7 @@ const DE: Dict = {
   reviewThanksTitle: "Vielen Dank!",
   reviewThanksBody: "Ihre Bewertung wurde übermittelt. Sie können sie über diese Seite jederzeit aktualisieren.",
   guestReviews: "Gästebewertungen",
+  photoGallery: "Fotogalerie",
   hotelResponse: "Antwort von {hotel}",
   reviewStarsRequired: "Bitte wählen Sie eine Gesamtbewertung.",
 };
@@ -1309,6 +1312,7 @@ const ES: Dict = {
   reviewThanksTitle: "¡Gracias!",
   reviewThanksBody: "Su opinión se ha enviado. Puede volver a esta página para actualizarla.",
   guestReviews: "Opiniones de los huéspedes",
+  photoGallery: "Galería de fotos",
   hotelResponse: "Respuesta de {hotel}",
   reviewStarsRequired: "Elija una valoración general.",
 };
@@ -1619,6 +1623,7 @@ const IT: Dict = {
   reviewThanksTitle: "Grazie!",
   reviewThanksBody: "La tua recensione è stata inviata. Puoi tornare su questa pagina per aggiornarla.",
   guestReviews: "Recensioni degli ospiti",
+  photoGallery: "Galleria fotografica",
   hotelResponse: "Risposta di {hotel}",
   reviewStarsRequired: "Scegli una valutazione complessiva.",
 };
@@ -1987,6 +1992,7 @@ const PT: Dict = {
   reviewThanksTitle: "Obrigado!",
   reviewThanksBody: "A sua avaliação foi enviada. Pode voltar a esta página para a atualizar.",
   guestReviews: "Avaliações dos hóspedes",
+  photoGallery: "Galeria de fotos",
   hotelResponse: "Resposta de {hotel}",
   reviewStarsRequired: "Escolha uma avaliação geral.",
 };
@@ -2297,6 +2303,7 @@ const NL: Dict = {
   reviewThanksTitle: "Bedankt!",
   reviewThanksBody: "Uw beoordeling is verzonden. U kunt deze pagina opnieuw bezoeken om deze bij te werken.",
   guestReviews: "Gastbeoordelingen",
+  photoGallery: "Fotogalerij",
   hotelResponse: "Reactie van {hotel}",
   reviewStarsRequired: "Kies een algemene beoordeling.",
 };
@@ -2664,6 +2671,7 @@ const EL: Dict = {
   reviewThanksTitle: "Ευχαριστούμε!",
   reviewThanksBody: "Η κριτική σας υποβλήθηκε. Μπορείτε να επιστρέψετε σε αυτή τη σελίδα για να την ενημερώσετε.",
   guestReviews: "Κριτικές επισκεπτών",
+  photoGallery: "Συλλογή φωτογραφιών",
   hotelResponse: "Απάντηση από το {hotel}",
   reviewStarsRequired: "Επιλέξτε συνολική βαθμολογία.",
 };

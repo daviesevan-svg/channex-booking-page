@@ -9,7 +9,18 @@
 // Built in loaders only (this is a .server module); the route component renders
 // the returned plain object inside a <script type="application/ld+json">.
 import { getConfig } from "./config.server";
+import { getGalleryFor } from "./gallery.server";
 import { getOverrides, getSettings } from "./overrides.server";
+
+/** schema.org wants absolute URLs; our image paths are site-relative (/images/…). */
+function absoluteUrl(path: string): string {
+  if (/^https?:\/\//.test(path)) return path;
+  return `${getConfig().appUrl.replace(/\/+$/, "")}${path.startsWith("/") ? "" : "/"}${path}`;
+}
+
+/** Cap on hotel-level photos in the payload — enough for Google, small enough
+ *  that the inline <script> stays a sensible size on every page. */
+const MAX_JSONLD_IMAGES = 12;
 
 // Industry-standard fallbacks when a property hasn't set its own times. The
 // Offer requires both as date-times.
@@ -53,11 +64,24 @@ interface HotelInfo {
   currency: string;
   checkinTime: string;
   checkoutTime: string;
+  /** Absolute URLs — the property gallery, else the cover photo. */
+  images: string[];
 }
 
 async function hotelInfo(pid: string, lang: string): Promise<HotelInfo> {
-  const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid, lang)]);
+  const [settings, overrides, gallery] = await Promise.all([
+    getSettings(pid),
+    getOverrides(pid, lang),
+    // Fail open: a missing gallery must never cost us the rest of the payload.
+    getGalleryFor(pid, lang).catch(() => []),
+  ]);
+  const photos = gallery.length
+    ? gallery.slice(0, MAX_JSONLD_IMAGES).map((g) => g.url)
+    : settings.coverImage
+      ? [settings.coverImage]
+      : [];
   return {
+    images: photos.map(absoluteUrl),
     identifier: pid,
     name: overrides.hotelName || "Hotel",
     address: overrides.address,
@@ -87,6 +111,7 @@ function baseHotel(info: HotelInfo): Record<string, unknown> {
   if (info.postalCode) addr.postalCode = info.postalCode;
   if (info.country) addr.addressCountry = info.country;
   if (Object.keys(addr).length > 1) hotel.address = addr;
+  if (info.images.length) hotel.image = info.images;
   return hotel;
 }
 
@@ -133,11 +158,7 @@ export async function catalogHotelJsonLd(
         identifier: r.roomId,
       };
       // Product recommends an image — emit the room's first photo, absolutised.
-      if (r.image) {
-        room.image = /^https?:\/\//.test(r.image)
-          ? r.image
-          : `${getConfig().appUrl.replace(/\/+$/, "")}${r.image.startsWith("/") ? "" : "/"}${r.image}`;
-      }
+      if (r.image) room.image = absoluteUrl(r.image);
       if (r.occupancy && r.occupancy > 0) {
         room.occupancy = { "@type": "QuantitativeValue", value: r.occupancy };
       }

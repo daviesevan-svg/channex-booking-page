@@ -30,6 +30,10 @@ export function uploadPropertyCoverImage(propertyId: string, file: File): Promis
   return uploadImage(`cover/${propertyId}`, file);
 }
 
+export function uploadGalleryImage(propertyId: string, file: File): Promise<string> {
+  return uploadImage(`gallery/${propertyId}`, file);
+}
+
 export function uploadPropertyLogo(propertyId: string, file: File): Promise<string> {
   return uploadImage(`logo/${propertyId}`, file);
 }
