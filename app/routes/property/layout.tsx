@@ -250,7 +250,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
               </>
             )}
           </Link>
-          <div className="flex items-center gap-5 text-sm text-muted">
+          {/* Wraps, and closes up its gaps on narrow screens: a hotel's own pages
+              are in here too, so the link count isn't fixed — with four items it
+              ran past the right edge of a phone and scrolled the whole page
+              sideways. */}
+          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-sm text-muted sm:gap-x-5">
             {languages.length > 1 && (
               <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
             )}

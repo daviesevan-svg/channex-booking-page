@@ -142,7 +142,7 @@ export function SectionList({
               />
             );
           case "richText":
-            return <RichTextSection key={section.id} section={section} />;
+            return <RichTextSection key={section.id} section={section} hotelName={hotelName} />;
         }
       })}
     </>

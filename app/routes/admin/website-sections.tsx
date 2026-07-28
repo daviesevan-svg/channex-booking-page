@@ -10,13 +10,23 @@ import { getSettings } from "~/lib/overrides.server";
 import { HOME_PAGE_ID, PAGE_TEXT_FIELDS, pageTextKey, sectionIdFor } from "~/lib/pages";
 import {
   addableTypes,
+  imageAltKey,
+  MAX_SECTION_IMAGES,
   SECTION_DEFS,
   SECTION_TYPES,
+  type SectionImage,
   type SectionType,
   type SiteSection,
 } from "~/lib/sections";
-import { getPageEditor, listPages, savePageSections, saveSiteCopy } from "~/lib/site.server";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { uploadSectionImage } from "~/lib/images.server";
+import {
+  addSectionImages,
+  getPageEditor,
+  listPages,
+  savePageSections,
+  saveSiteCopy,
+} from "~/lib/site.server";
+import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -87,7 +97,18 @@ export async function action({ request }: Route.ActionArgs) {
         if (!f.options || f.options.includes(s)) settings[f.key] = s;
       }
     }
-    sections.push({ id, type: t, hidden: form.get(`h:${id}`) === "on", settings });
+    // Images travel with the structure, in the order the hidden fields appear —
+    // so removing or moving one is just a save, exactly like a section.
+    const images: SectionImage[] = form
+      .getAll(`i:${id}`)
+      .map(String)
+      .map((raw) => {
+        const at = raw.indexOf("|");
+        return at < 0 ? null : { id: raw.slice(0, at), url: raw.slice(at + 1) };
+      })
+      .filter((x): x is SectionImage => Boolean(x?.id && x.url));
+
+    sections.push({ id, type: t, hidden: form.get(`h:${id}`) === "on", settings, images });
   }
   await savePageSections(propertyId, pageId, sections);
 
@@ -100,6 +121,28 @@ export async function action({ request }: Route.ActionArgs) {
     if (id && field) text[`${id}.${field}`] = String(v);
   }
   await saveSiteCopy(propertyId, lang, pageId, text);
+
+  // An upload comes from a button inside this same form, so everything above has
+  // just been persisted and nothing typed is lost — which is why the new files
+  // are appended after the save rather than instead of it.
+  const uploadFor = String(form.get("uploadFor") ?? "");
+  if (uploadFor) {
+    const files = form
+      .getAll(`file:${uploadFor}`)
+      .filter((f): f is File => f instanceof File && f.size > 0);
+    if (!files.length) return { error: "Choose an image first." };
+    try {
+      const urls: string[] = [];
+      for (const file of files) urls.push(await uploadSectionImage(propertyId, file));
+      // One batch, one write — addSectionImages is read-modify-write.
+      const { skipped } = await addSectionImages(propertyId, pageId, uploadFor, urls);
+      if (skipped) {
+        return { error: `Only ${MAX_SECTION_IMAGES} images per section — ${skipped} not added.` };
+      }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Image upload failed." };
+    }
+  }
   return { ok: true as const };
 }
 
@@ -122,12 +165,17 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
   }
 
   const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled } = loaderData;
+  const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
     <Editor
       // Remount on a saved change (or a switch to another page) so the
       // uncontrolled inputs pick up the new order and any pruned copy, rather
-      // than keeping stale DOM state.
-      key={`${pageId}:${lang}:${sections.map((s) => s.id).join(",")}`}
+      // than keeping stale DOM state. Image ids are part of this: an upload
+      // changes nothing else, so without them a new photo wouldn't appear until
+      // the editor was reloaded by hand.
+      key={`${pageId}:${lang}:${sections
+        .map((s) => [s.id, ...(s.images ?? []).map((i) => i.id)].join("~"))
+        .join(",")}`}
       lang={lang}
       pageId={pageId}
       isHome={isHome}
@@ -138,6 +186,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       websiteEnabled={websiteEnabled}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
+      error={error}
       t={t}
     />
   );
@@ -154,6 +203,7 @@ function Editor({
   websiteEnabled,
   saving,
   saved,
+  error,
   t,
 }: {
   lang: string;
@@ -166,6 +216,7 @@ function Editor({
   websiteEnabled: boolean;
   saving: boolean;
   saved: boolean;
+  error: string | null;
   t: ReturnType<typeof useAdminT>;
 }) {
   const [list, setList] = useState(initial);
@@ -179,6 +230,13 @@ function Editor({
     setList(next);
   };
   const remove = (id: string) => setList(list.filter((s) => s.id !== id));
+
+  /** Images live on the section, so dropping or moving one is local state that
+   *  the next save persists — no separate request, and no half-applied delete. */
+  const patchImages = (sectionId: string, fn: (imgs: SectionImage[]) => SectionImage[]) =>
+    setList((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, images: fn(s.images ?? []) } : s)),
+    );
   const add = () => {
     if (!adding) return;
     // Built-ins keep their type in the id so copy written before a removal comes
@@ -226,7 +284,15 @@ function Editor({
         </p>
       )}
 
-      <Form method="post" className="flex flex-col gap-4">
+      {error && (
+        <p className="mb-5 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
+          {error}
+        </p>
+      )}
+
+      {/* multipart because the text-block sections upload their own pictures.
+          Every other field is unaffected — the action reads them the same way. */}
+      <Form method="post" encType="multipart/form-data" className="flex flex-col gap-4">
         <input type="hidden" name="lang" value={lang} />
         <input type="hidden" name="pageId" value={pageId} />
 
@@ -318,6 +384,12 @@ function Editor({
                   {def.fields.map((f) => {
                     const tKey = `${section.id}.${f.key}`;
                     const label = t(`secField_${f.key}`);
+                    // Only one of these two ever applies, so only one is shown:
+                    // which side the photos go on is meaningless without photos,
+                    // and centring the copy is meaningless beside them.
+                    const hasImages = Boolean(section.images?.length);
+                    if (f.key === "imageSide" && !hasImages) return null;
+                    if (f.key === "align" && hasImages) return null;
                     if (f.localized) {
                       const common = {
                         name: `t:${section.id}:${f.key}`,
@@ -382,6 +454,27 @@ function Editor({
                   })}
                 </div>
               )}
+
+              {def.images && (
+                <SectionImages
+                  section={section}
+                  text={text}
+                  baseText={baseText}
+                  saving={saving}
+                  t={t}
+                  onMove={(from, to) =>
+                    patchImages(section.id, (imgs) => {
+                      if (to < 0 || to >= imgs.length) return imgs;
+                      const next = [...imgs];
+                      [next[from], next[to]] = [next[to], next[from]];
+                      return next;
+                    })
+                  }
+                  onRemove={(imageId) =>
+                    patchImages(section.id, (imgs) => imgs.filter((x) => x.id !== imageId))
+                  }
+                />
+              )}
             </div>
           );
         })}
@@ -422,6 +515,121 @@ function Editor({
           </button>
         </div>
       </Form>
+    </div>
+  );
+}
+
+/**
+ * One text block's picture column: upload, reorder, remove, and alt text per
+ * language.
+ *
+ * The images are submitted as hidden fields in display order, so they're part of
+ * the ordinary section save — reordering and removing need no request of their
+ * own, and can't leave a photo half-deleted. Only the upload needs the server,
+ * and it submits this whole form, so nothing typed is lost when you click it.
+ */
+function SectionImages({
+  section,
+  text,
+  baseText,
+  saving,
+  t,
+  onMove,
+  onRemove,
+}: {
+  section: SiteSection;
+  text: Record<string, string>;
+  baseText: Record<string, string>;
+  saving: boolean;
+  t: ReturnType<typeof useAdminT>;
+  onMove: (from: number, to: number) => void;
+  onRemove: (imageId: string) => void;
+}) {
+  const images = section.images ?? [];
+  const full = images.length >= MAX_SECTION_IMAGES;
+
+  return (
+    <div className="mt-4 border-t border-line-alt pt-4">
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-[13px] font-semibold text-secondary">{t("secImages")}</span>
+        <span className="text-[12px] text-muted-2">
+          {t("secImagesHint", { n: MAX_SECTION_IMAGES })}
+        </span>
+      </div>
+
+      {images.length > 0 && (
+        <div className="mb-3 flex flex-col gap-2.5">
+          {images.map((img, n) => {
+            const key = `${section.id}.${imageAltKey(img.id)}`;
+            return (
+              <div
+                key={img.id}
+                className="flex items-center gap-3 rounded-[10px] border border-line bg-surface-alt p-2.5"
+              >
+                <input type="hidden" name={`i:${section.id}`} value={`${img.id}|${img.url}`} />
+                <img
+                  src={img.url}
+                  alt=""
+                  className="h-14 w-20 flex-none rounded-[6px] border border-line object-cover"
+                />
+                <label className="min-w-0 flex-1 text-[12px] font-semibold text-muted-2">
+                  {t("secField_imageAlt")}
+                  <input
+                    name={`t:${section.id}:${imageAltKey(img.id)}`}
+                    defaultValue={text[key] ?? ""}
+                    placeholder={baseText[key] ?? t("secImageAltPlaceholder")}
+                    maxLength={200}
+                    className={`${FIELD_INPUT} !mt-1`}
+                  />
+                </label>
+                <div className="flex flex-none items-center gap-1.5">
+                  <Move
+                    onClick={() => onMove(n, n - 1)}
+                    disabled={n === 0}
+                    label="↑"
+                    title={t("secMoveUp")}
+                  />
+                  <Move
+                    onClick={() => onMove(n, n + 1)}
+                    disabled={n === images.length - 1}
+                    label="↓"
+                    title={t("secMoveDown")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRemove(img.id)}
+                    title={t("secRemove")}
+                    aria-label={t("secRemove")}
+                    className="cursor-pointer rounded-[8px] border border-line px-3 py-1.5 text-[13px] font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {full ? (
+        <p className="text-[12px] text-muted-2">{t("secImagesFull", { n: MAX_SECTION_IMAGES })}</p>
+      ) : (
+        <div className="flex flex-wrap items-center gap-3">
+          <FilePicker name={`file:${section.id}`} accept="image/*" multiple />
+          {/* `uploadFor` tells the action which section the files belong to, and
+              only the clicked button carries it — every other section's picker
+              stays inert. */}
+          <button
+            type="submit"
+            name="uploadFor"
+            value={section.id}
+            disabled={saving}
+            className="cursor-pointer rounded-[9px] border border-accent px-4 py-2 text-[13px] font-semibold text-accent hover:bg-accent-soft disabled:opacity-50"
+          >
+            {saving ? t("saving") : t("secImagesUpload")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
