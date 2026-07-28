@@ -326,17 +326,60 @@ export function RoomsSection({
 
 // ----------------------------------------------------------------- rich text
 
-export function RichTextSection({ section }: Pick<Common, "section">) {
+export function RichTextSection({
+  section,
+  hotelName,
+}: Pick<Common, "section"> & { hotelName?: string }) {
   const heading = section.text?.heading?.trim();
   const body = section.text?.body?.trim();
-  if (!heading && !body) return null;
-  const centered = (section.settings?.align ?? "left") === "center";
-  return (
-    <div className={`mt-12 max-w-[720px] ${centered ? "mx-auto text-center" : ""}`}>
+  const images = section.images ?? [];
+  if (!heading && !body && !images.length) return null;
+
+  const copy = (
+    <div>
       {heading && <h2 className="mb-3 font-serif text-[24px] font-semibold">{heading}</h2>}
       {body && (
         <p className="whitespace-pre-line text-[16px] leading-[1.7] text-secondary">{body}</p>
       )}
+    </div>
+  );
+
+  // Text-only keeps the old single narrow column exactly as it was, centring
+  // included — a section a hotel already wrote must not move.
+  if (!images.length) {
+    const centered = (section.settings?.align ?? "left") === "center";
+    return (
+      <div className={`mt-12 max-w-[720px] ${centered ? "mx-auto text-center" : ""}`}>{copy}</div>
+    );
+  }
+
+  // With pictures it becomes two columns, so the copy no longer runs the width
+  // of the page on its own. `align` deliberately doesn't apply here.
+  // "Photos on the left" is a two-column choice. Stacked on a phone the copy
+  // always comes first — arriving on "Parking Info" and meeting a photo before
+  // the heading tells you nothing — so the order is swapped in CSS at lg, not by
+  // reordering the DOM.
+  const left = section.settings?.imageSide === "photosLeft";
+  const stack = (
+    <div className={`flex flex-col gap-4 ${left ? "lg:order-first" : ""}`}>
+      {images.map((img) => (
+        <img
+          key={img.id}
+          src={img.url}
+          // Hotels skip alt text; the heading is a far better fallback than the
+          // filename, and it's what a screen reader would want to hear here.
+          alt={section.text?.[`alt_${img.id}`] || heading || hotelName || ""}
+          loading="lazy"
+          className="w-full rounded-[14px] border border-line bg-surface-alt"
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="mt-12 grid grid-cols-1 items-start gap-10 lg:grid-cols-2">
+      {copy}
+      {stack}
     </div>
   );
 }

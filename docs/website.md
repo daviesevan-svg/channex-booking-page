@@ -155,7 +155,7 @@ the base language, so a half-translated site renders complete rather than blank.
 | `rooms` | `CatalogRoom` | heading, intro, how many. Cards link to a room page |
 | `gallery` | **new** gallery | heading, grid or masonry |
 | `facilities` | **new** facilities | heading, columns |
-| `richText` | — | heading, body, image, image side |
+| `richText` | — | heading, body, **its own pictures** + which side, align (text-only) |
 | `reviews` | `reviews.server` | heading, min rating, count |
 | `offers` | promotions | heading |
 | `extras` | extras catalog | heading |
@@ -323,6 +323,35 @@ Both the home page and every extra page render through **one** `SectionList` and
 load their data through **one** `loadSectionData`, which loads only what the
 sections present actually need. With the website off, that same switch renders
 the legacy booking-page layout — so there is no second code path to drift.
+
+#### Section pictures
+
+A text block takes its own uploaded photos in a column beside the copy — the
+shape hotels use for directions, parking, and "how to find the spa". Distinct
+from the gallery, which is the property-wide set.
+
+`SiteSection.images` is `{ id, url }[]`: structural, so it is **not** per
+language and it travels with the section. Only alt text is translated, under
+`${sectionId}.alt_${imageId}` — the same `${owner}.${field}` shape as every other
+localized field, so it resolves and gets pruned by the existing code with no
+per-image special case. `pageCopyKeys` must list those keys: one missing from
+that list looks like garbage to `saveSiteCopy` and is dropped on the next save.
+
+Reordering and removing are ordinary section saves (the images are submitted as
+hidden fields in display order), so only the upload needs the server. The upload
+button lives inside the whole editor form, and the action saves everything
+*before* appending the files — so clicking it never costs you what you just
+typed. Blank alt text falls back to the section heading, which is a better
+answer than a filename and what a screen reader actually wants.
+
+`imageSide` is stored as `photosRight` / `photosLeft`, not `right` / `left`:
+option labels are keyed `secOpt_${value}` and `secOpt_left` already means
+left-*aligned* text. On a phone the columns stack and the copy always comes
+first — swapped with `lg:order-first`, not by reordering the DOM — because
+meeting a photo before the heading tells a guest nothing.
+
+Only one of `align` and `imageSide` is ever shown, since only one ever applies.
+A text block with no pictures renders exactly as it did before this existed.
 
 ### Phase 2 — custom domain
 

@@ -5,7 +5,7 @@
 // has to keep the copy that's already written in eight languages, and a slug is
 // exactly the thing a hotel changes its mind about.
 
-import { SECTION_DEFS, type SectionType, type SiteSection } from "./sections";
+import { imageAltKey, SECTION_DEFS, type SectionType, type SiteSection } from "./sections";
 
 /** The home page. Stored with slug "" and this fixed id, so the copy written
  *  before pages existed keeps resolving. */
@@ -106,12 +106,19 @@ export function pageTextKey(pageId: string, field: PageTextField): string {
   return `page_${pageId}.${field}`;
 }
 
-/** Every copy key a page owns — its own text plus its sections' localized
- *  fields. The save path uses this to know which keys it may replace. */
+/**
+ * Every copy key a page owns — its own text, its sections' localized fields, and
+ * one alt text per section image. The save path uses this both to know which
+ * keys it may replace and to spot keys owned by nothing.
+ *
+ * The image alt keys are not optional here: a key missing from this list looks
+ * like garbage to `saveSiteCopy` and gets dropped on the next save.
+ */
 export function pageCopyKeys(page: { id: string; sections: SiteSection[] }): string[] {
   const keys: string[] = PAGE_TEXT_FIELDS.map((f) => pageTextKey(page.id, f));
   for (const s of page.sections) {
     for (const f of SECDEF_FIELDS(s.type)) keys.push(`${s.id}.${f}`);
+    for (const img of s.images ?? []) keys.push(`${s.id}.${imageAltKey(img.id)}`);
   }
   return keys;
 }

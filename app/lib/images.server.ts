@@ -34,6 +34,13 @@ export function uploadGalleryImage(propertyId: string, file: File): Promise<stri
   return uploadImage(`gallery/${propertyId}`, file);
 }
 
+/** A picture belonging to one website section (a text block's photo column).
+ *  Not keyed by section id — the section it belongs to is recorded in the page
+ *  config, and a re-ordered or re-created section shouldn't orphan the file. */
+export function uploadSectionImage(propertyId: string, file: File): Promise<string> {
+  return uploadImage(`sections/${propertyId}`, file);
+}
+
 export function uploadPropertyLogo(propertyId: string, file: File): Promise<string> {
   return uploadImage(`logo/${propertyId}`, file);
 }

@@ -32,7 +32,9 @@ import {
 import {
   DEFAULT_PAGE_SECTIONS,
   DEFAULT_WEBSITE_SECTIONS,
+  imageAltKey,
   LEGACY_SECTIONS,
+  MAX_SECTION_IMAGES,
   normalizeSections,
   SECTION_DEFS,
   type ResolvedSection,
@@ -125,11 +127,16 @@ function resolveText(
   const loc = config.copy[lang] ?? {};
   return sections.map((s) => {
     const text: Record<string, string> = {};
+    const pick = (field: string) => {
+      const v = loc[`${s.id}.${field}`] || base[`${s.id}.${field}`];
+      if (v) text[field] = v;
+    };
     for (const f of SECTION_DEFS[s.type].fields) {
-      if (!f.localized) continue;
-      const v = loc[`${s.id}.${f.key}`] || base[`${s.id}.${f.key}`];
-      if (v) text[f.key] = v;
+      if (f.localized) pick(f.key);
     }
+    // One alt text per image, under the same `${owner}.${field}` keys as the
+    // rest, so the renderer reads it out of the same `text` map.
+    for (const img of s.images ?? []) pick(imageAltKey(img.id));
     return { ...s, text };
   });
 }
@@ -353,6 +360,41 @@ export async function savePageSections(
       p.id === pageId ? { ...p, sections: normalizeSections(sections, isHome(p)) } : p,
     ),
   });
+}
+
+/**
+ * Append uploaded images to one section.
+ *
+ * Removal and reordering are NOT here: images travel with the section structure,
+ * so the editor drops or moves them in its own state and `savePageSections`
+ * persists the result — the same path as removing a section. That also means the
+ * alt text of a removed image is pruned by `saveSiteCopy` with no special case.
+ *
+ * Returns how many didn't fit, so the caller can say so rather than silently
+ * dropping the tail of a batch.
+ */
+export async function addSectionImages(
+  pid: string,
+  pageId: string,
+  sectionId: string,
+  urls: string[],
+): Promise<{ added: number; skipped: number }> {
+  if (!urls.length) return { added: 0, skipped: 0 };
+  const config = await read(pid);
+  const pages = pagesOf(config);
+  const page = pages.find((p) => p.id === pageId);
+  const section = page?.sections.find((s) => s.id === sectionId);
+  if (!page || !section || !SECTION_DEFS[section.type].images) {
+    return { added: 0, skipped: urls.length };
+  }
+
+  const images = section.images ?? [];
+  const room = Math.max(0, MAX_SECTION_IMAGES - images.length);
+  const take = urls.slice(0, room);
+  section.images = [...images, ...take.map((url) => ({ id: crypto.randomUUID(), url }))];
+
+  await write(pid, { ...config, pages });
+  return { added: take.length, skipped: urls.length - take.length };
 }
 
 /**

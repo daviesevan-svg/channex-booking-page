@@ -24,6 +24,19 @@ export const SECTION_TYPES = [
 
 export type SectionType = (typeof SECTION_TYPES)[number];
 
+/** Hard cap per section. Enough for a stack of directions photos; small enough
+ *  that the whole page config stays one modest KV value. */
+export const MAX_SECTION_IMAGES = 8;
+
+/** A picture belonging to one section. Ordered; alt text is per language and
+ *  lives in the copy map under `${sectionId}.alt_${imageId}`. */
+export interface SectionImage {
+  /** Stable id — survives reordering, and keys the per-language alt text. */
+  id: string;
+  /** /images/… path (R2). */
+  url: string;
+}
+
 export interface SiteSection {
   /** Stable id. Built-in sections use their type as the id so a hotel's copy
    *  survives edits; a second section of the same type gets a uuid. */
@@ -32,6 +45,9 @@ export interface SiteSection {
   hidden?: boolean;
   /** Non-text configuration — layout, counts, toggles. Language-independent. */
   settings?: Record<string, string | number | boolean>;
+  /** The section's own pictures, in display order. Structural (not per
+   *  language), like `settings` — only the alt text is translated. */
+  images?: SectionImage[];
 }
 
 /** A section with its localized text merged in for one language. Lives here
@@ -106,6 +122,9 @@ export interface SectionDef {
    * words, which is not what "add a section" looks like it does.
    */
   homeOnly?: boolean;
+  /** The section takes its own uploaded pictures (see `SiteSection.images`).
+   *  Sections that render property-wide photos use the gallery instead. */
+  images?: boolean;
 }
 
 const HEADING: SectionFieldDef = { key: "heading", kind: "text", localized: true };
@@ -193,8 +212,21 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
       HEADING,
       { key: "body", kind: "textarea", localized: true },
       { key: "align", kind: "select", options: ["left", "center"], default: "left" },
+      // Which side the pictures sit on. Ignored when the section has none, and
+      // it's why `align` only applies to a text-only block — centred copy beside
+      // a column of photos reads as a mistake.
+      //
+      // The values aren't plain "left"/"right": option labels are keyed by value
+      // (`secOpt_${value}`) and `secOpt_left` already means left-ALIGNED text.
+      {
+        key: "imageSide",
+        kind: "select",
+        options: ["photosRight", "photosLeft"],
+        default: "photosRight",
+      },
     ],
     repeatable: true,
+    images: true,
   },
 };
 
@@ -266,7 +298,13 @@ export function normalizeSections(input: SiteSection[], home = true): SiteSectio
     if (!SECTION_DEFS[s.type].repeatable && seenTypes.has(s.type)) continue;
     seenIds.add(s.id);
     seenTypes.add(s.type);
-    out.push({ id: s.id, type: s.type, hidden: s.hidden === true, settings: s.settings ?? {} });
+    out.push({
+      id: s.id,
+      type: s.type,
+      hidden: s.hidden === true,
+      settings: s.settings ?? {},
+      images: normalizeSectionImages(s.type, s.images),
+    });
   }
   if (!home) return out;
   // A required section can never be dropped or hidden, however the list arrived
@@ -276,6 +314,32 @@ export function normalizeSections(input: SiteSection[], home = true): SiteSectio
     const found = out.find((s) => s.type === type);
     if (found) found.hidden = false;
     else out.unshift({ id: type, type, hidden: false, settings: {} });
+  }
+  return out;
+}
+
+/** The copy key holding one section image's alt text. Same `${owner}.${field}`
+ *  shape as every other localized field, so it resolves and gets pruned by the
+ *  same code — no per-image special case in the save path. */
+export function imageAltKey(imageId: string): string {
+  return `alt_${imageId}`;
+}
+
+/** Drop anything a hand-edited KV value could contain: images on a section type
+ *  that doesn't take them, malformed entries, duplicate ids, and any past the cap. */
+export function normalizeSectionImages(
+  type: SectionType,
+  input: SectionImage[] | undefined,
+): SectionImage[] {
+  if (!SECTION_DEFS[type].images || !Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: SectionImage[] = [];
+  for (const img of input) {
+    if (!img || typeof img.id !== "string" || typeof img.url !== "string") continue;
+    if (!img.id || !img.url || seen.has(img.id)) continue;
+    seen.add(img.id);
+    out.push({ id: img.id, url: img.url });
+    if (out.length >= MAX_SECTION_IMAGES) break;
   }
   return out;
 }
