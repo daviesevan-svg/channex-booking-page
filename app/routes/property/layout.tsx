@@ -14,7 +14,9 @@ import {
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
-import { getRenderSections } from "~/lib/site.server";
+import { getSiteChrome } from "~/lib/site.server";
+import { SiteFooterBlock } from "~/components/site-footer";
+import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty, resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 
@@ -34,13 +36,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getOverrides(pid, lang),
     getSettings(pid),
   ]);
-  // Only offer the "Rooms" link when the home page actually has a visible rooms
-  // section to jump to — a nav link to nothing is worse than no nav link.
-  const websiteRooms = settings.websiteEnabled
-    ? await getRenderSections(pid, lang, true)
-        .then((x) => x.some((s) => s.type === "rooms"))
-        .catch(() => false)
-    : false;
+  // One read for both bits of website chrome. The "Rooms" nav link only appears
+  // when the home page actually has a visible rooms section — a nav link to
+  // nothing is worse than no nav link.
+  const chrome = settings.websiteEnabled
+    ? await getSiteChrome(pid, lang).catch(() => null)
+    : null;
 
   return {
     property: { address: overrides.address, phone: overrides.phone, photos: [] },
@@ -60,7 +61,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     singleUnit: settings.singleUnit ?? false,
     lang,
     languages: enabledLanguages(settings),
-    websiteRooms,
+    websiteRooms: chrome?.hasRoomsSection ?? false,
+    footer: chrome?.footer ?? null,
+    contact: { address: overrides.address, phone: overrides.phone, email: overrides.email },
+    termsUrl: settings.termsUrl ?? null,
+    privacyUrl: settings.privacyUrl ?? null,
   };
 }
 
@@ -125,7 +130,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, footer, contact, termsUrl, privacyUrl } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -253,6 +258,25 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       <div className="flex-1">
         <Outlet context={context} />
       </div>
+
+      {/* Not on checkout or confirmation. The header's nav is already hidden on
+          those steps to keep them focused; a footer full of social links and
+          "Rooms" is the same exit risk at the worst possible moment. */}
+      {footer && step !== "checkout" && step !== "confirmation" && (
+        <SiteFooterBlock
+          footer={footer as ResolvedFooter}
+          contact={contact}
+          hotelName={hotelName}
+          links={[
+            ...(websiteRooms ? [{ label: tr.t("roomsNav"), to: `${base}#rooms` }] : []),
+            ...(hasVouchers ? [{ label: tr.t("vouchersTitle"), to: `${base}/vouchers` }] : []),
+            { label: tr.t("manageBooking"), to: `${base}/manage` },
+            ...(termsUrl ? [{ label: tr.t("termsLink"), to: termsUrl, external: true }] : []),
+            ...(privacyUrl ? [{ label: tr.t("privacyLink"), to: privacyUrl, external: true }] : []),
+          ]}
+          tr={tr}
+        />
+      )}
 
       <footer className="border-t border-nav-border bg-surface-alt">
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-[13px] text-muted-2">

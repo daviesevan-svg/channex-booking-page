@@ -70,6 +70,7 @@ export default [
     route("home", "routes/admin/home.tsx"),
     route("website", "routes/admin/website.tsx"),
     route("website/sections", "routes/admin/website-sections.tsx"),
+    route("website/footer", "routes/admin/website-footer.tsx"),
     route("gallery", "routes/admin/gallery.tsx"),
     route("facilities", "routes/admin/facilities.tsx"),
     route("pages/:page", "routes/admin/page.tsx"),

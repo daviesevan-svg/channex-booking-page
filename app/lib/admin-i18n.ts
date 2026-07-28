@@ -95,6 +95,7 @@ const EN: Record<string, string> = {
   navWebsite: "Website",
   navWebsiteGeneral: "General",
   navSections: "Sections",
+  navFooter: "Footer",
   navGallery: "Gallery",
   navFacilities: "Facilities",
   navEmails: "Emails",
@@ -297,6 +298,32 @@ const EN: Record<string, string> = {
   secDefault_facilities: "Facilities",
   secDefault_reviews: "Guest reviews",
   secDefault_vouchers: "Give the gift of a stay",
+
+  // -- website footer (ft*) --
+  ftTitle: "Footer",
+  ftIntro:
+    "The footer appears on every page of your website. Most of it fills itself from details you have already entered.",
+  ftAddPropertyFirst: "Add a property first to set up its footer.",
+  ftWebsiteOff:
+    "Your website is switched off, so guests don't see this footer yet. Turn it on in",
+  ftBlurbTitle: "Short description",
+  ftBlurbHint: "A line or two about the property, in the language you are editing.",
+  ftBlurbPlaceholder: "A family-run hotel in the heart of town, five minutes from the castle.",
+  ftContactTitle: "Contact details",
+  ftContactHint:
+    "Taken from the address, phone and email on Property details — edit them there and the footer follows.",
+  ftShowContact: "Show contact details",
+  ftShowContactDesc: "Address, phone and email. Only the ones you have filled in appear.",
+  ftSocialTitle: "Social profiles",
+  ftSocialHint: "Paste the full address of each profile. Leave blank to hide.",
+  ftLinksTitle: "Your own links",
+  ftLinksHint:
+    "Rooms, gift vouchers, manage booking, terms and privacy are added for you when available. Add up to {max} of your own.",
+  ftLinksEmpty: "No extra links yet.",
+  ftLinkLabel: "Label",
+  ftLinkUrl: "Address",
+  ftAddLink: "Add a link",
+  ftRemoveLink: "Remove",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Admin",
@@ -1747,6 +1774,7 @@ const DE: Record<string, string> = {
   navWebsite: "Website",
   navWebsiteGeneral: "Allgemein",
   navSections: "Abschnitte",
+  navFooter: "Fußzeile",
   navGallery: "Galerie",
   navFacilities: "Ausstattung",
   navEmails: "E-Mails",
@@ -1952,6 +1980,33 @@ const DE: Record<string, string> = {
   secDefault_facilities: "Ausstattung",
   secDefault_reviews: "Gästebewertungen",
   secDefault_vouchers: "Verschenken Sie einen Aufenthalt",
+
+  // -- website footer (ft*) --
+  ftTitle: "Fußzeile",
+  ftIntro:
+    "Die Fußzeile erscheint auf jeder Seite Ihrer Website. Das meiste füllt sich aus Angaben, die Sie schon gemacht haben.",
+  ftAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Fußzeile einzurichten.",
+  ftWebsiteOff:
+    "Ihre Website ist ausgeschaltet, Gäste sehen diese Fußzeile also noch nicht. Einschalten unter",
+  ftBlurbTitle: "Kurzbeschreibung",
+  ftBlurbHint: "Ein oder zwei Sätze zur Unterkunft, in der Sprache, die Sie gerade bearbeiten.",
+  ftBlurbPlaceholder:
+    "Ein familiengeführtes Hotel im Herzen der Stadt, fünf Minuten von der Burg.",
+  ftContactTitle: "Kontaktdaten",
+  ftContactHint:
+    "Übernommen aus Adresse, Telefon und E-Mail in den Unterkunftsdetails — dort ändern, und die Fußzeile folgt.",
+  ftShowContact: "Kontaktdaten anzeigen",
+  ftShowContactDesc: "Adresse, Telefon und E-Mail. Es erscheinen nur die ausgefüllten Angaben.",
+  ftSocialTitle: "Social-Media-Profile",
+  ftSocialHint: "Fügen Sie die vollständige Adresse jedes Profils ein. Leer lassen zum Ausblenden.",
+  ftLinksTitle: "Eigene Links",
+  ftLinksHint:
+    "Zimmer, Gutscheine, Buchung verwalten, AGB und Datenschutz werden automatisch ergänzt, sofern vorhanden. Fügen Sie bis zu {max} eigene hinzu.",
+  ftLinksEmpty: "Noch keine zusätzlichen Links.",
+  ftLinkLabel: "Bezeichnung",
+  ftLinkUrl: "Adresse",
+  ftAddLink: "Link hinzufügen",
+  ftRemoveLink: "Entfernen",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Verwaltung",
@@ -3406,6 +3461,7 @@ const PT: Record<string, string> = {
   navWebsite: "Site",
   navWebsiteGeneral: "Geral",
   navSections: "Secções",
+  navFooter: "Rodapé",
   navGallery: "Galeria",
   navFacilities: "Instalações",
   navEmails: "E-mails",
@@ -3610,6 +3666,33 @@ const PT: Record<string, string> = {
   secDefault_facilities: "Instalações",
   secDefault_reviews: "Avaliações dos hóspedes",
   secDefault_vouchers: "Ofereça uma estadia",
+
+  // -- website footer (ft*) --
+  ftTitle: "Rodapé",
+  ftIntro:
+    "O rodapé aparece em todas as páginas do seu site. A maior parte preenche-se com dados que já introduziu.",
+  ftAddPropertyFirst: "Adicione primeiro uma propriedade para configurar o seu rodapé.",
+  ftWebsiteOff:
+    "O seu site está desligado, por isso os hóspedes ainda não vêem este rodapé. Ligue-o em",
+  ftBlurbTitle: "Descrição breve",
+  ftBlurbHint: "Uma ou duas linhas sobre a propriedade, no idioma que está a editar.",
+  ftBlurbPlaceholder:
+    "Um hotel familiar no centro da cidade, a cinco minutos do castelo.",
+  ftContactTitle: "Dados de contacto",
+  ftContactHint:
+    "Retirados da morada, telefone e e-mail nos dados da propriedade — altere-os lá e o rodapé acompanha.",
+  ftShowContact: "Mostrar dados de contacto",
+  ftShowContactDesc: "Morada, telefone e e-mail. Só aparecem os que tiver preenchido.",
+  ftSocialTitle: "Perfis nas redes sociais",
+  ftSocialHint: "Cole o endereço completo de cada perfil. Deixe em branco para ocultar.",
+  ftLinksTitle: "Os seus próprios links",
+  ftLinksHint:
+    "Quartos, vales de oferta, gerir reserva, termos e privacidade são adicionados automaticamente quando disponíveis. Adicione até {max} dos seus.",
+  ftLinksEmpty: "Ainda não há links adicionais.",
+  ftLinkLabel: "Etiqueta",
+  ftLinkUrl: "Endereço",
+  ftAddLink: "Adicionar link",
+  ftRemoveLink: "Remover",
 
   // -- page titles (mt*) — the browser tab, in the admin's language --
   mtAdmin: "Administração",
