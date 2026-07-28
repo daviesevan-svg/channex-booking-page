@@ -171,6 +171,31 @@ export async function listVouchers(pid: string): Promise<VoucherRecord[]> {
   return (results ?? []).map((r) => JSON.parse(r.json) as VoucherRecord);
 }
 
+/**
+ * Product images referenced by SOLD vouchers, for the image garbage collector.
+ *
+ * Each sold voucher freezes a copy of the product (`VoucherProductSnapshot`) so
+ * later catalog edits can't change what a buyer already paid for — which means a
+ * product's image can still be live on a voucher and its PDF long after it has
+ * gone from the catalog. Deleting that object would break a page someone paid
+ * for, so these count as references.
+ *
+ * Pulled out with json_extract rather than via `listVouchers`, which would parse
+ * every sold voucher's full record just to read one field.
+ */
+export async function voucherSnapshotImages(pid: string): Promise<string[]> {
+  await ensureSchema();
+  const { results } = await db()
+    .prepare(
+      `SELECT DISTINCT json_extract(json, '$.product.image') AS image
+         FROM voucher
+        WHERE pid = ? AND json_extract(json, '$.product.image') IS NOT NULL`,
+    )
+    .bind(pid)
+    .all<{ image: string | null }>();
+  return (results ?? []).map((r) => r.image).filter((u): u is string => Boolean(u));
+}
+
 /** Every voucher bought with this email — powers the guest self-service list.
  *  Filters in code (per-property voucher counts are small; no email column). */
 export async function listVouchersByEmail(pid: string, email: string): Promise<VoucherRecord[]> {

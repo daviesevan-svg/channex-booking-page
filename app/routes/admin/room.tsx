@@ -8,6 +8,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
 import { VR_AMENITY_KEYS } from "~/lib/content";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
@@ -32,7 +33,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   const isNew = params.roomId === "new";
 
   if (form.get("intent") === "delete" && !isNew) {
+    // Read the photos before the row goes, or there's nothing left to name them.
+    const gone = (await getRoom(propertyId, params.roomId))?.images ?? [];
     await deleteRoom(propertyId, params.roomId);
+    queueImageCleanup(propertyId, gone);
     await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
     return redirect("/admin/rooms");
   }
@@ -76,6 +80,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   };
   await saveRoom(propertyId, room);
+  // Unticking "keep" is how a photo is removed here, so the dropped ones are
+  // whatever the room had and the new list doesn't.
+  const kept = new Set(room.images);
+  queueImageCleanup(propertyId, (existing?.images ?? []).filter((u) => !kept.has(u)));
   await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
   // Back to the rooms list after every save. Staying on the editor left the
   // chosen file in the upload input, so a second save re-uploaded it and created

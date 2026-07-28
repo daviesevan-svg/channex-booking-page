@@ -68,13 +68,17 @@ export async function addImages(
   return { added: take.length, skipped: urls.length - take.length };
 }
 
-export async function removeImage(pid: string, id: string): Promise<void> {
+/** Remove one image. Returns its url, for `queueImageCleanup` — dropping the
+ *  row here is the only thing that ever stops referencing the R2 object. */
+export async function removeImage(pid: string, id: string): Promise<string[]> {
   const gallery = await read(pid);
+  const gone = gallery.images.find((i) => i.id === id);
   gallery.images = gallery.images.filter((i) => i.id !== id);
   // Drop the orphaned text in every language, so a re-uploaded photo can't
   // inherit a caption from a deleted one (ids are fresh, but keep KV tidy).
   for (const lang of Object.keys(gallery.text)) delete gallery.text[lang][id];
   await write(pid, gallery);
+  return gone ? [gone.url] : [];
 }
 
 /** Save order and the alt/caption for ONE language in a single write. */

@@ -37,6 +37,7 @@ import {
 } from "~/lib/vouchers.server";
 import { sendVoucherEmails } from "~/lib/voucher-purchase.server";
 import { fmtDate } from "~/lib/dates";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadVoucherImage } from "~/lib/images.server";
 import { getRooms } from "~/lib/catalog.server";
 
@@ -198,7 +199,12 @@ export async function action({ request }: Route.ActionArgs) {
     return redirect("/admin/vouchers");
   }
   if (intent === "delete") {
-    await deleteVoucherProduct(propertyId, String(form.get("id")));
+    const id = String(form.get("id"));
+    // Sold vouchers froze a copy of this product, so the picture may well still
+    // be referenced — the gc checks that before deleting anything.
+    const gone = (await getVoucherProducts(propertyId)).find((p) => p.id === id)?.image;
+    await deleteVoucherProduct(propertyId, id);
+    queueImageCleanup(propertyId, gone ? [gone] : []);
     return redirect("/admin/vouchers");
   }
   if (intent === "toggle") {
@@ -362,6 +368,8 @@ export async function action({ request }: Route.ActionArgs) {
     package: pkg,
   };
   await saveVoucherProduct(propertyId, product);
+  // A replaced or cleared picture leaves the old file behind.
+  if (prev?.image && prev.image !== image) queueImageCleanup(propertyId, [prev.image]);
   return redirect("/admin/vouchers");
 }
 

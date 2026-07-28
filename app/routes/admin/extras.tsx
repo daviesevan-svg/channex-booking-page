@@ -19,6 +19,7 @@ import {
   type ExtraUnit,
 } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
+import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadExtraImage } from "~/lib/images.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
@@ -98,7 +99,10 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = form.get("intent");
 
   if (intent === "delete") {
-    await deleteExtra(propertyId, String(form.get("id")));
+    const id = String(form.get("id"));
+    const gone = (await getExtras(propertyId)).find((e) => e.id === id)?.image;
+    await deleteExtra(propertyId, id);
+    queueImageCleanup(propertyId, gone ? [gone] : []);
     return redirect("/admin/extras");
   }
   if (intent === "toggle") {
@@ -176,6 +180,8 @@ export async function action({ request }: Route.ActionArgs) {
     createdAt: prev?.createdAt ?? new Date().toISOString(),
   };
   await saveExtra(propertyId, extra);
+  // A replaced or cleared picture leaves the old file behind.
+  if (prev?.image && prev.image !== image) queueImageCleanup(propertyId, [prev.image]);
   return redirect("/admin/extras");
 }
 
