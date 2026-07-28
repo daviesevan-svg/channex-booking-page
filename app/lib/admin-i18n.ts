@@ -322,6 +322,8 @@ const EN: Record<string, string> = {
   secField_zoom: "Zoom level",
   secField_align: "Alignment",
   secField_imageSide: "Picture position",
+  secRichHint:
+    "Formatting: **bold**, *italic*, [link text](https://example.com). Start lines with - for a bulleted list, or 1. for a numbered one.",
   secOpt_photosRight: "Pictures on the right",
   secOpt_photosLeft: "Pictures on the left",
   secImages: "Pictures",
@@ -2048,6 +2050,8 @@ const DE: Record<string, string> = {
   secField_zoom: "Zoomstufe",
   secField_align: "Ausrichtung",
   secField_imageSide: "Bildposition",
+  secRichHint:
+    "Formatierung: **fett**, *kursiv*, [Linktext](https://example.com). Zeilen mit - beginnen für eine Aufzählung, mit 1. für eine numerierte Liste.",
   secOpt_photosRight: "Bilder rechts",
   secOpt_photosLeft: "Bilder links",
   secImages: "Bilder",
@@ -3778,6 +3782,8 @@ const PT: Record<string, string> = {
   secField_zoom: "Nível de zoom",
   secField_align: "Alinhamento",
   secField_imageSide: "Posição das imagens",
+  secRichHint:
+    "Formatação: **negrito**, *itálico*, [texto do link](https://example.com). Comece as linhas com - para uma lista e 1. para uma lista numerada.",
   secOpt_photosRight: "Imagens à direita",
   secOpt_photosLeft: "Imagens à esquerda",
   secImages: "Imagens",
