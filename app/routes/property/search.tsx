@@ -22,6 +22,7 @@ import { normalizeFacilities } from "~/lib/content";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCalendarAvailability, getRooms } from "~/lib/catalog.server";
 import { getRenderSections } from "~/lib/site.server";
+import { settingOf } from "~/lib/sections";
 import {
   FacilitiesSection,
   GallerySection,
@@ -146,6 +147,13 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const searchButton = content.searchButton || DEFAULT_SEARCH.searchButton;
   const highlights = content.highlights?.length ? content.highlights : DEFAULT_SEARCH.highlights;
   const heroPhoto = content.heroImage || property.photos?.[0]?.url;
+  // The hero photo, else the first gallery photo — on a website with a gallery
+  // the hero image was otherwise never shown at all.
+  const heroSection = sections.find((s) => s.type === "hero");
+  const heroSplit =
+    heroSection && settingOf(heroSection, "layout", "split") === "split"
+      ? heroPhoto || gallery[0]?.url
+      : undefined;
 
   function searchRooms() {
     if (!dates.checkinIso || !dates.checkoutIso) {
@@ -170,17 +178,47 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   // The hero stays inline: it owns the search form's state (dates, guests,
   // promo, calendar), and lifting it out would mean threading all of that
   // through the section renderer for nothing.
+  const heroCopy = (split: boolean) => (
+    <div className={split ? "" : "max-w-[680px]"}>
+      <div className="eyebrow mb-[18px]">{eyebrow}</div>
+      <h1
+        className={`mb-[18px] font-serif font-medium leading-[1.05] tracking-[-0.02em] ${
+          split ? "text-[44px] lg:text-[50px]" : "text-[56px]"
+        }`}
+      >
+        {heading}
+      </h1>
+      <p
+        className={`whitespace-pre-line text-[18px] leading-[1.6] text-secondary ${
+          split ? "mb-0" : "mb-9 max-w-[560px]"
+        }`}
+      >
+        {intro}
+      </p>
+    </div>
+  );
+
   const hero = (
     <div key="hero">
-      <div className="max-w-[680px]">
-        <div className="eyebrow mb-[18px]">{eyebrow}</div>
-        <h1 className="mb-[18px] font-serif text-[56px] font-medium leading-[1.05] tracking-[-0.02em]">
-          {heading}
-        </h1>
-        <p className="mb-9 max-w-[560px] whitespace-pre-line text-[18px] leading-[1.6] text-secondary">
-          {intro}
-        </p>
-      </div>
+      {/* Split puts the property photo beside the copy instead of leaving the
+          right half of the page empty. It needs an actual image to show, so it
+          falls back to the single full-width column when there isn't one —
+          better a narrow column than an empty half. The search card spans the
+          full width below either way, so it stays the most prominent thing. */}
+      {heroSplit ? (
+        <div className="mb-9 grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr]">
+          {heroCopy(true)}
+          {/* The COPY sets the row height, not the photo: grid stretch matches
+              the photo to the text, with a floor so a one-line intro doesn't
+              leave a sliver and a ceiling so a long one doesn't produce a
+              1,000px portrait. */}
+          <div className="min-h-[320px] overflow-hidden rounded-[18px] bg-surface-alt lg:h-full lg:max-h-[560px]">
+            <img src={heroSplit} alt={hotelName} className="h-full w-full object-cover" />
+          </div>
+        </div>
+      ) : (
+        heroCopy(false)
+      )}
 
       {/* search card — `#book` is the anchor the room cards jump to */}
       <div className="relative max-w-[920px]" id="book">

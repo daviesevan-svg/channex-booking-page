@@ -96,7 +96,7 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
     // Heading, intro and image already live in Website → Home (they also feed
     // the plain booking page). Reused here rather than duplicated, so there's
     // one place to edit them.
-    fields: [],
+    fields: [{ key: "layout", kind: "select", options: ["split", "wide"], default: "split" }],
     required: true,
   },
   highlights: {

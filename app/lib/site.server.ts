@@ -91,8 +91,14 @@ export async function getRenderSections(
 ): Promise<ResolvedSection[]> {
   if (!websiteEnabled) {
     // Legacy layout takes no custom copy: it renders the same translated
-    // defaults it always has.
-    return LEGACY_SECTIONS.map((s) => ({ ...s, settings: {}, text: {} }));
+    // defaults it always has. The hero's layout is pinned to "wide" here, not
+    // left to the field default — the booking page has always been a single
+    // full-width column and a default change must not reach it.
+    return LEGACY_SECTIONS.map((s) => ({
+      ...s,
+      settings: (s.type === "hero" ? { layout: "wide" } : {}) as SiteSection["settings"],
+      text: {},
+    }));
   }
   const config = await read(pid);
   const sections = homeOf(config) ?? normalizeSections(DEFAULT_WEBSITE_SECTIONS);
