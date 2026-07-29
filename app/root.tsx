@@ -9,7 +9,8 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
-import { langFromRequest } from "./lib/content";
+import { DEFAULT_FONTS_HREF, langFromRequest } from "./lib/content";
+import { FontStylesheet } from "./components/font-stylesheet";
 import { registerDict } from "./lib/i18n";
 import { guestDictFor } from "./lib/i18n-locales.server";
 import "./app.css";
@@ -33,16 +34,10 @@ export const links: Route.LinksFunction = () => [
     href: "https://fonts.gstatic.com",
     crossOrigin: "anonymous",
   },
-  {
-    // No `opsz` axis and no italic face. Asking for `ital,opsz,wght` made Google
-    // serve the full two-axis variable font: 128.8 KiB for the latin subset
-    // against 56.8 KiB for wght alone, and the italic serif was never used
-    // anywhere. Narrowing the weight list buys nothing — one variable file covers
-    // the family's whole wght range — so the axis IS the cost.
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap",
-  },
 ];
+// The default pair is loaded by <FontStylesheet> in the Layout below rather than
+// declared here: as a `links()` entry it was a render-blocking stylesheet, and
+// PageSpeed costed that third-party round trip at 750 ms.
 
 export function Layout({ children }: { children: React.ReactNode }) {
   // Registered during THIS render, so it is in place before any descendant
@@ -61,6 +56,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <FontStylesheet href={DEFAULT_FONTS_HREF} />
       </head>
       <body>
         {children}

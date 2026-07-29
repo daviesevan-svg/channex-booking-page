@@ -4,14 +4,9 @@
 // tokens.json. Everything here mirrors what property/layout.tsx + app.css render,
 // so the exported values ARE what guests see on the booking engine.
 import { getConfig } from "./config.server";
-import { DEFAULT_THEME, THEMES, fontPair } from "./content";
+import { DEFAULT_FONTS_HREF, DEFAULT_THEME, THEMES, fontPair } from "./content";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperty } from "./properties.server";
-
-// Default font pair (FONT_PAIRS[0]) has no href — it's loaded in root.tsx. Give
-// external sites the same Google Fonts URL so they render identical type.
-const DEFAULT_FONTS_HREF =
-  "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap";
 
 // Per-theme accent-deep + page, mirroring the [data-theme] blocks in app.css.
 // (accent itself comes from THEMES; soft/soft-strong are color-mix of accent.)

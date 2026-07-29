@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/collection.$collectionSlug";
+import { FontStylesheet } from "~/components/font-stylesheet";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { getCollectionBySlug } from "~/lib/collections.server";
@@ -409,11 +410,10 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       data-theme={isCustom ? undefined : theme}
       style={themeStyle}
     >
-      {/* `precedence` makes React 19 hoist this into <head>. Rendered here because
-          the chosen pair only becomes known from loader data, but left in the body
-          it was a render-blocking stylesheet discovered late — after the document
-          had already been parsed past it. */}
-      {font.href && <link rel="stylesheet" href={font.href} precedence="font" />}
+      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
+          It's rendered here rather than in `links()` because the chosen pair only
+          becomes known from loader data. */}
+      <FontStylesheet href={font.href} />
 
       {/* header */}
       <header

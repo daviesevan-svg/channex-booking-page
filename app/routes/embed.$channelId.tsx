@@ -1,6 +1,7 @@
 import { Outlet } from "react-router";
 
 import type { Route } from "./+types/embed.$channelId";
+import { FontStylesheet } from "~/components/font-stylesheet";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
@@ -64,11 +65,10 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
-      {/* `precedence` makes React 19 hoist this into <head>. Rendered here because
-          the chosen pair only becomes known from loader data, but left in the body
-          it was a render-blocking stylesheet discovered late — after the document
-          had already been parsed past it. */}
-      {font.href && <link rel="stylesheet" href={font.href} precedence="font" />}
+      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
+          It's rendered here rather than in `links()` because the chosen pair only
+          becomes known from loader data. */}
+      <FontStylesheet href={font.href} />
       <Outlet context={context} />
     </div>
   );
