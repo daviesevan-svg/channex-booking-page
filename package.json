@@ -5,7 +5,8 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "typecheck": "wrangler types && react-router typegen && tsc -b",
+    "check:tokens": "node scripts/check-design-tokens.mjs",
+    "typecheck": "wrangler types && react-router typegen && tsc -b && node scripts/check-design-tokens.mjs",
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && vite preview",
     "cf-typegen": "wrangler types",

@@ -97,11 +97,11 @@ export function meta({ matches }: Route.MetaArgs) {
 
 function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc: () => void }) {
   const btn =
-    "flex h-9 w-9 flex-none items-center justify-center rounded-[9px] border border-line-alt text-[18px] leading-none text-ink hover:border-accent hover:text-accent";
+    "flex h-9 w-9 flex-none items-center justify-center rounded-chip-lg border border-line-alt text-title-xs leading-none text-ink hover:border-accent hover:text-accent";
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} className={btn}>−</button>
-      <span className="min-w-[20px] text-center text-[15px] font-semibold">{qty}</span>
+      <span className="min-w-[20px] text-center text-body-lg font-semibold">{qty}</span>
       <button type="button" aria-label="Increase" onClick={onInc} className={btn}>+</button>
     </div>
   );
@@ -149,8 +149,8 @@ function ExtraSection({
   if (extras.length === 0) return null;
   return (
     <section className="mb-9">
-      <h2 className="mb-1 font-serif text-[24px] font-medium tracking-[-0.01em]">{title}</h2>
-      {subtitle && <p className="mb-4 text-[14px] text-secondary">{subtitle}</p>}
+      <h2 className="mb-1 font-serif text-title-3xl font-medium tracking-[-0.01em]">{title}</h2>
+      {subtitle && <p className="mb-4 text-body text-secondary">{subtitle}</p>}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {extras.map((e) => (
           <ExtraCard
@@ -255,51 +255,51 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
         {/* summary */}
         <aside
-          className="sticky top-24 min-w-[300px] flex-1 rounded-[18px] border border-line bg-surface p-6"
+          className="sticky top-24 min-w-[300px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-4 font-serif text-[21px] font-semibold">{roomTitle}</h3>
+          <h3 className="mb-4 font-serif text-title-lg font-semibold">{roomTitle}</h3>
           <div className="flex items-start justify-between gap-3 border-b border-divider pb-4">
             <div className="min-w-0">
-              <div className="text-[12px] text-muted-2">{rateTitle}</div>
+              <div className="text-label text-muted-2">{rateTitle}</div>
             </div>
-            <span className="whitespace-nowrap text-[14px] font-semibold">{formatMoney(roomTotal, cur)}</span>
+            <span className="whitespace-nowrap text-body font-semibold">{formatMoney(roomTotal, cur)}</span>
           </div>
 
           {allLines.length > 0 && (
             <div className="flex flex-col gap-2.5 border-b border-divider py-4">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{text.summaryLabel}</div>
+              <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{text.summaryLabel}</div>
               {allLines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium">
+                    <div className="text-caption font-medium">
                       {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
                       {l.qty > 1 ? ` ×${l.qty}` : ""}
                     </div>
-                    {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
+                    {l.infoLine && <div className="text-label text-muted-2">{l.infoLine}</div>}
                   </div>
-                  <span className="whitespace-nowrap text-[13px] font-semibold">{formatMoney(l.amount, cur)}</span>
+                  <span className="whitespace-nowrap text-caption font-semibold">{formatMoney(l.amount, cur)}</span>
                 </div>
               ))}
             </div>
           )}
 
           <div className="flex items-baseline justify-between py-4">
-            <span className="text-[15px] font-semibold">{text.summaryLabel}</span>
-            <span className="font-serif text-[24px] font-semibold">{formatMoney(extrasSum, cur)}</span>
+            <span className="text-body-lg font-semibold">{text.summaryLabel}</span>
+            <span className="font-serif text-title-3xl font-semibold">{formatMoney(extrasSum, cur)}</span>
           </div>
 
           <button
             type="button"
             onClick={() => go(false)}
-            className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep"
+            className="w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep"
           >
             {text.continueButton}
           </button>
           <button
             type="button"
             onClick={() => go(true)}
-            className="mt-2.5 w-full rounded-[10px] py-2.5 text-center text-[14px] font-semibold text-muted hover:text-accent"
+            className="mt-2.5 w-full rounded-control py-2.5 text-center text-body font-semibold text-muted hover:text-accent"
           >
             {text.skipButton}
           </button>
@@ -341,7 +341,7 @@ function ExtraCard({
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded-[16px] border bg-surface"
+      className="flex flex-col overflow-hidden rounded-panel border bg-surface"
       style={{ borderColor: has ? "var(--accent)" : "var(--line)" }}
     >
       {extra.image ? (
@@ -351,29 +351,29 @@ function ExtraCard({
       )}
       <div className="flex flex-1 flex-col p-5">
         <div className="mb-1 flex items-baseline justify-between gap-2">
-          <h3 className="font-serif text-[19px] font-semibold">{extra.name}</h3>
-          <span className="whitespace-nowrap text-[14px] font-semibold text-secondary">
+          <h3 className="font-serif text-title-sm font-semibold">{extra.name}</h3>
+          <span className="whitespace-nowrap text-body font-semibold text-secondary">
             {configurable
               ? `${tr.t("from")} ${formatMoney(fromPrice(extra), currency)}`
               : formatMoney(extra.price ?? 0, currency)}
-            <span className="text-[12px] font-normal text-muted-2"> · {UNIT_LABEL[extra.unit]}</span>
+            <span className="text-label font-normal text-muted-2"> · {UNIT_LABEL[extra.unit]}</span>
           </span>
         </div>
-        {extra.desc && <p className="mb-4 text-[13px] leading-[1.5] text-muted">{extra.desc}</p>}
+        {extra.desc && <p className="mb-4 text-caption leading-[1.5] text-muted">{extra.desc}</p>}
 
         <div className="mt-auto">
           {/* configured / added summary */}
           {has && (configurable || extra.fields?.length) ? (
-            <div className="rounded-[12px] border border-accent bg-accent-soft p-3.5">
+            <div className="rounded-card border border-accent bg-accent-soft p-3.5">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[14px] font-semibold">
+                <span className="text-body font-semibold">
                   {line?.optionName ?? extra.name}
                   {line && line.qty > 1 ? ` ×${line.qty}` : ""}
                 </span>
-                <span className="text-[14px] font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
+                <span className="text-body font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
               </div>
-              {line?.infoLine && <div className="mt-0.5 text-[12px] text-muted-2">{line.infoLine}</div>}
-              <div className="mt-2 flex items-center gap-3 text-[13px] font-semibold">
+              {line?.infoLine && <div className="mt-0.5 text-label text-muted-2">{line.infoLine}</div>}
+              <div className="mt-2 flex items-center gap-3 text-caption font-semibold">
                 <button type="button" onClick={onConfigure} className="text-accent hover:underline">{tr.t("editExtra")}</button>
                 <button type="button" onClick={onRemove} className="text-[#c0392b] hover:underline">{tr.t("removeExtra")}</button>
               </div>
@@ -382,20 +382,20 @@ function ExtraCard({
             <button
               type="button"
               onClick={onConfigure}
-              className="w-full rounded-[10px] border border-line-alt bg-surface py-2.5 text-[14px] font-semibold text-ink hover:border-accent hover:text-accent"
+              className="w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent"
             >
               {configurable ? tr.t("chooseOption") : tr.t("add")}
             </button>
           ) : has ? (
             <div className="flex items-center justify-between">
               <Stepper qty={selection!.qty} onDec={onDec} onInc={onInc} />
-              <span className="text-[14px] font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
+              <span className="text-body font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
             </div>
           ) : (
             <button
               type="button"
               onClick={onAdd}
-              className="w-full rounded-[10px] border border-line-alt bg-surface py-2.5 text-[14px] font-semibold text-ink hover:border-accent hover:text-accent"
+              className="w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent"
             >
               + {tr.t("add")}
             </button>
@@ -447,7 +447,7 @@ function ConfigureModal({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-[480px] flex-col overflow-hidden rounded-[20px] bg-surface"
+        className="flex max-h-[88vh] w-full max-w-[480px] flex-col overflow-hidden rounded-well bg-surface"
         onClick={(e) => e.stopPropagation()}
       >
         {extra.image ? (
@@ -457,14 +457,14 @@ function ConfigureModal({
         )}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="font-serif text-[22px] font-semibold">{extra.name}</h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="text-[22px] leading-none text-muted-2 hover:text-ink">×</button>
+            <h2 className="font-serif text-title-xl font-semibold">{extra.name}</h2>
+            <button type="button" onClick={onClose} aria-label="Close" className="text-title-xl leading-none text-muted-2 hover:text-ink">×</button>
           </div>
-          {extra.desc && <p className="mb-5 text-[14px] leading-[1.5] text-muted">{extra.desc}</p>}
+          {extra.desc && <p className="mb-5 text-body leading-[1.5] text-muted">{extra.desc}</p>}
 
           {configurable && (
             <div className="mb-5 flex flex-col gap-2.5">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("chooseOption")}</div>
+              <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("chooseOption")}</div>
               {extra.options!.map((o) => {
                 const active = o.id === optionId;
                 return (
@@ -472,7 +472,7 @@ function ConfigureModal({
                     key={o.id}
                     type="button"
                     onClick={() => setOptionId(o.id)}
-                    className="flex items-start gap-3 rounded-[12px] border-[1.5px] p-3.5 text-left"
+                    className="flex items-start gap-3 rounded-card border-[1.5px] p-3.5 text-left"
                     style={{ borderColor: active ? "var(--accent)" : "#e8e0d5", background: active ? "var(--accent-soft)" : "#fff" }}
                   >
                     <span
@@ -481,13 +481,13 @@ function ConfigureModal({
                     />
                     <span className="flex-1">
                       <span className="flex items-baseline justify-between gap-2">
-                        <span className="text-[15px] font-semibold">{o.name}</span>
-                        <span className="whitespace-nowrap text-[14px] font-semibold">
+                        <span className="text-body-lg font-semibold">{o.name}</span>
+                        <span className="whitespace-nowrap text-body font-semibold">
                           {formatMoney(o.price, currency)}
-                          <span className="text-[12px] font-normal text-muted-2"> · {UNIT_LABEL[o.unit ?? extra.unit]}</span>
+                          <span className="text-label font-normal text-muted-2"> · {UNIT_LABEL[o.unit ?? extra.unit]}</span>
                         </span>
                       </span>
-                      {o.desc && <span className="mt-0.5 block text-[13px] text-muted">{o.desc}</span>}
+                      {o.desc && <span className="mt-0.5 block text-caption text-muted">{o.desc}</span>}
                     </span>
                   </button>
                 );
@@ -497,26 +497,26 @@ function ConfigureModal({
 
           {(optionOk || !configurable) && (
             <div className="mb-5 flex items-center justify-between">
-              <span className="text-[14px] font-semibold text-secondary">{tr.t("quantity")}</span>
+              <span className="text-body font-semibold text-secondary">{tr.t("quantity")}</span>
               <Stepper qty={qty} onDec={() => setQty((q) => Math.max(1, q - 1))} onInc={() => setQty((q) => q + 1)} />
             </div>
           )}
 
           {extra.fields?.length ? (
             <div className="mb-1">
-              <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+              <div className="mb-2 text-label font-semibold uppercase tracking-wide text-muted-2">
                 {extra.infoTitle || "Details"}
               </div>
               <div className="flex flex-col gap-3">
                 {extra.fields.map((f) => (
-                  <label key={f.id} className="block text-[13px] font-semibold text-secondary">
+                  <label key={f.id} className="block text-caption font-semibold text-secondary">
                     {f.label}
                     {f.required ? " *" : ""}
                     <input
                       value={info[f.id] ?? ""}
                       onChange={(e) => setInfo((prev) => ({ ...prev, [f.id]: e.target.value }))}
                       placeholder={f.placeholder}
-                      className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+                      className="mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent"
                     />
                   </label>
                 ))}
@@ -526,12 +526,12 @@ function ConfigureModal({
         </div>
 
         <div className="flex-none border-t border-divider p-5">
-          {!canAdd && <p className="mb-2.5 text-[12px] text-[#b08968]">{tr.t("selectToContinue")}</p>}
+          {!canAdd && <p className="mb-2.5 text-label text-[#b08968]">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
-            <span className="font-serif text-[22px] font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
+            <span className="font-serif text-title-xl font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
             <div className="flex items-center gap-3">
               {already && (
-                <button type="button" onClick={onRemove} className="text-[13px] font-semibold text-[#c0392b] hover:underline">
+                <button type="button" onClick={onRemove} className="text-caption font-semibold text-[#c0392b] hover:underline">
                   {tr.t("removeExtra")}
                 </button>
               )}
@@ -539,7 +539,7 @@ function ConfigureModal({
                 type="button"
                 disabled={!canAdd}
                 onClick={() => canAdd && onCommit({ id: extra.id, optionId, qty, info })}
-                className="rounded-[10px] bg-accent px-5 py-2.5 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-control bg-accent px-5 py-2.5 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {already ? tr.t("updateBooking") : tr.t("addToBooking")}
               </button>

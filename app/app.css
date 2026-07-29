@@ -48,6 +48,66 @@
 @theme {
   --font-serif: "Newsreader", ui-serif, Georgia, serif;
   --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+
+  /* ----- Type scale -----
+     Sizes used to be typed straight into each route as `text-[13px]`, which
+     meant a template could change the colours and the typeface but never the
+     shape of the page. These tokens are the same values, named by role, so one
+     override restyles every surface at once — booking funnel, vouchers, manage
+     pages and the website all read from here.
+
+     Values are byte-for-byte what the routes had before, so this layer is a
+     no-op on its own. It is not yet a *scale*: 25 steps is more than any design
+     needs, and the title/display ramps in particular are finer than anything
+     uses deliberately. Collapsing them is a follow-up — and now a one-file
+     change rather than 642 edits, which is the whole point of landing this
+     first. Usage counts below are from the guest surfaces at the time of the
+     conversion, kept as a guide to which steps are load-bearing. */
+  --text-nano: 9px; /* ×1 */
+  --text-micro: 11px; /* ×20 — badges, superscript labels */
+  --text-label: 12px; /* ×67 — uppercase eyebrows, field labels */
+  --text-caption: 13px; /* ×107 — the workhorse: form labels, meta, errors */
+  --text-body: 14px; /* ×85 */
+  --text-body-lg: 15px; /* ×59 — prose and inputs */
+  --text-lead: 16px; /* ×22 */
+  --text-lead-lg: 17px; /* ×9 */
+
+  --text-title-xs: 18px; /* ×17 */
+  --text-title-sm: 19px; /* ×8 */
+  --text-title-md: 20px; /* ×14 */
+  --text-title-lg: 21px; /* ×8 */
+  --text-title-xl: 22px; /* ×7 */
+  --text-title-2xl: 23px; /* ×1 */
+  --text-title-3xl: 24px; /* ×13 — section headings */
+
+  --text-display-xs: 26px; /* ×2 */
+  --text-display-sm: 28px; /* ×9 */
+  --text-display-md: 30px; /* ×2 */
+  --text-display-lg: 32px; /* ×1 */
+  --text-display-xl: 34px; /* ×6 */
+  --text-display-2xl: 38px; /* ×3 */
+  --text-display-3xl: 40px; /* ×6 */
+  --text-display-4xl: 44px; /* ×3 */
+  --text-display-5xl: 50px; /* ×1 */
+  --text-display-6xl: 56px; /* ×1 — hero headline */
+
+  /* ----- Radii -----
+     Same story, and the more expressive half of a template: sharp corners read
+     as a completely different company from soft ones. `mark` is the decorative
+     diamond, deliberately its own role so a template can restyle cards without
+     turning the diamonds into blobs. */
+  --radius-mark: 1px; /* ×7 — the diamond marker */
+  --radius-mark-lg: 2px; /* ×3 */
+  --radius-chip: 8px; /* ×2 */
+  --radius-chip-lg: 9px; /* ×1 */
+  --radius-control: 10px; /* ×44 — buttons and inputs */
+  --radius-field: 11px; /* ×3 */
+  --radius-card: 12px; /* ×38 — cards */
+  --radius-card-lg: 14px; /* ×11 */
+  --radius-panel: 16px; /* ×23 */
+  --radius-panel-lg: 18px; /* ×17 */
+  --radius-well: 20px; /* ×2 */
+  --radius-well-lg: 22px; /* ×2 */
 }
 
 @theme inline {

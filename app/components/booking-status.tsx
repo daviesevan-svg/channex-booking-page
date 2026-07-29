@@ -13,10 +13,10 @@ export function BookingStatusBadge({ status }: { status: BookingStatus }) {
   const s = STYLES[status];
   return (
     <span
-      className="inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold"
+      className="inline-flex flex-none items-center gap-1.5 rounded-full px-2.5 py-1 text-label font-semibold"
       style={{ background: s.bg, color: s.fg }}
     >
-      <span className="text-[11px] leading-none">{s.icon}</span>
+      <span className="text-micro leading-none">{s.icon}</span>
       {t(s.key)}
     </span>
   );

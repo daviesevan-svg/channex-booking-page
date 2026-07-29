@@ -118,7 +118,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
       <Link
         to={`/${params.channelId}`}
-        className="mb-6 inline-flex items-center gap-1.5 text-[14px] font-semibold text-muted hover:text-accent"
+        className="mb-6 inline-flex items-center gap-1.5 text-body font-semibold text-muted hover:text-accent"
       >
         ‹ {tr.t("backToHome")}
       </Link>
@@ -126,7 +126,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_1fr]">
         {/* ---- photos + copy ---- */}
         <div>
-          <div className="aspect-[3/2] overflow-hidden rounded-[18px] bg-surface-alt">
+          <div className="aspect-[3/2] overflow-hidden rounded-panel-lg bg-surface-alt">
             {cover ? (
               <img
                 {...imageProps(cover, IMAGE_SIZES.full)}
@@ -151,7 +151,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
                   type="button"
                   onClick={() => setPhoto(i)}
                   aria-label={`${room.title} ${i + 1}`}
-                  className={`h-[62px] w-[86px] flex-none overflow-hidden rounded-[10px] border-2 ${i === photo ? "border-accent" : "border-transparent"}`}
+                  className={`h-[62px] w-[86px] flex-none overflow-hidden rounded-control border-2 ${i === photo ? "border-accent" : "border-transparent"}`}
                 >
                   <img
                     {...imageProps(src, IMAGE_SIZES.galleryGrid)}
@@ -164,30 +164,30 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
             </div>
           )}
 
-          <h1 className="mb-2 mt-7 font-serif text-[38px] font-medium leading-[1.1] tracking-[-0.01em]">
+          <h1 className="mb-2 mt-7 font-serif text-display-2xl font-medium leading-[1.1] tracking-[-0.01em]">
             {room.title}
           </h1>
-          <div className="mb-5 text-[14px] text-muted-2">
+          <div className="mb-5 text-body text-muted-2">
             {tr.t("sleeps", { n: room.maxGuests })}
           </div>
           {room.description && (
-            <p className="mb-7 max-w-[560px] whitespace-pre-line text-[16px] leading-[1.7] text-secondary">
+            <p className="mb-7 max-w-[560px] whitespace-pre-line text-lead leading-[1.7] text-secondary">
               {room.description}
             </p>
           )}
 
           {(room.facilities.length > 0 || room.amenities.length > 0) && (
             <div className="mb-7">
-              <h2 className="mb-3 font-serif text-[20px] font-semibold">{tr.t("inThisRoom")}</h2>
+              <h2 className="mb-3 font-serif text-title-md font-semibold">{tr.t("inThisRoom")}</h2>
               <ul className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
                 {room.amenities.map((key) => (
-                  <li key={key} className="flex items-start gap-3 text-[15px]">
+                  <li key={key} className="flex items-start gap-3 text-body-lg">
                     <Diamond className="mt-[7px]" size={7} />
                     {tr.t(`am_${key}`)}
                   </li>
                 ))}
                 {room.facilities.map((line, i) => (
-                  <li key={`f${i}`} className="flex items-start gap-3 text-[15px]">
+                  <li key={`f${i}`} className="flex items-start gap-3 text-body-lg">
                     <Diamond className="mt-[7px]" size={7} />
                     {line}
                   </li>
@@ -198,12 +198,12 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
 
           {rateNames.length > 0 && (
             <div>
-              <h2 className="mb-3 font-serif text-[20px] font-semibold">{tr.t("ratesAvailable")}</h2>
+              <h2 className="mb-3 font-serif text-title-md font-semibold">{tr.t("ratesAvailable")}</h2>
               <div className="flex flex-wrap gap-2">
                 {rateNames.map((name) => (
                   <span
                     key={name}
-                    className="rounded-full border border-line-alt bg-surface-alt px-3.5 py-1.5 text-[13px] text-secondary"
+                    className="rounded-full border border-line-alt bg-surface-alt px-3.5 py-1.5 text-caption text-secondary"
                   >
                     {name}
                   </span>
@@ -212,7 +212,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
               {/* Prices live on the next page, where there are dates to price
                   against. Naming the rates here without numbers is honest and
                   still tells the guest what they'll be choosing between. */}
-              <p className="mt-2.5 text-[12px] text-faint">{tr.t("ratesPricedOnDates")}</p>
+              <p className="mt-2.5 text-label text-faint">{tr.t("ratesPricedOnDates")}</p>
             </div>
           )}
         </div>
@@ -220,7 +220,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
         {/* ---- always-on availability ---- */}
         <div>
           <div
-            className="rounded-[18px] border border-line bg-surface p-[22px_22px_18px] lg:sticky lg:top-6"
+            className="rounded-panel-lg border border-line bg-surface p-[22px_22px_18px] lg:sticky lg:top-6"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
             <CalendarNav state={dates} title={tr.t("roomAvailability")} />
@@ -235,12 +235,12 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
                 type="button"
                 onClick={seeRates}
                 disabled={!ready}
-                className="mt-3 w-full cursor-pointer rounded-[12px] bg-accent px-6 py-3.5 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:cursor-default disabled:opacity-50"
+                className="mt-3 w-full cursor-pointer rounded-card bg-accent px-6 py-3.5 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:cursor-default disabled:opacity-50"
               >
                 {ready ? tr.t("seeRatesFor", { range: dates.rangeSummary }) : tr.t("pickYourDates")}
               </button>
               {!ready && (
-                <p className="mt-2 text-center text-[12px] text-faint">{tr.t("pickYourDatesHint")}</p>
+                <p className="mt-2 text-center text-label text-faint">{tr.t("pickYourDatesHint")}</p>
               )}
             </div>
           </div>

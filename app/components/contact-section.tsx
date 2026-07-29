@@ -13,7 +13,7 @@ import { Diamond } from "~/components/sections";
 import { RichText } from "~/components/rich-text";
 
 const FIELD =
-  "mt-1.5 w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-accent";
+  "mt-1.5 w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
 
 export interface ContactDetails {
   address?: string;
@@ -45,10 +45,10 @@ export function ContactSection({
 
   return (
     <div className="mt-12 scroll-mt-24" id="contact">
-      <h2 className="mb-2 font-serif text-[24px] font-semibold">{heading}</h2>
+      <h2 className="mb-2 font-serif text-title-3xl font-semibold">{heading}</h2>
       {intro && (
         <div className="mb-6 max-w-[620px]">
-          <RichText text={intro} className="text-[15px] leading-[1.6] text-muted" />
+          <RichText text={intro} className="text-body-lg leading-[1.6] text-muted" />
         </div>
       )}
 
@@ -56,7 +56,7 @@ export function ContactSection({
         className={`grid grid-cols-1 gap-10 ${showForm ? "lg:grid-cols-[1fr_1.2fr]" : "max-w-[620px]"}`}
       >
         {hasDetails && (
-          <dl className="flex flex-col gap-4 text-[15px]">
+          <dl className="flex flex-col gap-4 text-body-lg">
             {details.address && (
               <Row label={tr.t("contactAddress")}>
                 <span className="whitespace-pre-line">{details.address}</span>
@@ -110,7 +110,7 @@ export function ContactSection({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <dt className="flex items-start gap-3 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+      <dt className="flex items-start gap-3 text-label font-semibold uppercase tracking-wide text-muted-2">
         <Diamond className="mt-[5px]" size={7} />
         <span>{label}</span>
       </dt>
@@ -127,9 +127,9 @@ function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
 
   if (result?.ok) {
     return (
-      <div className="rounded-[14px] border border-[#cfe3d3] bg-[#eef5ef] p-6">
-        <p className="text-[15px] font-semibold text-[#3f7a52]">{tr.t("contactSentTitle")}</p>
-        <p className="mt-1 text-[14px] leading-[1.55] text-[#4a6b52]">{tr.t("contactSentBody")}</p>
+      <div className="rounded-card-lg border border-[#cfe3d3] bg-[#eef5ef] p-6">
+        <p className="text-body-lg font-semibold text-[#3f7a52]">{tr.t("contactSentTitle")}</p>
+        <p className="mt-1 text-body leading-[1.55] text-[#4a6b52]">{tr.t("contactSentBody")}</p>
       </div>
     );
   }
@@ -152,7 +152,7 @@ function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
     <fetcher.Form
       method="post"
       action={`/${channelId}/contact`}
-      className="rounded-[14px] border border-line bg-surface p-6"
+      className="rounded-card-lg border border-line bg-surface p-6"
     >
       {/* Honeypot. Hidden from people, irresistible to bots; a filled value is
           accepted and dropped server-side. */}
@@ -164,11 +164,11 @@ function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <label className="block text-[13px] font-semibold text-secondary">
+        <label className="block text-caption font-semibold text-secondary">
           {tr.t("contactYourName")}
           <input name="name" required maxLength={100} autoComplete="name" className={FIELD} />
         </label>
-        <label className="block text-[13px] font-semibold text-secondary">
+        <label className="block text-caption font-semibold text-secondary">
           {tr.t("contactYourEmail")}
           <input
             name="email"
@@ -180,17 +180,17 @@ function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
           />
         </label>
       </div>
-      <label className="mt-4 block text-[13px] font-semibold text-secondary">
+      <label className="mt-4 block text-caption font-semibold text-secondary">
         {tr.t("contactMessage")}
         <textarea name="message" required rows={5} maxLength={2000} className={FIELD} />
       </label>
 
-      {errorText && <p className="mt-3 text-[13px] font-medium text-red-600">{errorText}</p>}
+      {errorText && <p className="mt-3 text-caption font-medium text-red-600">{errorText}</p>}
 
       <button
         type="submit"
         disabled={sending}
-        className="mt-4 cursor-pointer rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+        className="mt-4 cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
       >
         {sending ? tr.t("contactSending") : tr.t("contactSend")}
       </button>

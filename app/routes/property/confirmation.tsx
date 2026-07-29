@@ -139,10 +139,10 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
   if (failed) {
     return (
       <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
-        <h1 className="mb-3 font-serif text-[40px] font-medium tracking-[-0.02em]">
+        <h1 className="mb-3 font-serif text-display-3xl font-medium tracking-[-0.02em]">
           {tr.t("confirmProblemHeading")}
         </h1>
-        <p className="mb-6 text-[17px] leading-[1.6] text-secondary">
+        <p className="mb-6 text-lead-lg leading-[1.6] text-secondary">
           {(refunded ? tr.t("confirmRefundedBody") : tr.t("confirmProblemBody")).replaceAll("{hotel}", hotelName)}
         </p>
         <div
@@ -154,7 +154,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         <div>
           <Link
             to={`/${params.channelId}`}
-            className="inline-block rounded-[12px] border border-line-alt bg-surface-alt px-7 py-3.5 text-[15px] font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+            className="inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
           >
             {text.newBooking}
           </Link>
@@ -176,7 +176,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
       {simulated && (
-        <div className="mb-6 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13px] text-muted">
+        <div className="mb-6 rounded-control border border-line-alt bg-surface-alt px-4 py-3 text-caption text-muted">
           {tr.t("demoMode")}
         </div>
       )}
@@ -194,8 +194,8 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
           }}
         />
       </div>
-      <h1 className="mb-3 font-serif text-[44px] font-medium tracking-[-0.02em]">{text.heading}</h1>
-      <p className="mb-2 text-[18px] leading-[1.6] text-secondary">
+      <h1 className="mb-3 font-serif text-display-4xl font-medium tracking-[-0.02em]">{text.heading}</h1>
+      <p className="mb-2 text-title-xs leading-[1.6] text-secondary">
         {text.subtitle.replaceAll("{hotel}", hotelName)}
       </p>
       <div
@@ -206,21 +206,21 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
       </div>
 
       <div
-        className="rounded-[18px] border border-line bg-surface p-[26px] text-left"
+        className="rounded-panel-lg border border-line bg-surface p-[26px] text-left"
         style={{ boxShadow: "var(--shadow-confirm)" }}
       >
         <div className="flex flex-col gap-4 border-b border-divider pb-5">
           {rooms.map((r, i) => (
             <div key={i} className="flex items-center gap-[18px]">
-              <div className="h-16 w-[84px] flex-none rounded-[12px]" style={{ background: stripe }} />
+              <div className="h-16 w-[84px] flex-none rounded-card" style={{ background: stripe }} />
               <div>
-                <div className="font-serif text-[19px] font-semibold">{r.title}</div>
-                <div className="mt-[3px] text-[13px] text-muted-2">{r.rate}</div>
+                <div className="font-serif text-title-sm font-semibold">{r.title}</div>
+                <div className="mt-[3px] text-caption text-muted-2">{r.rate}</div>
               </div>
             </div>
           ))}
         </div>
-        <div className="mt-5 flex flex-col gap-3 text-[15px]">
+        <div className="mt-5 flex flex-col gap-3 text-body-lg">
           <div className="flex justify-between">
             <span className="text-secondary">{tr.t("dates")}</span>
             <span className="font-semibold">{datesStr}</span>
@@ -261,13 +261,13 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             ))}
           {groupExtrasByRoom(extraLines).map((g, gi) => (
             <div key={gi} className="flex flex-col gap-1">
-              <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+              <div className="text-label font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
               {g.lines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex justify-between pl-2">
                   <span className="text-secondary">
                     {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
                     {l.qty > 1 ? ` ×${l.qty}` : ""}
-                    {l.infoLine ? <span className="block text-[12px] text-muted-2">{l.infoLine}</span> : null}
+                    {l.infoLine ? <span className="block text-label text-muted-2">{l.infoLine}</span> : null}
                   </span>
                   <span className="font-semibold">{formatMoney(l.amount, currency)}</span>
                 </div>
@@ -277,13 +277,13 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
           {total > 0 && (
             <div className="flex items-baseline justify-between border-t border-divider pt-3">
               <span className="text-secondary">{tr.t("total")}</span>
-              <span className="font-serif text-[24px] font-semibold">
+              <span className="font-serif text-title-3xl font-semibold">
                 {formatMoney(grandTotal, currency)}
               </span>
             </div>
           )}
           {total > 0 && pricing.taxIncluded > 0 && (
-            <div className="text-right text-[12px] text-muted-2">
+            <div className="text-right text-label text-muted-2">
               {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
             </div>
           )}
@@ -292,7 +292,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
 
       <Link
         to={`/${params.channelId}`}
-        className="mt-7 inline-block rounded-[12px] border border-line-alt bg-surface-alt px-7 py-3.5 text-[15px] font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+        className="mt-7 inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
       >
         {text.newBooking}
       </Link>

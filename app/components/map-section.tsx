@@ -93,9 +93,9 @@ export function MapSection({
 
   return (
     <div className="mt-12">
-      <h2 className="mb-2 font-serif text-[24px] font-semibold">{heading}</h2>
+      <h2 className="mb-2 font-serif text-title-3xl font-semibold">{heading}</h2>
       {(address || directions) && (
-        <div className="mb-5 max-w-[620px] text-[15px] leading-[1.6] text-muted">
+        <div className="mb-5 max-w-[620px] text-body-lg leading-[1.6] text-muted">
           {address && <p className="whitespace-pre-line">{address}</p>}
           {directions && (
             <div className="mt-2">
@@ -105,7 +105,7 @@ export function MapSection({
         </div>
       )}
 
-      <div className="relative h-[340px] overflow-hidden rounded-[18px] border border-line bg-surface-alt">
+      <div className="relative h-[340px] overflow-hidden rounded-panel-lg border border-line bg-surface-alt">
         {show && !failed ? (
           <LiveMap
             lat={lat}
@@ -123,13 +123,13 @@ export function MapSection({
                 <button
                   type="button"
                   onClick={() => setShow(true)}
-                  className="cursor-pointer rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white shadow-sm hover:bg-accent-deep"
+                  className="cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white shadow-sm hover:bg-accent-deep"
                 >
                   {tr.t("showMap")}
                 </button>
               )}
               {failed && (
-                <span className="rounded-[10px] bg-surface px-4 py-2 text-[13px] font-medium text-secondary">
+                <span className="rounded-control bg-surface px-4 py-2 text-caption font-medium text-secondary">
                   {tr.t("mapUnavailable")}
                 </span>
               )}
@@ -145,7 +145,7 @@ export function MapSection({
         href={directionsUrl}
         target="_blank"
         rel="noreferrer noopener"
-        className="mt-3 inline-block text-[14px] font-semibold text-accent hover:underline"
+        className="mt-3 inline-block text-body font-semibold text-accent hover:underline"
       >
         {tr.t("getDirections")} ↗
       </a>

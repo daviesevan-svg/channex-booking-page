@@ -222,7 +222,7 @@ function Diamond({ size, className = "" }: { size: number; className?: string })
   return (
     <span
       aria-hidden
-      className={`inline-block flex-none rounded-[1px] bg-accent ${className}`}
+      className={`inline-block flex-none rounded-mark bg-accent ${className}`}
       style={{ width: size, height: size, transform: "rotate(45deg)" }}
     />
   );
@@ -233,7 +233,7 @@ function Diamond({ size, className = "" }: { size: number; className?: string })
 function Faq({ items }: { items: { q: string; a: string }[] }) {
   const [open, setOpen] = useState(0);
   return (
-    <div className="overflow-hidden rounded-[16px] border border-line bg-surface-alt">
+    <div className="overflow-hidden rounded-panel border border-line bg-surface-alt">
       {items.map((item, i) => (
         <div key={i} className={i === 0 ? "" : "border-t border-divider"}>
           <button
@@ -241,9 +241,9 @@ function Faq({ items }: { items: { q: string; a: string }[] }) {
             onClick={() => setOpen(open === i ? -1 : i)}
             className="flex w-full items-center justify-between gap-4 px-[22px] py-[19px] text-left"
           >
-            <span className="text-[16px] font-semibold text-ink">{item.q}</span>
+            <span className="text-lead font-semibold text-ink">{item.q}</span>
             <span
-              className="flex-none text-[22px] leading-none text-accent transition-transform duration-200"
+              className="flex-none text-title-xl leading-none text-accent transition-transform duration-200"
               style={{ transform: open === i ? "rotate(45deg)" : "rotate(0deg)" }}
             >
               +
@@ -253,7 +253,7 @@ function Faq({ items }: { items: { q: string; a: string }[] }) {
             className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
             style={{ maxHeight: open === i ? "300px" : "0px" }}
           >
-            <p className="m-0 max-w-[64ch] px-[22px] pb-5 text-[15px] leading-[1.6] text-secondary">{item.a}</p>
+            <p className="m-0 max-w-[64ch] px-[22px] pb-5 text-body-lg leading-[1.6] text-secondary">{item.a}</p>
           </div>
         </div>
       ))}
@@ -273,7 +273,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
   const money = (n: number) => formatMoney(n, currency);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
   const input =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-accent";
+    "mt-1.5 block w-full rounded-control border border-line-alt bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
 
   const pkg = p.package;
   const pkgGuests = pkg ? pkg.adults + (pkg.children ?? 0) : 0;
@@ -335,14 +335,14 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
   };
 
   const primaryBtn =
-    "w-full rounded-[12px] bg-accent px-6 py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60";
+    "w-full rounded-card bg-accent px-6 py-[15px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60";
   const outlineBtn =
-    "w-full rounded-[12px] border border-line-alt bg-transparent px-6 py-[13px] text-[15px] font-semibold text-secondary transition-colors hover:bg-chip";
+    "w-full rounded-card border border-line-alt bg-transparent px-6 py-[13px] text-body-lg font-semibold text-secondary transition-colors hover:bg-chip";
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-24 pt-6 min-[900px]:pb-20">
       {/* Breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-[13px] text-muted-2">
+      <div className="mb-4 flex items-center gap-2 text-caption text-muted-2">
         <Link to={`/${params.channelId}/vouchers`} className="hover:text-accent">
           {tr.t("vouchersTitle")}
         </Link>
@@ -353,7 +353,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
       {/* Hero gallery: one large image spanning two rows + two stacked. */}
       {gallery.length > 0 ? (
         <section
-          className={`mb-6 grid gap-3 overflow-hidden rounded-[22px] ${gallery.length >= 3 ? "grid-cols-[2fr_1fr] grid-rows-2" : gallery.length === 2 ? "grid-cols-[2fr_1fr]" : ""}`}
+          className={`mb-6 grid gap-3 overflow-hidden rounded-well-lg ${gallery.length >= 3 ? "grid-cols-[2fr_1fr] grid-rows-2" : gallery.length === 2 ? "grid-cols-[2fr_1fr]" : ""}`}
           style={{ height: "clamp(300px, 42vw, 460px)" }}
         >
           {gallery.slice(0, 3).map((src, i) => {
@@ -367,7 +367,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
               >
                 <img src={src} alt={i === 0 ? p.title : ""} className="h-full w-full object-cover" />
                 {last && gallery.length > 1 && (
-                  <span className="absolute bottom-3.5 right-3.5 rounded-full bg-ink/80 px-[15px] py-2 text-[13px] font-semibold text-page backdrop-blur-sm">
+                  <span className="absolute bottom-3.5 right-3.5 rounded-full bg-ink/80 px-[15px] py-2 text-caption font-semibold text-page backdrop-blur-sm">
                     {tr.t("voucherPhotosCount", { n: String(gallery.length) })}
                   </span>
                 )}
@@ -376,14 +376,14 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           })}
         </section>
       ) : (
-        <div className="mb-6 h-[280px] rounded-[22px]" style={{ background: stripe }} />
+        <div className="mb-6 h-[280px] rounded-well-lg" style={{ background: stripe }} />
       )}
 
       {/* Body: content + sticky purchase panel */}
       <div className="grid items-start gap-x-12 gap-y-8 min-[900px]:grid-cols-[minmax(0,1fr)_360px]">
         {/* LEFT column */}
         <div>
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-[13px] py-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent-deep">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-[13px] py-1.5 text-label font-semibold uppercase tracking-[0.06em] text-accent-deep">
             <Diamond size={7} />
             {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
           </div>
@@ -391,23 +391,23 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
             {p.title}
           </h1>
           {(pkg || (p.kind === "experience" && p.guests)) && (
-            <p className="mb-3.5 text-[16px] text-secondary">
+            <p className="mb-3.5 text-lead text-secondary">
               {tr.t("voucherForGuests", { n: String(pkg ? pkgGuests : p.guests) })}
             </p>
           )}
           {p.description && (
-            <p className="mb-7 max-w-[60ch] text-[17px] leading-[1.6] text-secondary">{p.description}</p>
+            <p className="mb-7 max-w-[60ch] text-lead-lg leading-[1.6] text-secondary">{p.description}</p>
           )}
 
           {/* Facts strip — hairline dividers via 1px gaps over the border color */}
           <div
-            className="mb-10 grid gap-px overflow-hidden rounded-[16px] border border-line bg-line"
+            className="mb-10 grid gap-px overflow-hidden rounded-panel border border-line bg-line"
             style={{ gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))" }}
           >
             {facts.map((f) => (
               <div key={f.label} className="bg-surface-alt px-[18px] pb-4 pt-[18px]">
-                <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted-2">{f.label}</div>
-                <div className="font-serif text-[20px] font-semibold tracking-[-0.01em]">{f.value}</div>
+                <div className="mb-1.5 text-label font-semibold uppercase tracking-[0.1em] text-muted-2">{f.label}</div>
+                <div className="font-serif text-title-md font-semibold tracking-[-0.01em]">{f.value}</div>
               </div>
             ))}
           </div>
@@ -415,14 +415,14 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           {/* What's included */}
           {p.included.length > 0 && (
             <section id="included" className="mb-11 scroll-mt-[90px]">
-              <h2 className="m-0 mb-5 font-serif text-[28px] font-semibold tracking-[-0.01em]">
+              <h2 className="m-0 mb-5 font-serif text-display-sm font-semibold tracking-[-0.01em]">
                 {tr.t("voucherIncludedTitle")}
               </h2>
               <div className="grid gap-x-7 gap-y-3.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))" }}>
                 {p.included.map((item) => (
                   <div key={item} className="flex items-start gap-3 py-0.5">
                     <Diamond size={8} className="mt-[7px]" />
-                    <span className="text-[16px] leading-[1.5] text-ink">{item}</span>
+                    <span className="text-lead leading-[1.5] text-ink">{item}</span>
                   </div>
                 ))}
               </div>
@@ -432,20 +432,20 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           {/* Where you'll stay — the package's room types (or the hotel's rooms) */}
           {roomCards.length > 0 && (
             <section className="mb-11">
-              <h2 className="m-0 mb-5 font-serif text-[28px] font-semibold tracking-[-0.01em]">
+              <h2 className="m-0 mb-5 font-serif text-display-sm font-semibold tracking-[-0.01em]">
                 {tr.t("voucherWhereYoullStay")}
               </h2>
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
                 {roomCards.map((r) => (
-                  <div key={r.name} className="overflow-hidden rounded-[18px] border border-line bg-surface-alt">
+                  <div key={r.name} className="overflow-hidden rounded-panel-lg border border-line bg-surface-alt">
                     {r.img && (
                       <div className="h-[150px] overflow-hidden bg-line">
                         <img src={r.img} alt={r.name} className="h-full w-full object-cover" />
                       </div>
                     )}
                     <div className="px-[18px] pb-5 pt-[18px]">
-                      <div className="mb-1.5 font-serif text-[21px] font-semibold tracking-[-0.01em]">{r.name}</div>
-                      {r.desc && <div className="line-clamp-3 text-[14px] leading-[1.55] text-secondary">{r.desc}</div>}
+                      <div className="mb-1.5 font-serif text-title-lg font-semibold tracking-[-0.01em]">{r.name}</div>
+                      {r.desc && <div className="line-clamp-3 text-body leading-[1.55] text-secondary">{r.desc}</div>}
                     </div>
                   </div>
                 ))}
@@ -455,7 +455,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
 
           {/* Good to know */}
           <section id="faq" className="scroll-mt-[90px]">
-            <h2 className="m-0 mb-[18px] font-serif text-[28px] font-semibold tracking-[-0.01em]">
+            <h2 className="m-0 mb-[18px] font-serif text-display-sm font-semibold tracking-[-0.01em]">
               {tr.t("voucherFaqTitle")}
             </h2>
             <Faq items={faqs} />
@@ -465,26 +465,26 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
         {/* RIGHT: sticky purchase panel */}
         <aside id="buy" className="scroll-mt-[88px] min-[900px]:sticky min-[900px]:top-[88px]">
           <div
-            className="overflow-hidden rounded-[20px] border border-line-alt bg-surface-alt"
+            className="overflow-hidden rounded-well border border-line-alt bg-surface-alt"
             style={{ boxShadow: "0 24px 60px -34px rgba(70,55,35,0.45)" }}
           >
             <div className="p-6 pb-[22px]">
               {soldOut ? (
-                <p className="m-0 text-[15px] font-semibold text-[#c0392b]">{tr.t("voucherSoldOut")}</p>
+                <p className="m-0 text-body-lg font-semibold text-[#c0392b]">{tr.t("voucherSoldOut")}</p>
               ) : (
                 <>
                   <div className="mb-0.5 flex items-baseline gap-2">
-                    <span className="font-serif text-[40px] font-semibold leading-none tracking-[-0.01em]">
+                    <span className="font-serif text-display-3xl font-semibold leading-none tracking-[-0.01em]">
                       {money(p.price)}
                     </span>
                   </div>
-                  <div className="mb-5 text-[14px] text-secondary">{priceSub}</div>
+                  <div className="mb-5 text-body text-secondary">{priceSub}</div>
 
                   <div className="mb-[18px] flex flex-col gap-2.5">
                     {panelPoints.map((pt) => (
                       <div key={pt} className="flex items-start gap-2.5">
                         <Diamond size={6} className="mt-[6px]" />
-                        <span className="text-[14px] leading-[1.45] text-secondary">{pt}</span>
+                        <span className="text-body leading-[1.45] text-secondary">{pt}</span>
                       </div>
                     ))}
                   </div>
@@ -500,17 +500,17 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                     </>
                   ) : (
                     <Form method="post" className="flex flex-col gap-4 border-t border-divider pt-4">
-                      <h2 className="m-0 font-serif text-[20px] font-semibold">{tr.t("voucherYourDetails")}</h2>
-                      <label className="block text-[13px] font-semibold text-secondary">
+                      <h2 className="m-0 font-serif text-title-md font-semibold">{tr.t("voucherYourDetails")}</h2>
+                      <label className="block text-caption font-semibold text-secondary">
                         {tr.t("buyerName")}
                         <input name="buyerName" required className={input} />
                       </label>
-                      <label className="block text-[13px] font-semibold text-secondary">
+                      <label className="block text-caption font-semibold text-secondary">
                         {tr.t("buyerEmail")}
                         <input name="buyerEmail" type="email" required className={input} />
                       </label>
 
-                      <label className="flex items-center gap-2.5 text-[14px] font-semibold">
+                      <label className="flex items-center gap-2.5 text-body font-semibold">
                         <input
                           type="checkbox"
                           name="isGift"
@@ -522,18 +522,18 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                       </label>
                       {isGift && (
                         <>
-                          <label className="block text-[13px] font-semibold text-secondary">
+                          <label className="block text-caption font-semibold text-secondary">
                             {tr.t("recipientName")}
                             <input name="recipientName" className={input} />
                           </label>
-                          <label className="block text-[13px] font-semibold text-secondary">
+                          <label className="block text-caption font-semibold text-secondary">
                             {tr.t("recipientEmail")}
                             <input name="recipientEmail" type="email" className={input} />
-                            <span className="mt-1 block text-[11px] font-normal text-faint">
+                            <span className="mt-1 block text-micro font-normal text-faint">
                               {tr.t("recipientEmailHint")}
                             </span>
                           </label>
-                          <label className="block text-[13px] font-semibold text-secondary">
+                          <label className="block text-caption font-semibold text-secondary">
                             {tr.t("giftMessage")}
                             <textarea name="message" rows={2} maxLength={400} className={`${input} resize-y`} />
                           </label>
@@ -541,7 +541,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                       )}
 
                       {p.terms && (
-                        <label className="flex items-start gap-2.5 text-[13px] text-secondary">
+                        <label className="flex items-start gap-2.5 text-caption text-secondary">
                           <input
                             type="checkbox"
                             name="agree"
@@ -551,21 +551,21 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                         </label>
                       )}
 
-                      {actionData?.error && <p className="m-0 text-[13px] text-red-600">{actionData.error}</p>}
+                      {actionData?.error && <p className="m-0 text-caption text-red-600">{actionData.error}</p>}
                       <button type="submit" disabled={busy} className={primaryBtn}>
                         {busy ? "…" : tr.t("voucherBuy", { amount: money(p.price) })}
                       </button>
                     </Form>
                   )}
 
-                  <div className="mt-4 flex items-center justify-center gap-2 text-[13px] text-muted-2">
+                  <div className="mt-4 flex items-center justify-center gap-2 text-caption text-muted-2">
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: "oklch(0.7 0.13 150)" }} />
                     {tr.t("voucherTrustLine", { n: String(p.expiresMonths) })}
                   </div>
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-[13px] text-secondary">
+            <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-caption text-secondary">
               <Diamond size={7} />
               {pkg ? tr.t("voucherStripDates") : p.kind === "experience" ? tr.t("voucherStripExperience") : tr.t("voucherStripBalance")}
             </div>
@@ -584,13 +584,13 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           }}
         >
           <div>
-            <div className="font-serif text-[24px] font-semibold leading-none">{money(p.price)}</div>
-            <div className="text-[12px] text-muted-2">{priceSub}</div>
+            <div className="font-serif text-title-3xl font-semibold leading-none">{money(p.price)}</div>
+            <div className="text-label text-muted-2">{priceSub}</div>
           </div>
           <a
             href="#buy"
             onClick={() => setFormOpen(true)}
-            className="flex-none rounded-[11px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep"
+            className="flex-none rounded-field bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep"
           >
             {tr.t("voucherBuy", { amount: money(p.price) })}
           </a>

@@ -153,13 +153,13 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       <div className="eyebrow mb-[18px]">{eyebrow}</div>
       <h1
         className={`mb-[18px] font-serif font-medium leading-[1.05] tracking-[-0.02em] ${
-          split ? "text-[44px] lg:text-[50px]" : "text-[56px]"
+          split ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl"
         }`}
       >
         {heading}
       </h1>
       <p
-        className={`whitespace-pre-line text-[18px] leading-[1.6] text-secondary ${
+        className={`whitespace-pre-line text-title-xs leading-[1.6] text-secondary ${
           split ? "mb-0" : "mb-9 max-w-[560px]"
         }`}
       >
@@ -182,7 +182,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               the photo to the text, with a floor so a one-line intro doesn't
               leave a sliver and a ceiling so a long one doesn't produce a
               1,000px portrait. */}
-          <div className="min-h-[320px] overflow-hidden rounded-[18px] bg-surface-alt lg:h-full lg:max-h-[560px]">
+          <div className="min-h-[320px] overflow-hidden rounded-panel-lg bg-surface-alt lg:h-full lg:max-h-[560px]">
             <img
               {...imageProps(heroSplit, IMAGE_SIZES.heroSplit)}
               alt={hotelName}
@@ -197,17 +197,17 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       {/* search card — `#book` is the anchor the room cards jump to */}
       <div className="relative max-w-[920px]" id="book">
         <div
-          className="flex flex-wrap items-stretch gap-1.5 rounded-[18px] border border-line bg-surface p-3.5"
+          className="flex flex-wrap items-stretch gap-1.5 rounded-panel-lg border border-line bg-surface p-3.5"
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <button
             type="button"
             onClick={() => setShowCal(true)}
-            className="min-w-[150px] flex-1 cursor-pointer rounded-[12px] px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
+            className="min-w-[150px] flex-1 cursor-pointer rounded-card px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
           >
             <div className="field-label mb-1.5">{tr.t("checkIn")}</div>
             <div
-              className="text-[17px] font-semibold"
+              className="text-lead-lg font-semibold"
               style={{ color: dates.checkin ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkinLabel}
@@ -217,11 +217,11 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           <button
             type="button"
             onClick={() => setShowCal(true)}
-            className="min-w-[150px] flex-1 cursor-pointer rounded-[12px] px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
+            className="min-w-[150px] flex-1 cursor-pointer rounded-card px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
           >
             <div className="field-label mb-1.5">{tr.t("checkOut")}</div>
             <div
-              className="text-[17px] font-semibold"
+              className="text-lead-lg font-semibold"
               style={{ color: dates.checkout ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkoutLabel}
@@ -233,7 +233,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             type="button"
             onClick={searchRooms}
             disabled={searching}
-            className="min-h-16 flex-none cursor-pointer rounded-[12px] bg-accent px-[34px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
+            className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
             {searching ? tr.t("searching") : searchButton}
           </button>
@@ -248,7 +248,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           onClick={() => setShowPromo((v) => !v)}
           className="flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-accent"
         >
-          <span className="text-[18px] leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
+          <span className="text-title-xs leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
           {promoText}
         </button>
         {showPromo && (
@@ -259,7 +259,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               if (e.key === "Enter") searchRooms();
             }}
             placeholder={promoPlaceholder}
-            className="mt-2 block w-[240px] max-w-full rounded-[10px] border border-line bg-surface px-3.5 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+            className="mt-2 block w-[240px] max-w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
           />
         )}
       </div>

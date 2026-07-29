@@ -49,7 +49,7 @@ export function CalendarPopover({
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
         ref={ref}
-        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-[18px] border border-line bg-surface p-[22px_22px_18px]"
+        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-panel-lg border border-line bg-surface p-[22px_22px_18px]"
         style={{ boxShadow: "var(--shadow-popover)", maxHeight: maxH ? `${maxH}px` : undefined }}
       >
         <CalendarNav state={state} />
@@ -58,18 +58,18 @@ export function CalendarPopover({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-divider pt-3.5">
           <CalendarLegend />
           <div className="flex items-center gap-2.5">
-            <div className="text-[13px] font-semibold text-secondary">{state.rangeSummary}</div>
+            <div className="text-caption font-semibold text-secondary">{state.rangeSummary}</div>
             <button
               type="button"
               onClick={state.clear}
-              className="cursor-pointer border-none bg-transparent text-[13px] font-semibold text-muted-2 hover:text-accent"
+              className="cursor-pointer border-none bg-transparent text-caption font-semibold text-muted-2 hover:text-accent"
             >
               {tr.t("clear")}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-[10px] bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent-deep"
+              className="rounded-control bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent-deep"
             >
               {tr.t("done")}
             </button>

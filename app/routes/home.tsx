@@ -101,7 +101,7 @@ export function meta() {
 function Diamond({ size = 13 }: { size?: number }) {
   return (
     <span
-      className="inline-block flex-none rounded-[2px] bg-accent"
+      className="inline-block flex-none rounded-mark-lg bg-accent"
       style={{ width: size, height: size, transform: "rotate(45deg)" }}
     />
   );
@@ -113,8 +113,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   if (items.length === 0) {
     return (
       <main className="mx-auto max-w-2xl px-7 py-24 text-center">
-        <span className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-[2px] bg-accent" style={{ transform: "rotate(45deg)" }} />
-        <h1 className="font-serif text-[40px] font-medium tracking-[-0.02em]">Roompanda</h1>
+        <span className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark-lg bg-accent" style={{ transform: "rotate(45deg)" }} />
+        <h1 className="font-serif text-display-3xl font-medium tracking-[-0.02em]">Roompanda</h1>
         <p className="mt-4 text-secondary">
           Open <code className="rounded bg-chip px-1.5 py-0.5">/your-property-id</code> to book, or
           create a collection / mark a property “Public” in the admin to list it here.
@@ -130,12 +130,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="mb-[clamp(28px,5vw,52px)] max-w-[640px]">
           <div className="mb-5 flex items-center gap-3">
             <Diamond />
-            <span className="font-serif text-[19px] font-semibold tracking-[-0.01em]">Roompanda</span>
+            <span className="font-serif text-title-sm font-semibold tracking-[-0.01em]">Roompanda</span>
           </div>
           <h1 className="font-serif text-[clamp(32px,6vw,46px)] font-medium leading-[1.05] tracking-[-0.02em]">
             Find your stay
           </h1>
-          <p className="mt-3 text-[16px] leading-[1.6] text-secondary">{subtitle}</p>
+          <p className="mt-3 text-lead leading-[1.6] text-secondary">{subtitle}</p>
         </div>
 
         {/* grid of cards */}
@@ -144,7 +144,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <Link
               key={c.href}
               to={c.href}
-              className="group flex flex-col overflow-hidden rounded-[16px] border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_22px_44px_-28px_rgba(70,55,35,0.5)]"
+              className="group flex flex-col overflow-hidden rounded-panel border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:border-accent hover:shadow-[0_22px_44px_-28px_rgba(70,55,35,0.5)]"
             >
               <div
                 className="relative aspect-[3/2] w-full overflow-hidden"
@@ -158,7 +158,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   />
                 )}
                 <span
-                  className="absolute left-3 top-3 rounded-full px-2.5 py-[5px] text-[11px] font-bold uppercase tracking-[0.04em]"
+                  className="absolute left-3 top-3 rounded-full px-2.5 py-[5px] text-micro font-bold uppercase tracking-[0.04em]"
                   style={{ background: "rgba(255,253,250,0.92)", color: "#5a5145" }}
                 >
                   {c.tag}
@@ -166,17 +166,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </div>
               <div className="flex flex-1 flex-col p-[22px_24px]">
                 {c.meta && (
-                  <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted">
+                  <div className="mb-1.5 text-label font-semibold uppercase tracking-[0.1em] text-muted">
                     {c.meta}
                   </div>
                 )}
-                <h3 className="font-serif text-[22px] font-semibold tracking-[-0.01em] group-hover:text-accent">
+                <h3 className="font-serif text-title-xl font-semibold tracking-[-0.01em] group-hover:text-accent">
                   {c.name}
                 </h3>
                 {c.blurb && (
-                  <p className="mt-2 line-clamp-2 text-[14px] leading-[1.55] text-secondary">{c.blurb}</p>
+                  <p className="mt-2 line-clamp-2 text-body leading-[1.55] text-secondary">{c.blurb}</p>
                 )}
-                <span className="mt-auto pt-4 text-[14px] font-semibold text-accent">{c.cta}</span>
+                <span className="mt-auto pt-4 text-body font-semibold text-accent">{c.cta}</span>
               </div>
             </Link>
           ))}

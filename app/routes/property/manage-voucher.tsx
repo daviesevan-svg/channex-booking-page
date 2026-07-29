@@ -178,9 +178,9 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
   const busy = nav.state !== "idle";
   const money = (n: number) => formatMoney(n, currency);
   const date = (iso: string) => fmtDate(iso, "d MMM yyyy", tr.locale);
-  const card = "rounded-[16px] border border-line bg-surface p-6";
+  const card = "rounded-panel border border-line bg-surface p-6";
   const inputCls =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-accent";
+    "mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
 
   const remindError = actionData && "remindError" in actionData ? actionData.remindError : undefined;
   const reminded = actionData && "reminded" in actionData ? actionData.reminded : undefined;
@@ -197,14 +197,14 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
       </Link>
 
       <div className="mb-2 flex flex-wrap items-center gap-3">
-        <h1 className="font-serif text-[34px] font-medium tracking-[-0.02em]">{v.title}</h1>
+        <h1 className="font-serif text-display-xl font-medium tracking-[-0.02em]">{v.title}</h1>
         <span
-          className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${STATUS_STYLE[v.status] ?? "bg-chip text-muted"}`}
+          className={`rounded-full px-3 py-1.5 text-label font-semibold ${STATUS_STYLE[v.status] ?? "bg-chip text-muted"}`}
         >
           {tr.t(`voucherStatus_${v.status}`)}
         </span>
       </div>
-      <p className="mb-7 text-[14px] text-muted-2">
+      <p className="mb-7 text-body text-muted-2">
         {v.code} · {tr.t("voucherPurchasedOn", { date: date(v.purchasedAt) })} ·{" "}
         {tr.t("voucherValidUntil", { date: date(v.expiresAt) })}
         {v.gift?.recipientName ? ` · ${tr.t("manageVoucherFor", { name: v.gift.recipientName })}` : ""}
@@ -215,26 +215,26 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
         <div className={card}>
           {v.kind === "gift" ? (
             <div className="flex items-baseline justify-between">
-              <span className="text-[14px] font-semibold text-secondary">{tr.t("voucherBalance")}</span>
-              <span className="font-serif text-[28px] font-semibold">{money(v.balance ?? 0)}</span>
+              <span className="text-body font-semibold text-secondary">{tr.t("voucherBalance")}</span>
+              <span className="font-serif text-display-sm font-semibold">{money(v.balance ?? 0)}</span>
             </div>
           ) : (
             <div className="flex items-baseline justify-between">
-              <span className="text-[14px] font-semibold text-secondary">
+              <span className="text-body font-semibold text-secondary">
                 {tr.t(`voucherStatus_${v.status}`)}
                 {v.bookingReference ? ` · ${tr.t("reference")} ${v.bookingReference}` : ""}
               </span>
-              <span className="font-serif text-[28px] font-semibold">{money(v.price)}</span>
+              <span className="font-serif text-display-sm font-semibold">{money(v.price)}</span>
             </div>
           )}
 
           {v.activity.length > 0 && (
             <div className="mt-4 border-t border-divider pt-4">
-              <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-muted-2">
+              <div className="mb-2 text-label font-semibold uppercase tracking-[0.1em] text-muted-2">
                 {tr.t("voucherManageActivity")}
               </div>
               {v.activity.map((a, i) => (
-                <div key={i} className="flex items-center justify-between py-1 text-[14px] text-secondary">
+                <div key={i} className="flex items-center justify-between py-1 text-body text-secondary">
                   <span>
                     {a.type === "cancelled"
                       ? tr.t("voucherStatus_cancelled")
@@ -250,7 +250,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
             </div>
           )}
 
-          <div className="mt-4 border-t border-divider pt-4 text-[13px]">
+          <div className="mt-4 border-t border-divider pt-4 text-caption">
             <Link to={`/${params.channelId}/voucher/${v.code}`} className="font-semibold text-accent hover:text-accent-deep">
               {tr.t("manageVoucherOpen")} →
             </Link>
@@ -260,21 +260,21 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
         {/* Reminder to the recipient */}
         {canRemind && v.gift && (
           <div className={card}>
-            <h2 className="m-0 mb-1.5 font-serif text-[20px] font-semibold">{tr.t("voucherRemindTitle")}</h2>
-            <p className="m-0 mb-4 text-[14px] leading-[1.6] text-secondary">
+            <h2 className="m-0 mb-1.5 font-serif text-title-md font-semibold">{tr.t("voucherRemindTitle")}</h2>
+            <p className="m-0 mb-4 text-body leading-[1.6] text-secondary">
               {tr.t("voucherRemindBody", { name: v.gift.recipientName })}
             </p>
             <Form method="post" className="flex flex-col gap-3">
               <input type="hidden" name="intent" value="remind" />
               {!v.gift.recipientEmail && (
-                <label className="block text-[13px] font-semibold text-secondary">
+                <label className="block text-caption font-semibold text-secondary">
                   {tr.t("voucherRemindEmailLabel")}
                   <input name="recipientEmail" type="email" required className={inputCls} />
                 </label>
               )}
-              {reminded && <p className="m-0 text-[13px] font-semibold text-[#3f7a52]">{tr.t("voucherRemindSent", { email: reminded })}</p>}
+              {reminded && <p className="m-0 text-caption font-semibold text-[#3f7a52]">{tr.t("voucherRemindSent", { email: reminded })}</p>}
               {remindError && (
-                <p className="m-0 text-[13px] text-red-600">
+                <p className="m-0 text-caption text-red-600">
                   {remindError === "tooMany"
                     ? tr.t("voucherRemindTooMany")
                     : remindError === "noEmail" || remindError === "invalidEmail"
@@ -285,7 +285,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
               <button
                 type="submit"
                 disabled={busy}
-                className="self-start rounded-[11px] border border-line-alt px-5 py-2.5 text-[14px] font-semibold text-secondary transition-colors hover:bg-chip disabled:opacity-60"
+                className="self-start rounded-field border border-line-alt px-5 py-2.5 text-body font-semibold text-secondary transition-colors hover:bg-chip disabled:opacity-60"
               >
                 {tr.t("voucherRemindButton")}
               </button>
@@ -295,9 +295,9 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
 
         {/* Cancel for a refund (cooling-off) */}
         <div className={card}>
-          <h2 className="m-0 mb-1.5 font-serif text-[20px] font-semibold">{tr.t("voucherCancelTitle")}</h2>
+          <h2 className="m-0 mb-1.5 font-serif text-title-md font-semibold">{tr.t("voucherCancelTitle")}</h2>
           {v.status === "cancelled" ? (
-            <p className="m-0 text-[14px] leading-[1.6] text-secondary">
+            <p className="m-0 text-body leading-[1.6] text-secondary">
               {tr.t("voucherCancelledNote")}{" "}
               {v.refund
                 ? tr.t("voucherRefundedNote", { amount: money(v.refund.amount), date: date(v.refund.at) })
@@ -314,26 +314,26 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
               className="flex flex-col gap-3"
             >
               <input type="hidden" name="intent" value="cancel" />
-              <p className="m-0 text-[14px] leading-[1.6] text-secondary">
+              <p className="m-0 text-body leading-[1.6] text-secondary">
                 {v.hasCharge
                   ? tr.t("voucherCancelWindow", { date: date(cancelBy), amount: money(v.chargedAmount) })
                   : tr.t("voucherCancelWindowFree", { date: date(cancelBy) })}
               </p>
               {cancelError && (
-                <p className="m-0 text-[13px] text-red-600">
+                <p className="m-0 text-caption text-red-600">
                   {cancelError === "conflict" ? tr.t("voucherCancelFailed") : tr.t(`voucherCancelReason_${cancelError}`)}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={busy}
-                className="self-start rounded-[11px] border border-[#e5c4bd] px-5 py-2.5 text-[14px] font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
+                className="self-start rounded-field border border-[#e5c4bd] px-5 py-2.5 text-body font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
               >
                 {busy ? "…" : tr.t("voucherCancelButton")}
               </button>
             </Form>
           ) : (
-            <p className="m-0 text-[14px] leading-[1.6] text-secondary">
+            <p className="m-0 text-body leading-[1.6] text-secondary">
               {tr.t(`voucherCancelReason_${cancelReason ?? "window"}`)}
             </p>
           )}

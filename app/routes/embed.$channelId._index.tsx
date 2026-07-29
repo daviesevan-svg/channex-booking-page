@@ -85,25 +85,25 @@ export default function EmbedPicker({ loaderData }: Route.ComponentProps) {
   }
 
   const dateBtn =
-    "min-w-[130px] flex-1 cursor-pointer rounded-[12px] px-4 py-3 text-left transition-colors hover:bg-field-hover";
+    "min-w-[130px] flex-1 cursor-pointer rounded-card px-4 py-3 text-left transition-colors hover:bg-field-hover";
 
   return (
     <div ref={rootRef} className="p-3">
       <div
-        className="flex flex-wrap items-stretch gap-1.5 rounded-[18px] border border-line bg-surface p-2.5"
+        className="flex flex-wrap items-stretch gap-1.5 rounded-panel-lg border border-line bg-surface p-2.5"
         style={{ boxShadow: "var(--shadow-card)" }}
       >
         <div className="relative flex min-w-[260px] flex-[2] flex-wrap items-stretch gap-1.5">
           <button type="button" onClick={() => setShowCal(true)} className={dateBtn}>
             <div className="field-label mb-1">{tr.t("checkIn")}</div>
-            <div className="text-[16px] font-semibold" style={{ color: dates.checkin ? "#2a2521" : "#b6ab9d" }}>
+            <div className="text-lead font-semibold" style={{ color: dates.checkin ? "#2a2521" : "#b6ab9d" }}>
               {dates.checkinLabel}
             </div>
           </button>
           <div className="my-2 w-px bg-line" />
           <button type="button" onClick={() => setShowCal(true)} className={dateBtn}>
             <div className="field-label mb-1">{tr.t("checkOut")}</div>
-            <div className="text-[16px] font-semibold" style={{ color: dates.checkout ? "#2a2521" : "#b6ab9d" }}>
+            <div className="text-lead font-semibold" style={{ color: dates.checkout ? "#2a2521" : "#b6ab9d" }}>
               {dates.checkoutLabel}
             </div>
           </button>
@@ -114,7 +114,7 @@ export default function EmbedPicker({ loaderData }: Route.ComponentProps) {
         <button
           type="button"
           onClick={search}
-          className="min-h-14 flex-none cursor-pointer rounded-[12px] bg-accent px-7 text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep"
+          className="min-h-14 flex-none cursor-pointer rounded-card bg-accent px-7 text-body-lg font-semibold text-white transition-colors hover:bg-accent-deep"
         >
           {searchButton}
         </button>

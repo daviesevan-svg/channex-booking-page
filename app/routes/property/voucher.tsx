@@ -97,18 +97,18 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[720px] px-7 pb-[72px] pt-10">
       {issued && (
-        <div className="mb-6 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[14px] font-medium text-[#3f7a52]">
+        <div className="mb-6 rounded-card border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-body font-medium text-[#3f7a52]">
           ✓ {tr.t("voucherIssued")}
         </div>
       )}
       {v.simulated && (
-        <div className="mb-6 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-caption text-amber-900">
           Test voucher — no payment was taken.
         </div>
       )}
       {booking && (
         <div
-          className={`mb-6 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3.5 text-[14px] leading-[1.6] text-[#3f7a52]`}
+          className={`mb-6 rounded-card border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3.5 text-body leading-[1.6] text-[#3f7a52]`}
         >
           {justBooked && <div className="font-semibold">✓ {tr.t("bookingConfirmedTitle")}</div>}
           <div>
@@ -119,43 +119,43 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-[18px] border border-line bg-surface" style={{ boxShadow: "var(--shadow-card)" }}>
+      <div className="overflow-hidden rounded-panel-lg border border-line bg-surface" style={{ boxShadow: "var(--shadow-card)" }}>
         <div className="h-[190px] overflow-hidden" style={{ background: stripe }}>
           {v.product.image && <img src={v.product.image} alt="" className="h-full w-full object-cover" />}
         </div>
         <div className="p-7">
           <div className="mb-2 flex flex-wrap items-center gap-2.5">
-            <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+            <span className="rounded-full bg-chip px-2.5 py-0.5 text-micro font-semibold text-muted">
               {v.kind === "gift" ? tr.t("voucherKindGift") : v.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
             </span>
-            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[v.status]}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-micro font-semibold ${STATUS_STYLE[v.status]}`}>
               {statusLabel}
             </span>
           </div>
-          <h1 className="mb-1 font-serif text-[30px] font-medium tracking-[-0.01em]">{v.product.title}</h1>
-          <p className="mb-5 text-[14px] text-muted">{hotelName}</p>
+          <h1 className="mb-1 font-serif text-display-md font-medium tracking-[-0.01em]">{v.product.title}</h1>
+          <p className="mb-5 text-body text-muted">{hotelName}</p>
 
           {v.gift && (
-            <div className="mb-5 rounded-[12px] bg-surface-alt px-4 py-3 text-[14px] leading-[1.6] text-secondary">
+            <div className="mb-5 rounded-card bg-surface-alt px-4 py-3 text-body leading-[1.6] text-secondary">
               <div className="font-semibold">{tr.t("voucherGiftFor", { name: v.gift.recipientName, from: v.buyerName })}</div>
               {v.gift.message && <p className="mt-1 italic">“{v.gift.message}”</p>}
             </div>
           )}
 
           {/* the code */}
-          <div className="mb-5 rounded-[14px] border-2 border-dashed border-accent bg-accent-soft/40 px-5 py-4 text-center">
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-widest text-muted">{tr.t("voucherCodeLabel")}</div>
-            <div className="font-mono text-[26px] font-bold tracking-[0.08em] text-accent-deep">{v.code}</div>
+          <div className="mb-5 rounded-card-lg border-2 border-dashed border-accent bg-accent-soft/40 px-5 py-4 text-center">
+            <div className="mb-1 text-micro font-semibold uppercase tracking-widest text-muted">{tr.t("voucherCodeLabel")}</div>
+            <div className="font-mono text-display-xs font-bold tracking-[0.08em] text-accent-deep">{v.code}</div>
           </div>
 
           {v.kind === "gift" ? (
             <div className="mb-5 text-center">
-              <span className="text-[15px] text-secondary">{tr.t("voucherBalance")}: </span>
-              <span className="text-[22px] font-bold text-accent-deep">{money(v.balance ?? 0)}</span>
+              <span className="text-body-lg text-secondary">{tr.t("voucherBalance")}: </span>
+              <span className="text-title-xl font-bold text-accent-deep">{money(v.balance ?? 0)}</span>
             </div>
           ) : (
             v.product.package && (
-              <div className="mb-5 rounded-[12px] border border-line bg-surface-alt/50 px-4 py-3.5 text-[14px] leading-[1.7] text-secondary">
+              <div className="mb-5 rounded-card border border-line bg-surface-alt/50 px-4 py-3.5 text-body leading-[1.7] text-secondary">
                 <div className="font-semibold text-ink">
                   {tr.p("night", v.product.package.nights)} · {tr.p("adult", v.product.package.adults)}
                   {v.product.package.children ? ` + ${tr.p("child", v.product.package.children)}` : ""}
@@ -172,12 +172,12 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           )}
 
           {v.kind === "experience" && v.product.guests != null && (
-            <div className="mb-5 text-center text-[15px] font-semibold text-secondary">
+            <div className="mb-5 text-center text-body-lg font-semibold text-secondary">
               {tr.t("voucherForGuests", { n: String(v.product.guests) })}
             </div>
           )}
 
-          <p className="mb-6 text-center text-[13px] text-muted">
+          <p className="mb-6 text-center text-caption text-muted">
             {tr.t("voucherValidUntil", { date: fmtDate(v.expiresAt, "d MMM yyyy") })}
           </p>
 
@@ -185,27 +185,27 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
             {v.kind === "package" && v.status === "active" && (
               <Link
                 to={`/${params.channelId}/voucher/${v.code}/book`}
-                className="rounded-[12px] bg-accent px-6 py-3.5 text-[16px] font-semibold text-white hover:bg-accent-deep"
+                className="rounded-card bg-accent px-6 py-3.5 text-lead font-semibold text-white hover:bg-accent-deep"
               >
                 {tr.t("voucherBookStay")}
               </Link>
             )}
             <a
               href={`/${params.channelId}/voucher/${v.code}/pdf`}
-              className="rounded-[12px] border border-line-alt bg-surface px-6 py-3.5 text-[16px] font-semibold text-secondary hover:border-accent hover:text-accent"
+              className="rounded-card border border-line-alt bg-surface px-6 py-3.5 text-lead font-semibold text-secondary hover:border-accent hover:text-accent"
             >
               {tr.t("voucherDownloadPdf")}
             </a>
           </div>
           {v.kind === "gift" && v.status === "active" && (
-            <p className="mt-5 text-center text-[13px] leading-[1.6] text-muted">{tr.t("voucherGiftHow")}</p>
+            <p className="mt-5 text-center text-caption leading-[1.6] text-muted">{tr.t("voucherGiftHow")}</p>
           )}
           {v.kind === "experience" && v.status === "active" && (
-            <p className="mt-5 text-center text-[13px] leading-[1.6] text-muted">{tr.t("voucherExperienceHow")}</p>
+            <p className="mt-5 text-center text-caption leading-[1.6] text-muted">{tr.t("voucherExperienceHow")}</p>
           )}
 
           {v.product.terms && (
-            <p className="mt-6 border-t border-divider pt-4 text-[12px] leading-[1.6] text-muted-2">
+            <p className="mt-6 border-t border-divider pt-4 text-label leading-[1.6] text-muted-2">
               {tr.t("voucherTermsTitle")}: {v.product.terms}
             </p>
           )}

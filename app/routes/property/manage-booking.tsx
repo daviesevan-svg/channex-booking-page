@@ -110,8 +110,8 @@ export function meta({ matches }: Route.MetaArgs) {
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 py-2">
-      <span className="text-[14px] text-secondary">{label}</span>
-      <span className="text-right text-[14px] font-semibold">{value}</span>
+      <span className="text-body text-secondary">{label}</span>
+      <span className="text-right text-body font-semibold">{value}</span>
     </div>
   );
 }
@@ -143,12 +143,12 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">
       <Link
         to={`/${params.channelId}/manage`}
-        className="mb-4 inline-block text-[13px] font-semibold text-muted hover:text-accent"
+        className="mb-4 inline-block text-caption font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("yourBookings")}
       </Link>
 
-      <h1 className="mb-1 font-serif text-[34px] font-medium tracking-[-0.02em]">
+      <h1 className="mb-1 font-serif text-display-xl font-medium tracking-[-0.02em]">
         {fmt(b.checkin, "EEE d MMM")} — {fmt(b.checkout, "EEE d MMM yyyy")}
       </h1>
       <div className="mb-7 flex flex-wrap items-center gap-2.5">
@@ -159,30 +159,30 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           {tr.t("reference")} {b.reference}
         </span>
         {cancelled && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-3 py-1.5 text-[13px] font-semibold text-[#c0392b]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-3 py-1.5 text-caption font-semibold text-[#c0392b]">
             ✕ {tr.t("statusCancelled")}
           </span>
         )}
       </div>
 
       {cancelled && (
-        <div className="mb-6 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[14px] text-[#c0392b]">
+        <div className="mb-6 rounded-card border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-body text-[#c0392b]">
           {tr.t("bookingCancelled")}
         </div>
       )}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <section className="rounded-[16px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionBooking")}</h2>
-          <Row label={tr.t("reference")} value={<span className="font-mono text-[13px]">{b.reference}</span>} />
+        <section className="rounded-panel border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionBooking")}</h2>
+          <Row label={tr.t("reference")} value={<span className="font-mono text-caption">{b.reference}</span>} />
           <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
           <Row label={tr.t("checkOut")} value={fmt(b.checkout, "EEE d MMM yyyy")} />
           <Row label={tr.t("nights")} value={String(b.nights)} />
           <Row label={tr.t("bookedOn")} value={fmt(b.createdAt, "d MMM yyyy, HH:mm")} />
         </section>
 
-        <section className="rounded-[16px] border border-line bg-surface p-5">
-          <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionGuest")}</h2>
+        <section className="rounded-panel border border-line bg-surface p-5">
+          <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionGuest")}</h2>
           <Row label={tr.t("guestName")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
           <Row
             label={tr.t("emailAddress")}
@@ -198,14 +198,14 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         </section>
       </div>
 
-      <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionRooms")}</h2>
+      <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+        <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionRooms")}</h2>
         <div className="flex flex-col divide-y divide-divider">
           {b.rooms.map((r, i) => (
             <div key={i} className="flex items-start justify-between gap-4 py-3 first:pt-0">
               <div className="min-w-0">
                 <div className="font-semibold">{r.roomTitle}</div>
-                <div className="text-[13px] text-muted-2">
+                <div className="text-caption text-muted-2">
                   {r.rateTitle} · {occLabel(tr, r.adults, Array(r.children).fill(8))}
                 </div>
               </div>
@@ -215,18 +215,18 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         </div>
         {b.extras && b.extras.length > 0 && (
           <div className="mt-3 flex flex-col gap-2 border-t border-divider pt-3">
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+            <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
             {groupExtrasByRoom(b.extras).map((g, gi) => (
               <div key={gi} className="flex flex-col gap-1.5">
-                <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                <div className="text-label font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
                 {g.lines.map((x, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[14px]">
+                  <div key={i} className="flex items-start justify-between gap-3 pl-2 text-body">
                     <div className="min-w-0">
                       <span>
                         {x.optionName ? `${x.name} · ${x.optionName}` : x.name}
                         {x.qty > 1 ? ` ×${x.qty}` : ""}
                       </span>
-                      {x.infoLine && <div className="text-[12px] text-muted-2">{x.infoLine}</div>}
+                      {x.infoLine && <div className="text-label text-muted-2">{x.infoLine}</div>}
                     </div>
                     <span className="whitespace-nowrap font-semibold">{formatMoney(x.amount, cur)}</span>
                   </div>
@@ -236,7 +236,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.offer && (
-          <div className="mt-3 flex justify-between text-[14px] text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
             <span>
               {b.offer.name || "Offer"} (−{b.offer.value}%)
             </span>
@@ -244,7 +244,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.promo && (
-          <div className="mt-3 flex justify-between text-[14px] text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
             <span>
               {tr.t("discount")} ({b.promo.code})
             </span>
@@ -252,21 +252,21 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         <div className="mt-4 flex items-baseline justify-between border-t border-divider pt-4">
-          <span className="text-[16px] font-semibold">{tr.t("total")}</span>
-          <span className="font-serif text-[28px] font-semibold">{formatMoney(b.total, cur)}</span>
+          <span className="text-lead font-semibold">{tr.t("total")}</span>
+          <span className="font-serif text-display-sm font-semibold">{formatMoney(b.total, cur)}</span>
         </div>
       </section>
 
       {cancellationText && (
-        <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
-          <h2 className="mb-2 font-serif text-[18px] font-semibold">{tr.t("cancellationPolicy")}</h2>
-          <p className="text-[14px] text-secondary">{cancellationText}</p>
+        <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+          <h2 className="mb-2 font-serif text-title-xs font-semibold">{tr.t("cancellationPolicy")}</h2>
+          <p className="text-body text-secondary">{cancellationText}</p>
         </section>
       )}
 
-      <section className="mt-5 rounded-[16px] border border-line bg-surface p-5">
-        <h2 className="mb-3 font-serif text-[18px] font-semibold">{tr.t("sectionPayment")}</h2>
-        <p className="text-[14px] text-muted-2">{tr.t("noPaymentInfo")}</p>
+      <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+        <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionPayment")}</h2>
+        <p className="text-body text-muted-2">{tr.t("noPaymentInfo")}</p>
       </section>
 
       {!cancelled && (
@@ -284,12 +284,12 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             disabled={!canCancel || cancelling}
             title={!canCancel ? cancelTip : undefined}
             aria-disabled={!canCancel}
-            className="rounded-[12px] border border-[#e0b4ac] bg-surface px-6 py-3 text-[15px] font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
+            className="rounded-card border border-[#e0b4ac] bg-surface px-6 py-3 text-body-lg font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
           >
             {cancelling ? tr.t("cancelling") : tr.t("cancelBooking")}
           </button>
           {!canCancel && cancelTip && (
-            <p className="mt-2 text-[12px] text-muted-2">{cancelTip}</p>
+            <p className="mt-2 text-label text-muted-2">{cancelTip}</p>
           )}
         </Form>
       )}

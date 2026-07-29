@@ -162,11 +162,11 @@ function Stepper({
   onInc: () => void;
 }) {
   const btn =
-    "flex h-8 w-8 flex-none items-center justify-center rounded-[8px] border border-line-alt text-[17px] leading-none text-ink disabled:opacity-40 enabled:hover:border-accent enabled:hover:text-accent";
+    "flex h-8 w-8 flex-none items-center justify-center rounded-chip border border-line-alt text-lead-lg leading-none text-ink disabled:opacity-40 enabled:hover:border-accent enabled:hover:text-accent";
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} disabled={value <= min} className={btn}>−</button>
-      <span className="min-w-[18px] text-center text-[15px] font-semibold">{value}</span>
+      <span className="min-w-[18px] text-center text-body-lg font-semibold">{value}</span>
       <button type="button" aria-label="Increase" onClick={onInc} disabled={value >= max} className={btn}>+</button>
     </div>
   );
@@ -319,7 +319,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           onClick={() => hero && setLightbox(0)}
           disabled={!hero}
           aria-label={tr.t("viewAllPhotos")}
-          className="group relative flex-[2] overflow-hidden rounded-[16px] disabled:cursor-default"
+          className="group relative flex-[2] overflow-hidden rounded-panel disabled:cursor-default"
           style={{ background: stripe }}
         >
           {hero && (
@@ -330,7 +330,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             />
           )}
           {galleryPhotos.length > 1 && (
-            <span className="pointer-events-none absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-[13px] font-semibold text-white backdrop-blur-sm">
+            <span className="pointer-events-none absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-black/55 px-4 py-2 text-caption font-semibold text-white backdrop-blur-sm">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <circle cx="8.5" cy="8.5" r="1.5" />
@@ -350,7 +350,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                 onClick={() => thumbs[i] && setLightbox(i + 1)}
                 disabled={!thumbs[i]}
                 aria-label={tr.t("viewAllPhotos")}
-                className="group relative flex-1 overflow-hidden rounded-[16px] disabled:cursor-default"
+                className="group relative flex-1 overflow-hidden rounded-panel disabled:cursor-default"
                 style={{ background: stripe }}
               >
                 {thumbs[i] && (
@@ -361,7 +361,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   />
                 )}
                 {i === 1 && more > 0 && thumbs[i] && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[19px] font-semibold text-white">
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-title-sm font-semibold text-white">
                     +{more}
                   </span>
                 )}
@@ -374,22 +374,22 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
       <div className="flex flex-wrap items-start gap-10">
         <div className="min-w-[320px] flex-[1.6]">
-          <h1 className="mb-2 font-serif text-[40px] font-medium tracking-[-0.02em]">
+          <h1 className="mb-2 font-serif text-display-3xl font-medium tracking-[-0.02em]">
             {room.title}
           </h1>
           {room.description && (
-            <p className="mb-7 max-w-[560px] text-[17px] leading-[1.65] text-[#5e5547]">
+            <p className="mb-7 max-w-[560px] text-lead-lg leading-[1.65] text-[#5e5547]">
               {room.description}
             </p>
           )}
           {amenities.length > 0 && (
             <>
-              <h3 className="mb-4 font-serif text-[20px] font-semibold">{text.amenitiesTitle}</h3>
+              <h3 className="mb-4 font-serif text-title-md font-semibold">{text.amenitiesTitle}</h3>
               <div className="grid max-w-[520px] grid-cols-1 gap-x-7 gap-y-3 sm:grid-cols-2">
                 {amenities.map((a) => (
-                  <div key={a} className="flex items-center gap-3 text-[15px] text-[#4a4236]">
+                  <div key={a} className="flex items-center gap-3 text-body-lg text-[#4a4236]">
                     <span
-                      className="h-[7px] w-[7px] flex-none rounded-[1px] bg-accent"
+                      className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
                       style={{ transform: "rotate(45deg)" }}
                     />
                     {a}
@@ -402,19 +402,19 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
         {/* rate card */}
         <div
-          className="sticky top-24 min-w-[320px] flex-1 rounded-[18px] border border-line bg-surface p-6"
+          className="sticky top-24 min-w-[320px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-1 font-serif text-[21px] font-semibold">{text.rateTitle}</h3>
-          <div className="mb-4 text-[13px] text-muted-2">{summary}</div>
+          <h3 className="mb-1 font-serif text-title-lg font-semibold">{text.rateTitle}</h3>
+          <div className="mb-4 text-caption text-muted-2">{summary}</div>
 
           {/* Per-room occupancy — book this room for a specific party. */}
-          <div className="mb-5 rounded-[12px] border border-line-alt bg-surface-alt/40 p-3.5">
-            <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+          <div className="mb-5 rounded-card border border-line-alt bg-surface-alt/40 p-3.5">
+            <div className="mb-2.5 text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("guests")}
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[14px] font-medium text-secondary">{tr.t("adults")}</span>
+              <span className="text-body font-medium text-secondary">{tr.t("adults")}</span>
               <Stepper
                 value={adults}
                 min={1}
@@ -425,7 +425,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             </div>
             {hasChildrenChoice && (
               <div className="mt-2.5 flex items-center justify-between">
-                <span className="text-[14px] font-medium text-secondary">{tr.t("children")}</span>
+                <span className="text-body font-medium text-secondary">{tr.t("children")}</span>
                 <Stepper
                   value={childCount}
                   min={0}
@@ -435,7 +435,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                 />
               </div>
             )}
-            <div className="mt-2.5 text-[11px] text-faint">
+            <div className="mt-2.5 text-micro text-faint">
               {tr.t("sleeps", { n: capacity })}
               {capacity > maxAdults && (
                 <> · {tr.p("adult", maxAdults)} + {tr.p("child", capacity - maxAdults)}</>
@@ -453,7 +453,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   key={plan.id}
                   type="button"
                   onClick={() => setSelectedRate(plan.id)}
-                  className="flex items-start gap-3 rounded-[12px] border-[1.5px] p-4 text-left transition-colors"
+                  className="flex items-start gap-3 rounded-card border-[1.5px] p-4 text-left transition-colors"
                   style={{
                     borderColor: active ? "var(--accent)" : "#e8e0d5",
                     background: active ? "var(--accent-soft)" : "#fff",
@@ -469,26 +469,26 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   <span className="flex-1">
                     <span className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
-                        <span className="block text-[15px] font-semibold">{plan.title}</span>
+                        <span className="block text-body-lg font-semibold">{plan.title}</span>
                         {plan.offer && (
-                          <span className="mt-1 inline-block rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
+                          <span className="mt-1 inline-block rounded-full bg-[#ece6f0] px-2 py-0.5 text-micro font-semibold text-[#6b4f8a]">
                             {plan.offer.name} −{plan.offer.percent}%
                           </span>
                         )}
                       </span>
                       <span className="flex-none text-right">
-                        <span className="block whitespace-nowrap text-[15px] font-semibold">
+                        <span className="block whitespace-nowrap text-body-lg font-semibold">
                           {pr.hasOffer && (
-                            <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
+                            <span className="mr-1.5 text-caption font-normal text-muted-2 line-through">
                               {formatMoney(pr.gross / nights, currency)}
                             </span>
                           )}
                           {formatMoney(perNight, currency)}
                         </span>
-                        <span className="block text-[11px] text-muted-2">{tr.t("perNightInclTaxes")}</span>
+                        <span className="block text-micro text-muted-2">{tr.t("perNightInclTaxes")}</span>
                       </span>
                     </span>
-                    <span className="mt-1.5 block text-[13px] leading-[1.45] text-muted">
+                    <span className="mt-1.5 block text-caption leading-[1.45] text-muted">
                       {rateNote(plan, tr)}
                     </span>
                   </span>
@@ -497,14 +497,14 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             })}
           </div>
           {(chosen?.description || chosen?.inclusions?.length) && (
-            <div className="mb-4 rounded-[12px] bg-[#faf6ef] p-4">
+            <div className="mb-4 rounded-card bg-[#faf6ef] p-4">
               {chosen?.description && (
-                <p className="text-[13px] leading-[1.55] text-[#5e5547]">{chosen.description}</p>
+                <p className="text-caption leading-[1.55] text-[#5e5547]">{chosen.description}</p>
               )}
               {chosen?.inclusions?.length ? (
                 <>
                   <div
-                    className={`mb-2 text-[12px] font-semibold uppercase tracking-wider text-muted-2 ${
+                    className={`mb-2 text-label font-semibold uppercase tracking-wider text-muted-2 ${
                       chosen?.description ? "mt-3" : ""
                     }`}
                   >
@@ -514,10 +514,10 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                     {chosen.inclusions.map((inc, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-2 text-[13px] text-[#4a4236]"
+                        className="flex items-start gap-2 text-caption text-[#4a4236]"
                       >
                         <span
-                          className="mt-[6px] h-[6px] w-[6px] flex-none rounded-[1px] bg-accent"
+                          className="mt-[6px] h-[6px] w-[6px] flex-none rounded-mark bg-accent"
                           style={{ transform: "rotate(45deg)" }}
                         />
                         {inc}
@@ -532,11 +532,11 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             <span className="text-sm text-secondary">
               {tr.t("totalNights", { n: nights })}
             </span>
-            <span className="font-serif text-[28px] font-semibold">
+            <span className="font-serif text-display-sm font-semibold">
               {chosen ? (
                 <>
                   {chosenPrice.hasOffer && (
-                    <span className="mr-2 text-[18px] font-normal text-muted-2 line-through">
+                    <span className="mr-2 text-title-xs font-normal text-muted-2 line-through">
                       {formatMoney(chosenPrice.gross, currency)}
                     </span>
                   )}
@@ -551,7 +551,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             type="button"
             onClick={addToStay}
             disabled={adding}
-            className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
+            className="w-full rounded-card bg-accent py-[15px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
             {adding ? "…" : editIndex != null ? tr.t("updateRoom") : text.addButton}
           </button>

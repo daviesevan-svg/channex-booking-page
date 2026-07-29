@@ -594,16 +594,16 @@ function Field({
   error?: string[];
 }) {
   return (
-    <label className="block text-[13px] font-semibold text-secondary">
+    <label className="block text-caption font-semibold text-secondary">
       {label}
       <input
         name={name}
         type={type}
         placeholder={placeholder}
-        className="mt-[7px] block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
+        className="mt-[7px] block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
       />
       {error?.[0] && (
-        <span className="mt-1 block text-[12px] font-normal text-red-600">{error[0]}</span>
+        <span className="mt-1 block text-label font-normal text-red-600">{error[0]}</span>
       )}
     </label>
   );
@@ -760,22 +760,22 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       >
         ← {tr.t("allRooms")}
       </Link>
-      <h1 className="mb-7 font-serif text-[38px] font-medium tracking-[-0.02em]">{text.heading}</h1>
+      <h1 className="mb-7 font-serif text-display-2xl font-medium tracking-[-0.02em]">{text.heading}</h1>
 
       {bookingError && (
-        <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
+        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
           {bookingError}
         </div>
       )}
 
       {actionData?.rateLimited && (
-        <div className="mb-6 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">
+        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
           {tr.t("bookingThrottled")}
         </div>
       )}
 
       {actionData?.paymentError && (
-        <div className="mb-6 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-700">
+        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
           {actionData.paymentError === "failed"
             ? "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking."
             : "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking."}
@@ -784,8 +784,8 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
       <Form method="post" className="flex flex-wrap items-start gap-9">
         <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
-          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.guestSection}</h3>
+          <section className="rounded-panel border border-line bg-surface p-[26px]">
+            <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName} />
               <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" error={errors?.lastName} />
@@ -794,31 +794,31 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </div>
           </section>
 
-          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-[18px] font-serif text-[20px] font-semibold">{text.arrivalSection}</h3>
+          <section className="rounded-panel border border-line bg-surface p-[26px]">
+            <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.arrivalSection}</h3>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field name="arrival" label={tr.t("estimatedArrival")} placeholder="15:00" />
             </div>
-            <label className="block text-[13px] font-semibold text-secondary">
+            <label className="block text-caption font-semibold text-secondary">
               {tr.t("specialRequests")}
               <textarea
                 name="requests"
                 rows={3}
                 placeholder="Quiet room, early check-in, anything we should know…"
-                className="mt-[7px] block w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent"
+                className="mt-[7px] block w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
               />
             </label>
           </section>
 
-          <section className="rounded-[16px] border border-line bg-surface p-[26px]">
-            <h3 className="mb-3 font-serif text-[20px] font-semibold">{text.paymentSection}</h3>
+          <section className="rounded-panel border border-line bg-surface p-[26px]">
+            <h3 className="mb-3 font-serif text-title-md font-semibold">{text.paymentSection}</h3>
 
             {/* The due-now/at-hotel split only makes sense when a card is really
                 collected at checkout. Without payments set up nothing is charged
                 today — showing a policy-derived "Due now" would contradict the
                 note below. */}
             {collectsCard && (
-              <div className="mb-3 flex flex-col gap-1.5 text-[14px]">
+              <div className="mb-3 flex flex-col gap-1.5 text-body">
                 {voucherApplied > 0 && appliedVoucher && (
                   <div className="flex justify-between text-[#3f7a52]">
                     <span>
@@ -857,12 +857,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </p>
 
             {mixedCancellation ? (
-              <div className="mb-[18px] border-t border-divider pt-3.5 text-[13px] text-secondary">
+              <div className="mb-[18px] border-t border-divider pt-3.5 text-caption text-secondary">
                 {tr.t("cancellationVariesByRoom")}
               </div>
             ) : (
               (cancellationText || latePhrase || noShowPhrase) && (
-                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13px] text-secondary">
+                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-caption text-secondary">
                   {cancellationText && <div>{cancellationText}</div>}
                   {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
                   {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
@@ -874,33 +874,33 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
         {/* summary */}
         <aside
-          className="sticky top-24 min-w-[300px] flex-1 rounded-[18px] border border-line bg-surface p-6"
+          className="sticky top-24 min-w-[300px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-4 font-serif text-[21px] font-semibold">
+          <h3 className="mb-4 font-serif text-title-lg font-semibold">
             {tr.p("yourStayRooms", lines.length)}
           </h3>
           <div className="flex flex-col gap-3 border-b border-divider pb-4">
             {lines.map((l, i) => (
               <div key={`${l.roomId}-${i}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[14px] font-semibold">{l.roomTitle}</div>
-                  <div className="text-[12px] text-muted-2">{l.rateTitle}</div>
+                  <div className="text-body font-semibold">{l.roomTitle}</div>
+                  <div className="text-label text-muted-2">{l.rateTitle}</div>
                 </div>
-                <span className="whitespace-nowrap text-[14px] font-semibold">
+                <span className="whitespace-nowrap text-body font-semibold">
                   {formatMoney(l.originalTotal, currency)}
                 </span>
               </div>
             ))}
           </div>
-          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
             <Row label={tr.t("checkIn")} value={fmt(parseISO(stay.checkin), "EEE d MMM")} />
             <Row label={tr.t("checkOut")} value={fmt(parseISO(stay.checkout), "EEE d MMM")} />
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
           {(offer || (discount > 0 && appliedPromo)) && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
               <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
                 <div className="flex justify-between text-[#3f7a52]">
@@ -923,7 +923,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
           {/* promo code */}
           <div className="border-b border-divider py-4">
-            <label className="block text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+            <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("promoCode")}
             </label>
             <div className="mt-2 flex gap-2">
@@ -932,7 +932,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={promoCodeValue}
                 placeholder="SUMMER10"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+                className="min-w-0 flex-1 rounded-control border border-line-alt bg-surface-alt px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
               />
               <button
                 type="submit"
@@ -940,20 +940,20 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyPromo"
                 formNoValidate
                 disabled={submitting}
-                className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+                className="flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
               >
                 {tr.t("applyCode")}
               </button>
             </div>
-            {promoError && <p className="mt-1.5 text-[12px] text-red-600">{tr.t("promoInvalid")}</p>}
+            {promoError && <p className="mt-1.5 text-label text-red-600">{tr.t("promoInvalid")}</p>}
             {appliedPromo && discount > 0 && (
-              <p className="mt-1.5 text-[12px] text-[#3f7a52]">{tr.t("promoApplied")}</p>
+              <p className="mt-1.5 text-label text-[#3f7a52]">{tr.t("promoApplied")}</p>
             )}
           </div>
 
           {/* gift voucher — pays (part of) the amount due today */}
           <div className="border-b border-divider py-4">
-            <label className="block text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+            <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("voucherHave")}
             </label>
             <div className="mt-2 flex gap-2">
@@ -962,7 +962,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={voucherCodeValue}
                 placeholder="RP-XXXX-XXXX"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-2.5 text-[14px] uppercase text-ink outline-none focus:border-accent"
+                className="min-w-0 flex-1 rounded-control border border-line-alt bg-surface-alt px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
               />
               <button
                 type="submit"
@@ -970,28 +970,28 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyVoucher"
                 formNoValidate
                 disabled={submitting}
-                className="flex-none rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[13px] font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+                className="flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
               >
                 {tr.t("applyCode")}
               </button>
             </div>
-            {voucherError === true && <p className="mt-1.5 text-[12px] text-red-600">{tr.t("voucherInvalid")}</p>}
+            {voucherError === true && <p className="mt-1.5 text-label text-red-600">{tr.t("voucherInvalid")}</p>}
             {voucherError === "payAtHotel" && (
-              <p className="mt-1.5 text-[12px] text-amber-700">{tr.t("voucherPayAtHotel")}</p>
+              <p className="mt-1.5 text-label text-amber-700">{tr.t("voucherPayAtHotel")}</p>
             )}
             {appliedVoucher && voucherApplied > 0 && (
-              <p className="mt-1.5 text-[12px] text-[#3f7a52]">
+              <p className="mt-1.5 text-label text-[#3f7a52]">
                 {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
               </p>
             )}
           </div>
 
           {extraLines.length > 0 && (
-            <div className="flex flex-col gap-3 border-b border-divider py-4 text-[14px]">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
+            <div className="flex flex-col gap-3 border-b border-divider py-4 text-body">
+              <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
               {groupExtrasByRoom(extraLines).map((g, gi) => (
                 <div key={gi} className="flex flex-col gap-1.5">
-                  <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                  <div className="text-label font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
                   {g.lines.map((l) => (
                     <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3 pl-2">
                       <div className="min-w-0">
@@ -999,7 +999,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                           {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
                           {l.qty > 1 ? ` ×${l.qty}` : ""}
                         </span>
-                        {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
+                        {l.infoLine && <div className="text-label text-muted-2">{l.infoLine}</div>}
                       </div>
                       <span className="whitespace-nowrap font-semibold">{formatMoney(l.amount, currency)}</span>
                     </div>
@@ -1010,7 +1010,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           )}
 
           {(pricing.charges.length > 0 || pricing.taxLines.length > 0) && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
               {pricing.charges.map((c, i) => (
                 <Row key={`charge-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
               ))}
@@ -1021,20 +1021,20 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           )}
 
           <div className="flex items-baseline justify-between pt-4">
-            <span className="text-[16px] font-semibold">{tr.t("total")}</span>
-            <span className="font-serif text-[30px] font-semibold">
+            <span className="text-lead font-semibold">{tr.t("total")}</span>
+            <span className="font-serif text-display-md font-semibold">
               {formatMoney(grandTotal, currency)}
             </span>
           </div>
           {pricing.taxIncluded > 0 && (
-            <p className="pb-4 pt-1 text-right text-[12px] text-muted-2">
+            <p className="pb-4 pt-1 text-right text-label text-muted-2">
               {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
             </p>
           )}
 
           {/* consent — required ticks sit directly above the booking button */}
           <div className="mb-3 flex flex-col gap-2.5 border-t border-divider pt-4">
-            <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-secondary">
+            <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
               <input
                 type="checkbox"
                 name="consent"
@@ -1059,7 +1059,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </label>
 
             {needAck && (
-              <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-secondary">
+              <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
                 <input
                   type="checkbox"
                   name="ackNonRefundable"
@@ -1071,7 +1071,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </label>
             )}
 
-            <label className="flex items-start gap-2.5 text-[13px] leading-[1.5] text-muted">
+            <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-muted">
               <input
                 type="checkbox"
                 name="marketing"
@@ -1087,7 +1087,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </label>
 
             {showConsentError && (
-              <p className="text-[12px] font-medium text-red-600">
+              <p className="text-label font-medium text-red-600">
                 {tr.t("consentRequired")}
               </p>
             )}
@@ -1104,12 +1104,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 setConsentError(true);
               }
             }}
-            className="w-full rounded-[12px] bg-accent py-[15px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
+            className="w-full rounded-card bg-accent py-[15px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
           >
             {submitting ? tr.t("confirming") : text.completeButton}
           </button>
           {collectsCard && (
-            <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[12px] text-muted-2">
+            <div className="mt-2.5 flex items-center justify-center gap-1.5 text-label text-muted-2">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <rect x="4" y="10" width="16" height="11" rx="2.5" />
                 <path d="M8 10V7a4 4 0 0 1 8 0v3" />
@@ -1118,12 +1118,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </div>
           )}
           {mixedCancellation ? (
-            <div className="mt-3 text-center text-[12px] leading-[1.5] text-muted-2">
+            <div className="mt-3 text-center text-label leading-[1.5] text-muted-2">
               {tr.t("cancellationVariesByRoom")}
             </div>
           ) : (
             cancellationText && (
-              <div className="mt-3 text-center text-[12px] leading-[1.5] text-muted-2">
+              <div className="mt-3 text-center text-label leading-[1.5] text-muted-2">
                 {cancellationText}
               </div>
             )

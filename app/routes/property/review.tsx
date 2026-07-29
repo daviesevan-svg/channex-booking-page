@@ -115,28 +115,28 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
   if (actionData && "ok" in actionData && actionData.ok) {
     return (
       <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-16 text-center">
-        <div className="mb-4 text-[44px]">🎉</div>
-        <h1 className="mb-3 font-serif text-[32px] font-medium">{tr.t("reviewThanksTitle")}</h1>
-        <p className="text-[15px] leading-[1.65] text-secondary">{tr.t("reviewThanksBody")}</p>
+        <div className="mb-4 text-display-4xl">🎉</div>
+        <h1 className="mb-3 font-serif text-display-lg font-medium">{tr.t("reviewThanksTitle")}</h1>
+        <p className="text-body-lg leading-[1.65] text-secondary">{tr.t("reviewThanksBody")}</p>
       </main>
     );
   }
 
-  const label = "mb-1.5 block text-[13px] font-semibold text-secondary";
+  const label = "mb-1.5 block text-caption font-semibold text-secondary";
   return (
     <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-10">
-      <h1 className="mb-2 font-serif text-[34px] font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
-      <p className="mb-1 text-[15px] text-secondary">{tr.t("reviewIntro", { hotel: hotelName })}</p>
-      <p className="mb-7 text-[13px] text-muted-2">
+      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
+      <p className="mb-1 text-body-lg text-secondary">{tr.t("reviewIntro", { hotel: hotelName })}</p>
+      <p className="mb-7 text-caption text-muted-2">
         {fmtDate(loaderData.checkin, "d MMM")} — {fmtDate(loaderData.checkout, "d MMM yyyy")}
       </p>
 
-      <Form method="post" className="flex flex-col gap-6 rounded-[16px] border border-line bg-surface p-[26px]">
+      <Form method="post" className="flex flex-col gap-6 rounded-panel border border-line bg-surface p-[26px]">
         <div>
           <div className={label}>{tr.t("overallRating")}</div>
           <Stars name="stars" value={stars} onChange={setStars} size={38} />
           {actionData && "error" in actionData && actionData.error === "stars" && (
-            <p className="mt-1.5 text-[13px] text-[#c0392b]">{tr.t("reviewStarsRequired")}</p>
+            <p className="mt-1.5 text-caption text-[#c0392b]">{tr.t("reviewStarsRequired")}</p>
           )}
         </div>
 
@@ -145,7 +145,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
           <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
             {REVIEW_CATEGORIES.map((c) => (
               <div key={c} className="flex items-center justify-between gap-3">
-                <span className="text-[14px] text-secondary">{tr.t(`cat_${c}`)}</span>
+                <span className="text-body text-secondary">{tr.t(`cat_${c}`)}</span>
                 <Stars name={`cat_${c}`} value={cats[c] ?? 0} onChange={(v) => setCats((p) => ({ ...p, [c]: v }))} size={22} />
               </div>
             ))}
@@ -158,9 +158,9 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="publicText"
             rows={5}
             defaultValue={loaderData.initialPublicText}
-            className="w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 text-[15px] outline-none focus:border-accent"
+            className="w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-3 text-body-lg outline-none focus:border-accent"
           />
-          <span className="mt-1 block text-[12px] text-muted">{tr.t("publicReviewHint")}</span>
+          <span className="mt-1 block text-label text-muted">{tr.t("publicReviewHint")}</span>
         </label>
 
         <label className="block">
@@ -169,15 +169,15 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="privateNote"
             rows={3}
             defaultValue={loaderData.initialPrivateNote}
-            className="w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 text-[15px] outline-none focus:border-accent"
+            className="w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-3 text-body-lg outline-none focus:border-accent"
           />
-          <span className="mt-1 block text-[12px] text-muted">{tr.t("privateNoteHint")}</span>
+          <span className="mt-1 block text-label text-muted">{tr.t("privateNoteHint")}</span>
         </label>
 
         <button
           type="submit"
           disabled={submitting || stars === 0}
-          className="self-start rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+          className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
         >
           {tr.t("submitReview")}
         </button>

@@ -40,9 +40,9 @@ export function SiteFooterBlock({
     <div className="border-t border-nav-border bg-surface-alt">
       <div className="mx-auto grid max-w-[1160px] grid-cols-1 gap-10 px-7 py-12 sm:grid-cols-2 lg:grid-cols-3">
         <div>
-          <div className="mb-2.5 font-serif text-[19px] font-semibold">{hotelName}</div>
+          <div className="mb-2.5 font-serif text-title-sm font-semibold">{hotelName}</div>
           {footer.blurb && (
-            <p className="max-w-[320px] whitespace-pre-line text-[14px] leading-[1.6] text-muted">
+            <p className="max-w-[320px] whitespace-pre-line text-body leading-[1.6] text-muted">
               {footer.blurb}
             </p>
           )}
@@ -54,7 +54,7 @@ export function SiteFooterBlock({
                   href={s.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-[13px] font-semibold text-secondary hover:text-accent"
+                  className="text-caption font-semibold text-secondary hover:text-accent"
                 >
                   {s.label}
                 </a>
@@ -65,10 +65,10 @@ export function SiteFooterBlock({
 
         {hasContact && (
           <div>
-            <h2 className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+            <h2 className="mb-2.5 text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("footerContact")}
             </h2>
-            <div className="flex flex-col gap-1.5 text-[14px] leading-[1.6] text-muted">
+            <div className="flex flex-col gap-1.5 text-body leading-[1.6] text-muted">
               {contact.address && <span className="whitespace-pre-line">{contact.address}</span>}
               {contact.phone && (
                 <a href={`tel:${contact.phone.replace(/\s+/g, "")}`} className="hover:text-accent">
@@ -86,10 +86,10 @@ export function SiteFooterBlock({
 
         {hasLinks && (
           <div>
-            <h2 className="mb-2.5 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+            <h2 className="mb-2.5 text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("footerExplore")}
             </h2>
-            <div className="flex flex-col gap-1.5 text-[14px]">
+            <div className="flex flex-col gap-1.5 text-body">
               {links.map((l) =>
                 l.external ? (
                   <a

@@ -50,12 +50,12 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-12">
       <div className="mb-9 max-w-[620px]">
-        <h1 className="mb-3 font-serif text-[40px] font-medium tracking-[-0.02em]">{tr.t("vouchersTitle")}</h1>
-        <p className="text-[17px] leading-[1.6] text-secondary">{tr.t("vouchersIntro", { hotel: hotelName })}</p>
+        <h1 className="mb-3 font-serif text-display-3xl font-medium tracking-[-0.02em]">{tr.t("vouchersTitle")}</h1>
+        <p className="text-lead-lg leading-[1.6] text-secondary">{tr.t("vouchersIntro", { hotel: hotelName })}</p>
       </div>
 
       {products.length === 0 ? (
-        <div className="rounded-[14px] border border-line bg-surface p-8 text-[15px] text-secondary">
+        <div className="rounded-card-lg border border-line bg-surface p-8 text-body-lg text-secondary">
           {tr.t("vouchersEmpty")}
         </div>
       ) : (
@@ -64,7 +64,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
             <Link
               key={p.id}
               to={`/${params.channelId}/vouchers/${p.id}`}
-              className="group overflow-hidden rounded-[16px] border border-line bg-surface transition-shadow hover:shadow-md"
+              className="group overflow-hidden rounded-panel border border-line bg-surface transition-shadow hover:shadow-md"
             >
               <div className="h-[170px] overflow-hidden" style={{ background: stripe }}>
                 {p.image && (
@@ -77,20 +77,20 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
               </div>
               <div className="p-5">
                 <div className="mb-1.5 flex items-center gap-2">
-                  <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11px] font-semibold text-muted">
+                  <span className="rounded-full bg-chip px-2.5 py-0.5 text-micro font-semibold text-muted">
                     {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
                   </span>
                   {p.soldOut && (
-                    <span className="rounded-full bg-[#fbe9e7] px-2.5 py-0.5 text-[11px] font-semibold text-[#c0392b]">
+                    <span className="rounded-full bg-[#fbe9e7] px-2.5 py-0.5 text-micro font-semibold text-[#c0392b]">
                       {tr.t("voucherSoldOut")}
                     </span>
                   )}
                 </div>
-                <h2 className="mb-1 font-serif text-[20px] font-semibold">{p.title}</h2>
-                <p className="mb-3 line-clamp-2 text-[13px] leading-[1.5] text-muted">{p.description}</p>
+                <h2 className="mb-1 font-serif text-title-md font-semibold">{p.title}</h2>
+                <p className="mb-3 line-clamp-2 text-caption leading-[1.5] text-muted">{p.description}</p>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-[18px] font-semibold text-accent-deep">{money(p.price)}</span>
-                  <span className="text-[12px] text-muted-2">
+                  <span className="text-title-xs font-semibold text-accent-deep">{money(p.price)}</span>
+                  <span className="text-label text-muted-2">
                     {p.kind === "gift"
                       ? tr.t("voucherValue", { amount: money(p.value ?? p.price) })
                       : p.kind === "experience"
