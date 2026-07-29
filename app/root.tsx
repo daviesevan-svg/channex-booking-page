@@ -34,8 +34,13 @@ export const links: Route.LinksFunction = () => [
     crossOrigin: "anonymous",
   },
   {
+    // No `opsz` axis and no italic face. Asking for `ital,opsz,wght` made Google
+    // serve the full two-axis variable font: 128.8 KiB for the latin subset
+    // against 56.8 KiB for wght alone, and the italic serif was never used
+    // anywhere. Narrowing the weight list buys nothing — one variable file covers
+    // the family's whole wght range — so the axis IS the cost.
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap",
   },
 ];
 
