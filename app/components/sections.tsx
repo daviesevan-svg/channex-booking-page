@@ -20,6 +20,17 @@ import { facilityLabelKey } from "~/lib/content";
 
 export type { ReviewView };
 
+/**
+ * Star gold, dark enough to be a legible graphic.
+ *
+ * #f5b301 sat at 1.85:1 on a review card. This clears 3:1 — the bar for a
+ * graphical object that carries meaning — rather than the 4.5:1 text bar, which
+ * would need roughly #9f6100 and no longer reads as a star rating. The glyphs are
+ * `aria-hidden` with the score on an `aria-label`, so they are a labelled image
+ * rather than text.
+ */
+const STAR_GOLD = "#bf7f00";
+
 /** A section's own heading, else the translated default for its type. */
 export function sectionHeading(
   section: Pick<SiteSection, "type"> & { text?: Record<string, string> },
@@ -119,7 +130,8 @@ export function ReviewsSection({
       <div className="mb-5 flex items-baseline gap-3">
         <h2 className="font-serif text-[24px] font-semibold">{sectionHeading(section, tr)}</h2>
         <span className="text-[14px] text-secondary">
-          <span style={{ color: "#f5b301" }}>★</span>{" "}
+          {/* Decorative: the figure follows it. */}
+          <span aria-hidden style={{ color: STAR_GOLD }}>★</span>{" "}
           <span className="font-semibold text-ink">{reviews.average}</span>/5 · {reviews.count}
         </span>
       </div>
@@ -130,11 +142,14 @@ export function ReviewsSection({
               <span className="text-[14px] font-semibold">{r.guestName}</span>
               <span
                 className="text-[13px]"
-                style={{ color: "#f5b301", letterSpacing: 1 }}
+                style={{ color: STAR_GOLD, letterSpacing: 1 }}
+                role="img"
                 aria-label={`${r.stars}/5`}
               >
-                {"★".repeat(r.stars)}
-                <span style={{ color: "#ddd5c8" }}>{"★".repeat(5 - r.stars)}</span>
+                <span aria-hidden>
+                  {"★".repeat(r.stars)}
+                  <span style={{ color: "#ddd5c8" }}>{"★".repeat(5 - r.stars)}</span>
+                </span>
               </span>
             </div>
             <p className="text-[14px] leading-[1.6] text-secondary">{r.publicText}</p>

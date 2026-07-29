@@ -436,7 +436,7 @@ function CartPanel({
         className="mb-4 flex items-center gap-2 rounded-[10px] px-3.5 py-2.5 text-[13px] font-semibold"
         style={{
           background: covered ? "#e8f0e6" : "#f5efe5",
-          color: covered ? "#3f7a52" : "#857a6c",
+          color: covered ? "#3f7a52" : "var(--color-muted)",
         }}
       >
         {covered ? (

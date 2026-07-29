@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link, Outlet, useLocation, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
+import { accessibleAccent, darkerAccent, mixWithWhite } from "~/lib/accessible-accent";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import {
   DEFAULT_LANG,
@@ -122,13 +123,13 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
           <div key={s.n} className="flex items-center gap-3.5">
             <span
               className="flex items-center gap-2.5"
-              style={{ color: s.on ? "var(--color-ink)" : "#b1a799" }}
+              style={{ color: s.on ? "var(--color-ink)" : "var(--color-faint)" }}
             >
               <span
                 className="flex h-6 w-6 items-center justify-center rounded-full text-[13px]"
                 style={{
                   background: s.on ? "var(--accent)" : "#efe7db",
-                  color: s.on ? "#fff" : "#b1a799",
+                  color: s.on ? "#fff" : "var(--color-faint)",
                 }}
               >
                 {s.n}
@@ -197,11 +198,17 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "var(--page)" } as React.CSSProperties;
   if (isCustom) {
+    // The chosen colour, darkened only if it can't carry white text or be read as
+    // a link. Spilman's #b5651d gave 4.34:1 under white and 3.98:1 on the page —
+    // the audit flagged both. See accessible-accent.ts.
+    const accent = accessibleAccent(customColor!, customBg || mixWithWhite(customColor!, 7));
     Object.assign(themeStyle, {
-      "--accent": customColor,
-      "--accent-deep": `color-mix(in oklab, ${customColor} 82%, black)`,
-      "--accent-soft": `color-mix(in oklab, ${customColor} 12%, #ffffff)`,
-      "--accent-soft-strong": `color-mix(in oklab, ${customColor} 20%, #ffffff)`,
+      "--accent": accent,
+      "--accent-deep": darkerAccent(accent),
+      // 8%, matching the named themes: at 12% `text-accent` on a soft background
+      // came out at 4.36:1.
+      "--accent-soft": `color-mix(in oklab, ${accent} 8%, #ffffff)`,
+      "--accent-soft-strong": `color-mix(in oklab, ${accent} 20%, #ffffff)`,
       "--page": customBg || `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
     });
   }

@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 
 import type { Route } from "./+types/embed.$channelId";
 import { FontStylesheet } from "~/components/font-stylesheet";
+import { accessibleAccent, darkerAccent, mixWithWhite } from "~/lib/accessible-accent";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
@@ -44,11 +45,17 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "transparent" } as React.CSSProperties;
   if (isCustom) {
+    // The chosen colour, darkened only if it can't carry white text or be read as
+    // a link. Spilman's #b5651d gave 4.34:1 under white and 3.98:1 on the page —
+    // the audit flagged both. See accessible-accent.ts.
+    const accent = accessibleAccent(customColor!, customBg || mixWithWhite(customColor!, 7));
     Object.assign(themeStyle, {
-      "--accent": customColor,
-      "--accent-deep": `color-mix(in oklab, ${customColor} 82%, black)`,
-      "--accent-soft": `color-mix(in oklab, ${customColor} 12%, #ffffff)`,
-      "--accent-soft-strong": `color-mix(in oklab, ${customColor} 20%, #ffffff)`,
+      "--accent": accent,
+      "--accent-deep": darkerAccent(accent),
+      // 8%, matching the named themes: at 12% `text-accent` on a soft background
+      // came out at 4.36:1.
+      "--accent-soft": `color-mix(in oklab, ${accent} 8%, #ffffff)`,
+      "--accent-soft-strong": `color-mix(in oklab, ${accent} 20%, #ffffff)`,
       "--page": customBg || `color-mix(in oklab, ${customColor} 7%, #ffffff)`,
     });
   }

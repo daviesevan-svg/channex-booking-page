@@ -6,6 +6,7 @@ import type { Route } from "./+types/collection.$collectionSlug";
 import { FontStylesheet } from "~/components/font-stylesheet";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
+import { accessibleAccent, darkerAccent } from "~/lib/accessible-accent";
 import { getCollectionBySlug } from "~/lib/collections.server";
 import { queueCollectionEvent } from "~/lib/collection-analytics.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
@@ -387,9 +388,12 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   const font = fontPair(themeFont);
   const themeStyle = { background: "#f7f2ec" } as React.CSSProperties;
   if (isCustom) {
+    // Darkened only if the chosen colour can't carry white text or be read as a
+    // link — see accessible-accent.ts.
+    const accent = accessibleAccent(customColor!, customBg || "#f7f2ec");
     Object.assign(themeStyle, {
-      "--accent": customColor,
-      "--accent-deep": `color-mix(in oklab, ${customColor} 82%, black)`,
+      "--accent": accent,
+      "--accent-deep": darkerAccent(accent),
       "--page": customBg || "#f7f2ec",
     });
     if (customBg) themeStyle.background = customBg;
@@ -425,7 +429,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             <Diamond size={13} />
             <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">{name}</span>
           </div>
-          <div className="flex items-center gap-6 text-[14px]" style={{ color: "#857a6c" }}>
+          <div className="flex items-center gap-6 text-[14px]" style={{ color: "var(--color-muted)" }}>
             <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
             {phone && <span className="hidden sm:inline">{phone}</span>}
           </div>
@@ -447,13 +451,13 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
               type="button"
               onClick={() => setEditingDates((v) => !v)}
               className="cursor-pointer text-[14px] font-semibold hover:text-accent"
-              style={{ color: "#857a6c" }}
+              style={{ color: "var(--color-muted)" }}
             >
               {hasDates ? tr.t("editDates") : tr.t("chooseDates")}
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-[14px] font-medium" style={{ color: "#857a6c" }}>
+            <div className="text-[14px] font-medium" style={{ color: "var(--color-muted)" }}>
               {tr.p("staysAvailable", availableCount)}
             </div>
             <label
@@ -515,7 +519,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
           {heading || tr.t("collectionHeading")}
         </h1>
         {intro && (
-          <p className="m-0 max-w-[620px] text-[16px] leading-[1.6]" style={{ color: "#6f6557" }}>
+          <p className="m-0 max-w-[620px] text-[16px] leading-[1.6]" style={{ color: "var(--color-secondary)" }}>
             {intro}
           </p>
         )}
@@ -526,7 +530,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         {/* list */}
         <div className="flex min-w-0 flex-col gap-4 lg:flex-[1.25] lg:basis-[380px]">
           {properties.length === 0 && (
-            <p className="text-[15px]" style={{ color: "#6f6557" }}>
+            <p className="text-[15px]" style={{ color: "var(--color-secondary)" }}>
               {tr.t("noPropertiesYet")}
             </p>
           )}
@@ -559,7 +563,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 </div>
                 <div className="flex flex-[2_1_300px] flex-col p-[22px_24px]">
                   {p.area && (
-                    <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "#9a8f80" }}>
+                    <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--color-muted-2)" }}>
                       {p.area}
                     </div>
                   )}
@@ -570,7 +574,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                         <span
                           key={c}
                           className="rounded-full px-3 py-[5px] text-[12.5px] font-medium"
-                          style={{ color: "#6f6557", background: "#f5efe5", border: "1px solid #ece3d4" }}
+                          style={{ color: "var(--color-secondary)", background: "#f5efe5", border: "1px solid #ece3d4" }}
                         >
                           {c}
                         </span>
@@ -580,17 +584,17 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                   <div className="mt-auto flex items-end justify-between gap-4 pt-[18px]">
                     <div className="flex items-baseline gap-[7px]">
                       {p.soldOut ? (
-                        <span className="text-[15px] font-semibold" style={{ color: "#9a8f80" }}>
+                        <span className="text-[15px] font-semibold" style={{ color: "var(--color-muted-2)" }}>
                           {hasDates ? tr.t("soldOutDates") : ""}
                         </span>
                       ) : p.fromPrice ? (
                         <>
-                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>{tr.t("from")}</span>
+                          <span className="text-[13px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("from")}</span>
                           <span className="font-serif text-[28px] font-semibold leading-none">{p.fromPrice}</span>
-                          <span className="text-[13px]" style={{ color: "#9a8f80" }}>{tr.t("perNightShort")}</span>
+                          <span className="text-[13px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("perNightShort")}</span>
                         </>
                       ) : (
-                        <span className="text-[14px]" style={{ color: "#9a8f80" }}>{tr.t("selectDatesForPrices")}</span>
+                        <span className="text-[14px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("selectDatesForPrices")}</span>
                       )}
                     </div>
                     <button
@@ -656,7 +660,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
       {/* footer */}
       <footer className="border-t" style={{ borderColor: "#ece4d8", background: "#fffdfa" }}>
-        <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-[13px]" style={{ color: "#9a8f80" }}>
+        <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-[13px]" style={{ color: "var(--color-muted-2)" }}>
           <span>© 2026 {name} · {tr.t("allRightsReserved")}</span>
           <span>{tr.t("footerRight")}</span>
         </div>
@@ -714,7 +718,7 @@ function StylizedMap({
               transform: `translate(-50%,-50%) scale(${on ? 1.12 : 1})`,
               zIndex: activeId === id ? 14 : hoveredId === id ? 12 : 3,
               background: on ? "var(--accent)" : "#fffdfa",
-              color: on ? "#fff" : "#2a2521",
+              color: on ? "#fff" : "var(--color-ink)",
               borderColor: on ? "var(--accent)" : "#e3d9c9",
               boxShadow: on ? "0 12px 26px -10px rgba(70,55,35,0.6)" : "0 4px 12px -6px rgba(70,55,35,0.4)",
             }}
@@ -803,7 +807,7 @@ function pinIcon(g: any, label: string, active: boolean, accent: string) {
   const w = Math.max(46, Math.round(label.length * 8.4) + 24);
   const h = 30;
   const bg = active ? accent : "#fffdfa";
-  const fg = active ? "#ffffff" : "#2a2521";
+  const fg = active ? "#ffffff" : "var(--color-ink)";
   const stroke = active ? accent : "#d8ccb8";
   const svg =
     `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'>` +

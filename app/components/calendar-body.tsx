@@ -19,7 +19,7 @@ export function cellStyle(cell: DayCell): CSSProperties {
     return { background: "var(--accent)", color: "#fff", fontWeight: 600 };
   }
   if (cell.inRange) {
-    return { background: "var(--accent-soft)", color: "#2a2521", fontWeight: 600 };
+    return { background: "var(--accent-soft)", color: "var(--color-ink)", fontWeight: 600 };
   }
   if (cell.past) {
     return { color: "#c9bdac", cursor: "default", fontWeight: 400 };
@@ -29,13 +29,13 @@ export function cellStyle(cell: DayCell): CSSProperties {
     // strike-through (you can still check out on it). Deeper sold/closed nights
     // use the plain greyed-out unavailable style.
     return {
-      color: cell.checkoutBoundary ? "#2a2521" : "#c9bdac",
+      color: cell.checkoutBoundary ? "var(--color-ink)" : "#c9bdac",
       cursor: "default",
       fontWeight: 400,
       textDecoration: cell.sold ? "line-through" : "none",
     };
   }
-  return { color: "#2a2521", fontWeight: 500, cursor: "pointer" };
+  return { color: "var(--color-ink)", fontWeight: 500, cursor: "pointer" };
 }
 
 /** Prev / title / next. `title` defaults to "Select your dates". */

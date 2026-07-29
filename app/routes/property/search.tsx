@@ -208,7 +208,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             <div className="field-label mb-1.5">{tr.t("checkIn")}</div>
             <div
               className="text-[17px] font-semibold"
-              style={{ color: dates.checkin ? "#2a2521" : "#b6ab9d" }}
+              style={{ color: dates.checkin ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkinLabel}
             </div>
@@ -222,7 +222,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             <div className="field-label mb-1.5">{tr.t("checkOut")}</div>
             <div
               className="text-[17px] font-semibold"
-              style={{ color: dates.checkout ? "#2a2521" : "#b6ab9d" }}
+              style={{ color: dates.checkout ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkoutLabel}
             </div>
