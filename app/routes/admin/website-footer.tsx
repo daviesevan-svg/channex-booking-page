@@ -168,7 +168,7 @@ function Editor({
       <p className="mb-6 text-[14px] text-muted">{t("ftIntro")}</p>
 
       {!websiteEnabled && (
-        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12.5px] leading-[1.55] text-[#7a6636]">
+        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
           {t("ftWebsiteOff")}{" "}
           <Link to="/admin/website" className="font-semibold underline">
             {t("navWebsiteGeneral")}
@@ -215,7 +215,7 @@ function Editor({
             />
             <span>
               <span className="block text-[14px] font-semibold text-ink">{t("ftShowContact")}</span>
-              <span className="block text-[12.5px] text-muted">{t("ftShowContactDesc")}</span>
+              <span className="block text-[12px] text-muted">{t("ftShowContactDesc")}</span>
             </span>
           </label>
         </div>
@@ -275,7 +275,7 @@ function Editor({
                   <button
                     type="button"
                     onClick={() => removeLink(l.id)}
-                    className="cursor-pointer rounded-[8px] border border-line px-3 py-2.5 text-[12.5px] font-semibold text-red-600 hover:bg-red-50"
+                    className="cursor-pointer rounded-[8px] border border-line px-3 py-2.5 text-[12px] font-semibold text-red-600 hover:bg-red-50"
                   >
                     {t("ftRemoveLink")}
                   </button>

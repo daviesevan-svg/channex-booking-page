@@ -81,7 +81,7 @@ export default function AdminWebhooks({ loaderData, actionData }: Route.Componen
       {actionData?.addedSecret && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] p-4">
           <div className="mb-1 text-[13px] font-semibold text-[#3f7a52]">{t("whAddedBanner")}</div>
-          <div className="mb-1 text-[12.5px] text-secondary">{actionData.addedUrl}</div>
+          <div className="mb-1 text-[12px] text-secondary">{actionData.addedUrl}</div>
           <code className="block break-all rounded-[8px] border border-line bg-white px-3 py-2 font-mono text-[13px] text-ink">{actionData.addedSecret}</code>
         </div>
       )}
@@ -89,13 +89,13 @@ export default function AdminWebhooks({ loaderData, actionData }: Route.Componen
 
       <Form method="post" className="mb-6 flex flex-col gap-3 rounded-[14px] border border-line bg-surface p-5">
         <input type="hidden" name="intent" value="add" />
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("whEndpointUrl")}
           <input name="url" type="url" placeholder="https://example.com/webhooks/roompanda" className={`${input} w-full`} />
         </label>
         <div className="flex flex-wrap gap-4">
           {WEBHOOK_EVENTS.map((ev) => (
-            <label key={ev} className="flex items-center gap-2 text-[13.5px] font-medium">
+            <label key={ev} className="flex items-center gap-2 text-[13px] font-medium">
               <input type="checkbox" name="events" value={ev} defaultChecked className="h-4 w-4" /> {ev}
             </label>
           ))}
@@ -111,7 +111,7 @@ export default function AdminWebhooks({ loaderData, actionData }: Route.Componen
         {endpoints.length === 0 ? (
           <p className="p-5 text-[14px] text-muted-2">{t("whEmpty")}</p>
         ) : (
-          <table className="w-full text-[13.5px]">
+          <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-divider text-left text-[12px] uppercase tracking-wide text-muted">
                 <th className="px-5 py-3 font-semibold">{t("whUrl")}</th>

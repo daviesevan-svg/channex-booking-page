@@ -278,7 +278,7 @@ function Editor({
       )}
 
       {!websiteEnabled && (
-        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12.5px] leading-[1.55] text-[#7a6636]">
+        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
           {t("secWebsiteOff")}{" "}
           <Link to="/admin/website" className="font-semibold underline">
             {t("navWebsiteGeneral")}
@@ -346,7 +346,7 @@ function Editor({
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-[12.5px] text-secondary">
+                  <label className="flex items-center gap-1.5 text-[12px] text-secondary">
                     <input
                       type="checkbox"
                       name={`h:${section.id}`}
@@ -366,7 +366,7 @@ function Editor({
                     <button
                       type="button"
                       onClick={() => remove(section.id)}
-                      className="cursor-pointer rounded-[8px] border border-line px-3 py-1.5 text-[12.5px] font-semibold text-red-600 hover:bg-red-50"
+                      className="cursor-pointer rounded-[8px] border border-line px-3 py-1.5 text-[12px] font-semibold text-red-600 hover:bg-red-50"
                     >
                       {t("secRemove")}
                     </button>
@@ -375,7 +375,7 @@ function Editor({
               </div>
 
               {def.fields.length === 0 ? (
-                <p className="text-[12.5px] text-muted">
+                <p className="text-[12px] text-muted">
                   {t("secEditedElsewhere")}{" "}
                   <Link to="/admin/home" className="font-semibold text-accent hover:underline">
                     {t("navHome")}
@@ -410,7 +410,7 @@ function Editor({
                           {/* Nobody guesses that asterisks do anything, so the
                               syntax is spelled out next to the box that takes it. */}
                           {f.rich && (
-                            <span className="mt-1 block text-[11.5px] font-normal leading-[1.5] text-muted-2">
+                            <span className="mt-1 block text-[11px] font-normal leading-[1.5] text-muted-2">
                               {t("secRichHint")}
                             </span>
                           )}

@@ -67,7 +67,7 @@ function LastAriUpdate({ at }: { at: number | null }) {
     if (at) setText(new Date(at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }));
   }, [at]);
   return (
-    <p className="mt-4 flex items-center gap-2 text-[12.5px] text-muted">
+    <p className="mt-4 flex items-center gap-2 text-[12px] text-muted">
       <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#3f7a52]" />
       {at ? (
         <>{t("cnLastUpdate", { time: text || "…" })}</>
@@ -104,7 +104,7 @@ function CopyField({ label, value, hint }: { label: string; value: string; hint?
           {copied ? t("cnCopied") : t("cnCopy")}
         </button>
       </div>
-      {hint && <p className="mt-1.5 text-[12.5px] text-muted">{hint}</p>}
+      {hint && <p className="mt-1.5 text-[12px] text-muted">{hint}</p>}
     </div>
   );
 }
@@ -157,15 +157,15 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="font-serif text-[18px] font-semibold">{sys.name}</div>
-                  <div className="text-[12.5px] text-muted">{t(sys.taglineKey)}</div>
+                  <div className="text-[12px] text-muted">{t(sys.taglineKey)}</div>
                 </div>
                 {isConnected ? (
-                  <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11.5px] font-semibold text-[#3f7a52]">
+                  <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
                     {t("cnConnected")}
                   </span>
                 ) : (
                   !sys.available && (
-                    <span className="flex-none rounded-full bg-chip px-2.5 py-1 text-[11.5px] font-semibold text-muted">
+                    <span className="flex-none rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-muted">
                       {t("cnComingSoon")}
                     </span>
                   )
@@ -218,7 +218,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
       {connected === "channex" && (
         <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
           <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("cnChannexTitle")}</h2>
-          <p className="mb-4 max-w-2xl text-[13.5px] text-muted">{t("cnChannexIntro")}</p>
+          <p className="mb-4 max-w-2xl text-[13px] text-muted">{t("cnChannexIntro")}</p>
           <div className="max-w-xl">
             <CopyField
               label={t("cnPropertyId")}

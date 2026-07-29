@@ -126,7 +126,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
       )}
 
       {platformReady && !secretReady && (
-        <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12.5px] text-amber-800">
+        <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-800">
           {t("paySecretMissingBefore")}
           <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>
           {t("paySecretMissingAfter")}
@@ -143,11 +143,11 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="font-serif text-[18px] font-semibold">Stripe</div>
-            <div className="text-[12.5px] text-muted">{t("payStripeDesc")}</div>
+            <div className="text-[12px] text-muted">{t("payStripeDesc")}</div>
           </div>
           {connected && (
             <span
-              className={`flex-none rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${
+              className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                 chargesEnabled ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-[#fbeede] text-[#9a6a1e]"
               }`}
             >
@@ -190,7 +190,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         )}
 
         {!platformReady && (
-          <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12.5px] text-amber-800">
+          <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
             {t("payPlatformMissing")}
           </p>
         )}

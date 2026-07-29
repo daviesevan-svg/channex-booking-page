@@ -223,7 +223,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       </div>
 
       {(b.lifecycle ?? "active") === "cancelled" && b.cancelledAt && (
-        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13px] text-[#c0392b]">
           {b.cancelledBy
             ? t("bkdCancelledByOn", { by: b.cancelledBy, date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm", dl) })
             : t("bkdCancelledByGuestOn", { date: fmtDate(b.cancelledAt, "d MMM yyyy, HH:mm", dl) })}
@@ -231,33 +231,33 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       )}
 
       {actionData?.retried && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("bkdRetriedOk")}
         </div>
       )}
       {actionData?.cancelled && (
-        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13px] font-medium text-[#c0392b]">
           {t("bkdCancelledMsg")}
         </div>
       )}
       {actionData?.emailResent && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("bkdEmailResent", { email: b.guest.email })}
         </div>
       )}
       {actionData?.guestEdited && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("bkdGuestUpdated")}
         </div>
       )}
       {actionData?.pushWarning && (
-        <div className="mb-5 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13.5px] text-amber-900">
+        <div className="mb-5 rounded-[12px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           {actionData.pushWarning}
         </div>
       )}
 
       {b.status === "failed" && (
-        <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13.5px] text-red-700">
+        <div className="mb-5 rounded-[12px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
           <p>
             <span className="font-semibold">{t("bkdNotConfirmed")}</span>{" "}
             {b.error ?? t("bkdNotSentChannex")}
@@ -341,20 +341,20 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               <Form method="post" className="mt-3 space-y-3">
                 <input type="hidden" name="intent" value="editGuest" />
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="block text-[12.5px] font-semibold text-secondary">
+                  <label className="block text-[12px] font-semibold text-secondary">
                     {t("bkdFirstName")}
                     <input name="firstName" defaultValue={b.guest.firstName} required className={FIELD_INPUT} />
                   </label>
-                  <label className="block text-[12.5px] font-semibold text-secondary">
+                  <label className="block text-[12px] font-semibold text-secondary">
                     {t("bkdLastName")}
                     <input name="lastName" defaultValue={b.guest.lastName} required className={FIELD_INPUT} />
                   </label>
                 </div>
-                <label className="block text-[12.5px] font-semibold text-secondary">
+                <label className="block text-[12px] font-semibold text-secondary">
                   {t("bkdEmail")}
                   <input name="email" type="email" defaultValue={b.guest.email} required className={FIELD_INPUT} />
                 </label>
-                <label className="block text-[12.5px] font-semibold text-secondary">
+                <label className="block text-[12px] font-semibold text-secondary">
                   {t("bkdPhone")}
                   <input name="phone" defaultValue={b.guest.phone} className={FIELD_INPUT} />
                 </label>
@@ -441,9 +441,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
             <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdExtras")}</div>
             {groupExtrasByRoom(b.extras).map((g, gi) => (
               <div key={gi} className="flex flex-col gap-1.5">
-                <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? t("bkdForYourStay")}</div>
+                <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? t("bkdForYourStay")}</div>
                 {g.lines.map((x, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[13.5px]">
+                  <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[13px]">
                     <div className="min-w-0">
                       <span>
                         {x.optionName ? `${x.name} · ${x.optionName}` : x.name}
@@ -464,7 +464,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           <div className="mt-3 flex flex-col gap-1.5 border-t border-divider pt-3">
             <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("bkdTaxesFees")}</div>
             {[...b.pricing.charges, ...b.pricing.taxLines].map((c, i) => (
-              <div key={i} className="flex justify-between text-[13.5px]">
+              <div key={i} className="flex justify-between text-[13px]">
                 <span>{c.label}</span>
                 <span className="whitespace-nowrap font-semibold">{formatMoney(c.amount, b.currency)}</span>
               </div>
@@ -472,13 +472,13 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           </div>
         )}
         {b.offer && (
-          <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-[13px] text-[#3f7a52]">
             <span>{b.offer.name || t("bkdOffer")} (−{b.offer.value}%)</span>
             <span className="font-semibold">−{formatMoney(b.offer.discount, b.currency)}</span>
           </div>
         )}
         {b.promo && (
-          <div className="mt-3 flex justify-between text-[13.5px] text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-[13px] text-[#3f7a52]">
             <span>{t("bkdPromo", { code: b.promo.code ?? "" })}</span>
             <span className="font-semibold">−{formatMoney(b.promo.discount, b.currency)}</span>
           </div>
@@ -578,7 +578,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 ? t("bkdRefunding")
                 : t("bkdRefundButton", { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) })}
             </button>
-            <p className="mt-2 text-[12.5px] text-muted">{t("bkdRefundHint")}</p>
+            <p className="mt-2 text-[12px] text-muted">{t("bkdRefundHint")}</p>
           </Form>
         )}
         {actionData?.error && (
@@ -609,7 +609,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 >
                   {resending ? t("bkdSending") : t("bkdResendEmail")}
                 </button>
-                <p className="mt-2 text-[12.5px] text-muted">
+                <p className="mt-2 text-[12px] text-muted">
                   {t("bkdResendHint", { email: b.guest.email })}
                 </p>
               </Form>
@@ -623,7 +623,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 >
                   {t("bkdDownloadPdf")}
                 </a>
-                <p className="mt-2 text-[12.5px] text-muted">
+                <p className="mt-2 text-[12px] text-muted">
                   {t("bkdDownloadHint")}
                 </p>
               </div>
@@ -644,7 +644,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               >
                 {cancelling ? t("bkdCancelling") : t("bkdCancelBooking")}
               </button>
-              <p className="mt-2 text-[12.5px] text-muted">
+              <p className="mt-2 text-[12px] text-muted">
                 {t("bkdCancelHint")}
               </p>
             </Form>

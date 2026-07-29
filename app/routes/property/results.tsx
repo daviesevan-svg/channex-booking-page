@@ -283,7 +283,7 @@ function RoomCard({
             {room.title}
           </h3>
         </Link>
-        <div className="mb-3 text-[13.5px] font-semibold text-muted-2">
+        <div className="mb-3 text-[13px] font-semibold text-muted-2">
           {tr.t("sleeps", { n: capacity })}
           {capacity > maxAdults && (
             <span className="font-normal text-faint">
@@ -293,7 +293,7 @@ function RoomCard({
           )}
         </div>
         {room.description && (
-          <p className="mb-4 max-w-[440px] text-[14.5px] leading-[1.55] text-secondary line-clamp-2">
+          <p className="mb-4 max-w-[440px] text-[14px] leading-[1.55] text-secondary line-clamp-2">
             {room.description}
           </p>
         )}
@@ -301,7 +301,7 @@ function RoomCard({
           {amenities.map((a) => (
             <span
               key={a}
-              className="rounded-full border border-chip-border bg-chip px-3 py-[5px] text-[12.5px] font-medium text-secondary"
+              className="rounded-full border border-chip-border bg-chip px-3 py-[5px] text-[12px] font-medium text-secondary"
             >
               {a}
             </span>
@@ -386,7 +386,7 @@ function CartPanel({
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
       {cartTitle && <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>}
-      <div className="mb-4 text-[13.5px] text-muted-2">
+      <div className="mb-4 text-[13px] text-muted-2">
         {lines.length === 0 ? tr.t("noRoomsSelected") : tr.p("roomsSelected", lines.length)}
       </div>
 
@@ -400,10 +400,10 @@ function CartPanel({
                   className="group block"
                   title={tr.t("updateRoom")}
                 >
-                  <div className="truncate text-[14.5px] font-semibold group-hover:text-accent">
+                  <div className="truncate text-[14px] font-semibold group-hover:text-accent">
                     {l.roomTitle}
                   </div>
-                  <div className="text-[12.5px] text-muted-2">
+                  <div className="text-[12px] text-muted-2">
                     {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
                     {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
                     <span className="ml-1 text-[11px] text-accent">✎</span>
@@ -411,7 +411,7 @@ function CartPanel({
                 </Link>
                 <Link
                   to={`/${channelId}/extras?line=${i}&${qs}`}
-                  className="mt-1 inline-block text-[12.5px] font-semibold text-accent hover:underline"
+                  className="mt-1 inline-block text-[12px] font-semibold text-accent hover:underline"
                 >
                   {extrasCounts[i] ? tr.t("editExtrasCount", { n: extrasCounts[i] }) : tr.t("addExtras")}
                 </Link>
@@ -457,7 +457,7 @@ function CartPanel({
       </div>
 
       {extrasSum > 0 && (
-        <div className="mb-2 flex items-baseline justify-between text-[13.5px]">
+        <div className="mb-2 flex items-baseline justify-between text-[13px]">
           <span className="text-secondary">{tr.t("extrasLabel")}</span>
           <span className="font-semibold">{formatMoney(extrasSum, currency)}</span>
         </div>

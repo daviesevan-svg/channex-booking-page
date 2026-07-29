@@ -171,7 +171,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
         ) : (
           <div>
             <p className="mb-2 text-[14px] text-secondary">{t("ghRequiredIntro")}</p>
-            <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-red-700">
+            <ul className="list-disc space-y-1 pl-5 text-[13px] text-red-700">
               {readiness.missingRequired.map((m) => (
                 <li key={m.field}>{m.label}</li>
               ))}
@@ -261,14 +261,14 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             </div>
             <div>
               <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("ghVrFeedPlainXml")}</div>
-              <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[12.5px] text-secondary">
+              <code className="block break-all rounded-[10px] bg-chip px-3.5 py-2.5 text-[12px] text-secondary">
                 {new URL("/feeds/google-vacation-rentals-all.xml", vrFeedUrl).toString()}
                 {"  ·  "}
                 {vrFeedUrl}
               </code>
             </div>
           </div>
-          <p className="mt-3 text-[12.5px] text-muted">
+          <p className="mt-3 text-[12px] text-muted">
             {t("ghVrFeedContentP1")}{" "}
             <a href="/admin" className="font-semibold text-accent hover:underline">
               {t("ghPropertyDetailsLink")}
@@ -288,7 +288,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
       {superadmin && (
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("ghPushNow")}</h2>
-        <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
+        <p className="mb-4 max-w-2xl text-[13px] text-muted">
           {t("ghPushNowIntro")}
         </p>
         <div className="flex flex-wrap gap-2.5">

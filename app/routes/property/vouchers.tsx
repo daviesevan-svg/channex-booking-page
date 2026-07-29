@@ -87,10 +87,10 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
                   )}
                 </div>
                 <h2 className="mb-1 font-serif text-[20px] font-semibold">{p.title}</h2>
-                <p className="mb-3 line-clamp-2 text-[13.5px] leading-[1.5] text-muted">{p.description}</p>
+                <p className="mb-3 line-clamp-2 text-[13px] leading-[1.5] text-muted">{p.description}</p>
                 <div className="flex items-baseline justify-between">
                   <span className="text-[18px] font-semibold text-accent-deep">{money(p.price)}</span>
-                  <span className="text-[12.5px] text-muted-2">
+                  <span className="text-[12px] text-muted-2">
                     {p.kind === "gift"
                       ? tr.t("voucherValue", { amount: money(p.value ?? p.price) })
                       : p.kind === "experience"

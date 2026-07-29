@@ -147,7 +147,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
             <input name="maxGuests" type="number" min={1} defaultValue={room?.maxGuests ?? 2} className={FIELD_INPUT} />
           </label>
         </div>
-        <p className="-mt-2 text-[12.5px] text-faint">
+        <p className="-mt-2 text-[12px] text-faint">
           {t("rmChildrenNote")}
         </p>
 
@@ -166,7 +166,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
 
         <div>
           <div className="mb-2 text-[13px] font-semibold text-secondary">{t("rmAmenitiesTitle")}</div>
-          <p className="mb-3 text-[12.5px] text-muted">
+          <p className="mb-3 text-[12px] text-muted">
             {t("rmAmenitiesIntro")}
           </p>
           <AmenitiesPicker selected={room?.amenities ?? []} />
@@ -190,7 +190,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
               {existing.map((src) => (
                 <label key={src} className="block cursor-pointer">
                   <img src={src} alt="" className="h-28 w-full rounded-[10px] object-cover" />
-                  <span className="mt-1.5 flex items-center gap-1.5 text-[12.5px] text-secondary">
+                  <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-secondary">
                     <input type="checkbox" name="keepImage" value={src} defaultChecked />
                     {t("rmKeep")}
                   </span>

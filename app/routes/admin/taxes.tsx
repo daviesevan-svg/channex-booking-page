@@ -179,7 +179,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
         {/* 1. Taxes */}
         <section className={sectionCls}>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("txTaxSection")}</div>
-          <p className="mb-4 text-[13.5px] text-muted">{t("txTaxIntro")}</p>
+          <p className="mb-4 text-[13px] text-muted">{t("txTaxIntro")}</p>
 
           <label className="mb-4 flex items-center gap-2.5 text-[14px] font-semibold">
             <input
@@ -238,7 +238,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
         {/* 2. City tax */}
         <section className={sectionCls}>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("txCityTaxSection")}</div>
-          <p className="mb-4 text-[13.5px] text-muted">{t("txCityTaxIntro")}</p>
+          <p className="mb-4 text-[13px] text-muted">{t("txCityTaxIntro")}</p>
 
           {!cityTax ? (
             <button
@@ -377,7 +377,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                           <button
                             type="button"
                             onClick={() => setCity({ seasons: cityTax.seasons!.filter((_, j) => j !== i) })}
-                            className="text-[12.5px] font-semibold text-[#c0392b] hover:underline"
+                            className="text-[12px] font-semibold text-[#c0392b] hover:underline"
                           >
                             {t("txRemove")}
                           </button>
@@ -406,7 +406,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
         {/* 3. Fees */}
         <section className={sectionCls}>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("txFeesSection")}</div>
-          <p className="mb-4 text-[13.5px] text-muted">{t("txFeesIntro")}</p>
+          <p className="mb-4 text-[13px] text-muted">{t("txFeesIntro")}</p>
 
           <div className="flex flex-col gap-2.5">
             {fees.map((f, i) => (
@@ -478,7 +478,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
         {/* Live preview */}
         <section className={`${sectionCls} bg-surface-alt`}>
           <div className="mb-1 font-serif text-[16px] font-semibold">{t("txExample")}</div>
-          <p className="mb-3 text-[12.5px] text-muted">{t("txExampleIntro", { price: money(200) })}</p>
+          <p className="mb-3 text-[12px] text-muted">{t("txExampleIntro", { price: money(200) })}</p>
           <div className="flex flex-col gap-1.5 text-[14px]">
             <div className="flex justify-between">
               <span className="text-secondary">{t("txRoom")}</span>

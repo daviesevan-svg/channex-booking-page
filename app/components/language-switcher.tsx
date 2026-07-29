@@ -71,7 +71,7 @@ export function LanguageSwitcher({
                 <button
                   type="button"
                   onClick={() => choose(code)}
-                  className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13.5px] hover:bg-field-hover ${
+                  className={`flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] hover:bg-field-hover ${
                     active ? "font-semibold text-accent" : "text-secondary"
                   }`}
                 >

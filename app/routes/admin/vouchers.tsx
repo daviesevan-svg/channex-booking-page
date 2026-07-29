@@ -441,7 +441,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
           <Link
             key={tabId}
             to={tabId === "products" ? "/admin/vouchers" : "/admin/vouchers?tab=sold"}
-            className={`rounded-[8px] px-4 py-2 text-[13.5px] font-semibold ${tab === tabId ? "bg-accent text-white" : "text-muted hover:text-ink"}`}
+            className={`rounded-[8px] px-4 py-2 text-[13px] font-semibold ${tab === tabId ? "bg-accent text-white" : "text-muted hover:text-ink"}`}
           >
             {label}
           </Link>
@@ -512,9 +512,9 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
           </div>
         ) : (
           <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
-            <table className="w-full text-[13.5px]">
+            <table className="w-full text-[13px]">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-muted-2">
+                <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted-2">
                   <th className="px-3 py-3">{t("voThCode")}</th>
                   <th className="px-3 py-3">{t("voVoucher")}</th>
                   <th className="px-3 py-3">{t("voThBuyer")}</th>
@@ -526,13 +526,13 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
               <tbody>
                 {sold.map((v) => (
                   <tr key={v.code} className="border-b border-divider last:border-0">
-                    <td className="whitespace-nowrap px-3 py-3 font-mono text-[12.5px] font-semibold">
+                    <td className="whitespace-nowrap px-3 py-3 font-mono text-[12px] font-semibold">
                       <Link to={`/admin/vouchers/${v.code}`} className="text-accent-deep hover:underline">{v.code}</Link>
                     </td>
                     <td className="px-3 py-3">
                       {v.title}
-                      {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-800">{t("voBadgeTest")}</span>}
-                      {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10.5px] font-semibold text-muted">{t("voBadgeComp")}</span>}
+                      {v.simulated && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{t("voBadgeTest")}</span>}
+                      {v.comp && <span className="ml-2 rounded-full bg-chip px-2 py-0.5 text-[10px] font-semibold text-muted">{t("voBadgeComp")}</span>}
                     </td>
                     <td className="px-3 py-3">
                       <div>{v.buyerName}{v.recipientName ? ` → ${v.recipientName}` : ""}</div>
@@ -546,12 +546,12 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                         <div className="mt-1 text-[12px] text-muted">{t("voBalanceLeft", { amount: formatMoney(v.balance, currency) })}</div>
                       )}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-[12.5px] text-muted">
+                    <td className="whitespace-nowrap px-3 py-3 text-[12px] text-muted">
                       <div>{fmtDate(v.purchasedAt, "d MMM yyyy", dl)}</div>
                       <div className="text-muted-2">→ {fmtDate(v.expiresAt, "d MMM yyyy", dl)}</div>
                     </td>
                     <td className="whitespace-nowrap px-3 py-3 text-right">
-                      <Link to={`/admin/vouchers/${v.code}`} className="text-[12.5px] font-semibold text-accent hover:text-accent-deep">
+                      <Link to={`/admin/vouchers/${v.code}`} className="text-[12px] font-semibold text-accent hover:text-accent-deep">
                         {t("voView")}
                       </Link>
                     </td>
@@ -768,16 +768,16 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                         setBriefMsg({ ok: false, text: t("voBriefClipboard") });
                       }
                     }}
-                    className="rounded-[9px] border border-line-alt px-3.5 py-2 text-[12.5px] font-semibold text-secondary hover:bg-chip"
+                    className="rounded-[9px] border border-line-alt px-3.5 py-2 text-[12px] font-semibold text-secondary hover:bg-chip"
                   >
                     {t("voCopyBrief")}
                   </button>
-                  <span className="text-[11.5px] font-normal text-faint">
+                  <span className="text-[11px] font-normal text-faint">
                     {t("voCopyBriefHint")}
                   </span>
                 </div>
                 {briefMsg && (
-                  <p className={`mb-0 mt-1.5 text-[12.5px] font-normal ${briefMsg.ok ? "text-[#3f7a52]" : "text-red-600"}`}>
+                  <p className={`mb-0 mt-1.5 text-[12px] font-normal ${briefMsg.ok ? "text-[#3f7a52]" : "text-red-600"}`}>
                     {briefMsg.text}
                   </p>
                 )}
@@ -807,7 +807,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                 <div className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-2">{t("voBookableRooms")}</div>
                 <div className="flex flex-col gap-1.5">
                   {rooms.map((r) => (
-                    <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
+                    <label key={r.id} className="flex items-center gap-2 text-[13px] font-medium text-secondary">
                       <input
                         type="checkbox"
                         name="roomIds"
@@ -819,7 +819,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                     </label>
                   ))}
                   {rooms.length === 0 && (
-                    <span className="text-[12.5px] text-muted">{t("voNoRoomTypes")}</span>
+                    <span className="text-[12px] text-muted">{t("voNoRoomTypes")}</span>
                   )}
                 </div>
               </div>
@@ -841,7 +841,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                 </div>
                 <div className="flex flex-wrap gap-3">
                   {WEEKDAY_LABELS.map((_, d) => (
-                    <label key={d} className="flex items-center gap-1.5 text-[13.5px] font-medium text-secondary">
+                    <label key={d} className="flex items-center gap-1.5 text-[13px] font-medium text-secondary">
                       <input
                         type="checkbox"
                         name="checkinDays"
@@ -945,7 +945,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
                       <span className="rounded-full bg-surface-alt px-2 py-0.5 text-[11px] font-semibold text-muted-2">{t("voBadgeHidden")}</span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-[12.5px] text-muted-2">{summary(p, currency, t)}</div>
+                  <div className="mt-0.5 text-[12px] text-muted-2">{summary(p, currency, t)}</div>
                 </div>
               </div>
               <div className="flex flex-none items-center gap-3">

@@ -261,7 +261,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           <h3 className="mb-4 font-serif text-[21px] font-semibold">{roomTitle}</h3>
           <div className="flex items-start justify-between gap-3 border-b border-divider pb-4">
             <div className="min-w-0">
-              <div className="text-[12.5px] text-muted-2">{rateTitle}</div>
+              <div className="text-[12px] text-muted-2">{rateTitle}</div>
             </div>
             <span className="whitespace-nowrap text-[14px] font-semibold">{formatMoney(roomTotal, cur)}</span>
           </div>
@@ -272,13 +272,13 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
               {allLines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[13.5px] font-medium">
+                    <div className="text-[13px] font-medium">
                       {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
                       {l.qty > 1 ? ` ×${l.qty}` : ""}
                     </div>
                     {l.infoLine && <div className="text-[12px] text-muted-2">{l.infoLine}</div>}
                   </div>
-                  <span className="whitespace-nowrap text-[13.5px] font-semibold">{formatMoney(l.amount, cur)}</span>
+                  <span className="whitespace-nowrap text-[13px] font-semibold">{formatMoney(l.amount, cur)}</span>
                 </div>
               ))}
             </div>
@@ -359,7 +359,7 @@ function ExtraCard({
             <span className="text-[12px] font-normal text-muted-2"> · {UNIT_LABEL[extra.unit]}</span>
           </span>
         </div>
-        {extra.desc && <p className="mb-4 text-[13.5px] leading-[1.5] text-muted">{extra.desc}</p>}
+        {extra.desc && <p className="mb-4 text-[13px] leading-[1.5] text-muted">{extra.desc}</p>}
 
         <div className="mt-auto">
           {/* configured / added summary */}
@@ -372,7 +372,7 @@ function ExtraCard({
                 </span>
                 <span className="text-[14px] font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
               </div>
-              {line?.infoLine && <div className="mt-0.5 text-[12.5px] text-muted-2">{line.infoLine}</div>}
+              {line?.infoLine && <div className="mt-0.5 text-[12px] text-muted-2">{line.infoLine}</div>}
               <div className="mt-2 flex items-center gap-3 text-[13px] font-semibold">
                 <button type="button" onClick={onConfigure} className="text-accent hover:underline">{tr.t("editExtra")}</button>
                 <button type="button" onClick={onRemove} className="text-[#c0392b] hover:underline">{tr.t("removeExtra")}</button>
@@ -482,7 +482,7 @@ function ConfigureModal({
                     <span className="flex-1">
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="text-[15px] font-semibold">{o.name}</span>
-                        <span className="whitespace-nowrap text-[14.5px] font-semibold">
+                        <span className="whitespace-nowrap text-[14px] font-semibold">
                           {formatMoney(o.price, currency)}
                           <span className="text-[12px] font-normal text-muted-2"> · {UNIT_LABEL[o.unit ?? extra.unit]}</span>
                         </span>
@@ -526,7 +526,7 @@ function ConfigureModal({
         </div>
 
         <div className="flex-none border-t border-divider p-5">
-          {!canAdd && <p className="mb-2.5 text-[12.5px] text-[#b08968]">{tr.t("selectToContinue")}</p>}
+          {!canAdd && <p className="mb-2.5 text-[12px] text-[#b08968]">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
             <span className="font-serif text-[22px] font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
             <div className="flex items-center gap-3">

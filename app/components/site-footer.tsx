@@ -54,7 +54,7 @@ export function SiteFooterBlock({
                   href={s.url}
                   target="_blank"
                   rel="noreferrer noopener"
-                  className="text-[13.5px] font-semibold text-secondary hover:text-accent"
+                  className="text-[13px] font-semibold text-secondary hover:text-accent"
                 >
                   {s.label}
                 </a>

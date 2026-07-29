@@ -176,7 +176,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 {c.blurb && (
                   <p className="mt-2 line-clamp-2 text-[14px] leading-[1.55] text-secondary">{c.blurb}</p>
                 )}
-                <span className="mt-auto pt-4 text-[14.5px] font-semibold text-accent">{c.cta}</span>
+                <span className="mt-auto pt-4 text-[14px] font-semibold text-accent">{c.cta}</span>
               </div>
             </Link>
           ))}

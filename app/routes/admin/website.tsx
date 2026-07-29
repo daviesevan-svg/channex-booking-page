@@ -139,10 +139,10 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
             />
             <span>
               <span className="block text-[14px] font-semibold text-ink">{t("webEnableLabel")}</span>
-              <span className="block text-[12.5px] text-muted">{t("webEnableLabelDesc")}</span>
+              <span className="block text-[12px] text-muted">{t("webEnableLabelDesc")}</span>
             </span>
           </label>
-          <p className="mt-3 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12.5px] leading-[1.55] text-[#7a6636]">
+          <p className="mt-3 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
             {t("webNotBuiltYet")}
           </p>
         </div>
@@ -152,7 +152,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("webAddressTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">{t("webAddressHint")}</p>
           <div className="flex flex-wrap items-center gap-3">
-            <code className="min-w-0 flex-1 truncate rounded-[9px] border border-line-alt bg-surface-alt px-3.5 py-2.5 text-[13.5px] text-ink">
+            <code className="min-w-0 flex-1 truncate rounded-[9px] border border-line-alt bg-surface-alt px-3.5 py-2.5 text-[13px] text-ink">
               {address}
             </code>
             <a
@@ -164,7 +164,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
               {t("webViewSite")}
             </a>
           </div>
-          <p className="mt-2 text-[12.5px] text-faint">
+          <p className="mt-2 text-[12px] text-faint">
             {t("webSlugHint")}{" "}
             <Link to="/admin/properties" className="font-semibold text-accent hover:underline">
               {t("navProperties")}
@@ -190,7 +190,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
           </label>
 
           {!cnameTarget ? (
-            <p className="mt-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[12.5px] leading-[1.55] text-secondary">
+            <p className="mt-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[12px] leading-[1.55] text-secondary">
               {t("webDomainUnavailable")}
             </p>
           ) : typedIsValid ? (
@@ -236,7 +236,7 @@ function DnsInstructions({
   return (
     <div className="mt-4 rounded-[12px] border border-line-alt bg-surface-alt p-5">
       <div className="mb-1 text-[14px] font-semibold text-ink">{t("webDnsTitle")}</div>
-      <p className="mb-3 text-[12.5px] leading-[1.55] text-muted">{t("webDnsHint")}</p>
+      <p className="mb-3 text-[12px] leading-[1.55] text-muted">{t("webDnsHint")}</p>
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
         <dt className="text-muted">{t("webDnsType")}</dt>
         <dd className="font-mono text-ink">CNAME</dd>
@@ -247,7 +247,7 @@ function DnsInstructions({
       </dl>
 
       {!isWwwSubdomain(domain) && (
-        <p className="mt-3 text-[12.5px] leading-[1.55] text-muted">{t("webApexNote")}</p>
+        <p className="mt-3 text-[12px] leading-[1.55] text-muted">{t("webApexNote")}</p>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -298,7 +298,7 @@ function DnsResult({
             : t("webDnsCheckFailed", { reason: dns.reason });
 
   return (
-    <div className={`mt-3 rounded-[10px] border px-4 py-3 text-[12.5px] leading-[1.55] ${tone}`}>
+    <div className={`mt-3 rounded-[10px] border px-4 py-3 text-[12px] leading-[1.55] ${tone}`}>
       {body}
       {dns.kind === "points_here" && (
         <span className="mt-1 block text-[#5c6b5f]">{t("webDnsNotLiveYet")}</span>

@@ -65,7 +65,7 @@ function Bars({
 }) {
   const t = useAdminT();
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
-  if (rows.length === 0) return <p className="text-[13.5px] text-muted">{t("anNoDataYet")}</p>;
+  if (rows.length === 0) return <p className="text-[13px] text-muted">{t("anNoDataYet")}</p>;
   return (
     <div className="flex flex-col gap-2">
       {rows.map((r) => (
@@ -90,9 +90,9 @@ function Bars({
 function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="rounded-[14px] border border-line bg-surface p-5">
-      <div className="text-[12.5px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+      <div className="text-[12px] font-semibold uppercase tracking-wide text-muted">{label}</div>
       <div className="mt-1 font-serif text-[28px] font-semibold tabular-nums">{value}</div>
-      {sub && <div className="mt-0.5 text-[12.5px] text-muted">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[12px] text-muted">{sub}</div>}
     </div>
   );
 }
@@ -122,7 +122,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-[26px] font-semibold">{t("anTitle")}</h1>
-          <p className="mt-1 text-[13.5px] text-muted">{t("anSubtitle")}</p>
+          <p className="mt-1 text-[13px] text-muted">{t("anSubtitle")}</p>
         </div>
         <div className="flex gap-1 rounded-[10px] border border-line-alt bg-surface p-1">
           {WINDOWS.map((w) => (
@@ -142,7 +142,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
       {totals.searches === 0 ? (
         <div className="rounded-[14px] border border-line bg-surface p-8 text-center">
           <div className="font-serif text-[18px] font-semibold">{t("anEmptyTitle")}</div>
-          <p className="mx-auto mt-2 max-w-[440px] text-[13.5px] text-muted">{t("anEmptyBody")}</p>
+          <p className="mx-auto mt-2 max-w-[440px] text-[13px] text-muted">{t("anEmptyBody")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-5">
@@ -223,7 +223,7 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
 
             <Card title={t("anActivityTitle")} sub={t("anActivitySub")}>
               {data.perDay.length === 0 ? (
-                <p className="text-[13.5px] text-muted">{t("anNoDataYet")}</p>
+                <p className="text-[13px] text-muted">{t("anNoDataYet")}</p>
               ) : (
                 <div className="flex h-[160px] items-end gap-[2px]">
                   {data.perDay.map((d) => {

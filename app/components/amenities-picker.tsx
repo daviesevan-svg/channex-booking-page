@@ -8,7 +8,7 @@ export function AmenitiesPicker({ selected }: { selected: string[] }) {
   return (
     <div className="grid grid-cols-2 gap-x-6 gap-y-2 sm:grid-cols-3">
       {VR_AMENITIES.map((a) => (
-        <label key={a.key} className="flex items-center gap-2 text-[13.5px] text-secondary">
+        <label key={a.key} className="flex items-center gap-2 text-[13px] text-secondary">
           <input
             type="checkbox"
             name="amenity"

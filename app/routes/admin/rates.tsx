@@ -95,7 +95,7 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">
+                <div className="mt-0.5 text-[12px] text-muted-2">
                   {rate.mealPlan || t("rtRoomOnly")} ·{" "}
                   {rate.roomCount === 0
                     ? t("rtNoRoomsPriced")

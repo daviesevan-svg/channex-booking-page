@@ -390,7 +390,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {rooms.map((r) => (
-                      <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
+                      <label key={r.id} className="flex items-center gap-2 text-[13px] font-medium text-secondary">
                         <input
                           type="checkbox"
                           name="excludeRooms"
@@ -411,7 +411,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                   </div>
                   <div className="flex flex-col gap-1.5">
                     {rates.map((r) => (
-                      <label key={r.id} className="flex items-center gap-2 text-[13.5px] font-medium text-secondary">
+                      <label key={r.id} className="flex items-center gap-2 text-[13px] font-medium text-secondary">
                         <input
                           type="checkbox"
                           name="excludeRates"
@@ -494,7 +494,7 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exVatExempt")}</span>
                   ) : null}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">{priceSummary(e, currency, t)}</div>
+                <div className="mt-0.5 text-[12px] text-muted-2">{priceSummary(e, currency, t)}</div>
                 </div>
               </div>
               <div className="flex flex-none items-center gap-3">

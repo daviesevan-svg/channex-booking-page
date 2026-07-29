@@ -90,11 +90,11 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
 
       <Form method="post" className="mb-6 flex flex-wrap items-end gap-3 rounded-[14px] border border-line bg-surface p-5">
         <input type="hidden" name="intent" value="create" />
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("akLabel")}
           <input name="label" placeholder={t("akLabelPlaceholder")} className={input} />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("akMode")}
           <select name="mode" defaultValue="test" className={input}>
             <option value="test">{t("akModeTest")}</option>
@@ -114,7 +114,7 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
         {keys.length === 0 ? (
           <p className="p-5 text-[14px] text-muted-2">{t("akEmpty")}</p>
         ) : (
-          <table className="w-full text-[13.5px]">
+          <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-divider text-left text-[12px] uppercase tracking-wide text-muted">
                 <th className="px-5 py-3 font-semibold">{t("akLabel")}</th>
@@ -131,7 +131,7 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
                   <td className="px-5 py-3 font-medium text-ink">{k.label}</td>
                   <td className="px-5 py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[11.5px] font-semibold ${
+                      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                         k.mode === "live" ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-[#fbeede] text-[#9a6a1e]"
                       }`}
                     >

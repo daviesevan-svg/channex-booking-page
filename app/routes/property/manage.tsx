@@ -181,7 +181,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
                 </div>
                 <div className="flex flex-none items-center gap-4">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[11.5px] font-semibold ${statusChip[v.status] ?? "bg-chip text-muted"}`}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChip[v.status] ?? "bg-chip text-muted"}`}
                   >
                     {tr.t(`voucherStatus_${v.status}`)}
                   </span>

@@ -159,7 +159,7 @@ function PropertySwitcher({
               </button>
             ))}
             {filtered.length === 0 && (
-              <div className="px-2.5 py-3 text-center text-[12.5px] text-muted">{t("noPropertiesMatch", { q: q.trim() })}</div>
+              <div className="px-2.5 py-3 text-center text-[12px] text-muted">{t("noPropertiesMatch", { q: q.trim() })}</div>
             )}
           </div>
         </div>
@@ -370,7 +370,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             </span>
             <Link
               to="/admin/general"
-              className="flex-none rounded-[8px] bg-amber-800 px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-amber-900"
+              className="flex-none rounded-[8px] bg-amber-800 px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-amber-900"
             >
               {t("activateLive")}
             </Link>

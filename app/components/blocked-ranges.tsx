@@ -20,7 +20,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
   const [error, setError] = useState<string | null>(null);
 
   const input =
-    "rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13.5px] text-ink outline-none focus:border-accent";
+    "rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13px] text-ink outline-none focus:border-accent";
 
   const add = () => {
     if (!from) {
@@ -56,7 +56,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
           {ranges.map((r, i) => (
             <span
               key={`${r.from}..${r.to}`}
-              className="inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-3 py-1.5 text-[12.5px] font-semibold text-secondary"
+              className="inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-3 py-1.5 text-[12px] font-semibold text-secondary"
             >
               {label(r)}
               <button
@@ -103,8 +103,8 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
           {t("brBlockDates")}
         </button>
       </div>
-      {error && <p className="mb-0 mt-1.5 text-[12.5px] text-red-600">{error}</p>}
-      <p className="mb-0 mt-1.5 text-[11.5px] font-normal text-faint">{t("brHint")}</p>
+      {error && <p className="mb-0 mt-1.5 text-[12px] text-red-600">{error}</p>}
+      <p className="mb-0 mt-1.5 text-[11px] font-normal text-faint">{t("brHint")}</p>
     </div>
   );
 }

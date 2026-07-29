@@ -109,7 +109,7 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
       <p className="mb-6 text-[14px] text-muted">{t("wpIntro")}</p>
 
       {!websiteEnabled && (
-        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12.5px] leading-[1.55] text-[#7a6636]">
+        <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
           {t("secWebsiteOff")}{" "}
           <Link to="/admin/website" className="font-semibold underline">
             {t("navWebsiteGeneral")}
@@ -140,7 +140,7 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   to={`/admin/website/sections?page=${page.id}`}
-                  className="rounded-[8px] border border-line px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip"
+                  className="rounded-[8px] border border-line px-3 py-1.5 text-[12px] font-semibold text-secondary hover:bg-chip"
                 >
                   {t("wpEditContent")}
                 </Link>
@@ -148,7 +148,7 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
                   href={`/${linkId}/${page.slug}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-[8px] border border-line px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:bg-chip"
+                  className="rounded-[8px] border border-line px-3 py-1.5 text-[12px] font-semibold text-secondary hover:bg-chip"
                 >
                   {t("wpView")} ↗
                 </a>
@@ -162,7 +162,7 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
                   onClick={(e) => {
                     if (!confirm(t("wpConfirmDelete"))) e.preventDefault();
                   }}
-                  className="cursor-pointer rounded-[8px] border border-line px-3 py-1.5 text-[12.5px] font-semibold text-red-600 hover:bg-red-50"
+                  className="cursor-pointer rounded-[8px] border border-line px-3 py-1.5 text-[12px] font-semibold text-red-600 hover:bg-red-50"
                 >
                   {t("secRemove")}
                 </button>
@@ -203,13 +203,13 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
         ))}
 
         {pages.length === 0 && (
-          <p className="rounded-[14px] border border-dashed border-line-alt bg-surface-alt p-5 text-[13.5px] text-muted">
+          <p className="rounded-[14px] border border-dashed border-line-alt bg-surface-alt p-5 text-[13px] text-muted">
             {t("wpNone")}
           </p>
         )}
 
         {atLimit ? (
-          <p className="text-[12.5px] text-muted-2">{t("wpLimit", { n: MAX_PAGES })}</p>
+          <p className="text-[12px] text-muted-2">{t("wpLimit", { n: MAX_PAGES })}</p>
         ) : (
           <Form
             method="post"

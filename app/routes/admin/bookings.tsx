@@ -74,7 +74,7 @@ export default function AdminBookings({ loaderData }: Route.ComponentProps) {
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">
+                <div className="mt-0.5 text-[12px] text-muted-2">
                   {b.reference} · {fmtDate(b.checkin, "d MMM", dl)} —{" "}
                   {fmtDate(b.checkout, "d MMM yyyy", dl)} ·{" "}
                   {b.rooms.length === 1

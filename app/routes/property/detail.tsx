@@ -406,7 +406,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-1 font-serif text-[21px] font-semibold">{text.rateTitle}</h3>
-          <div className="mb-4 text-[13.5px] text-muted-2">{summary}</div>
+          <div className="mb-4 text-[13px] text-muted-2">{summary}</div>
 
           {/* Per-room occupancy — book this room for a specific party. */}
           <div className="mb-5 rounded-[12px] border border-line-alt bg-surface-alt/40 p-3.5">
@@ -435,7 +435,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                 />
               </div>
             )}
-            <div className="mt-2.5 text-[11.5px] text-faint">
+            <div className="mt-2.5 text-[11px] text-faint">
               {tr.t("sleeps", { n: capacity })}
               {capacity > maxAdults && (
                 <> · {tr.p("adult", maxAdults)} + {tr.p("child", capacity - maxAdults)}</>
@@ -469,7 +469,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   <span className="flex-1">
                     <span className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
-                        <span className="block text-[15.5px] font-semibold">{plan.title}</span>
+                        <span className="block text-[15px] font-semibold">{plan.title}</span>
                         {plan.offer && (
                           <span className="mt-1 inline-block rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
                             {plan.offer.name} −{plan.offer.percent}%
@@ -477,7 +477,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                         )}
                       </span>
                       <span className="flex-none text-right">
-                        <span className="block whitespace-nowrap text-[15.5px] font-semibold">
+                        <span className="block whitespace-nowrap text-[15px] font-semibold">
                           {pr.hasOffer && (
                             <span className="mr-1.5 text-[13px] font-normal text-muted-2 line-through">
                               {formatMoney(pr.gross / nights, currency)}
@@ -485,7 +485,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                           )}
                           {formatMoney(perNight, currency)}
                         </span>
-                        <span className="block text-[11.5px] text-muted-2">{tr.t("perNightInclTaxes")}</span>
+                        <span className="block text-[11px] text-muted-2">{tr.t("perNightInclTaxes")}</span>
                       </span>
                     </span>
                     <span className="mt-1.5 block text-[13px] leading-[1.45] text-muted">
@@ -499,7 +499,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           {(chosen?.description || chosen?.inclusions?.length) && (
             <div className="mb-4 rounded-[12px] bg-[#faf6ef] p-4">
               {chosen?.description && (
-                <p className="text-[13.5px] leading-[1.55] text-[#5e5547]">{chosen.description}</p>
+                <p className="text-[13px] leading-[1.55] text-[#5e5547]">{chosen.description}</p>
               )}
               {chosen?.inclusions?.length ? (
                 <>
@@ -514,7 +514,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                     {chosen.inclusions.map((inc, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-2 text-[13.5px] text-[#4a4236]"
+                        className="flex items-start gap-2 text-[13px] text-[#4a4236]"
                       >
                         <span
                           className="mt-[6px] h-[6px] w-[6px] flex-none rounded-[1px] bg-accent"

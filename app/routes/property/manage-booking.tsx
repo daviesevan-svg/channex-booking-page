@@ -218,7 +218,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
             {groupExtrasByRoom(b.extras).map((g, gi) => (
               <div key={gi} className="flex flex-col gap-1.5">
-                <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
                 {g.lines.map((x, i) => (
                   <div key={i} className="flex items-start justify-between gap-3 pl-2 text-[14px]">
                     <div className="min-w-0">
@@ -289,7 +289,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             {cancelling ? tr.t("cancelling") : tr.t("cancelBooking")}
           </button>
           {!canCancel && cancelTip && (
-            <p className="mt-2 text-[12.5px] text-muted-2">{cancelTip}</p>
+            <p className="mt-2 text-[12px] text-muted-2">{cancelTip}</p>
           )}
         </Form>
       )}

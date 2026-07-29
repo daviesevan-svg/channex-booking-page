@@ -134,9 +134,9 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Booking link (shortcode) */}
         <section>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genBookingLink")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">{t("genBookingLinkHint")}</p>
+          <p className="mb-3 text-[13px] text-muted">{t("genBookingLinkHint")}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-[10px] bg-chip px-3 py-[11px] font-mono text-[13.5px] text-secondary">
+            <span className="rounded-[10px] bg-chip px-3 py-[11px] font-mono text-[13px] text-secondary">
               {host}/
             </span>
             <input
@@ -153,7 +153,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             <p className="mt-2 text-[13px] text-red-600">{actionData.slugError}</p>
           ) : (
             slug && (
-              <p className="mt-2 text-[12.5px] text-muted">
+              <p className="mt-2 text-[12px] text-muted">
                 {t("genLiveAtPrefix")}{" "}
                 <code className="rounded bg-chip px-1.5 py-0.5">{host}/{slug}</code>{" "}
                 {t("genLiveAtSuffix")}
@@ -165,7 +165,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Theme */}
         <section>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genBrandColour")}</div>
-          <p className="mb-4 text-[13.5px] text-muted">{t("genBrandColourHint")}</p>
+          <p className="mb-4 text-[13px] text-muted">{t("genBrandColourHint")}</p>
           <div className="flex flex-wrap gap-3">
             {THEMES.map((t) => (
               <label key={t.id} className="cursor-pointer">
@@ -178,7 +178,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                 />
                 <span className="flex w-[92px] flex-col items-center gap-2 rounded-[12px] border-2 border-line-alt p-3 transition-colors peer-checked:border-accent peer-checked:bg-field-hover">
                   <span className="h-8 w-8 rounded-full" style={{ background: t.accent }} />
-                  <span className="text-[12.5px] font-semibold">{t.label}</span>
+                  <span className="text-[12px] font-semibold">{t.label}</span>
                 </span>
               </label>
             ))}
@@ -197,7 +197,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                   className="h-8 w-8 rounded-full"
                   style={{ background: validHex ? hex : "conic-gradient(red,orange,gold,green,blue,violet,red)" }}
                 />
-                <span className="text-[12.5px] font-semibold">{t("genCustom")}</span>
+                <span className="text-[12px] font-semibold">{t("genCustom")}</span>
               </span>
             </label>
           </div>
@@ -245,14 +245,14 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                   <button
                     type="button"
                     onClick={() => setBgHex("")}
-                    className="text-[12.5px] font-semibold text-muted hover:text-accent"
+                    className="text-[12px] font-semibold text-muted hover:text-accent"
                   >
                     {t("genAuto")}
                   </button>
                 )}
               </div>
             </div>
-            <span className="text-[12.5px] text-muted">
+            <span className="text-[12px] text-muted">
               {t("genHexHintPrefix")} <strong>{t("genCustom")}</strong> {t("genHexHintSuffix")}
             </span>
           </div>
@@ -261,7 +261,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Currency */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genCurrency")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">{t("genCurrencyHint")}</p>
+          <p className="mb-3 text-[13px] text-muted">{t("genCurrencyHint")}</p>
           <select
             name="currency"
             defaultValue={settings.currency || "GBP"}
@@ -276,7 +276,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Booking lead time */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genLeadTime")}</div>
-          <p className="mb-4 text-[13.5px] text-muted">{t("genLeadTimeHint")}</p>
+          <p className="mb-4 text-[13px] text-muted">{t("genLeadTimeHint")}</p>
           <div className="grid grid-cols-1 gap-4 sm:max-w-md">
             <label className="block text-[13px] font-semibold text-secondary">
               {t("genPropertyTimezone")}
@@ -321,12 +321,12 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               </label>
             )}
           </div>
-          <p className="mt-3 rounded-[10px] bg-chip px-4 py-2.5 text-[12.5px] text-secondary">{cutoffSummary}</p>
+          <p className="mt-3 rounded-[10px] bg-chip px-4 py-2.5 text-[12px] text-secondary">{cutoffSummary}</p>
         </section>
 
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genLegalLinks")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">{t("genLegalLinksHint")}</p>
+          <p className="mb-3 text-[13px] text-muted">{t("genLegalLinksHint")}</p>
           <div className="grid grid-cols-1 gap-4 sm:max-w-md">
             <label className="block text-[13px] font-semibold text-secondary">
               {t("genTermsUrl")}
@@ -354,7 +354,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Languages */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genLanguages")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">{t("genLanguagesHint")}</p>
+          <p className="mb-3 text-[13px] text-muted">{t("genLanguagesHint")}</p>
           <div className="flex flex-wrap gap-2.5">
             {LANGUAGES.map((l) => {
               const isDefault = l.code === DEFAULT_LANG;
@@ -382,7 +382,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Property type */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genPropertyType")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">
+          <p className="mb-3 text-[13px] text-muted">
             {t("genPropertyTypeHintPrefix")}{" "}
             <strong>{t("genSingleBookableUnit")}</strong>{t("genPropertyTypeHintSuffix")}
           </p>
@@ -390,7 +390,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             <input type="checkbox" name="singleUnit" defaultChecked={settings.singleUnit} className="mt-1" />
             <span>
               <span className="block text-[14px] font-semibold text-ink">{t("genSingleUnitMode")}</span>
-              <span className="block text-[12.5px] text-muted">
+              <span className="block text-[12px] text-muted">
                 {t("genSingleUnitModeDesc")}
               </span>
             </span>
@@ -400,7 +400,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
         {/* Booking mode */}
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genBookingMode")}</div>
-          <p className="mb-3 text-[13.5px] text-muted">
+          <p className="mb-3 text-[13px] text-muted">
             {t("genBookingModeIn")} <strong>{t("genTestMode")}</strong> {t("genBookingModeHintMid")}{" "}
             <strong>{t("genLiveMode")}</strong> {t("genBookingModeHintEnd")}
           </p>
@@ -414,13 +414,13 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             />
             <span>
               <span className="block text-[14px] font-semibold text-ink">{t("genEnableLiveBookings")}</span>
-              <span className="block text-[12.5px] text-muted">
+              <span className="block text-[12px] text-muted">
                 {live ? t("genLiveDesc") : t("genTestDesc")}
               </span>
             </span>
           </label>
           {live && (
-            <div className="mt-3 rounded-[10px] border border-[#e7c9a3] bg-[#fbf2e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a5a23]">
+            <div className="mt-3 rounded-[10px] border border-[#e7c9a3] bg-[#fbf2e6] px-4 py-3 text-[12px] leading-[1.6] text-[#8a5a23]">
               <strong>{t("genLiveWarningTitle")}</strong> {t("genLiveWarningBody")}
             </div>
           )}

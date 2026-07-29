@@ -236,7 +236,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           {(["code", "auto"] as PromoTrigger[]).map((tr) => (
             <label
               key={tr}
-              className={`cursor-pointer rounded-[10px] border px-4 py-2.5 text-[13.5px] font-semibold ${
+              className={`cursor-pointer rounded-[10px] border px-4 py-2.5 text-[13px] font-semibold ${
                 trigger === tr ? "border-accent bg-accent-soft text-accent-deep" : "border-line-alt text-muted"
               }`}
             >
@@ -317,7 +317,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
             <div className="mb-1 text-[13px] font-semibold text-secondary">{t("pmRules")}</div>
             <p className="mb-3 text-[12px] text-faint">{t("pmRulesIntro")}</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <label className="block text-[12.5px] font-semibold text-secondary">
+              <label className="block text-[12px] font-semibold text-secondary">
                 {t("pmMinDaysAhead")}
                 <input
                   name="minDaysAhead"
@@ -329,7 +329,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                 />
                 <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmEarlyBird")}</span>
               </label>
-              <label className="block text-[12.5px] font-semibold text-secondary">
+              <label className="block text-[12px] font-semibold text-secondary">
                 {t("pmMaxDaysAhead")}
                 <input
                   name="maxDaysAhead"
@@ -341,7 +341,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                 />
                 <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmLastMinute")}</span>
               </label>
-              <label className="block text-[12.5px] font-semibold text-secondary">
+              <label className="block text-[12px] font-semibold text-secondary">
                 {t("pmMinNights")}
                 <input
                   name="minNights"
@@ -355,7 +355,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
               </label>
             </div>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block text-[12.5px] font-semibold text-secondary">
+              <label className="block text-[12px] font-semibold text-secondary">
                 {t("pmStayFrom")}
                 <input
                   name="stayFrom"
@@ -364,7 +364,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   className={FIELD_INPUT}
                 />
               </label>
-              <label className="block text-[12.5px] font-semibold text-secondary">
+              <label className="block text-[12px] font-semibold text-secondary">
                 {t("pmStayTo")}
                 <input
                   name="stayTo"
@@ -441,7 +441,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">
+                <div className="mt-0.5 text-[12px] text-muted-2">
                   {discountSummary(p, currency, t)}
                   {p.trigger === "auto"
                     ? ` · ${conditionSummary(t, p.conditions)}`

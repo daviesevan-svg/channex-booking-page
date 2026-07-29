@@ -113,7 +113,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
         method="get"
         className="mb-5 flex flex-wrap items-end gap-3 rounded-[12px] border border-line bg-surface p-4"
       >
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("alAffectedDate")}
           <input
             type="date"
@@ -122,7 +122,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
             className="rounded-[9px] border border-line-alt bg-surface px-3 py-2 text-[14px] font-normal text-ink outline-none focus:border-accent"
           />
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("alRoom")}
           <select
             name="room"
@@ -137,7 +137,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-[12.5px] font-semibold text-secondary">
+        <label className="flex flex-col gap-1 text-[12px] font-semibold text-secondary">
           {t("alRatePlan")}
           <select
             name="rate"
@@ -170,9 +170,9 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
       </Form>
 
       <div className="overflow-x-auto rounded-[14px] border border-line bg-surface">
-        <table className="w-full min-w-[760px] border-collapse text-[13.5px]">
+        <table className="w-full min-w-[760px] border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-divider text-left text-[11.5px] font-semibold uppercase tracking-wider text-faint">
+            <tr className="border-b border-divider text-left text-[11px] font-semibold uppercase tracking-wider text-faint">
               <th className="px-4 py-3">{t("alColWhen")}</th>
               <th className="px-4 py-3">{t("alColWho")}</th>
               <th className="px-4 py-3">{t("alRoom")}</th>
@@ -222,7 +222,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
         </table>
       </div>
       {rows.length >= 300 && (
-        <p className="mt-3 text-[12.5px] text-muted">{t("alShowingLimit")}</p>
+        <p className="mt-3 text-[12px] text-muted">{t("alShowingLimit")}</p>
       )}
     </div>
   );

@@ -241,7 +241,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
   const d = (iso: string) => fmtDate(iso, "d MMM yyyy", dl);
   const section = "rounded-[14px] border border-line bg-surface p-5";
   const actionBtn =
-    "rounded-[10px] border border-line-alt px-4 py-2.5 text-[13.5px] font-semibold text-secondary hover:bg-chip disabled:opacity-60";
+    "rounded-[10px] border border-line-alt px-4 py-2.5 text-[13px] font-semibold text-secondary hover:bg-chip disabled:opacity-60";
   const active = v.status === "active";
   const pkg = v.product.package;
 
@@ -260,10 +260,10 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
         </h1>
         <div className="flex items-center gap-2">
           {v.simulated && (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11.5px] font-semibold text-amber-800">{t("vdBadgeTest")}</span>
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">{t("vdBadgeTest")}</span>
           )}
           {v.comp && (
-            <span className="rounded-full bg-chip px-2.5 py-1 text-[11.5px] font-semibold text-muted">{t("vdBadgeComp")}</span>
+            <span className="rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-muted">{t("vdBadgeComp")}</span>
           )}
           <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${STATUS_STYLE[v.status] ?? "bg-chip text-muted"}`}>
             {t(`vdStatus_${v.status}`)}
@@ -272,37 +272,37 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
       </div>
 
       {actionData && "error" in actionData && actionData.error && (
-        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] text-[#c0392b]">
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13px] text-[#c0392b]">
           {actionData.error}
         </div>
       )}
       {actionData && "resent" in actionData && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("vdResentTo", { to: actionData.resent ?? "" })}
         </div>
       )}
       {actionData && "redeemed" in actionData && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("vdMarkedRedeemedBanner")}
         </div>
       )}
       {actionData && "deducted" in actionData && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("vdDeductedBanner")}
         </div>
       )}
       {actionData && "cancelled" in actionData && (
-        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13.5px] font-medium text-[#c0392b]">
+        <div className="mb-5 rounded-[12px] border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-[13px] font-medium text-[#c0392b]">
           {t("vdCancelledBanner")}
         </div>
       )}
       {actionData && "termsUpdated" in actionData && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("vdTermsUpdatedBanner")}
         </div>
       )}
       {actionData && "refunded" in actionData && typeof actionData.refunded === "number" && (
-        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13.5px] font-medium text-[#3f7a52]">
+        <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-[13px] font-medium text-[#3f7a52]">
           {t("vdRefundedBanner", { amount: money(actionData.refunded) })}
         </div>
       )}
@@ -400,7 +400,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
               )}
             </>
           ) : (
-            <p className="m-0 text-[13.5px] text-muted">
+            <p className="m-0 text-[13px] text-muted">
               {v.comp ? t("vdCompNoPayment") : t("vdTestNoPayment")}
             </p>
           )}
@@ -411,7 +411,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
       <section className={`${section} mt-5`}>
         <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("vdSectionActivity")}</h2>
         {v.activity.length === 0 ? (
-          <p className="m-0 text-[13.5px] text-muted">{t("vdNoRedemptions")}</p>
+          <p className="m-0 text-[13px] text-muted">{t("vdNoRedemptions")}</p>
         ) : (
           <div className="flex flex-col">
             {v.activity.map((a, i) => (
@@ -436,7 +436,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
                               )
                             : `${a.amount != null ? t("vdActDeducted", { amount: money(a.amount) }) : t("vdActRedeemed")}${a.by ? ` ${t("vdActBy", { by: a.by })}` : ""}`}
                 </span>
-                <span className="text-[12.5px] text-muted-2">{dt(a.at)}</span>
+                <span className="text-[12px] text-muted-2">{dt(a.at)}</span>
               </div>
             ))}
           </div>
@@ -536,7 +536,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
                 min={0.01}
                 step="0.01"
                 placeholder="0.00"
-                className="w-[92px] rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13.5px] outline-none focus:border-accent"
+                className="w-[92px] rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13px] outline-none focus:border-accent"
               />
               <button type="submit" disabled={busy} className={actionBtn}>
                 {t("vdDeductBtn")}
@@ -555,7 +555,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-[10px] border border-[#e5c4bd] px-4 py-2.5 text-[13.5px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
+                className="rounded-[10px] border border-[#e5c4bd] px-4 py-2.5 text-[13px] font-semibold text-[#c0392b] hover:bg-[#fbe9e7] disabled:opacity-60"
               >
                 {t("vdCancelVoucher")}
               </button>
@@ -563,7 +563,7 @@ export default function AdminVoucher({ loaderData, actionData }: Route.Component
           )}
         </div>
         {!canManage && (
-          <p className="mb-0 mt-3 text-[12.5px] text-faint">
+          <p className="mb-0 mt-3 text-[12px] text-faint">
             {t("vdManageOnly")}
           </p>
         )}

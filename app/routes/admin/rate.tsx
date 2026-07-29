@@ -332,7 +332,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               the hotelier can act on it rather than letting the guest agree to
               something that quietly means nothing. */}
           {!canTakeCard && (!refundable || noShowPenalty !== "none") && (
-            <p className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12.5px] text-amber-800">
+            <p className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[12px] text-amber-800">
               <span className="font-semibold">{t("rtNoCardWarnTitle")}</span> {t("rtNoCardWarnBody")}{" "}
               <Link to="/admin/payments" className="font-semibold underline">{t("rtNoCardWarnLink")}</Link>
             </p>
@@ -415,15 +415,15 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             {t("rtChildTitle")} <span className="font-normal text-faint">{t("rtChildHint")}</span>
           </div>
           <div className="mt-1.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label className="block text-[12.5px] font-semibold text-muted-2">
+            <label className="block text-[12px] font-semibold text-muted-2">
               {t("rtAge0to3")}
               <input name="child0to3" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child0to3 ?? ""} placeholder="0" className={FIELD_INPUT} />
             </label>
-            <label className="block text-[12.5px] font-semibold text-muted-2">
+            <label className="block text-[12px] font-semibold text-muted-2">
               {t("rtAge4to12")}
               <input name="child4to12" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child4to12 ?? ""} placeholder="15" className={FIELD_INPUT} />
             </label>
-            <label className="block text-[12.5px] font-semibold text-muted-2">
+            <label className="block text-[12px] font-semibold text-muted-2">
               {t("rtAge13plus")}
               <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
             </label>

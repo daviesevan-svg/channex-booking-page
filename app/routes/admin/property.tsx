@@ -211,9 +211,9 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             control as the Properties page, surfaced here where it's edited. */}
         <label className="flex items-start gap-2.5 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
           <input type="checkbox" name="public" defaultChecked={isPublic} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
-          <span className="text-[13.5px]">
+          <span className="text-[13px]">
             <span className="font-semibold text-ink">{t("propListedPublicly")}</span>
-            <span className="mt-0.5 block text-[12.5px] text-muted">
+            <span className="mt-0.5 block text-[12px] text-muted">
               {t("propListedPubliclyHint")}
             </span>
           </span>
@@ -234,7 +234,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               </label>
             </div>
           ) : (
-            <p className="mb-2 text-[12.5px] text-muted">
+            <p className="mb-2 text-[12px] text-muted">
               {t("propLogoEmpty")}
             </p>
           )}
@@ -266,7 +266,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               </label>
             </div>
           ) : (
-            <p className="mb-2 text-[12.5px] text-muted">
+            <p className="mb-2 text-[12px] text-muted">
               {t("propCoverEmpty")}
             </p>
           )}
@@ -416,7 +416,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
                 {geoStatus?.kind === "busy" ? t("propGeoLooking") : t("propGeoButton")}
               </button>
               {geoStatus && geoStatus.kind !== "busy" && (
-                <span className={`text-[12.5px] ${geoStatus.kind === "ok" ? "text-[#3f7a52]" : "text-[#c0392b]"}`}>
+                <span className={`text-[12px] ${geoStatus.kind === "ok" ? "text-[#3f7a52]" : "text-[#c0392b]"}`}>
                   {geoStatus.text}
                 </span>
               )}
@@ -430,7 +430,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
           <p className="mb-3 text-[13px] text-muted">
             {t("propGoogleIntro")}
           </p>
-          <p className="mb-3 text-[12.5px] text-muted">
+          <p className="mb-3 text-[12px] text-muted">
             {t("propGoogleFeedLabel")}{" "}
             <code className="rounded bg-chip px-1.5 py-0.5">
               {host ? `https://${host}` : ""}/feeds/google-hotels.xml
@@ -439,7 +439,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
 
           {/* Feed readiness — Google rejects/drops listings with missing content. */}
           {googleReadiness.missingRequired.length > 0 ? (
-            <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#9a3b27]">
+            <div className="mb-3 rounded-[10px] border border-[#e7b4a8] bg-[#fbeae6] px-4 py-3 text-[12px] leading-[1.6] text-[#9a3b27]">
               <strong>{t("propGoogleMissingTitle")}</strong> {t("propGoogleMissingBody")}
               <ul className="mt-1.5 list-disc pl-5">
                 {googleReadiness.missingRequired.map((m) => (
@@ -448,12 +448,12 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               </ul>
             </div>
           ) : (
-            <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12.5px] font-medium text-[#3f7a52]">
+            <div className="mb-3 rounded-[10px] border border-[#bcd9c2] bg-[#eaf3ec] px-4 py-3 text-[12px] font-medium text-[#3f7a52]">
               {t("propGoogleReady")}
             </div>
           )}
           {googleReadiness.missingRecommended.length > 0 && (
-            <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12.5px] leading-[1.6] text-[#8a6a23]">
+            <div className="mb-3 rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3 text-[12px] leading-[1.6] text-[#8a6a23]">
               <strong>{t("propGoogleRecommendedTitle")}</strong> {t("propGoogleRecommendedBody")}
               <ul className="mt-1.5 list-disc pl-5">
                 {googleReadiness.missingRecommended.map((m) => (

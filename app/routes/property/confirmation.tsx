@@ -215,7 +215,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
               <div className="h-16 w-[84px] flex-none rounded-[12px]" style={{ background: stripe }} />
               <div>
                 <div className="font-serif text-[19px] font-semibold">{r.title}</div>
-                <div className="mt-[3px] text-[13.5px] text-muted-2">{r.rate}</div>
+                <div className="mt-[3px] text-[13px] text-muted-2">{r.rate}</div>
               </div>
             </div>
           ))}
@@ -261,7 +261,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             ))}
           {groupExtrasByRoom(extraLines).map((g, gi) => (
             <div key={gi} className="flex flex-col gap-1">
-              <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+              <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
               {g.lines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex justify-between pl-2">
                   <span className="text-secondary">
