@@ -95,14 +95,27 @@ export function ContactSection({
   );
 }
 
+/**
+ * One label/value pair.
+ *
+ * A `<div>` inside a `<dl>` may contain ONLY `<dt>` and `<dd>` (plus script and
+ * template). The first version wrapped them in a second div and put the diamond
+ * beside it as a sibling `<span>`, which broke that rule — it failed two
+ * accessibility audits and the "accessibility tree is not well-formed" check that
+ * AI agents rely on to read the page.
+ *
+ * So the diamond lives inside the `<dt>` now, and the `<dd>` is indented by the
+ * diamond's width plus the gap to keep the value aligned under the label.
+ */
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start gap-3">
-      <Diamond className="mt-[7px]" size={7} />
-      <div>
-        <dt className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{label}</dt>
-        <dd className="mt-0.5 leading-[1.55] text-secondary">{children}</dd>
-      </div>
+    <div>
+      <dt className="flex items-start gap-3 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
+        <Diamond className="mt-[5px]" size={7} />
+        <span>{label}</span>
+      </dt>
+      {/* 7px diamond + 12px gap */}
+      <dd className="mt-0.5 pl-[19px] leading-[1.55] text-secondary">{children}</dd>
     </div>
   );
 }
