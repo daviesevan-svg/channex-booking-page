@@ -12,6 +12,7 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { formatAddress } from "~/lib/address";
+import { FontStylesheet } from "~/components/font-stylesheet";
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
@@ -215,11 +216,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       data-theme={isCustom ? undefined : theme}
       style={themeStyle}
     >
-      {/* `precedence` makes React 19 hoist this into <head>. Rendered here because
-          the chosen pair only becomes known from loader data, but left in the body
-          it was a render-blocking stylesheet discovered late — after the document
-          had already been parsed past it. */}
-      {font.href && <link rel="stylesheet" href={font.href} precedence="font" />}
+      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
+          It's rendered here rather than in `links()` because the chosen pair only
+          becomes known from loader data. */}
+      <FontStylesheet href={font.href} />
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"

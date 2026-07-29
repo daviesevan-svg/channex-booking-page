@@ -140,6 +140,17 @@ export function isThemeId(value: string): value is ThemeId {
 // allowlist so we control exactly which stylesheets load (no arbitrary font
 // injection). `heading` maps to --font-serif, `body` to --font-sans. `href` is a
 // Google Fonts CSS URL; `default` reuses the fonts already loaded in root.tsx.
+/**
+ * The default pair's stylesheet. FONT_PAIRS[0] carries no href because the
+ * default is loaded once by the root layout rather than per surface — but the
+ * brand kit hands the same URL to hotels building their own site, so it lives
+ * here rather than being written out twice. It already drifted once: root was
+ * trimmed to drop the `opsz` axis and the brand kit kept serving the heavy
+ * two-axis version.
+ */
+export const DEFAULT_FONTS_HREF =
+  "https://fonts.googleapis.com/css2?family=Newsreader:wght@400;500;600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap";
+
 export const FONT_PAIRS = [
   { id: "default", label: "Newsreader + Hanken Grotesk (default)", heading: '"Newsreader", ui-serif, Georgia, serif', body: '"Hanken Grotesk", system-ui, sans-serif', href: "" },
   { id: "playfair-inter", label: "Playfair Display + Inter", heading: '"Playfair Display", ui-serif, Georgia, serif', body: '"Inter", system-ui, sans-serif', href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" },
