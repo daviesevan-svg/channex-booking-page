@@ -370,7 +370,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             </span>
             <Link
               to="/admin/general"
-              className="flex-none rounded-[8px] bg-amber-600 px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-amber-700"
+              className="flex-none rounded-[8px] bg-amber-800 px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-amber-900"
             >
               {t("activateLive")}
             </Link>
