@@ -298,7 +298,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
               {t("obRoomTypes")} <span className="font-sans text-[13px] font-normal text-muted">({rooms.length})</span>
             </div>
             {rooms.length === 0 ? (
-              <p className="text-[13.5px] text-muted">{t("obNoRooms")}</p>
+              <p className="text-[13px] text-muted">{t("obNoRooms")}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {rooms.map((r) => (
@@ -309,7 +309,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                     <input type="checkbox" name="rooms" value={r.id} defaultChecked className="mt-1" />
                     <span className="flex-1">
                       <span className="block text-[14px] font-semibold text-ink">{r.title}</span>
-                      <span className="block text-[12.5px] text-muted">
+                      <span className="block text-[12px] text-muted">
                         {t(r.maxAdults === 1 ? "obSleepsAdults_one" : "obSleepsAdults_other", {
                           guests: r.maxGuests,
                           adults: r.maxAdults,
@@ -327,11 +327,11 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
             <div className="mb-1 font-serif text-[18px] font-semibold">
               {t("obRatePlans")} <span className="font-sans text-[13px] font-normal text-muted">({rateGroups.length})</span>
             </div>
-            <p className="mb-3 text-[12.5px] text-muted">
+            <p className="mb-3 text-[12px] text-muted">
               {t("obRatesHint")}
             </p>
             {rateGroups.length === 0 ? (
-              <p className="text-[13.5px] text-muted">{t("obNoRates")}</p>
+              <p className="text-[13px] text-muted">{t("obNoRates")}</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {directGroups.map((g) => (
@@ -342,7 +342,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                     <input type="checkbox" name="rateTitles" value={g.title} defaultChecked className="mt-1" />
                     <span className="flex-1">
                       <span className="block text-[14px] font-semibold text-ink">{g.title}</span>
-                      <span className="block text-[12.5px] text-muted">
+                      <span className="block text-[12px] text-muted">
                         {g.mealPlan ?? t("obRoomOnly")} · {t(g.count === 1 ? "obRoomTypesCount_one" : "obRoomTypesCount_other", { n: g.count })}
                       </span>
                     </span>
@@ -354,7 +354,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                     <div className="mt-4 mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted-2">
                       {t("obOtaHeading")}
                     </div>
-                    <p className="mb-2 text-[12.5px] text-muted">
+                    <p className="mb-2 text-[12px] text-muted">
                       {t("obOtaHint")}
                     </p>
                     {otaGroups.map((g) => (
@@ -375,7 +375,7 @@ export default function OnboardChannex({ actionData }: Route.ComponentProps) {
                               </span>
                             ))}
                           </span>
-                          <span className="block text-[12.5px] text-muted">
+                          <span className="block text-[12px] text-muted">
                             {g.mealPlan ?? t("obRoomOnly")} · {t(g.count === 1 ? "obRoomTypesCount_one" : "obRoomTypesCount_other", { n: g.count })}
                           </span>
                         </span>

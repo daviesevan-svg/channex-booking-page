@@ -347,7 +347,7 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
             {t("coPropertiesIntroAfter")}
           </p>
           {properties.length === 0 ? (
-            <p className="text-[13.5px] text-muted">{t("coNoProperties")}</p>
+            <p className="text-[13px] text-muted">{t("coNoProperties")}</p>
           ) : (
             <div className="flex flex-col gap-2">
               {properties.map((p) => (
@@ -448,17 +448,17 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
                     // thing that reliably says which button was pressed.
                     <Form method="post" className="flex gap-2">
                       <input type="hidden" name="propertyId" value={m.id} />
-                      <button type="submit" name="intent" value="approveRequest" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                      <button type="submit" name="intent" value="approveRequest" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
                         {t("coApprove")}
                       </button>
-                      <button type="submit" name="intent" value="declineRequest" className="rounded-[9px] border border-line-alt px-3 py-1.5 text-[12.5px] font-semibold text-secondary hover:border-accent">
+                      <button type="submit" name="intent" value="declineRequest" className="rounded-[9px] border border-line-alt px-3 py-1.5 text-[12px] font-semibold text-secondary hover:border-accent">
                         {t("coDecline")}
                       </button>
                     </Form>
                   ) : (
                     <Form method="post">
                       <input type="hidden" name="propertyId" value={m.id} />
-                      <button type="submit" name="intent" value="removeMember" className="text-[12.5px] font-semibold text-[#c0392b] hover:underline">
+                      <button type="submit" name="intent" value="removeMember" className="text-[12px] font-semibold text-[#c0392b] hover:underline">
                         {t("coRemoveMember")}
                       </button>
                     </Form>
@@ -488,7 +488,7 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
               {directory.map((d: DirectoryEntry) => (
                 <div key={d.id} className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt px-4 py-3">
                   <span className="text-[14px] font-semibold text-ink">{d.name}</span>
-                  {d.location && <span className="text-[12.5px] text-muted">{d.location}</span>}
+                  {d.location && <span className="text-[12px] text-muted">{d.location}</span>}
                   {d.propertyType && (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{d.propertyType}</span>
                   )}
@@ -496,7 +496,7 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
                   <Trading activity={d.activity} />
                   <Form method="post">
                     <input type="hidden" name="propertyId" value={d.id} />
-                    <button type="submit" name="intent" value="addMember" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                    <button type="submit" name="intent" value="addMember" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
                       {c.membershipMode === "official" ? t("coInvite") : t("coAdd")}
                     </button>
                   </Form>

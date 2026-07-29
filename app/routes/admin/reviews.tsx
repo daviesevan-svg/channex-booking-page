@@ -104,14 +104,14 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
             <div className="mb-2 flex flex-wrap items-center gap-3">
               <StarRow n={r.stars} size={18} />
               <span className="font-semibold">{r.guestName}</span>
-              <span className="text-[12.5px] text-muted-2">
+              <span className="text-[12px] text-muted-2">
                 {fmtDate(r.checkin, "d MMM", dl)} — {fmtDate(r.checkout, "d MMM yyyy", dl)} ·{" "}
                 {t("rvReviewedOn", { date: fmtDate(r.createdAt, "d MMM yyyy", dl) })}
               </span>
             </div>
 
             {Object.keys(r.categories).length > 0 && (
-              <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-secondary">
+              <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-secondary">
                 {REVIEW_CATEGORIES.filter((c) => r.categories[c]).map((c) => (
                   <span key={c} className="flex items-center gap-1.5">
                     {t(`rvCat_${c}`)} <StarRow n={r.categories[c]!} size={12} />
@@ -120,13 +120,13 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
               </div>
             )}
 
-            {r.publicText && <p className="mb-3 max-w-2xl text-[14.5px] leading-[1.6]">{r.publicText}</p>}
+            {r.publicText && <p className="mb-3 max-w-2xl text-[14px] leading-[1.6]">{r.publicText}</p>}
             {r.privateNote && (
               <div className="mb-3 max-w-2xl rounded-[10px] border border-[#e7d3a3] bg-[#fbf4e6] px-4 py-3">
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#8a6a23]">
                   {t("rvPrivateNote")}
                 </div>
-                <p className="text-[13.5px] leading-[1.6] text-[#6a5a2e]">{r.privateNote}</p>
+                <p className="text-[13px] leading-[1.6] text-[#6a5a2e]">{r.privateNote}</p>
               </div>
             )}
 
@@ -142,18 +142,18 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
                 rows={2}
                 defaultValue={r.response?.text ?? ""}
                 placeholder={t("rvResponsePlaceholder")}
-                className="w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-2.5 text-[13.5px] outline-none focus:border-accent"
+                className="w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-2.5 text-[13px] outline-none focus:border-accent"
               />
               <div className="mt-1.5 flex items-center gap-3">
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-[8px] border border-line-alt bg-surface px-3.5 py-1.5 text-[12.5px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  className="rounded-[8px] border border-line-alt bg-surface px-3.5 py-1.5 text-[12px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
                 >
                   {r.response ? t("rvUpdateResponse") : t("rvPublishResponse")}
                 </button>
                 {r.response && (
-                  <span className="text-[11.5px] text-muted-2">
+                  <span className="text-[11px] text-muted-2">
                     {t("rvPublishedOn", { date: fmtDate(r.response.at, "d MMM yyyy", dl) })}
                   </span>
                 )}

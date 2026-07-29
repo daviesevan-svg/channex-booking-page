@@ -199,7 +199,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
             {copied ? t("wwCopied") : t("wwCopy")}
           </button>
         </div>
-        <p className="mt-2.5 text-[12.5px] text-muted">
+        <p className="mt-2.5 text-[12px] text-muted">
           {t("wwEmbedHintP1")} <code className="font-mono">data-target="my-div-id"</code> {t("wwEmbedHintP2")}
           {" "}<code className="font-mono">data-height="180"</code> {t("wwEmbedHintP3")}
         </p>
@@ -208,7 +208,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
       {/* AI branding */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwAiThemeTitle")}</h2>
-        <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
+        <p className="mb-4 max-w-2xl text-[13px] text-muted">
           {t("wwAiThemeIntroP1")} <em>{t("wwAnd")}</em> {t("wwAiThemeIntroP2")}
         </p>
 
@@ -257,7 +257,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
       {/* Build a fully custom widget (advanced) */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwCustomTitle")}</h2>
-        <p className="mb-4 max-w-2xl text-[13.5px] text-muted">
+        <p className="mb-4 max-w-2xl text-[13px] text-muted">
           {t("wwCustomIntro")}
         </p>
 
@@ -269,7 +269,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
         />
 
         <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("wwDeepLinkLabel")}</div>
-        <code className="mb-3 block whitespace-pre-wrap break-all rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 font-mono text-[12.5px] text-ink">
+        <code className="mb-3 block whitespace-pre-wrap break-all rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 font-mono text-[12px] text-ink">
           {deepLink}
         </code>
 
@@ -280,7 +280,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
         >
           {devCopied ? t("wwBriefCopied") : t("wwCopyDevBrief")}
         </button>
-        <p className="mt-2.5 text-[12.5px] text-muted">
+        <p className="mt-2.5 text-[12px] text-muted">
           {t("wwCustomHint")}
         </p>
       </section>
@@ -288,7 +288,7 @@ export default function WebsiteWidget({ loaderData, actionData }: Route.Componen
       {/* Live preview */}
       <section className="rounded-[14px] border border-line bg-surface p-6">
         <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("wwLivePreview")}</h2>
-        <p className="mb-4 text-[13.5px] text-muted">{t("wwLivePreviewHint")}</p>
+        <p className="mb-4 text-[13px] text-muted">{t("wwLivePreviewHint")}</p>
         <iframe
           key={themeVersion}
           title={t("wwPreviewIframeTitle")}

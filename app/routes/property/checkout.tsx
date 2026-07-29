@@ -818,7 +818,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 today — showing a policy-derived "Due now" would contradict the
                 note below. */}
             {collectsCard && (
-              <div className="mb-3 flex flex-col gap-1.5 text-[14.5px]">
+              <div className="mb-3 flex flex-col gap-1.5 text-[14px]">
                 {voucherApplied > 0 && appliedVoucher && (
                   <div className="flex justify-between text-[#3f7a52]">
                     <span>
@@ -857,12 +857,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </p>
 
             {mixedCancellation ? (
-              <div className="mb-[18px] border-t border-divider pt-3.5 text-[13.5px] text-secondary">
+              <div className="mb-[18px] border-t border-divider pt-3.5 text-[13px] text-secondary">
                 {tr.t("cancellationVariesByRoom")}
               </div>
             ) : (
               (cancellationText || latePhrase || noShowPhrase) && (
-                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13.5px] text-secondary">
+                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-[13px] text-secondary">
                   {cancellationText && <div>{cancellationText}</div>}
                   {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
                   {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
@@ -884,8 +884,8 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             {lines.map((l, i) => (
               <div key={`${l.roomId}-${i}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[14.5px] font-semibold">{l.roomTitle}</div>
-                  <div className="text-[12.5px] text-muted-2">{l.rateTitle}</div>
+                  <div className="text-[14px] font-semibold">{l.roomTitle}</div>
+                  <div className="text-[12px] text-muted-2">{l.rateTitle}</div>
                 </div>
                 <span className="whitespace-nowrap text-[14px] font-semibold">
                   {formatMoney(l.originalTotal, currency)}
@@ -893,14 +893,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </div>
             ))}
           </div>
-          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
+          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
             <Row label={tr.t("checkIn")} value={fmt(parseISO(stay.checkin), "EEE d MMM")} />
             <Row label={tr.t("checkOut")} value={fmt(parseISO(stay.checkout), "EEE d MMM")} />
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
           {(offer || (discount > 0 && appliedPromo)) && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14.5px]">
+            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-[14px]">
               <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
                 <div className="flex justify-between text-[#3f7a52]">
@@ -991,7 +991,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               <div className="text-[12px] font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
               {groupExtrasByRoom(extraLines).map((g, gi) => (
                 <div key={gi} className="flex flex-col gap-1.5">
-                  <div className="text-[12.5px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
+                  <div className="text-[12px] font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
                   {g.lines.map((l) => (
                     <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3 pl-2">
                       <div className="min-w-0">
@@ -1087,7 +1087,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </label>
 
             {showConsentError && (
-              <p className="text-[12.5px] font-medium text-red-600">
+              <p className="text-[12px] font-medium text-red-600">
                 {tr.t("consentRequired")}
               </p>
             )}
@@ -1118,12 +1118,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </div>
           )}
           {mixedCancellation ? (
-            <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
+            <div className="mt-3 text-center text-[12px] leading-[1.5] text-muted-2">
               {tr.t("cancellationVariesByRoom")}
             </div>
           ) : (
             cancellationText && (
-              <div className="mt-3 text-center text-[12.5px] leading-[1.5] text-muted-2">
+              <div className="mt-3 text-center text-[12px] leading-[1.5] text-muted-2">
                 {cancellationText}
               </div>
             )

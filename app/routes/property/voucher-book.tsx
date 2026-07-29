@@ -126,7 +126,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         <section>
           <h2 className="mb-3 font-serif text-[20px] font-semibold">1 · {tr.t("voucherPickDate")}</h2>
           {options.length === 0 ? (
-            <p className="rounded-[12px] border border-line bg-surface p-5 text-[14.5px] text-secondary">
+            <p className="rounded-[12px] border border-line bg-surface p-5 text-[14px] text-secondary">
               {tr.t("voucherNoDates")}
             </p>
           ) : (
@@ -143,7 +143,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                         setCheckin(o.date);
                         setRoomId(null);
                       }}
-                      className={`rounded-[12px] border px-4 py-2.5 text-center text-[13.5px] font-semibold transition-colors ${
+                      className={`rounded-[12px] border px-4 py-2.5 text-center text-[13px] font-semibold transition-colors ${
                         active ? "border-accent bg-accent text-white" : "border-line-alt bg-surface text-secondary hover:border-accent"
                       }`}
                     >
@@ -157,7 +157,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
               </div>
               <p className="mt-2 text-[12px] text-faint">{tr.t("voucherShowingNext")}</p>
               {checkin && checkoutISO && (
-                <p className="mt-2 text-[13.5px] font-semibold text-accent-deep">
+                <p className="mt-2 text-[13px] font-semibold text-accent-deep">
                   {format(parseISO(checkin), "EEE d MMM", { locale })} → {format(parseISO(checkoutISO), "EEE d MMM yyyy", { locale })} ·{" "}
                   {tr.p("night", nights)} · {tr.p("adult", adults)}
                   {children ? ` + ${tr.p("child", children)}` : ""}
@@ -189,7 +189,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                     </div>
                     <div className="bg-surface p-4">
                       <div className="font-semibold">{r.title}</div>
-                      {r.description && <p className="mt-0.5 line-clamp-2 text-[12.5px] text-muted">{r.description}</p>}
+                      {r.description && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted">{r.description}</p>}
                     </div>
                   </button>
                 );
@@ -229,7 +229,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         )}
 
         {actionData?.error && (
-          <p className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13.5px] text-red-700">
+          <p className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
             {actionData.error}
           </p>
         )}
@@ -242,7 +242,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
             >
               {busy ? "…" : tr.t("voucherConfirm")}
             </button>
-            <p className="mt-2 text-[12.5px] text-muted">{tr.t("voucherNoPayment")}</p>
+            <p className="mt-2 text-[12px] text-muted">{tr.t("voucherNoPayment")}</p>
           </div>
         )}
       </Form>

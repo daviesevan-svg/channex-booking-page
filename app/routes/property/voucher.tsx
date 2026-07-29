@@ -125,10 +125,10 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
         </div>
         <div className="p-7">
           <div className="mb-2 flex flex-wrap items-center gap-2.5">
-            <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11.5px] font-semibold text-muted">
+            <span className="rounded-full bg-chip px-2.5 py-0.5 text-[11px] font-semibold text-muted">
               {v.kind === "gift" ? tr.t("voucherKindGift") : v.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
             </span>
-            <span className={`rounded-full px-2.5 py-0.5 text-[11.5px] font-semibold ${STATUS_STYLE[v.status]}`}>
+            <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${STATUS_STYLE[v.status]}`}>
               {statusLabel}
             </span>
           </div>
@@ -198,10 +198,10 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
             </a>
           </div>
           {v.kind === "gift" && v.status === "active" && (
-            <p className="mt-5 text-center text-[13.5px] leading-[1.6] text-muted">{tr.t("voucherGiftHow")}</p>
+            <p className="mt-5 text-center text-[13px] leading-[1.6] text-muted">{tr.t("voucherGiftHow")}</p>
           )}
           {v.kind === "experience" && v.status === "active" && (
-            <p className="mt-5 text-center text-[13.5px] leading-[1.6] text-muted">{tr.t("voucherExperienceHow")}</p>
+            <p className="mt-5 text-center text-[13px] leading-[1.6] text-muted">{tr.t("voucherExperienceHow")}</p>
           )}
 
           {v.product.terms && (

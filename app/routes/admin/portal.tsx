@@ -124,7 +124,7 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
           <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
           <span>
             {t("poAutoRefund")}
-            <span className="mt-0.5 block text-[12.5px] font-normal text-muted">
+            <span className="mt-0.5 block text-[12px] font-normal text-muted">
               {t("poAutoRefundHint")}
             </span>
           </span>

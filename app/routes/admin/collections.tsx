@@ -205,7 +205,7 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
             {listings.map((l) => (
               <div
                 key={`${l.slug}:${l.propertyId}`}
-                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13.5px]"
+                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13px]"
               >
                 <span className="font-semibold text-ink">{l.propertyName}</span>
                 <span className="text-muted">{t("coListedInOn")}</span>
@@ -223,19 +223,19 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
                   <input type="hidden" name="propertyId" value={l.propertyId} />
                   {l.status === "invited" ? (
                     <>
-                      <button type="submit" name="intent" value="acceptInvite" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white">
+                      <button type="submit" name="intent" value="acceptInvite" className="rounded-[9px] bg-accent px-3 py-1.5 text-[12px] font-semibold text-white">
                         {t("coAcceptInvite")}
                       </button>
-                      <button type="submit" name="intent" value="declineInvite" className="text-[12.5px] font-semibold text-secondary hover:underline">
+                      <button type="submit" name="intent" value="declineInvite" className="text-[12px] font-semibold text-secondary hover:underline">
                         {t("coDecline")}
                       </button>
                     </>
                   ) : (
                     <>
-                      <button type="submit" name="intent" value="leave" className="text-[12.5px] font-semibold text-secondary hover:underline">
+                      <button type="submit" name="intent" value="leave" className="text-[12px] font-semibold text-secondary hover:underline">
                         {t("coLeave")}
                       </button>
-                      <button type="submit" name="intent" value="block" className="text-[12.5px] font-semibold text-[#c0392b] hover:underline" title={t("coBlockHelp")}>
+                      <button type="submit" name="intent" value="block" className="text-[12px] font-semibold text-[#c0392b] hover:underline" title={t("coBlockHelp")}>
                         {t("coBlock")}
                       </button>
                     </>
@@ -271,7 +271,7 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
               <Form
                 key={j.slug}
                 method="post"
-                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13.5px]"
+                className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 text-[13px]"
               >
                 <input type="hidden" name="slug" value={j.slug} />
                 <Link to={`/c/${j.slug}`} target="_blank" className="font-semibold text-ink hover:text-accent">
@@ -286,7 +286,7 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
                     chosen here rather than inferred. */}
                 <select
                   name="propertyId"
-                  className="rounded-[9px] border border-line-alt bg-surface px-2 py-1.5 text-[12.5px]"
+                  className="rounded-[9px] border border-line-alt bg-surface px-2 py-1.5 text-[12px]"
                 >
                   {j.options.map((o) => (
                     <option key={o.id} value={o.id}>{o.name}</option>
@@ -296,7 +296,7 @@ export default function AdminCollections({ loaderData, actionData }: Route.Compo
                   type="submit"
                   name="intent"
                   value="requestJoin"
-                  className="rounded-[9px] bg-accent px-3 py-1.5 text-[12.5px] font-semibold text-white"
+                  className="rounded-[9px] bg-accent px-3 py-1.5 text-[12px] font-semibold text-white"
                 >
                   {j.mode === "open" ? t("coJoinNow") : t("coJoinAsk")}
                 </button>

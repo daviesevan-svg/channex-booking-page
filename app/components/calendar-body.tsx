@@ -107,7 +107,7 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
 
       {state.helper && (
         <div
-          className="mt-3.5 flex items-center gap-2.5 rounded-[10px] px-3.5 py-[11px] text-[13.5px] font-semibold"
+          className="mt-3.5 flex items-center gap-2.5 rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold"
           style={{ background: "var(--accent-soft)", color: "var(--accent-deep)" }}
         >
           <span
@@ -125,7 +125,7 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
 export function CalendarLegend() {
   const tr = useT();
   return (
-    <div className="flex items-center gap-[18px] text-[12.5px] text-muted-2">
+    <div className="flex items-center gap-[18px] text-[12px] text-muted-2">
       <span className="flex items-center gap-1.5">
         <span className="text-disabled-day line-through">12</span> {tr.t("unavailable")}
       </span>

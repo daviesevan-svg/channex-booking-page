@@ -84,7 +84,7 @@ export default function AdminRooms({ loaderData }: Route.ComponentProps) {
                 )}
                 <div className="min-w-0">
                 <div className="truncate font-semibold">{room.title}</div>
-                <div className="mt-0.5 text-[12.5px] text-muted-2">
+                <div className="mt-0.5 text-[12px] text-muted-2">
                   {t("rmSleeps", { n: room.maxGuests })} ·{" "}
                   {t(room.maxAdults === 1 ? "rmUpToAdults_one" : "rmUpToAdults_other", { n: room.maxAdults })} ·{" "}
                   {t(room.images === 1 ? "rmPhotos_one" : "rmPhotos_other", { n: room.images })} ·{" "}

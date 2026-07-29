@@ -573,7 +573,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                       {p.chips.map((c) => (
                         <span
                           key={c}
-                          className="rounded-full px-3 py-[5px] text-[12.5px] font-medium"
+                          className="rounded-full px-3 py-[5px] text-[12px] font-medium"
                           style={{ color: "var(--color-secondary)", background: "#f5efe5", border: "1px solid #ece3d4" }}
                         >
                           {c}
@@ -601,7 +601,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                       type="button"
                       onClick={() => goToProperty(p)}
                       disabled={p.soldOut}
-                      className="flex-none rounded-[10px] bg-accent px-[22px] py-[11px] text-[14.5px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex-none rounded-[10px] bg-accent px-[22px] py-[11px] text-[14px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {tr.t("viewProperty")}
                     </button>

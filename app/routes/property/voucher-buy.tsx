@@ -383,7 +383,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
       <div className="grid items-start gap-x-12 gap-y-8 min-[900px]:grid-cols-[minmax(0,1fr)_360px]">
         {/* LEFT column */}
         <div>
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-[13px] py-1.5 text-[12.5px] font-semibold uppercase tracking-[0.06em] text-accent-deep">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-[13px] py-1.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent-deep">
             <Diamond size={7} />
             {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
           </div>
@@ -445,7 +445,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                     )}
                     <div className="px-[18px] pb-5 pt-[18px]">
                       <div className="mb-1.5 font-serif text-[21px] font-semibold tracking-[-0.01em]">{r.name}</div>
-                      {r.desc && <div className="line-clamp-3 text-[14.5px] leading-[1.55] text-secondary">{r.desc}</div>}
+                      {r.desc && <div className="line-clamp-3 text-[14px] leading-[1.55] text-secondary">{r.desc}</div>}
                     </div>
                   </div>
                 ))}
@@ -484,7 +484,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                     {panelPoints.map((pt) => (
                       <div key={pt} className="flex items-start gap-2.5">
                         <Diamond size={6} className="mt-[6px]" />
-                        <span className="text-[14.5px] leading-[1.45] text-secondary">{pt}</span>
+                        <span className="text-[14px] leading-[1.45] text-secondary">{pt}</span>
                       </div>
                     ))}
                   </div>
@@ -529,7 +529,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                           <label className="block text-[13px] font-semibold text-secondary">
                             {tr.t("recipientEmail")}
                             <input name="recipientEmail" type="email" className={input} />
-                            <span className="mt-1 block text-[11.5px] font-normal text-faint">
+                            <span className="mt-1 block text-[11px] font-normal text-faint">
                               {tr.t("recipientEmailHint")}
                             </span>
                           </label>
@@ -565,7 +565,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-[13.5px] text-secondary">
+            <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-[13px] text-secondary">
               <Diamond size={7} />
               {pkg ? tr.t("voucherStripDates") : p.kind === "experience" ? tr.t("voucherStripExperience") : tr.t("voucherStripBalance")}
             </div>
@@ -585,7 +585,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
         >
           <div>
             <div className="font-serif text-[24px] font-semibold leading-none">{money(p.price)}</div>
-            <div className="text-[12.5px] text-muted-2">{priceSub}</div>
+            <div className="text-[12px] text-muted-2">{priceSub}</div>
           </div>
           <a
             href="#buy"

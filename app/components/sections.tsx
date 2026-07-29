@@ -155,7 +155,7 @@ export function ReviewsSection({
             <p className="text-[14px] leading-[1.6] text-secondary">{r.publicText}</p>
             {r.response?.text && (
               <div className="mt-3 border-l-2 border-line-alt pl-3">
-                <div className="text-[11.5px] font-semibold uppercase tracking-wide text-muted-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-2">
                   {tr.t("hotelResponse", { hotel: hotelName })}
                 </div>
                 <p className="mt-0.5 text-[13px] leading-[1.55] text-muted">{r.response.text}</p>
@@ -252,7 +252,7 @@ export function GallerySection({
               />
             </div>
             {photo.caption && (
-              <figcaption className="mt-1.5 text-[12.5px] leading-[1.45] text-muted">
+              <figcaption className="mt-1.5 text-[12px] leading-[1.45] text-muted">
                 {photo.caption}
               </figcaption>
             )}

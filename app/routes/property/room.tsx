@@ -212,7 +212,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
               {/* Prices live on the next page, where there are dates to price
                   against. Naming the rates here without numbers is honest and
                   still tells the guest what they'll be choosing between. */}
-              <p className="mt-2.5 text-[12.5px] text-faint">{tr.t("ratesPricedOnDates")}</p>
+              <p className="mt-2.5 text-[12px] text-faint">{tr.t("ratesPricedOnDates")}</p>
             </div>
           )}
         </div>
@@ -240,7 +240,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
                 {ready ? tr.t("seeRatesFor", { range: dates.rangeSummary }) : tr.t("pickYourDates")}
               </button>
               {!ready && (
-                <p className="mt-2 text-center text-[12.5px] text-faint">{tr.t("pickYourDatesHint")}</p>
+                <p className="mt-2 text-center text-[12px] text-faint">{tr.t("pickYourDatesHint")}</p>
               )}
             </div>
           </div>
