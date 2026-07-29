@@ -1,7 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/users";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import { getProperties } from "~/lib/properties.server";

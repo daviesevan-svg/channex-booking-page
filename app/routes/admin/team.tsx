@@ -1,7 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/team";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";

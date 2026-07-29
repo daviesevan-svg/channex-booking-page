@@ -3,7 +3,7 @@ import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";

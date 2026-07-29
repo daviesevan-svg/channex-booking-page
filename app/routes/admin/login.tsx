@@ -1,7 +1,7 @@
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/login";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import {
   canSignIn,
   createMagicToken,

@@ -2,7 +2,7 @@ import { fmtDate } from "~/lib/dates";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/bookings";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";

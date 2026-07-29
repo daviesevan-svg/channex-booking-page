@@ -5,7 +5,7 @@ import { Form, Link, redirect, useNavigation, useSearchParams } from "react-rout
 import { useEffect, useState } from "react";
 
 import type { Route } from "./+types/vouchers";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { useAdminDateLocale, useAdminT, type AdminT } from "~/lib/admin-i18n";

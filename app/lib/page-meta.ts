@@ -8,9 +8,13 @@
 // Before this existed the landing and results pages had NO <title> at all and
 // nothing had a description, which is not survivable for a page whose whole job
 // is to be found.
+//
+// Guest-only on purpose: every guest route imports this, so anything it imports
+// ships to every hotel's public pages. The admin equivalent lives in
+// admin-meta.ts — when both were here, the admin dictionary (82 kB gzipped) was
+// downloaded by every visitor to every landing page.
 
 import { DEFAULT_LANG } from "./content";
-import { adminT, isAdminLang } from "./admin-i18n";
 import { makeTranslator } from "./i18n";
 
 interface LayoutData {
@@ -23,7 +27,6 @@ interface LayoutData {
 type MetaMatch = { id: string; loaderData?: unknown } | undefined;
 
 const LAYOUT_ID = "routes/property/layout";
-const ADMIN_LAYOUT_ID = "routes/admin/layout";
 
 function chrome(matches: readonly MetaMatch[]): { lang: string; hotelName: string } {
   const data = matches.find((m) => m?.id === LAYOUT_ID)?.loaderData as
@@ -59,25 +62,6 @@ export function pageMeta(
   if (description) out.push({ name: "description", content: truncate(description) });
   if (noindex) out.push({ name: "robots", content: "noindex" });
   return out;
-}
-
-/** Admin tab title, in the admin's own language. Same `matches` trick, reading
- *  the admin layout's `adminLang`. Not SEO — but a Portuguese admin staring at
- *  an English browser tab is the same bug wearing a different hat.
- *
- *  `text` wins over `key`, for pages titled after a record (a voucher code, an
- *  email template) rather than after a fixed label. */
-export function adminMeta(
-  matches: readonly MetaMatch[],
-  { key, text, vars }: { key?: string; text?: string; vars?: Record<string, string | number> },
-): Array<Record<string, string>> {
-  const data = matches.find((m) => m?.id === ADMIN_LAYOUT_ID)?.loaderData as
-    | { adminLang?: string }
-    | undefined;
-  const raw = data?.adminLang ?? "";
-  const t = adminT(isAdminLang(raw) ? raw : "en");
-  const label = text?.trim() || (key ? t(key, vars) : "");
-  return [{ title: label ? `${t("mtAdmin")} · ${label}` : t("mtAdmin") }];
 }
 
 /** Trim to a length search engines will actually show, on a word boundary. */

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";

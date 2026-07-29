@@ -8,7 +8,7 @@
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website-pages";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { langParam } from "~/lib/content";

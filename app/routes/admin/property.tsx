@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { geocodeAddress } from "~/lib/google-maps-client";
 import { getConfig } from "~/lib/config.server";
 import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";

@@ -6,7 +6,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/reviews";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { listReviews, setReviewResponse } from "~/lib/reviews.server";

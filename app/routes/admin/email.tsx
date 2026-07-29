@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/email";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { emailDef, langParam, pickLang } from "~/lib/content";
