@@ -64,7 +64,11 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
-      {font.href && <link rel="stylesheet" href={font.href} />}
+      {/* `precedence` makes React 19 hoist this into <head>. Rendered here because
+          the chosen pair only becomes known from loader data, but left in the body
+          it was a render-blocking stylesheet discovered late — after the document
+          had already been parsed past it. */}
+      {font.href && <link rel="stylesheet" href={font.href} precedence="font" />}
       <Outlet context={context} />
     </div>
   );

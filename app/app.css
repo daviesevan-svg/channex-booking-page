@@ -37,10 +37,20 @@
   --page: oklch(0.966 0.011 350);
 }
 
-@theme inline {
+/* Fonts are deliberately NOT in the `@theme inline` block below.
+   `inline` bakes the value straight into the utility —
+     .font-serif { font-family: Newsreader, ui-serif, Georgia, serif }
+   — so the per-hotel pair set on the wrapper element at runtime had no effect
+   whatsoever: every property rendered the default fonts while still fetching the
+   stylesheet for the one it had chosen. A plain @theme emits
+     .font-serif { font-family: var(--font-serif) }
+   which is what makes the override work. */
+@theme {
   --font-serif: "Newsreader", ui-serif, Georgia, serif;
   --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+}
 
+@theme inline {
   /* Warm neutral palette (design handoff) */
   --color-page: #f7f2ec;
   --color-surface: #ffffff;
