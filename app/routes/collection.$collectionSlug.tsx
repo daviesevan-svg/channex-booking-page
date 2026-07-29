@@ -279,7 +279,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 function Diamond({ size = 8 }: { size?: number }) {
   return (
     <span
-      className="inline-block flex-none rounded-[1px] bg-accent"
+      className="inline-block flex-none rounded-mark bg-accent"
       style={{ width: size, height: size, transform: "rotate(45deg)" }}
     />
   );
@@ -427,9 +427,9 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-[1420px] items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-4">
           <div className="flex items-center gap-3">
             <Diamond size={13} />
-            <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">{name}</span>
+            <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">{name}</span>
           </div>
-          <div className="flex items-center gap-6 text-[14px]" style={{ color: "var(--color-muted)" }}>
+          <div className="flex items-center gap-6 text-body" style={{ color: "var(--color-muted)" }}>
             <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
             {phone && <span className="hidden sm:inline">{phone}</span>}
           </div>
@@ -441,7 +441,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-x-4 gap-y-3 px-[clamp(16px,4vw,32px)] py-3.5">
           <div className="flex flex-wrap items-center gap-3.5">
             <div
-              className="flex items-center gap-2.5 rounded-[12px] px-4 py-2.5 text-[14px] font-semibold"
+              className="flex items-center gap-2.5 rounded-card px-4 py-2.5 text-body font-semibold"
               style={{ background: "#f7f2ec", border: "1px solid #e8dfd0" }}
             >
               <Diamond />
@@ -450,18 +450,18 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
             <button
               type="button"
               onClick={() => setEditingDates((v) => !v)}
-              className="cursor-pointer text-[14px] font-semibold hover:text-accent"
+              className="cursor-pointer text-body font-semibold hover:text-accent"
               style={{ color: "var(--color-muted)" }}
             >
               {hasDates ? tr.t("editDates") : tr.t("chooseDates")}
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-[14px] font-medium" style={{ color: "var(--color-muted)" }}>
+            <div className="text-body font-medium" style={{ color: "var(--color-muted)" }}>
               {tr.p("staysAvailable", availableCount)}
             </div>
             <label
-              className="flex items-center rounded-full py-2 pl-4 pr-2 text-[14px] font-semibold"
+              className="flex items-center rounded-full py-2 pl-4 pr-2 text-body font-semibold"
               style={{ background: "#f7f2ec", border: "1px solid #e3d9c9" }}
             >
               <span className="text-muted-2">{tr.t("sortLabel")} ·</span>
@@ -485,10 +485,10 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 <button
                   type="button"
                   onClick={() => dates.setOpen?.(true)}
-                  className="rounded-[10px] border px-4 py-2.5 text-left text-[14px] font-semibold"
+                  className="rounded-control border px-4 py-2.5 text-left text-body font-semibold"
                   style={{ borderColor: "#e8dfd0", background: "#f7f2ec" }}
                 >
-                  <span className="block text-[11px] uppercase tracking-wide text-muted-2">
+                  <span className="block text-micro uppercase tracking-wide text-muted-2">
                     {tr.t("datesLabel")}
                   </span>
                   {dates.checkinLabel || tr.t("checkIn")} — {dates.checkoutLabel || tr.t("checkOut")}
@@ -500,7 +500,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 type="button"
                 onClick={applyDates}
                 disabled={!dates.checkinIso || !dates.checkoutIso}
-                className="rounded-[10px] bg-accent px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-50"
+                className="rounded-control bg-accent px-6 py-2.5 text-body font-semibold text-white hover:bg-accent-deep disabled:opacity-50"
               >
                 {tr.t("searchLabel")}
               </button>
@@ -511,7 +511,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
       {/* intro */}
       <div className="mx-auto max-w-[1420px] px-[clamp(16px,4vw,32px)] pb-2 pt-[34px]">
-        <div className="mb-3 text-[13px] font-semibold uppercase tracking-[0.16em] text-accent">
+        <div className="mb-3 text-caption font-semibold uppercase tracking-[0.16em] text-accent">
           {destination ? `${destination} · ` : ""}
           {properties.length} {properties.length === 1 ? "property" : "properties"}
         </div>
@@ -519,7 +519,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
           {heading || tr.t("collectionHeading")}
         </h1>
         {intro && (
-          <p className="m-0 max-w-[620px] text-[16px] leading-[1.6]" style={{ color: "var(--color-secondary)" }}>
+          <p className="m-0 max-w-[620px] text-lead leading-[1.6]" style={{ color: "var(--color-secondary)" }}>
             {intro}
           </p>
         )}
@@ -530,7 +530,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         {/* list */}
         <div className="flex min-w-0 flex-col gap-4 lg:flex-[1.25] lg:basis-[380px]">
           {properties.length === 0 && (
-            <p className="text-[15px]" style={{ color: "var(--color-secondary)" }}>
+            <p className="text-body-lg" style={{ color: "var(--color-secondary)" }}>
               {tr.t("noPropertiesYet")}
             </p>
           )}
@@ -543,7 +543,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 id={`prop-${id}`}
                 onMouseEnter={() => setHoveredId(id)}
                 onMouseLeave={() => setHoveredId(null)}
-                className="flex flex-wrap overflow-hidden rounded-[16px] bg-white transition-all"
+                className="flex flex-wrap overflow-hidden rounded-panel bg-white transition-all"
                 style={{
                   border: `1.5px solid ${on ? "var(--accent)" : "#efe7da"}`,
                   boxShadow: on ? "0 20px 40px -26px rgba(70,55,35,0.45)" : "0 1px 0 rgba(70,55,35,0.02)",
@@ -555,7 +555,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 >
                   {p.photo && <img src={p.photo} alt={p.name} className="h-full w-full object-cover" />}
                   <span
-                    className="absolute left-3 top-3 rounded-full px-2.5 py-[5px] text-[11px] font-bold uppercase tracking-[0.04em]"
+                    className="absolute left-3 top-3 rounded-full px-2.5 py-[5px] text-micro font-bold uppercase tracking-[0.04em]"
                     style={{ background: "rgba(255,253,250,0.92)", color: "#5a5145" }}
                   >
                     {p.typeLabel}
@@ -563,17 +563,17 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 </div>
                 <div className="flex flex-[2_1_300px] flex-col p-[22px_24px]">
                   {p.area && (
-                    <div className="mb-1.5 text-[12px] font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--color-muted-2)" }}>
+                    <div className="mb-1.5 text-label font-semibold uppercase tracking-[0.1em]" style={{ color: "var(--color-muted-2)" }}>
                       {p.area}
                     </div>
                   )}
-                  <h3 className="mb-3 font-serif text-[23px] font-semibold tracking-[-0.01em]">{p.name}</h3>
+                  <h3 className="mb-3 font-serif text-title-2xl font-semibold tracking-[-0.01em]">{p.name}</h3>
                   {p.chips.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {p.chips.map((c) => (
                         <span
                           key={c}
-                          className="rounded-full px-3 py-[5px] text-[12px] font-medium"
+                          className="rounded-full px-3 py-[5px] text-label font-medium"
                           style={{ color: "var(--color-secondary)", background: "#f5efe5", border: "1px solid #ece3d4" }}
                         >
                           {c}
@@ -584,24 +584,24 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                   <div className="mt-auto flex items-end justify-between gap-4 pt-[18px]">
                     <div className="flex items-baseline gap-[7px]">
                       {p.soldOut ? (
-                        <span className="text-[15px] font-semibold" style={{ color: "var(--color-muted-2)" }}>
+                        <span className="text-body-lg font-semibold" style={{ color: "var(--color-muted-2)" }}>
                           {hasDates ? tr.t("soldOutDates") : ""}
                         </span>
                       ) : p.fromPrice ? (
                         <>
-                          <span className="text-[13px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("from")}</span>
-                          <span className="font-serif text-[28px] font-semibold leading-none">{p.fromPrice}</span>
-                          <span className="text-[13px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("perNightShort")}</span>
+                          <span className="text-caption" style={{ color: "var(--color-muted-2)" }}>{tr.t("from")}</span>
+                          <span className="font-serif text-display-sm font-semibold leading-none">{p.fromPrice}</span>
+                          <span className="text-caption" style={{ color: "var(--color-muted-2)" }}>{tr.t("perNightShort")}</span>
                         </>
                       ) : (
-                        <span className="text-[14px]" style={{ color: "var(--color-muted-2)" }}>{tr.t("selectDatesForPrices")}</span>
+                        <span className="text-body" style={{ color: "var(--color-muted-2)" }}>{tr.t("selectDatesForPrices")}</span>
                       )}
                     </div>
                     <button
                       type="button"
                       onClick={() => goToProperty(p)}
                       disabled={p.soldOut}
-                      className="flex-none rounded-[10px] bg-accent px-[22px] py-[11px] text-[14px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex-none rounded-control bg-accent px-[22px] py-[11px] text-body font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {tr.t("viewProperty")}
                     </button>
@@ -615,7 +615,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         {/* map */}
         <div className="order-first min-w-0 self-stretch lg:order-none lg:flex-1 lg:basis-[360px]">
           <div
-            className="relative h-[340px] overflow-hidden rounded-[18px] lg:sticky lg:top-[132px] lg:h-[calc(100vh-160px)]"
+            className="relative h-[340px] overflow-hidden rounded-panel-lg lg:sticky lg:top-[132px] lg:h-[calc(100vh-160px)]"
             style={{ border: "1px solid #e3d9c9", boxShadow: "0 22px 50px -30px rgba(70,55,35,0.35)", minHeight: 320 }}
           >
             {mapKey ? (
@@ -648,7 +648,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
             {/* chrome — sits above whichever map is shown */}
             <div
-              className="pointer-events-none absolute left-4 top-4 z-[6] flex items-center gap-2 rounded-full px-[15px] py-2 text-[13px] font-semibold"
+              className="pointer-events-none absolute left-4 top-4 z-[6] flex items-center gap-2 rounded-full px-[15px] py-2 text-caption font-semibold"
               style={{ background: "rgba(255,253,250,0.94)", border: "1px solid #e8dfd0", color: "#5a5145", boxShadow: "0 6px 18px -10px rgba(70,55,35,0.4)" }}
             >
               <Diamond />
@@ -660,7 +660,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
 
       {/* footer */}
       <footer className="border-t" style={{ borderColor: "#ece4d8", background: "#fffdfa" }}>
-        <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-[13px]" style={{ color: "var(--color-muted-2)" }}>
+        <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-caption" style={{ color: "var(--color-muted-2)" }}>
           <span>© 2026 {name} · {tr.t("allRightsReserved")}</span>
           <span>{tr.t("footerRight")}</span>
         </div>
@@ -711,7 +711,7 @@ function StylizedMap({
             onClick={() => clickPin(id)}
             onMouseEnter={() => setHoveredId(id)}
             onMouseLeave={() => setHoveredId(null)}
-            className="absolute cursor-pointer whitespace-nowrap rounded-full border-[1.5px] px-3 py-[7px] text-[13px] font-bold transition-all"
+            className="absolute cursor-pointer whitespace-nowrap rounded-full border-[1.5px] px-3 py-[7px] text-caption font-bold transition-all"
             style={{
               left: `${p.left}%`,
               top: `${p.top}%`,

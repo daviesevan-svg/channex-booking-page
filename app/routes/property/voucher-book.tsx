@@ -101,7 +101,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
   const [roomId, setRoomId] = useState<string | null>(null);
   const { locale } = tr;
   const input =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface px-3.5 py-2.5 text-[15px] text-ink outline-none focus:border-accent";
+    "mt-1.5 block w-full rounded-control border border-line-alt bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 10px,#e7ddcc 10px,#e7ddcc 20px)";
 
   const selected = options.find((o) => o.date === checkin);
@@ -116,17 +116,17 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
       >
         ← {tr.t("voucherCodeLabel")} {code}
       </Link>
-      <h1 className="mb-2 font-serif text-[34px] font-medium tracking-[-0.02em]">{tr.t("voucherRedeemTitle")}</h1>
-      <p className="mb-8 max-w-[560px] text-[16px] leading-[1.6] text-secondary">
+      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">{tr.t("voucherRedeemTitle")}</h1>
+      <p className="mb-8 max-w-[560px] text-lead leading-[1.6] text-secondary">
         {tr.t("voucherRedeemIntro", { title, nights: String(nights) })}
       </p>
 
       <Form method="post" className="flex flex-col gap-8">
         {/* 1 · date */}
         <section>
-          <h2 className="mb-3 font-serif text-[20px] font-semibold">1 · {tr.t("voucherPickDate")}</h2>
+          <h2 className="mb-3 font-serif text-title-md font-semibold">1 · {tr.t("voucherPickDate")}</h2>
           {options.length === 0 ? (
-            <p className="rounded-[12px] border border-line bg-surface p-5 text-[14px] text-secondary">
+            <p className="rounded-card border border-line bg-surface p-5 text-body text-secondary">
               {tr.t("voucherNoDates")}
             </p>
           ) : (
@@ -143,11 +143,11 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                         setCheckin(o.date);
                         setRoomId(null);
                       }}
-                      className={`rounded-[12px] border px-4 py-2.5 text-center text-[13px] font-semibold transition-colors ${
+                      className={`rounded-card border px-4 py-2.5 text-center text-caption font-semibold transition-colors ${
                         active ? "border-accent bg-accent text-white" : "border-line-alt bg-surface text-secondary hover:border-accent"
                       }`}
                     >
-                      <span className="block text-[11px] font-medium uppercase opacity-80">
+                      <span className="block text-micro font-medium uppercase opacity-80">
                         {format(d, "EEE", { locale })}
                       </span>
                       {format(d, "d MMM yyyy", { locale })}
@@ -155,9 +155,9 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                   );
                 })}
               </div>
-              <p className="mt-2 text-[12px] text-faint">{tr.t("voucherShowingNext")}</p>
+              <p className="mt-2 text-label text-faint">{tr.t("voucherShowingNext")}</p>
               {checkin && checkoutISO && (
-                <p className="mt-2 text-[13px] font-semibold text-accent-deep">
+                <p className="mt-2 text-caption font-semibold text-accent-deep">
                   {format(parseISO(checkin), "EEE d MMM", { locale })} → {format(parseISO(checkoutISO), "EEE d MMM yyyy", { locale })} ·{" "}
                   {tr.p("night", nights)} · {tr.p("adult", adults)}
                   {children ? ` + ${tr.p("child", children)}` : ""}
@@ -171,7 +171,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         {/* 2 · room */}
         {checkin && (
           <section>
-            <h2 className="mb-3 font-serif text-[20px] font-semibold">2 · {tr.t("voucherPickRoom")}</h2>
+            <h2 className="mb-3 font-serif text-title-md font-semibold">2 · {tr.t("voucherPickRoom")}</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {availableRooms.map((r) => {
                 const active = roomId === r.id;
@@ -180,7 +180,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                     key={r.id}
                     type="button"
                     onClick={() => setRoomId(r.id)}
-                    className={`overflow-hidden rounded-[14px] border-2 text-left transition-colors ${
+                    className={`overflow-hidden rounded-card-lg border-2 text-left transition-colors ${
                       active ? "border-accent" : "border-line hover:border-accent/50"
                     }`}
                   >
@@ -189,7 +189,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                     </div>
                     <div className="bg-surface p-4">
                       <div className="font-semibold">{r.title}</div>
-                      {r.description && <p className="mt-0.5 line-clamp-2 text-[12px] text-muted">{r.description}</p>}
+                      {r.description && <p className="mt-0.5 line-clamp-2 text-label text-muted">{r.description}</p>}
                     </div>
                   </button>
                 );
@@ -202,25 +202,25 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         {/* 3 · guest */}
         {checkin && roomId && (
           <section>
-            <h2 className="mb-3 font-serif text-[20px] font-semibold">3 · {tr.t("voucherYourDetails")}</h2>
-            <div className="grid grid-cols-1 gap-4 rounded-[14px] border border-line bg-surface p-5 sm:grid-cols-2">
-              <label className="block text-[13px] font-semibold text-secondary">
+            <h2 className="mb-3 font-serif text-title-md font-semibold">3 · {tr.t("voucherYourDetails")}</h2>
+            <div className="grid grid-cols-1 gap-4 rounded-card-lg border border-line bg-surface p-5 sm:grid-cols-2">
+              <label className="block text-caption font-semibold text-secondary">
                 {tr.t("firstName")}
                 <input name="firstName" required defaultValue={recipientName?.split(/\s+/)[0] ?? ""} className={input} />
               </label>
-              <label className="block text-[13px] font-semibold text-secondary">
+              <label className="block text-caption font-semibold text-secondary">
                 {tr.t("lastName")}
                 <input name="lastName" required defaultValue={recipientName?.split(/\s+/).slice(1).join(" ") ?? ""} className={input} />
               </label>
-              <label className="block text-[13px] font-semibold text-secondary">
+              <label className="block text-caption font-semibold text-secondary">
                 {tr.t("email")}
                 <input name="email" type="email" required className={input} />
               </label>
-              <label className="block text-[13px] font-semibold text-secondary">
+              <label className="block text-caption font-semibold text-secondary">
                 {tr.t("phone")}
                 <input name="phone" className={input} />
               </label>
-              <label className="block text-[13px] font-semibold text-secondary sm:col-span-2">
+              <label className="block text-caption font-semibold text-secondary sm:col-span-2">
                 {tr.t("specialRequests")}
                 <textarea name="requests" rows={2} className={`${input} resize-y`} />
               </label>
@@ -229,7 +229,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         )}
 
         {actionData?.error && (
-          <p className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
+          <p className="rounded-control border border-red-200 bg-red-50 px-4 py-2.5 text-caption text-red-700">
             {actionData.error}
           </p>
         )}
@@ -238,11 +238,11 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
             <button
               type="submit"
               disabled={busy}
-              className="rounded-[12px] bg-accent px-8 py-4 text-[16px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+              className="rounded-card bg-accent px-8 py-4 text-lead font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
             >
               {busy ? "…" : tr.t("voucherConfirm")}
             </button>
-            <p className="mt-2 text-[12px] text-muted">{tr.t("voucherNoPayment")}</p>
+            <p className="mt-2 text-label text-muted">{tr.t("voucherNoPayment")}</p>
           </div>
         )}
       </Form>

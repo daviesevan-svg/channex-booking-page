@@ -48,17 +48,17 @@ export function CalendarNav({ state, title }: { state: DateRangeState; title?: s
         onClick={state.prevMonth}
         disabled={!state.canPrev}
         aria-label={tr.t("prevMonth")}
-        className="h-9 w-9 rounded-[10px] border border-line-alt bg-surface-alt text-[18px] leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-xs leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ‹
       </button>
-      <div className="text-[13px] font-semibold text-muted-2">{title ?? tr.t("selectYourDates")}</div>
+      <div className="text-caption font-semibold text-muted-2">{title ?? tr.t("selectYourDates")}</div>
       <button
         type="button"
         onClick={state.nextMonth}
         disabled={!state.canNext}
         aria-label={tr.t("nextMonth")}
-        className="h-9 w-9 rounded-[10px] border border-line-alt bg-surface-alt text-[18px] leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-xs leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ›
       </button>
@@ -75,12 +75,12 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
       <div className="flex flex-wrap gap-7">
         {state.months.map((month) => (
           <div key={month.title} className="min-w-[240px] flex-1">
-            <div className="mb-3 text-center font-serif text-[17px] font-semibold">
+            <div className="mb-3 text-center font-serif text-lead-lg font-semibold">
               {month.title}
             </div>
             <div className="mb-1 grid grid-cols-7 gap-0.5">
               {weekdays.map((w) => (
-                <div key={w} className="py-1 text-center text-[11px] font-semibold text-faint">
+                <div key={w} className="py-1 text-center text-micro font-semibold text-faint">
                   {w}
                 </div>
               ))}
@@ -92,7 +92,7 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
                   title={cell.title}
                   onClick={cell.disabled ? undefined : () => cell.date && state.handleDay(cell.date)}
                   style={cellStyle(cell)}
-                  className="relative flex h-10 items-center justify-center rounded-[10px] text-sm"
+                  className="relative flex h-10 items-center justify-center rounded-control text-sm"
                 >
                   {cell.label}
                   {cell.showDot && (
@@ -107,11 +107,11 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
 
       {state.helper && (
         <div
-          className="mt-3.5 flex items-center gap-2.5 rounded-[10px] px-3.5 py-[11px] text-[13px] font-semibold"
+          className="mt-3.5 flex items-center gap-2.5 rounded-control px-3.5 py-[11px] text-caption font-semibold"
           style={{ background: "var(--accent-soft)", color: "var(--accent-deep)" }}
         >
           <span
-            className="h-[7px] w-[7px] flex-none rounded-[1px] bg-accent"
+            className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
             style={{ transform: "rotate(45deg)" }}
           />
           {state.helper}
@@ -125,7 +125,7 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
 export function CalendarLegend() {
   const tr = useT();
   return (
-    <div className="flex items-center gap-[18px] text-[12px] text-muted-2">
+    <div className="flex items-center gap-[18px] text-label text-muted-2">
       <span className="flex items-center gap-1.5">
         <span className="text-disabled-day line-through">12</span> {tr.t("unavailable")}
       </span>

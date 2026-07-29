@@ -109,7 +109,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
   return (
     <main className="mx-auto max-w-[760px] px-7 pb-20 pt-12">
       <div className="mb-7 flex items-center justify-between gap-4">
-        <h1 className="font-serif text-[34px] font-medium tracking-[-0.02em]">
+        <h1 className="font-serif text-display-xl font-medium tracking-[-0.02em]">
           {tr.t("yourBookings")}
         </h1>
         <Form method="post">
@@ -117,7 +117,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
             type="submit"
             name="intent"
             value="logout"
-            className="text-[13px] font-semibold text-muted hover:text-accent"
+            className="text-caption font-semibold text-muted hover:text-accent"
           >
             {tr.t("signOut")}
           </button>
@@ -125,11 +125,11 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
       </div>
 
       {bookings.length === 0 ? (
-        <div className="rounded-[14px] border border-line bg-surface p-6 text-[15px] text-secondary">
+        <div className="rounded-card-lg border border-line bg-surface p-6 text-body-lg text-secondary">
           {tr.t("noBookingsForEmail")}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-[16px] border border-line bg-surface">
+        <div className="overflow-hidden rounded-panel border border-line bg-surface">
           {bookings.map((b, i) => (
             <Link
               key={b.id}
@@ -139,18 +139,18 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
               }`}
             >
               <div className="min-w-0">
-                <div className="font-serif text-[19px] font-semibold">
+                <div className="font-serif text-title-sm font-semibold">
                   {fmt(b.checkin, "EEE d MMM")} — {fmt(b.checkout, "EEE d MMM yyyy")}
                 </div>
-                <div className="mt-1 text-[13px] text-muted-2">
+                <div className="mt-1 text-caption text-muted-2">
                   {tr.t("reference")} {b.reference} · {tr.p("room", b.rooms)}
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">
-                <span className="font-serif text-[18px] font-semibold">
+                <span className="font-serif text-title-xs font-semibold">
                   {formatMoney(b.total, b.currency || currency)}
                 </span>
-                <span className="text-[13px] font-semibold text-accent">{tr.t("view")} →</span>
+                <span className="text-caption font-semibold text-accent">{tr.t("view")} →</span>
               </div>
             </Link>
           ))}
@@ -159,10 +159,10 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
 
       {vouchers.length > 0 && (
         <>
-          <h2 className="mb-4 mt-10 font-serif text-[24px] font-semibold tracking-[-0.01em]">
+          <h2 className="mb-4 mt-10 font-serif text-title-3xl font-semibold tracking-[-0.01em]">
             {tr.t("manageVouchersTitle")}
           </h2>
-          <div className="overflow-hidden rounded-[16px] border border-line bg-surface">
+          <div className="overflow-hidden rounded-panel border border-line bg-surface">
             {vouchers.map((v, i) => (
               <Link
                 key={v.code}
@@ -172,8 +172,8 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
                 }`}
               >
                 <div className="min-w-0">
-                  <div className="font-serif text-[19px] font-semibold">{v.title}</div>
-                  <div className="mt-1 text-[13px] text-muted-2">
+                  <div className="font-serif text-title-sm font-semibold">{v.title}</div>
+                  <div className="mt-1 text-caption text-muted-2">
                     {v.code}
                     {v.recipientName ? ` · ${tr.t("manageVoucherFor", { name: v.recipientName })}` : ""}
                     {v.balance != null ? ` · ${tr.t("voucherBalance")}: ${formatMoney(v.balance, currency)}` : ""}
@@ -181,11 +181,11 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
                 </div>
                 <div className="flex flex-none items-center gap-4">
                   <span
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusChip[v.status] ?? "bg-chip text-muted"}`}
+                    className={`rounded-full px-2.5 py-1 text-micro font-semibold ${statusChip[v.status] ?? "bg-chip text-muted"}`}
                   >
                     {tr.t(`voucherStatus_${v.status}`)}
                   </span>
-                  <span className="text-[13px] font-semibold text-accent">{tr.t("view")} →</span>
+                  <span className="text-caption font-semibold text-accent">{tr.t("view")} →</span>
                 </div>
               </Link>
             ))}
@@ -208,36 +208,36 @@ function ManageLogin({
 }) {
   const tr = useT();
   const inputCls =
-    "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[13px] text-[15px] text-ink outline-none focus:border-accent";
+    "mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent";
 
   return (
     <main className="mx-auto max-w-[460px] px-7 pb-20 pt-16">
-      <h1 className="mb-2 font-serif text-[34px] font-medium tracking-[-0.02em]">
+      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">
         {tr.t("manageTitle")}
       </h1>
-      <p className="mb-7 text-[15px] leading-[1.6] text-secondary">{tr.t("manageIntro")}</p>
+      <p className="mb-7 text-body-lg leading-[1.6] text-secondary">{tr.t("manageIntro")}</p>
 
       <Form
         method="post"
-        className="flex flex-col gap-4 rounded-[16px] border border-line bg-surface p-6"
+        className="flex flex-col gap-4 rounded-panel border border-line bg-surface p-6"
       >
-        <label className="block text-[13px] font-semibold text-secondary">
+        <label className="block text-caption font-semibold text-secondary">
           {tr.t("manageRefOrCode")}
           <input name="reference" placeholder="ABC123 / RP-XXXX-XXXX" className={inputCls} autoComplete="off" />
         </label>
-        <label className="block text-[13px] font-semibold text-secondary">
+        <label className="block text-caption font-semibold text-secondary">
           {tr.t("emailAddress")}
           <input name="email" type="email" placeholder="you@email.com" className={inputCls} />
         </label>
         {tooMany ? (
-          <p className="text-[13px] text-red-600">{tr.t("manageTooMany")}</p>
+          <p className="text-caption text-red-600">{tr.t("manageTooMany")}</p>
         ) : (
-          notFound && <p className="text-[13px] text-red-600">{tr.t("manageNotFound")}</p>
+          notFound && <p className="text-caption text-red-600">{tr.t("manageNotFound")}</p>
         )}
         <button
           type="submit"
           disabled={submitting}
-          className="mt-1 w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
+          className="mt-1 w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
         >
           {tr.t("findBooking")}
         </button>

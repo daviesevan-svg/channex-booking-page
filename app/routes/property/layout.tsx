@@ -126,7 +126,7 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
               style={{ color: s.on ? "var(--color-ink)" : "var(--color-faint)" }}
             >
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full text-[13px]"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-caption"
                 style={{
                   background: s.on ? "var(--accent)" : "#efe7db",
                   color: s.on ? "#fff" : "var(--color-faint)",
@@ -244,7 +244,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
               <>
                 <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
                 {!logoHideName && (
-                  <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">
+                  <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">
                     {hotelName}
                   </span>
                 )}
@@ -252,10 +252,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             ) : (
               <>
                 <span
-                  className="inline-block h-[13px] w-[13px] rounded-[2px] bg-accent"
+                  className="inline-block h-[13px] w-[13px] rounded-mark-lg bg-accent"
                   style={{ transform: "rotate(45deg)" }}
                 />
-                <span className="font-serif text-[21px] font-semibold tracking-[-0.01em]">
+                <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">
                   {hotelName}
                 </span>
               </>
@@ -322,7 +322,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       )}
 
       <footer className="border-t border-nav-border bg-surface-alt">
-        <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-[13px] text-muted-2">
+        <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-caption text-muted-2">
           <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
           <span className="flex items-center gap-2">
             {tr.t("footerRight")}

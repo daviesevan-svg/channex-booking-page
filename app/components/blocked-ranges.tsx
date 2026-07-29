@@ -20,7 +20,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
   const [error, setError] = useState<string | null>(null);
 
   const input =
-    "rounded-[10px] border border-line-alt bg-surface px-2.5 py-2 text-[13px] text-ink outline-none focus:border-accent";
+    "rounded-control border border-line-alt bg-surface px-2.5 py-2 text-caption text-ink outline-none focus:border-accent";
 
   const add = () => {
     if (!from) {
@@ -56,14 +56,14 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
           {ranges.map((r, i) => (
             <span
               key={`${r.from}..${r.to}`}
-              className="inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-3 py-1.5 text-[12px] font-semibold text-secondary"
+              className="inline-flex items-center gap-2 rounded-full border border-chip-border bg-chip px-3 py-1.5 text-label font-semibold text-secondary"
             >
               {label(r)}
               <button
                 type="button"
                 aria-label={t("brRemove", { range: label(r) })}
                 onClick={() => setRanges(ranges.filter((_, j) => j !== i))}
-                className="text-[15px] leading-none text-muted-2 hover:text-[#c0392b]"
+                className="text-body-lg leading-none text-muted-2 hover:text-[#c0392b]"
               >
                 ×
               </button>
@@ -83,7 +83,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
           className={input}
           aria-label={t("brFrom")}
         />
-        <span className="text-[13px] text-muted-2">{t("brTo")}</span>
+        <span className="text-caption text-muted-2">{t("brTo")}</span>
         <input
           type="date"
           value={to}
@@ -98,13 +98,13 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
         <button
           type="button"
           onClick={add}
-          className="rounded-[10px] border border-line-alt px-3.5 py-2 text-[13px] font-semibold text-secondary hover:bg-chip"
+          className="rounded-control border border-line-alt px-3.5 py-2 text-caption font-semibold text-secondary hover:bg-chip"
         >
           {t("brBlockDates")}
         </button>
       </div>
-      {error && <p className="mb-0 mt-1.5 text-[12px] text-red-600">{error}</p>}
-      <p className="mb-0 mt-1.5 text-[11px] font-normal text-faint">{t("brHint")}</p>
+      {error && <p className="mb-0 mt-1.5 text-label text-red-600">{error}</p>}
+      <p className="mb-0 mt-1.5 text-micro font-normal text-faint">{t("brHint")}</p>
     </div>
   );
 }

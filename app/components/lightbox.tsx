@@ -67,10 +67,10 @@ export function Lightbox({
         <img
           src={photos[index].url}
           alt={title}
-          className="max-h-[82vh] w-auto max-w-full rounded-[12px] object-contain"
+          className="max-h-[82vh] w-auto max-w-full rounded-card object-contain"
         />
         {total > 1 && (
-          <figcaption className="mt-3 text-[13px] text-white/70">
+          <figcaption className="mt-3 text-caption text-white/70">
             {index + 1} / {total}
           </figcaption>
         )}

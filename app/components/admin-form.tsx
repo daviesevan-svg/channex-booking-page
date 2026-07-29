@@ -5,7 +5,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 
 /** Standard text-input styling used across the admin editors. */
 export const FIELD_INPUT =
-  "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
+  "mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent";
 
 /** Full-page notice for a feature that doesn't apply to the current property
  *  (e.g. revenue management on a single-unit rental). Caller passes already
@@ -13,8 +13,8 @@ export const FIELD_INPUT =
 export function FeatureUnavailable({ title, body }: { title: string; body: string }) {
   return (
     <div className="max-w-[560px]">
-      <h1 className="mb-2 font-serif text-[26px] font-semibold">{title}</h1>
-      <p className="rounded-[12px] border border-line bg-surface px-5 py-4 text-[14px] leading-relaxed text-muted">{body}</p>
+      <h1 className="mb-2 font-serif text-display-xs font-semibold">{title}</h1>
+      <p className="rounded-card border border-line bg-surface px-5 py-4 text-body leading-relaxed text-muted">{body}</p>
     </div>
   );
 }
@@ -43,7 +43,7 @@ export function Field({
 }) {
   const t = useAdminT();
   return (
-    <label className="block text-[13px] font-semibold text-secondary">
+    <label className="block text-caption font-semibold text-secondary">
       {label}
       {textarea ? (
         <textarea
@@ -57,11 +57,11 @@ export function Field({
         <input name={name} defaultValue={value} placeholder={placeholder} className={FIELD_INPUT} />
       )}
       {channexHint && placeholder ? (
-        <span className="mt-1 block text-[11px] font-normal text-faint">
+        <span className="mt-1 block text-micro font-normal text-faint">
           {t("afChannexHint", { value: placeholder })}
         </span>
       ) : hint ? (
-        <span className="mt-1 block text-[11px] font-normal text-faint">{hint}</span>
+        <span className="mt-1 block text-micro font-normal text-faint">{hint}</span>
       ) : null}
     </label>
   );
@@ -74,8 +74,8 @@ export function FilePicker({ name, accept, multiple }: { name: string; accept?: 
   const t = useAdminT();
   const [fileName, setFileName] = useState<string | null>(null);
   return (
-    <label className="flex cursor-pointer flex-wrap items-center gap-3 text-[13px]">
-      <span className="rounded-[8px] border border-line-alt bg-surface px-3 py-1.5 text-[13px] font-semibold text-secondary hover:border-accent">
+    <label className="flex cursor-pointer flex-wrap items-center gap-3 text-caption">
+      <span className="rounded-chip border border-line-alt bg-surface px-3 py-1.5 text-caption font-semibold text-secondary hover:border-accent">
         {t("chooseFile")}
       </span>
       <span className="min-w-0 truncate text-muted">{fileName ?? t("noFileChosen")}</span>

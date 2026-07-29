@@ -50,7 +50,7 @@ export default function WebsitePage({ loaderData, params }: Route.ComponentProps
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
       {page.title && (
-        <h1 className="max-w-[720px] font-serif text-[40px] font-medium leading-[1.1] tracking-[-0.02em]">
+        <h1 className="max-w-[720px] font-serif text-display-3xl font-medium leading-[1.1] tracking-[-0.02em]">
           {page.title}
         </h1>
       )}

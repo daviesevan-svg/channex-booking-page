@@ -255,7 +255,7 @@ function RoomCard({
 
   return (
     <div
-      className={`flex flex-wrap overflow-hidden rounded-[16px] border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_40px_-26px_rgba(70,55,35,0.4)] ${
+      className={`flex flex-wrap overflow-hidden rounded-panel border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_40px_-26px_rgba(70,55,35,0.4)] ${
         isBestMatch ? "ring-2 ring-accent" : ""
       }`}
     >
@@ -272,18 +272,18 @@ function RoomCard({
           />
         )}
         {isBestMatch && (
-          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-[12px] font-semibold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-label font-semibold text-white">
             {tr.t("bestMatch")}
           </span>
         )}
       </Link>
       <div className="flex min-w-[240px] flex-1 flex-col p-6">
         <Link to={detailHref}>
-          <h3 className="mb-1.5 font-serif text-[24px] font-semibold tracking-[-0.01em] hover:text-accent">
+          <h3 className="mb-1.5 font-serif text-title-3xl font-semibold tracking-[-0.01em] hover:text-accent">
             {room.title}
           </h3>
         </Link>
-        <div className="mb-3 text-[13px] font-semibold text-muted-2">
+        <div className="mb-3 text-caption font-semibold text-muted-2">
           {tr.t("sleeps", { n: capacity })}
           {capacity > maxAdults && (
             <span className="font-normal text-faint">
@@ -293,7 +293,7 @@ function RoomCard({
           )}
         </div>
         {room.description && (
-          <p className="mb-4 max-w-[440px] text-[14px] leading-[1.55] text-secondary line-clamp-2">
+          <p className="mb-4 max-w-[440px] text-body leading-[1.55] text-secondary line-clamp-2">
             {room.description}
           </p>
         )}
@@ -301,7 +301,7 @@ function RoomCard({
           {amenities.map((a) => (
             <span
               key={a}
-              className="rounded-full border border-chip-border bg-chip px-3 py-[5px] text-[12px] font-medium text-secondary"
+              className="rounded-full border border-chip-border bg-chip px-3 py-[5px] text-label font-medium text-secondary"
             >
               {a}
             </span>
@@ -310,33 +310,33 @@ function RoomCard({
       </div>
       <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
         {cheapest?.offer && (
-          <div className="self-end rounded-full bg-[#ece6f0] px-2.5 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
+          <div className="self-end rounded-full bg-[#ece6f0] px-2.5 py-0.5 text-micro font-semibold text-[#6b4f8a]">
             {cheapest.offer.name} · −{cheapest.offer.percent}%
           </div>
         )}
         <div>
-          <span className="text-[13px] text-muted-2">{tr.t("from")} </span>
+          <span className="text-caption text-muted-2">{tr.t("from")} </span>
           {cheapest?.offer && (
-            <span className="mr-1.5 text-[15px] text-muted-2 line-through">
+            <span className="mr-1.5 text-body-lg text-muted-2 line-through">
               {formatMoney((cheapest.allInOriginal ?? Number(cheapest.offer.originalTotalPrice)) / nights, currency)}
             </span>
           )}
-          <span className="font-serif text-[28px] font-semibold">
+          <span className="font-serif text-display-sm font-semibold">
             {formatMoney(perNight, currency)}
           </span>
-          <div className="text-[12px] text-muted-2">{tr.t("perNightInclTaxes")}</div>
+          <div className="text-label text-muted-2">{tr.t("perNightInclTaxes")}</div>
         </div>
         {!atMax && remaining <= 5 && (
-          <div className="text-[12px] font-medium text-accent">{tr.t("onlyLeft", { n: remaining })}</div>
+          <div className="text-label font-medium text-accent">{tr.t("onlyLeft", { n: remaining })}</div>
         )}
         {atMax ? (
-          <div className="rounded-[10px] bg-surface-alt py-[11px] text-center text-[13px] font-medium text-muted-2">
+          <div className="rounded-control bg-surface-alt py-[11px] text-center text-caption font-medium text-muted-2">
             {tr.t("allAvailableAdded", { n: available })}
           </div>
         ) : (
           <Link
             to={detailHref}
-            className="w-full rounded-[10px] bg-accent py-[11px] text-center text-[15px] font-semibold text-white transition-colors hover:bg-accent-deep"
+            className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-white transition-colors hover:bg-accent-deep"
           >
             {tr.t("chooseRate")}
           </Link>
@@ -382,11 +382,11 @@ function CartPanel({
   const tr = useT();
   return (
     <aside
-      className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-[18px] border border-line bg-surface p-6"
+      className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-panel-lg border border-line bg-surface p-6"
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
-      {cartTitle && <h3 className="mb-1 font-serif text-[21px] font-semibold">{cartTitle}</h3>}
-      <div className="mb-4 text-[13px] text-muted-2">
+      {cartTitle && <h3 className="mb-1 font-serif text-title-lg font-semibold">{cartTitle}</h3>}
+      <div className="mb-4 text-caption text-muted-2">
         {lines.length === 0 ? tr.t("noRoomsSelected") : tr.p("roomsSelected", lines.length)}
       </div>
 
@@ -400,29 +400,29 @@ function CartPanel({
                   className="group block"
                   title={tr.t("updateRoom")}
                 >
-                  <div className="truncate text-[14px] font-semibold group-hover:text-accent">
+                  <div className="truncate text-body font-semibold group-hover:text-accent">
                     {l.roomTitle}
                   </div>
-                  <div className="text-[12px] text-muted-2">
+                  <div className="text-label text-muted-2">
                     {l.rateTitle} · {tr.p("adult", l.occupancy.adults)}
                     {l.occupancy.children ? `, ${tr.p("child", l.occupancy.children)}` : ""}
-                    <span className="ml-1 text-[11px] text-accent">✎</span>
+                    <span className="ml-1 text-micro text-accent">✎</span>
                   </div>
                 </Link>
                 <Link
                   to={`/${channelId}/extras?line=${i}&${qs}`}
-                  className="mt-1 inline-block text-[12px] font-semibold text-accent hover:underline"
+                  className="mt-1 inline-block text-label font-semibold text-accent hover:underline"
                 >
                   {extrasCounts[i] ? tr.t("editExtrasCount", { n: extrasCounts[i] }) : tr.t("addExtras")}
                 </Link>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-[14px] font-semibold">{formatMoney(l.total, currency)}</span>
+                <span className="text-body font-semibold">{formatMoney(l.total, currency)}</span>
                 <button
                   type="button"
                   onClick={() => onRemove(i)}
                   aria-label="Remove room"
-                  className="text-[18px] leading-none text-muted-2 hover:text-accent"
+                  className="text-title-xs leading-none text-muted-2 hover:text-accent"
                 >
                   ×
                 </button>
@@ -433,19 +433,19 @@ function CartPanel({
       )}
 
       <div
-        className="mb-4 flex items-center gap-2 rounded-[10px] px-3.5 py-2.5 text-[13px] font-semibold"
+        className="mb-4 flex items-center gap-2 rounded-control px-3.5 py-2.5 text-caption font-semibold"
         style={{
           background: covered ? "#e8f0e6" : "#f5efe5",
           color: covered ? "#3f7a52" : "var(--color-muted)",
         }}
       >
         {covered ? (
-          <span className="flex-none text-[14px] leading-none" style={{ color: "#3f7a52" }}>
+          <span className="flex-none text-body leading-none" style={{ color: "#3f7a52" }}>
             ✓
           </span>
         ) : (
           <span
-            className="h-[7px] w-[7px] flex-none rounded-[1px] bg-accent"
+            className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
             style={{ transform: "rotate(45deg)" }}
           />
         )}
@@ -457,14 +457,14 @@ function CartPanel({
       </div>
 
       {extrasSum > 0 && (
-        <div className="mb-2 flex items-baseline justify-between text-[13px]">
+        <div className="mb-2 flex items-baseline justify-between text-caption">
           <span className="text-secondary">{tr.t("extrasLabel")}</span>
           <span className="font-semibold">{formatMoney(extrasSum, currency)}</span>
         </div>
       )}
       <div className="mb-4 flex items-baseline justify-between">
-        <span className="text-[15px] font-semibold">{tr.t("total")}</span>
-        <span className="font-serif text-[26px] font-semibold">
+        <span className="text-body-lg font-semibold">{tr.t("total")}</span>
+        <span className="font-serif text-display-xs font-semibold">
           {formatMoney(coverage.total + extrasSum, currency)}
         </span>
       </div>
@@ -473,7 +473,7 @@ function CartPanel({
         type="button"
         onClick={onContinue}
         disabled={!covered || continuePending}
-        className="w-full rounded-[12px] bg-accent py-[14px] text-[16px] font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+        className="w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
       >
         {continuePending ? tr.t("loading") : continueLabel}
       </button>
@@ -537,10 +537,10 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       )}
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
-          <h1 className="mb-2 font-serif text-[38px] font-medium tracking-[-0.02em]">
+          <h1 className="mb-2 font-serif text-display-2xl font-medium tracking-[-0.02em]">
             {singleUnit ? text.cartTitle : text.heading}
           </h1>
-          <div className="text-[15px] text-secondary">
+          <div className="text-body-lg text-secondary">
             {summary}
             <span className="mx-1.5 text-line-alt">·</span>
             <Link
@@ -553,18 +553,18 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
         </div>
         <Link
           to={`/${params.channelId}?${qs}`}
-          className="rounded-[10px] border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+          className="rounded-control border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
         >
           {text.editSearch}
         </Link>
       </div>
 
       {rooms.length > 0 && !fitsParty && (
-        <div className="mb-6 rounded-[14px] border border-accent/40 bg-[#f9ede6] p-5">
-          <div className="mb-1 font-serif text-[18px] font-semibold text-[#8a4a2f]">
+        <div className="mb-6 rounded-card-lg border border-accent/40 bg-[#f9ede6] p-5">
+          <div className="mb-1 font-serif text-title-xs font-semibold text-[#8a4a2f]">
             {tr.t("capacityTitle", { n: party })}
           </div>
-          <p className="text-[14px] text-secondary">
+          <p className="text-body text-secondary">
             {tr.t("capacityBody", { max: maxCapacity })}{" "}
             <Link
               to={`/${params.channelId}?${qs}`}
