@@ -1,6 +1,32 @@
+import { env } from "cloudflare:workers";
+
 import { getImagesBucket } from "./config.server";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+
+/**
+ * The image's pixel size, as a `-WxH` filename suffix.
+ *
+ * Read once here rather than stored, because image urls are bare strings in six
+ * different stores and adding a field to each would be six migrations for
+ * something the upload already knows. `imageSize()` reads it back off the url so
+ * guest pages can reserve the right box before the bytes arrive. Returns "" if
+ * Images can't read the file — the image still works, just without dimensions.
+ */
+async function sizeSuffix(bytes: ArrayBuffer): Promise<string> {
+  const transformer = (env as unknown as { IMAGE_TRANSFORM?: ImagesBinding }).IMAGE_TRANSFORM;
+  if (!transformer) return "";
+  try {
+    const info = await transformer.info(
+      new Response(bytes).body as ReadableStream<Uint8Array>,
+    );
+    const w = "width" in info ? info.width : 0;
+    const h = "height" in info ? info.height : 0;
+    return w > 0 && h > 0 && w < 20000 && h < 20000 ? `-${w}x${h}` : "";
+  } catch {
+    return "";
+  }
+}
 
 /** Store an uploaded image in R2 under the given key prefix and return the path
  *  to serve it (/images/<key>). */
@@ -11,8 +37,11 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
   if (file.size > MAX_BYTES) throw new Error("Image is too large (max 8MB).");
 
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
-  const key = `${prefix}/${crypto.randomUUID()}.${ext}`;
-  await bucket.put(key, await file.arrayBuffer(), {
+  // The uploaded name is otherwise discarded — the key is a uuid so a hostile
+  // filename can't shape the path.
+  const bytes = await file.arrayBuffer();
+  const key = `${prefix}/${crypto.randomUUID()}${await sizeSuffix(bytes)}.${ext}`;
+  await bucket.put(key, bytes, {
     httpMetadata: { contentType: file.type },
   });
   return `/images/${key}`;

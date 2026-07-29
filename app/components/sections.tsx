@@ -13,6 +13,7 @@ import { Link } from "react-router";
 import type { Translator } from "~/lib/i18n";
 import { SECTION_DEFS, numberSetting, type SiteSection } from "~/lib/sections";
 import { RichText } from "~/components/rich-text";
+import { imageProps, IMAGE_SIZES } from "~/lib/image-srcset";
 import type { ResolvedGalleryImage } from "~/lib/gallery";
 import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
@@ -203,7 +204,11 @@ export function GallerySection({
     return (
       <div className="relative mt-12 h-[300px] overflow-hidden rounded-[18px]">
         {fallbackPhoto ? (
-          <img src={fallbackPhoto} alt={hotelName} className="h-full w-full object-cover" />
+          <img
+            {...imageProps(fallbackPhoto, IMAGE_SIZES.full)}
+            alt={hotelName}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div
             className="h-full w-full"
@@ -225,7 +230,7 @@ export function GallerySection({
           <figure key={photo.id}>
             <div className="aspect-[4/3] overflow-hidden rounded-[14px] bg-surface-alt">
               <img
-                src={photo.url}
+                {...imageProps(photo.url, IMAGE_SIZES.galleryGrid)}
                 alt={photo.alt ?? hotelName}
                 loading="lazy"
                 className="h-full w-full object-cover"
@@ -285,7 +290,7 @@ export function RoomsSection({
             <div className="aspect-[3/2] w-full flex-none overflow-hidden bg-surface-alt">
               {room.photo ? (
                 <img
-                  src={room.photo}
+                  {...imageProps(room.photo, IMAGE_SIZES.roomCard)}
                   alt={room.title}
                   loading="lazy"
                   className="h-full w-full object-cover"
@@ -366,12 +371,13 @@ export function RichTextSection({
       {images.map((img) => (
         <img
           key={img.id}
-          src={img.url}
+          {...imageProps(img.url, IMAGE_SIZES.sectionColumn)}
           // Hotels skip alt text; the heading is a far better fallback than the
           // filename, and it's what a screen reader would want to hear here.
           alt={section.text?.[`alt_${img.id}`] || heading || hotelName || ""}
           loading="lazy"
-          className="w-full rounded-[14px] border border-line bg-surface-alt"
+          // h-auto so the intrinsic width/height above don't fix the drawn size.
+          className="h-auto w-full rounded-[14px] border border-line bg-surface-alt"
         />
       ))}
     </div>
