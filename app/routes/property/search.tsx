@@ -4,6 +4,7 @@ import { useNavigate, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/search";
 import { pageMeta } from "~/lib/page-meta";
+import { imageProps, IMAGE_SIZES } from "~/lib/image-srcset";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { useProperty } from "~/lib/booking-context";
@@ -182,7 +183,11 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               leave a sliver and a ceiling so a long one doesn't produce a
               1,000px portrait. */}
           <div className="min-h-[320px] overflow-hidden rounded-[18px] bg-surface-alt lg:h-full lg:max-h-[560px]">
-            <img src={heroSplit} alt={hotelName} className="h-full w-full object-cover" />
+            <img
+              {...imageProps(heroSplit, IMAGE_SIZES.heroSplit)}
+              alt={hotelName}
+              className="h-full w-full object-cover"
+            />
           </div>
         </div>
       ) : (

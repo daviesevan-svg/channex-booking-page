@@ -65,6 +65,10 @@
 	"r2_buckets": [
 		{ "binding": "IMAGES", "bucket_name": "channex-booking-images" }
 	],
+	// Cloudflare Images transformations, used to resize the images above on the
+	// way out (see app/routes/image.tsx) and to read their pixel size on upload.
+	// Named IMAGE_TRANSFORM because IMAGES is already the bucket holding them.
+	"images": { "binding": "IMAGE_TRANSFORM" },
 	// Holds ARI pushed via the Open Channel API. Create for production with
 	// `wrangler d1 create channex-ari` and paste the returned database_id here.
 	"d1_databases": [

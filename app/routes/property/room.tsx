@@ -12,6 +12,7 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/room";
 import { pageMeta } from "~/lib/page-meta";
+import { imageProps, IMAGE_SIZES } from "~/lib/image-srcset";
 import { CalendarLegend, CalendarMonths, CalendarNav } from "~/components/calendar-body";
 import { GuestSelector } from "~/components/guest-selector";
 import { Diamond } from "~/components/sections";
@@ -127,7 +128,11 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
         <div>
           <div className="aspect-[3/2] overflow-hidden rounded-[18px] bg-surface-alt">
             {cover ? (
-              <img src={cover} alt={room.title} className="h-full w-full object-cover" />
+              <img
+                {...imageProps(cover, IMAGE_SIZES.full)}
+                alt={room.title}
+                className="h-full w-full object-cover"
+              />
             ) : (
               <div
                 className="h-full w-full"
@@ -148,7 +153,12 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
                   aria-label={`${room.title} ${i + 1}`}
                   className={`h-[62px] w-[86px] flex-none overflow-hidden rounded-[10px] border-2 ${i === photo ? "border-accent" : "border-transparent"}`}
                 >
-                  <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+                  <img
+                    {...imageProps(src, IMAGE_SIZES.galleryGrid)}
+                    alt=""
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
                 </button>
               ))}
             </div>
