@@ -1,7 +1,7 @@
 import { Link, redirect, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/collection-analytics";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { getVisibleCollections } from "~/lib/collections.server";
 import { getCollectionAnalytics } from "~/lib/collection-analytics.server";

@@ -1,7 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/webhooks";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { addWebhook, isSafeWebhookUrl, listWebhooks, removeWebhook } from "~/lib/webhooks.server";

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website-footer";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pickLang } from "~/lib/content";

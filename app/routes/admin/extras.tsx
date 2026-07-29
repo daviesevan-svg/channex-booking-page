@@ -1,7 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/extras";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";

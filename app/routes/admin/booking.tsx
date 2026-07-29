@@ -1,7 +1,7 @@
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/booking";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";

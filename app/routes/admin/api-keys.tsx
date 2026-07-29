@@ -1,7 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/api-keys";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { issueApiKey, listApiKeys, revokeApiKey, type ApiKeyMode } from "~/lib/api-auth.server";

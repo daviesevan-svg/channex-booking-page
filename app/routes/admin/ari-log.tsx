@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Form, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/ari-log";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, rateChannexId } from "~/lib/catalog.server";

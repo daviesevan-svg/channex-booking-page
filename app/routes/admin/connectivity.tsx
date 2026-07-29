@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/connectivity";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";

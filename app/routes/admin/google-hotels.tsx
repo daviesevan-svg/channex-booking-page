@@ -1,7 +1,7 @@
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/google-hotels";
-import { adminMeta } from "~/lib/page-meta";
+import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
