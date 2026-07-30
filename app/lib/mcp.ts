@@ -131,7 +131,11 @@ export const TOOLS: McpTool[] = [
             last_name: { type: "string" },
             email: { type: "string", description: "Where the confirmation is sent" },
             phone: { type: "string", description: "Required by the property" },
-            arrival: { type: "string", description: "Expected arrival time, free text (optional)" },
+            arrival: {
+              type: "string",
+              description:
+                'Expected arrival time (optional) — prefer 24h "HH:MM", e.g. "15:00". Recognisable free text ("3pm", "16h30") is normalized; unparseable text is kept on the record but not forwarded to the property\'s PMS.',
+            },
             requests: { type: "string", description: "Special requests, free text (optional)" },
           },
           required: ["first_name", "last_name", "email", "phone"],

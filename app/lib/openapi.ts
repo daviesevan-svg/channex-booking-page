@@ -616,7 +616,12 @@ export const openApiSpec = {
               last_name: { type: "string", minLength: 1 },
               email: { type: "string", format: "email" },
               phone: { type: "string", minLength: 3 },
-              arrival: { type: "string", description: "Estimated arrival time, e.g. \"15:00\"." },
+              arrival: {
+                type: "string",
+                example: "15:00",
+                description:
+                  'Estimated arrival time — send 24h "HH:MM" (e.g. "15:00"). Free text is tolerated: a recognisable time ("3pm", "16h30") is normalized to HH:MM for the property\'s PMS; anything unparseable is kept on the booking record but omitted from the PMS copy.',
+              },
               requests: { type: "string" },
             },
           },
