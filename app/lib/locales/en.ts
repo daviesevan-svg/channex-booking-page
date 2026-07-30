@@ -305,6 +305,7 @@ const EN: Dict = {
   email: "Email",
   phone: "Phone",
   estimatedArrival: "Estimated arrival",
+  arrivalUnknown: "I'm not sure yet",
   specialRequests: "Special requests",
   yourStayRooms_one: "Your stay · {n} room",
   yourStayRooms_other: "Your stay · {n} rooms",

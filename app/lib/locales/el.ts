@@ -295,6 +295,7 @@ const EL: Dict = {
   email: "Email",
   phone: "Τηλέφωνο",
   estimatedArrival: "Εκτιμώμενη ώρα άφιξης",
+  arrivalUnknown: "Δεν ξέρω ακόμα",
   specialRequests: "Ειδικά αιτήματα",
   yourStayRooms_one: "Η διαμονή σας · {n} δωμάτιο",
   yourStayRooms_other: "Η διαμονή σας · {n} δωμάτια",

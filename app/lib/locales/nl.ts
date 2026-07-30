@@ -249,6 +249,7 @@ const NL: Dict = {
   email: "E-mail",
   phone: "Telefoon",
   estimatedArrival: "Verwachte aankomst",
+  arrivalUnknown: "Weet ik nog niet",
   specialRequests: "Speciale verzoeken",
   yourStayRooms_one: "Uw verblijf · {n} kamer",
   yourStayRooms_other: "Uw verblijf · {n} kamers",

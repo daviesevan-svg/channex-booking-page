@@ -249,6 +249,7 @@ const DE: Dict = {
   email: "E-Mail",
   phone: "Telefon",
   estimatedArrival: "Voraussichtliche Ankunft",
+  arrivalUnknown: "Weiß ich noch nicht",
   specialRequests: "Besondere Wünsche",
   yourStayRooms_one: "Ihr Aufenthalt · {n} Zimmer",
   yourStayRooms_other: "Ihr Aufenthalt · {n} Zimmer",
