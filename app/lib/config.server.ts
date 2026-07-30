@@ -68,11 +68,17 @@ export interface AppConfig extends ChannexConfig {
   /** The service account's PEM private key (may contain literal \n from the JSON). */
   googleTravelPartnerSaKey?: string;
   /** Cloudflare for SaaS CNAME target — the hostname a hotel points their own
-   *  domain at. Deliberately NOT pinned in wrangler.jsonc `vars`: it isn't
-   *  chosen yet, and an empty pinned var would wipe a dashboard value on every
-   *  deploy. Unset = the admin page says custom domains aren't available yet
+   *  domain at. Unset = the admin page says custom domains aren't available yet
    *  rather than printing a target that wouldn't work. */
   customHostnameTarget?: string;
+  /** Cloudflare API token (SSL and Certificates: Edit) and the zone the custom
+   *  hostnames live on. Both unset = a domain can be entered and DNS-checked but
+   *  never activated, and the admin page says exactly that. Kept as dashboard
+   *  SECRETS rather than pinned vars: a plaintext dashboard var not listed in
+   *  wrangler `vars` is dropped on the next deploy, and silently losing these
+   *  would strand every pending domain. */
+  cloudflareApiToken?: string;
+  cloudflareZoneId?: string;
   /** Extra hostnames that are ours, comma-separated — e.g. a marketing site or
    *  staging host on the same zone. Listed explicitly because the registrable
    *  domain can't be derived safely without a public suffix list. Used to refuse
@@ -114,6 +120,8 @@ export function getConfig(): AppConfig {
     appUrl: read("APP_URL", "http://localhost:5173"),
     customHostnameTarget: read("CUSTOM_HOSTNAME_TARGET") || undefined,
     ownHosts: read("OWN_HOSTS") || undefined,
+    cloudflareApiToken: read("CLOUDFLARE_API_TOKEN") || undefined,
+    cloudflareZoneId: read("CLOUDFLARE_ZONE_ID") || undefined,
     stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
     stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
     stripeWebhookSecret: read("STRIPE_WEBHOOK_SECRET") || undefined,

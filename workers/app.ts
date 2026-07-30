@@ -8,6 +8,7 @@ import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
 import { pruneAri } from "../app/lib/ari.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
+import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 
 
 const requestHandler = createRequestHandler(
@@ -40,5 +41,9 @@ export default {
     ctx.waitUntil(refreshAllMatchStatuses().catch((e) => console.log(`[cron] refreshAllMatchStatuses failed: ${e}`)));
     // Review requests: checkout-evening ask + up to two reminders per booking.
     ctx.waitUntil(scheduledReviewRequests().catch((e) => console.log(`[cron] scheduledReviewRequests failed: ${e}`)));
+    // Custom domains: switch on any hostname Cloudflare has since verified. The
+    // admin has a button for this, but hotels add their DNS records and don't come
+    // back — without the sweep the domain would sit dark with everything in place.
+    ctx.waitUntil(activateVerifiedDomains().catch((e) => console.log(`[cron] activateVerifiedDomains failed: ${e}`)));
   },
 } satisfies ExportedHandler<Env>;
