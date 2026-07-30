@@ -20,15 +20,16 @@ import { useT } from "~/lib/i18n";
 import { VR_AMENITY_KEYS } from "~/lib/content";
 import { getCalendarAvailability, getRoom, getRatesForRoom } from "~/lib/catalog.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { earliestCheckinDate } from "~/lib/dates";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const settings = await getSettings(pid);
   // The room page belongs to the website layer. With it off there is no
   // website, so this URL shouldn't exist — 404 rather than serve an orphan.

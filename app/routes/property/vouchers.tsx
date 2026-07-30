@@ -7,12 +7,13 @@ import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { getActiveVoucherProducts, soldCount } from "~/lib/vouchers.server";
 import { useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
-export async function loader({ params }: Route.LoaderArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+export async function loader({ params, request }: Route.LoaderArgs) {
+  const pid = await resolveRequestProperty(params.channelId, request);
   const products = await getActiveVoucherProducts(pid);
   // Loader data serializes into the page HTML — return a strict public
   // projection (no caps, no positions).

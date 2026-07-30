@@ -1,4 +1,59 @@
-import { type RouteConfig, index, route } from "@react-router/dev/routes";
+import {
+  type RouteConfig,
+  type RouteConfigEntry,
+  index,
+  layout,
+  route,
+} from "@react-router/dev/routes";
+
+/**
+ * The guest tree's children, shared by both mounts.
+ *
+ * A property is reachable two ways — `/spilmanhotel/rooms` on the shared domain
+ * and `/rooms` on the hotel's own — and both must serve the SAME modules. Listing
+ * them once is the point: a route added to one mount and forgotten on the other
+ * is a page that silently exists at only one address.
+ *
+ * `prefix` set = the root mount, which needs explicit route ids because these
+ * modules are already used by the mount that has a path. Unprefixed keeps the
+ * file-derived ids, so nothing referring to them by name changes.
+ *
+ * The index is NOT here: the two mounts want different things at their root
+ * (`/spilmanhotel` is the property home; `/` is either the picker or a hotel's
+ * own home page), so each declares its own.
+ */
+function guestRoutes(prefix?: string): RouteConfigEntry[] {
+  const r = (path: string, file: string, name: string) =>
+    prefix ? route(path, file, { id: `${prefix}-${name}` }) : route(path, file);
+  return [
+    r("rooms", "routes/property/results.tsx", "rooms"),
+    r("rooms/:roomId", "routes/property/detail.tsx", "detail"),
+    // Website room page (no dates needed) — distinct from the dated funnel step.
+    r("room/:roomId", "routes/property/room.tsx", "room"),
+    // Contact-form submission (POST only; GET redirects home).
+    r("contact", "routes/property/contact.tsx", "contact"),
+    r("extras", "routes/property/extras.tsx", "extras"),
+    r("vouchers", "routes/property/vouchers.tsx", "vouchers"),
+    r("vouchers/complete", "routes/property/vouchers-complete.tsx", "vouchers-complete"),
+    r("vouchers/:productId", "routes/property/voucher-buy.tsx", "voucher-buy"),
+    r("voucher/:code", "routes/property/voucher.tsx", "voucher"),
+    r("voucher/:code/pdf", "routes/property/voucher-pdf.tsx", "voucher-pdf"),
+    r("voucher/:code/book", "routes/property/voucher-book.tsx", "voucher-book"),
+    r("checkout", "routes/property/checkout.tsx", "checkout"),
+    r("checkout/complete", "routes/property/checkout.complete.tsx", "checkout-complete"),
+    r("confirmation/:ref", "routes/property/confirmation.tsx", "confirmation"),
+    r("manage", "routes/property/manage.tsx", "manage"),
+    r("manage/voucher/:code", "routes/property/manage-voucher.tsx", "manage-voucher"),
+    r("manage/:id", "routes/property/manage-booking.tsx", "manage-booking"),
+    r("review/:bookingId", "routes/property/review.tsx", "review"),
+    // Extra website pages ("about", "dining"). Under /p/ because a single segment
+    // at the ROOT of a custom domain is ambiguous — /parking is a page there,
+    // while /spilmanhotel on the shared domain is a property, and route matching
+    // cannot see the hostname. Static prefix = no ambiguity on either mount.
+    // See RESERVED_PAGE_SLUGS in app/lib/pages.ts.
+    r("p/:pageSlug", "routes/property/page.tsx", "page"),
+  ];
+}
 
 export default [
   index("routes/home.tsx"),
@@ -106,38 +161,31 @@ export default [
   // :channelId catch-all; the "c" segment is reserved from property slugs.
   route("c/:collectionSlug", "routes/collection.$collectionSlug.tsx"),
 
-  // Guest booking flow
+  // Guest booking flow, mounted TWICE — see guestRoutes() above.
+  //
+  //   /:channelId/rooms   shared domain, property in the path
+  //   /rooms              custom domain, property from the hostname
+  //
+  // The shared-domain mount keeps file-derived route ids, so nothing that
+  // referenced them by name changes.
   route(":channelId", "routes/property/layout.tsx", [
     index("routes/property/search.tsx"),
-    route("rooms", "routes/property/results.tsx"),
-    route("rooms/:roomId", "routes/property/detail.tsx"),
-    // Website room page (no dates needed) — distinct from the dated funnel step.
-    route("room/:roomId", "routes/property/room.tsx"),
-    // Contact-form submission (POST only; GET redirects home).
-    route("contact", "routes/property/contact.tsx"),
-    route("extras", "routes/property/extras.tsx"),
-    route("vouchers", "routes/property/vouchers.tsx"),
-    route("vouchers/complete", "routes/property/vouchers-complete.tsx"),
-    route("vouchers/:productId", "routes/property/voucher-buy.tsx"),
-    route("voucher/:code", "routes/property/voucher.tsx"),
-    route("voucher/:code/pdf", "routes/property/voucher-pdf.tsx"),
-    route("voucher/:code/book", "routes/property/voucher-book.tsx"),
-    route("checkout", "routes/property/checkout.tsx"),
-    route("checkout/complete", "routes/property/checkout.complete.tsx"),
-    route("confirmation/:ref", "routes/property/confirmation.tsx"),
-    route("manage", "routes/property/manage.tsx"),
-    route("manage/voucher/:code", "routes/property/manage-voucher.tsx"),
-    route("manage/:id", "routes/property/manage-booking.tsx"),
-    route("review/:bookingId", "routes/property/review.tsx"),
-    // Extra website pages ("about", "dining"). Under /p/ because a single
-    // segment at the ROOT of a custom domain is ambiguous — /parking is a page
-    // there, while /spilmanhotel on the shared domain is a property, and route
-    // matching cannot see the hostname. Static prefix = no ambiguity either way.
-    // See RESERVED_PAGE_SLUGS in app/lib/pages.ts.
-    route("p/:pageSlug", "routes/property/page.tsx"),
-    // Their old address. MUST stay last: it matches any single segment, and only
-    // React Router's static-beats-dynamic ranking keeps the funnel routes above
-    // from being read as page slugs. Redirects real pages, 404s anything else.
+    ...guestRoutes(),
+    // Website pages at their OLD address. MUST stay last: it matches any single
+    // segment, and only React Router's static-beats-dynamic ranking keeps the
+    // funnel routes above from being read as page slugs. Redirects real pages,
+    // 404s anything else. Only on this mount — a custom domain never had the old
+    // shape, so there is nothing to redirect there.
     route(":pageSlug", "routes/property/page-legacy.tsx"),
   ]),
+
+  // The same tree at the root, for a hotel's own domain. Pathless: it contributes
+  // no path segment, so its children sit directly under "/". Every child needs an
+  // explicit id because the modules are already used by the mount above.
+  //
+  // Deliberately NO index here yet — "/" still belongs to routes/home.tsx (the
+  // property picker). That one URL means two different things depending on the
+  // hostname and is the last piece of this feature; until it lands, a custom
+  // domain's landing page falls through to the picker rather than the hotel.
+  layout("routes/property/layout.tsx", { id: "host" }, guestRoutes("host")),
 ] satisfies RouteConfig;

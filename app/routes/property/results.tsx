@@ -24,7 +24,7 @@ import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getPageText, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { queueSearchEvent } from "~/lib/search-analytics.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
@@ -39,10 +39,12 @@ import {
   roomCapacity,
   roomFits,
 } from "~/lib/occupancy";
-import { basePath, useBase } from "~/lib/base";
+import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
+  const home = homePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
@@ -50,13 +52,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups; redirects
   // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
-    throw redirect(`${base}`);
+    throw redirect(home);
   }
   if (isTooLastMinute(checkin, await getBookingCutoff(pid))) {
-    throw redirect(`${base}`);
+    throw redirect(home);
   }
 
   // Currency is the property's, not the URL param — there's no conversion, so a
@@ -231,11 +233,12 @@ function RoomCard({
   currency: string;
   nights: number;
   party: number;
-  channelId: string;
+  channelId: string | undefined;
   qs: string;
   inCart: number;
 }) {
   const base = useBase();
+  const home = useHome();
   const tr = useT();
   const available = roomAvailability(room);
   const remaining = Number.isFinite(available) ? available - inCart : Infinity;
@@ -377,12 +380,13 @@ function CartPanel({
   continuePending: boolean;
   cartTitle: string;
   continueLabel: string;
-  channelId: string;
+  channelId: string | undefined;
   qs: string;
   extrasCounts: number[];
   extrasSum: number;
 }) {
   const base = useBase();
+  const home = useHome();
   const tr = useT();
   return (
     <aside
@@ -491,6 +495,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
+  const home = useHome();
   const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();

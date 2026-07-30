@@ -37,3 +37,20 @@ export function basePath(channelId: string | undefined): string {
 export function useBase(): string {
   return basePath(useParams().channelId);
 }
+
+/**
+ * The property's home page, as a URL you can navigate to on its own.
+ *
+ * Use this instead of a bare `` `${base}` ``. `basePath` returns a PREFIX, and on
+ * a custom domain that prefix is the empty string — so `redirect(`${base}`)`
+ * redirects to "", which resolves to the current URL and loops, and `<Link to={base}>`
+ * goes nowhere. Both are silent: nothing throws, the page just stops working.
+ */
+export function homePath(channelId: string | undefined): string {
+  return channelId ? `/${channelId}` : "/";
+}
+
+/** `homePath` for components. */
+export function useHome(): string {
+  return homePath(useParams().channelId);
+}

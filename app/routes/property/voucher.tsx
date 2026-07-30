@@ -9,14 +9,15 @@ import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { fmtDate } from "~/lib/dates";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { getBooking } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
 import { useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const v = await lookupVoucherGuarded(pid, params.code, request);
   if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!v) throw new Response("Voucher not found", { status: 404 });

@@ -11,10 +11,11 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/contact";
 import { sendContactEmail } from "~/lib/email.server";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { langFromRequest } from "~/lib/content";
-import { basePath } from "~/lib/base";
+import { basePath, homePath } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 const MAX_NAME = 100;
 const MAX_EMAIL = 200;
@@ -24,11 +25,12 @@ const MAX_MESSAGE = 2000;
  *  rather than rendering an empty layout. */
 export async function loader({ params }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
-  return redirect(`${base}`);
+  const home = homePath(params.channelId);
+  return redirect(home);
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const form = await request.formData();
 
   // Honeypot: a real guest never sees this field, so anything in it is a bot.

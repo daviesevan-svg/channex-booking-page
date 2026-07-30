@@ -12,13 +12,14 @@ import { refundBookingCharge } from "~/lib/refunds.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
 import { getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 async function ownedBooking(channelId: string, id: string, request: Request) {
   const email = await getGuestEmail(request);
@@ -49,7 +50,7 @@ function cancelState(
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
   // :channelId may be a slug — resolve to the real id for data; redirects keep it.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await ownedBooking(pid, params.id, request);
   if (!booking) throw redirect(`${base}/manage`);
 
@@ -65,7 +66,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await ownedBooking(pid, params.id, request);
   if (!booking) throw redirect(`${base}/manage`);
 

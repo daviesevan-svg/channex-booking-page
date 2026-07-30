@@ -11,10 +11,11 @@ import { pageMeta } from "~/lib/page-meta";
 import { getBooking } from "~/lib/bookings.server";
 import { getReviewByBooking, upsertReview } from "~/lib/reviews.server";
 import { REVIEW_CATEGORIES, type ReviewCategory } from "~/lib/reviews";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { useProperty } from "~/lib/booking-context";
 import { fmtDate } from "~/lib/dates";
 import { useT } from "~/lib/i18n";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 const clampStars = (v: unknown): number | undefined => {
   const n = parseInt(String(v ?? ""), 10);
@@ -22,7 +23,7 @@ const clampStars = (v: unknown): number | undefined => {
 };
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await getBooking(pid, params.bookingId);
   if (!booking) throw new Response("Not found", { status: 404 });
   const review = await getReviewByBooking(pid, booking.id);
@@ -41,7 +42,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await getBooking(pid, params.bookingId);
   if (!booking) throw new Response("Not found", { status: 404 });
 

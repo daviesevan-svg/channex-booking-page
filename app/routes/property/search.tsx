@@ -13,7 +13,7 @@ import { DEFAULT_PROMO_PLACEHOLDER, DEFAULT_SEARCH, langFromRequest } from "~/li
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getBookingCutoff, getSearchContent, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { getCalendarAvailability } from "~/lib/catalog.server";
 import { getRenderSections } from "~/lib/site.server";
 import { loadSectionData } from "~/lib/section-data.server";
@@ -22,11 +22,12 @@ import { SectionList } from "~/components/section-list";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();

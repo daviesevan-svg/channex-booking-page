@@ -14,7 +14,7 @@ import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { getConfig } from "~/lib/config.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getRooms } from "~/lib/catalog.server";
 import { computeExpiry, voucherCode, WEEKDAY_LABELS, type VoucherRecord } from "~/lib/vouchers";
@@ -24,10 +24,11 @@ import { stashPendingVoucher, type PendingVoucher } from "~/lib/pending-vouchers
 import { finalizeVoucher } from "~/lib/voucher-purchase.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
 import { basePath, useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const product = await getVoucherProduct(pid, params.productId);
   if (!product || !product.active) throw redirect(`${base}/vouchers`);
   const soldOut = product.cap != null && (await soldCount(pid, product.id).catch(() => 0)) >= product.cap;
@@ -79,7 +80,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const product = await getVoucherProduct(pid, params.productId);
   if (!product || !product.active) return { error: "This voucher is no longer on sale." };
   if (product.cap != null && (await soldCount(pid, product.id)) >= product.cap) {

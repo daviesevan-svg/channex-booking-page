@@ -11,17 +11,18 @@ import {
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
 import { getVoucherByCode, listVouchersByEmail } from "~/lib/vouchers.server";
 import { createGuestSession, getGuestEmail, guestLogout } from "~/lib/guest-auth.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const email = await getGuestEmail(request);
   if (!email) return { authed: false as const };
   // :channelId may be a slug — resolve to the real id for booking lookups.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const [bookings, vouchers] = await Promise.all([
     getBookingsByEmail(pid, email),
     listVouchersByEmail(pid, email).catch(() => []),
@@ -57,7 +58,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (form.get("intent") === "logout") {
     return guestLogout(request, `${base}/manage`);
   }
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
   if (!(await rateLimit(`manage:${pid}:${clientKey(request)}`, 8, 600))) {
     return { tooMany: true };
@@ -204,7 +205,7 @@ function ManageLogin({
   notFound,
   tooMany,
 }: {
-  params: { channelId: string };
+  params: { channelId?: string };
   submitting: boolean;
   notFound: boolean;
   tooMany: boolean;
