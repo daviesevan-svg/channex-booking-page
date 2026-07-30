@@ -402,12 +402,15 @@ function Note({ tone, children }: { tone: keyof typeof TONE; children: React.Rea
 }
 
 /**
- * Activation: what Cloudflare thinks of the saved domain, and the records still
- * outstanding.
+ * Activation: what Cloudflare currently thinks of the saved domain.
  *
- * Separate from the CNAME block above on purpose. That block is one record the
+ * Separate from the CNAME block above on purpose. That block is the record the
  * hotel adds whenever they like; this one is a live state machine, and conflating
  * them made "I added the record, why isn't it working?" impossible to answer.
+ *
+ * There is deliberately nothing to do here beyond the CNAME — ownership and the
+ * certificate both validate themselves once it's in place (see
+ * custom-hostnames.server.ts). This panel exists to say how far along that is.
  */
 function Activation({
   domain,
@@ -424,8 +427,6 @@ function Activation({
   busy: boolean;
   t: ReturnType<typeof useAdminT>;
 }) {
-  const pending = state.kind === "hostname" ? state.txt : [];
-
   return (
     <div className="mt-4 rounded-[12px] border border-line-alt bg-surface-alt p-5">
       <div className="mb-1 flex flex-wrap items-center gap-3">
@@ -449,30 +450,6 @@ function Activation({
         <Note tone="plain">{t("webProvNotStarted")}</Note>
       ) : (
         <>
-          {pending.length > 0 && (
-            <div className="mt-3">
-              <div className="mb-1 text-[13px] font-semibold text-ink">{t("webProvRecordsTitle")}</div>
-              <p className="mb-2 text-[12px] leading-[1.55] text-muted">{t("webProvRecordsHint")}</p>
-              {pending.map((r) => (
-                <dl
-                  key={`${r.purpose}-${r.name}`}
-                  className="mb-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-[10px] border border-line-alt bg-surface px-4 py-3 text-[12px] last:mb-0"
-                >
-                  <dt className="text-muted">{t("webDnsType")}</dt>
-                  <dd className="font-mono text-ink">TXT</dd>
-                  <dt className="text-muted">{t("webDnsName")}</dt>
-                  <dd className="break-all font-mono text-ink">{r.name}</dd>
-                  <dt className="text-muted">{t("webDnsValue")}</dt>
-                  <dd className="break-all font-mono text-ink">{r.value}</dd>
-                  <dt className="text-muted">{t("webProvRecordFor")}</dt>
-                  <dd className="text-secondary">
-                    {r.purpose === "ownership" ? t("webProvForOwnership") : t("webProvForCert")}
-                  </dd>
-                </dl>
-              ))}
-            </div>
-          )}
-
           {live ? (
             <Note tone="ok">{t("webProvLive")}</Note>
           ) : state.verified ? (

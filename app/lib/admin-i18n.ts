@@ -287,7 +287,7 @@ const EN: Record<string, string> = {
     "We switch the domain on automatically once we can confirm it's yours — see Activation below.",
   webProvTitle: "Activation",
   webProvIntro:
-    "Before your domain can serve your site, we confirm you control it and get a certificate issued for it. Both are done with TXT records you add once.",
+    "There's nothing to add beyond the CNAME above. Once it's in place we confirm the domain is yours and get a certificate issued for it, both automatically.",
   webProvLivePill: "Live",
   webProvSaveFirst: "Save the domain first, then finish activation here.",
   webProvOff:
@@ -296,23 +296,17 @@ const EN: Record<string, string> = {
     "Couldn't check with our CDN just now: {message}. Nothing is lost — try again in a moment.",
   webProvNotStarted:
     "This domain isn't registered with our CDN yet. Press Check status to register it and get your records.",
-  webProvRecordsTitle: "Add these records to your DNS",
-  webProvRecordsHint:
-    "Add them wherever you manage your domain, alongside the CNAME above. You can add them before pointing your domain at us — that way the certificate is ready and your guests never see a security warning.",
-  webProvRecordFor: "Purpose",
-  webProvForOwnership: "Proves the domain is yours",
-  webProvForCert: "Lets your certificate be issued",
   webProvLive: "Your domain is live and serving your site.",
   webProvVerifiedNotLive:
     "Ownership confirmed. Your domain will start serving your site within a few minutes.",
   webProvWaiting:
-    "Waiting for the records above. Once they're in place we switch your domain on automatically — you don't need to come back to this page.",
+    "Waiting for the CNAME above. Once it's in place we switch your domain on automatically — you don't need to come back to this page.",
   webProvCertPending:
-    "The certificate isn't ready yet (status: {status}). This usually takes a few minutes once the records are in place, and until then browsers will warn on your domain.",
+    "The certificate isn't ready yet (status: {status}). It can only be issued once your domain points at us, and then it usually takes a few minutes — until it's done, browsers will warn on your domain.",
   webProvProblem: "Our CDN reported: {problems}",
   webProvCheck: "Check status",
   webProvChecking: "Checking…",
-  webProvCheckHint: "Re-reads your records and switches the domain on if everything is in place.",
+  webProvCheckHint: "Re-checks your domain and switches it on if everything is in place.",
 
   // -- website sections editor (sec*) --
   secTitle: "Sections",
@@ -2043,7 +2037,7 @@ const DE: Record<string, string> = {
     "Wir schalten die Domain automatisch frei, sobald wir bestätigen können, dass sie Ihnen gehört — siehe „Aktivierung“ unten.",
   webProvTitle: "Aktivierung",
   webProvIntro:
-    "Bevor Ihre Domain Ihre Website ausliefern kann, bestätigen wir, dass Sie sie kontrollieren, und lassen ein Zertifikat ausstellen. Beides erledigen TXT-Einträge, die Sie einmal anlegen.",
+    "Außer dem CNAME oben ist nichts anzulegen. Sobald er vorhanden ist, bestätigen wir, dass die Domain Ihnen gehört, und lassen ein Zertifikat ausstellen — beides automatisch.",
   webProvLivePill: "Aktiv",
   webProvSaveFirst: "Speichern Sie die Domain zuerst, dann schließen Sie die Aktivierung hier ab.",
   webProvOff:
@@ -2052,24 +2046,18 @@ const DE: Record<string, string> = {
     "Konnte gerade nicht bei unserem CDN nachfragen: {message}. Es ist nichts verloren — bitte gleich erneut versuchen.",
   webProvNotStarted:
     "Diese Domain ist bei unserem CDN noch nicht registriert. Klicken Sie auf „Status prüfen“, um sie zu registrieren und Ihre Einträge zu erhalten.",
-  webProvRecordsTitle: "Legen Sie diese Einträge in Ihrem DNS an",
-  webProvRecordsHint:
-    "Legen Sie sie dort an, wo Sie Ihre Domain verwalten, zusätzlich zum CNAME oben. Sie können sie anlegen, bevor Sie die Domain auf uns richten — dann ist das Zertifikat bereit und Ihre Gäste sehen nie eine Sicherheitswarnung.",
-  webProvRecordFor: "Zweck",
-  webProvForOwnership: "Belegt, dass die Domain Ihnen gehört",
-  webProvForCert: "Ermöglicht die Ausstellung Ihres Zertifikats",
   webProvLive: "Ihre Domain ist aktiv und liefert Ihre Website aus.",
   webProvVerifiedNotLive:
     "Eigentum bestätigt. Ihre Domain liefert Ihre Website innerhalb weniger Minuten aus.",
   webProvWaiting:
-    "Wir warten auf die Einträge oben. Sobald sie vorhanden sind, schalten wir Ihre Domain automatisch frei — Sie müssen nicht auf diese Seite zurückkommen.",
+    "Wir warten auf den CNAME oben. Sobald er vorhanden ist, schalten wir Ihre Domain automatisch frei — Sie müssen nicht auf diese Seite zurückkommen.",
   webProvCertPending:
-    "Das Zertifikat ist noch nicht bereit (Status: {status}). Das dauert nach dem Anlegen der Einträge meist wenige Minuten; bis dahin warnen Browser auf Ihrer Domain.",
+    "Das Zertifikat ist noch nicht bereit (Status: {status}). Es kann erst ausgestellt werden, wenn Ihre Domain auf uns zeigt, und dauert dann meist wenige Minuten; bis dahin warnen Browser auf Ihrer Domain.",
   webProvProblem: "Unser CDN meldet: {problems}",
   webProvCheck: "Status prüfen",
   webProvChecking: "Wird geprüft…",
   webProvCheckHint:
-    "Liest Ihre Einträge erneut und schaltet die Domain frei, wenn alles vorhanden ist.",
+    "Prüft Ihre Domain erneut und schaltet sie frei, wenn alles vorhanden ist.",
 
   // -- website sections editor (sec*) --
   secTitle: "Abschnitte",
@@ -3804,7 +3792,7 @@ const PT: Record<string, string> = {
     "Ativamos o domínio automaticamente assim que conseguirmos confirmar que é seu — veja “Ativação” abaixo.",
   webProvTitle: "Ativação",
   webProvIntro:
-    "Antes de o seu domínio poder servir o seu site, confirmamos que o controla e pedimos a emissão de um certificado. Ambos se resolvem com registos TXT que adiciona uma única vez.",
+    "Não há nada a acrescentar além do CNAME acima. Assim que estiver no lugar, confirmamos que o domínio é seu e pedimos a emissão de um certificado — ambos automaticamente.",
   webProvLivePill: "Ativo",
   webProvSaveFirst: "Guarde primeiro o domínio e depois conclua a ativação aqui.",
   webProvOff:
@@ -3813,23 +3801,17 @@ const PT: Record<string, string> = {
     "Não foi possível verificar junto do nosso CDN neste momento: {message}. Nada se perdeu — tente novamente dentro de instantes.",
   webProvNotStarted:
     "Este domínio ainda não está registado no nosso CDN. Clique em “Verificar estado” para o registar e obter os seus registos.",
-  webProvRecordsTitle: "Adicione estes registos ao seu DNS",
-  webProvRecordsHint:
-    "Adicione-os onde gere o seu domínio, juntamente com o CNAME acima. Pode adicioná-los antes de apontar o domínio para nós — assim o certificado fica pronto e os seus hóspedes nunca veem um aviso de segurança.",
-  webProvRecordFor: "Finalidade",
-  webProvForOwnership: "Prova que o domínio é seu",
-  webProvForCert: "Permite emitir o seu certificado",
   webProvLive: "O seu domínio está ativo e a servir o seu site.",
   webProvVerifiedNotLive:
     "Propriedade confirmada. O seu domínio começará a servir o seu site dentro de alguns minutos.",
   webProvWaiting:
-    "Estamos à espera dos registos acima. Assim que estiverem no lugar, ativamos o seu domínio automaticamente — não precisa de voltar a esta página.",
+    "Estamos à espera do CNAME acima. Assim que estiver no lugar, ativamos o seu domínio automaticamente — não precisa de voltar a esta página.",
   webProvCertPending:
-    "O certificado ainda não está pronto (estado: {status}). Depois de os registos estarem no lugar costuma levar poucos minutos e, até lá, os navegadores mostram um aviso no seu domínio.",
+    "O certificado ainda não está pronto (estado: {status}). Só pode ser emitido depois de o seu domínio apontar para nós e, a partir daí, costuma levar poucos minutos; até lá, os navegadores mostram um aviso no seu domínio.",
   webProvProblem: "O nosso CDN comunicou: {problems}",
   webProvCheck: "Verificar estado",
   webProvChecking: "A verificar…",
-  webProvCheckHint: "Volta a ler os seus registos e ativa o domínio se estiver tudo no lugar.",
+  webProvCheckHint: "Volta a verificar o seu domínio e ativa-o se estiver tudo no lugar.",
 
   // -- website sections editor (sec*) --
   secTitle: "Secções",

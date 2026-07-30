@@ -14,11 +14,19 @@
 // check leaves open: nothing stops a tenant typing `marriott.com`, and before
 // this the index would happily record it.
 //
-// DCV is TXT, deliberately — never `http`. HTTP validation needs traffic to
-// already reach us, so the cert can only be issued AFTER the hotel cuts their
-// DNS over, leaving a window where guests hit the hotel's own domain and get a
-// TLS warning. TXT lets the cert be issued while the domain still points at
-// their old site, so the cutover is the last step and it's clean.
+// Validation is CNAME + automatic HTTP DCV, so the hotel adds ONE record and
+// nothing else. Both of Cloudflare's checks then complete on their own:
+// ownership, because the hostname now CNAMEs into our zone, and the certificate,
+// because Cloudflare can serve the CA's token from the edge once traffic arrives.
+//
+// The known cost, accepted deliberately (Evan, 2026-07-30): the certificate can
+// only be issued AFTER the CNAME points here, so there is a window — usually
+// minutes — where the hotel's domain resolves to us without a valid cert and
+// browsers warn. Pre-issuing would remove it, but only by asking every hotel for
+// a TXT record (or a permanent `_acme-challenge` CNAME via delegated DCV), and
+// one record beats two for hotels who are pointing a domain that isn't live yet.
+// If we ever onboard a hotel migrating an already-live site, THAT is when to add
+// pre-validation — for them the window is a real outage, not a blank domain.
 //
 // We deliberately do NOT use Cloudflare's per-hostname `custom_metadata` to carry
 // the property id, even though `request.cf.hostMetadata` would make it readable
@@ -31,14 +39,6 @@ import { normalizeDomain } from "./domains";
 
 const API = "https://api.cloudflare.com/client/v4";
 const TIMEOUT_MS = 8000;
-
-/** A TXT record the hotel has to create in their own DNS. */
-export interface TxtRecord {
-  name: string;
-  value: string;
-  /** What it's for, so the admin UI can label the two records apart. */
-  purpose: "ownership" | "certificate";
-}
 
 export type ProvisionState =
   /** No API credentials on this deployment: custom domains can't be activated. */
@@ -58,9 +58,9 @@ export type ProvisionState =
        *  something is stuck, and paraphrasing them loses information. */
       status: string;
       certStatus: string;
-      /** Records still outstanding. Empty once Cloudflare is satisfied. */
-      txt: TxtRecord[];
-      /** Validation errors Cloudflare reported (e.g. a CAA record blocking the CA). */
+      /** Validation errors Cloudflare reported, verbatim. The one diagnostic worth
+       *  surfacing as-is: "custom hostname does not CNAME to this zone" IS the
+       *  answer when a hotel says their domain isn't working. */
       problems: string[];
     };
 
@@ -75,10 +75,8 @@ interface CfCustomHostname {
   hostname: string;
   status: string;
   verification_errors?: string[];
-  ownership_verification?: { type?: string; name?: string; value?: string };
   ssl?: {
     status?: string;
-    validation_records?: { txt_name?: string; txt_value?: string }[];
     validation_errors?: { message?: string }[];
   };
 }
@@ -124,30 +122,13 @@ function isVerified(h: CfCustomHostname): boolean {
 
 function describe(h: CfCustomHostname): ProvisionState {
   const certStatus = h.ssl?.status ?? "unknown";
-  const verified = isVerified(h);
-  const txt: TxtRecord[] = [];
-
-  // The ownership record proves the domain is theirs. Cloudflare stops returning
-  // it once the hostname is verified, so an empty list means "nothing to do".
-  const own = h.ownership_verification;
-  if (!verified && own?.name && own?.value) {
-    txt.push({ name: own.name, value: own.value, purpose: "ownership" });
-  }
-  // The DCV record lets the certificate be issued before the domain points here.
-  for (const r of h.ssl?.validation_records ?? []) {
-    if (r.txt_name && r.txt_value) {
-      txt.push({ name: r.txt_name, value: r.txt_value, purpose: "certificate" });
-    }
-  }
-
   return {
     kind: "hostname",
     id: h.id,
-    verified,
+    verified: isVerified(h),
     certReady: certStatus === "active",
     status: h.status ?? "unknown",
     certStatus,
-    txt,
     problems: [
       ...(h.verification_errors ?? []),
       ...(h.ssl?.validation_errors ?? []).map((e) => e.message ?? ""),
@@ -195,19 +176,22 @@ export async function ensureCustomHostname(hostname: string): Promise<ProvisionS
         // `certificate_authority` is left unset on purpose: that selects
         // Cloudflare's default CA, which checks CAA records before requesting a
         // cert instead of failing issuance later.
-        ssl: { method: "txt", type: "dv" },
+        //
+        // method "http" = automatic DCV. Cloudflare serves the CA's token from
+        // the edge once the hotel's CNAME points here, so the hotel adds no
+        // record beyond that CNAME. See the header note on the TLS window.
+        ssl: { method: "http", type: "dv" },
       }),
     });
   } catch (e) {
     return { kind: "error", message: e instanceof Error ? e.message : String(e) };
   }
 
-  // Cloudflare's POST response often omits `validation_records`, so the records
-  // the hotel needs come from a follow-up read rather than the create call.
-  const created = await findCustomHostname(host);
-  // A create that succeeded but reads back as missing is Cloudflare being
-  // eventually consistent, not a failure — say "check again", don't re-create.
-  return created;
+  // Read back rather than trusting the POST body: the create response reports a
+  // just-born hostname, and its status is what the caller acts on. A create that
+  // succeeded but reads back as missing is Cloudflare being eventually
+  // consistent, not a failure — say "check again", don't re-create.
+  return findCustomHostname(host);
 }
 
 /** Remove `hostname` from our zone. Callers MUST have verified ownership first. */
