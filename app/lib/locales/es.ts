@@ -405,6 +405,75 @@ const ES: Dict = {
   fac_nonSmoking: "Sin humo",
   hotelResponse: "Respuesta de {hotel}",
   reviewStarsRequired: "Elija una valoración general.",
+
+  // Manage-booking lookup and list
+  manageTitle: "Gestione su reserva",
+  manageIntro: "Introduzca su número de reserva y el correo electrónico con el que reservó.",
+  manageNotFound: "No hemos encontrado ninguna reserva con ese número y ese correo electrónico. Compruébelo e inténtelo de nuevo.",
+  manageTooMany: "Demasiados intentos. Espere unos minutos e inténtelo de nuevo.",
+  findBooking: "Buscar mi reserva",
+  bookingReference: "Número de reserva",
+  emailAddress: "Correo electrónico",
+  guestName: "Nombre",
+  reference: "Referencia",
+  bookedOn: "Reservado",
+  yourBookings: "Sus reservas",
+  noBookingsForEmail: "Todavía no hay reservas para este correo electrónico.",
+  signOut: "Cerrar sesión",
+  view: "Ver",
+  statusCancelled: "Cancelada",
+
+  // Confirmation / manage section headings
+  sectionBooking: "Reserva",
+  sectionGuest: "Huésped",
+  sectionPayment: "Pago",
+  sectionRooms: "Habitaciones",
+
+  // Cancellation policy and cancelling
+  cancellationPolicy: "Política de cancelación",
+  freeCancellationAnytime: "Cancelación gratuita en cualquier momento antes de la llegada.",
+  freeCancellationUntil: "Cancelación gratuita hasta el {date}.",
+  freeCancellationEnded: "La cancelación gratuita estuvo disponible hasta el {date}.",
+  afterDeadlineCharge: "Después de esa fecha, cobramos {penalty} si cancela.",
+  noShowCharge: "No presentarse: cobramos {penalty}.",
+  penaltyFirstNight: "la primera noche",
+  penaltyFullStay: "la estancia completa",
+  penaltyPercent: "el {n} % de la estancia",
+  nonRefundableBooking: "Esta reserva no es reembolsable.",
+  nonRefundableNotice: "Esta es una reserva no reembolsable y no puede cancelarse en línea.",
+  cancellationVariesByRoom: "Las condiciones de cancelación varían según la habitación: la política de cada habitación aparece en su confirmación.",
+  cancelBooking: "Cancelar reserva",
+  cancelConfirm: "¿Seguro que quiere cancelar esta reserva? No se puede deshacer.",
+  cancelling: "Cancelando…",
+  cancelUnavailable: "Esta reserva ya no puede cancelarse en línea. Póngase en contacto con nosotros.",
+  cancelNotAllowed: "La cancelación en línea no está disponible para esta reserva. Póngase en contacto con nosotros.",
+  bookingCancelled: "Esta reserva ha sido cancelada.",
+
+  // Payment
+  dueNow: "A pagar ahora",
+  dueAtHotel: "A pagar en el hotel",
+  cardChargedNote: "Se cargará el importe en su tarjeta ahora.",
+  cardGuaranteeNote: "Solo necesitamos una tarjeta para garantizar la reserva: hoy no se le cobrará nada.",
+  walletsAccepted: "Se aceptan Apple Pay, Google Pay y tarjetas — pago seguro.",
+  noPaymentInfo: "Todavía no hay información de pago.",
+  includesTaxes: "Incluye {amount} de impuestos y tasas",
+  discount: "Descuento",
+
+  // Promo codes
+  promoCode: "Código promocional",
+  applyCode: "Aplicar",
+  promoApplied: "Código aplicado.",
+  promoInvalid: "Ese código no es válido.",
+
+  // Calendar availability helpers
+  checkoutOnly: "Solo salida: no se puede llegar este día",
+  helperClosedToArrival: "No se puede llegar el {date}. Elija otra fecha de llegada.",
+  helperClosedToDeparture: "No se puede salir el {date}. Elija otra fecha de salida.",
+
+  // Paid but not confirmed (checkout failure states)
+  confirmProblemHeading: "No hemos podido confirmar su reserva",
+  confirmProblemBody: "Su pago se ha realizado correctamente, pero no hemos podido completar su reserva en {hotel}. Nuestro equipo ha sido informado y se pondrá en contacto con usted en breve. Si no podemos confirmarla, se le reembolsará el importe completo.",
+  confirmRefundedBody: "Su pago se ha realizado correctamente, pero la habitación ya no estaba disponible, por lo que no hemos podido confirmar su reserva en {hotel}. Le hemos reembolsado el importe completo: recibirá un correo de confirmación en breve.",
 };
 
 export default ES;

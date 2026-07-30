@@ -405,6 +405,75 @@ const IT: Dict = {
   fac_nonSmoking: "Non fumatori",
   hotelResponse: "Risposta di {hotel}",
   reviewStarsRequired: "Scegli una valutazione complessiva.",
+
+  // Manage-booking lookup and list
+  manageTitle: "Gestisci la prenotazione",
+  manageIntro: "Inserisca il numero di prenotazione e l’e-mail con cui ha prenotato.",
+  manageNotFound: "Non abbiamo trovato alcuna prenotazione con questo numero e questa e-mail. Controlli i dati e riprovi.",
+  manageTooMany: "Troppi tentativi. Attenda qualche minuto e riprovi.",
+  findBooking: "Trova la mia prenotazione",
+  bookingReference: "Numero di prenotazione",
+  emailAddress: "E-mail",
+  guestName: "Nome",
+  reference: "Riferimento",
+  bookedOn: "Prenotato il",
+  yourBookings: "Le sue prenotazioni",
+  noBookingsForEmail: "Nessuna prenotazione trovata per questa e-mail.",
+  signOut: "Esci",
+  view: "Vedi",
+  statusCancelled: "Cancellata",
+
+  // Confirmation / manage section headings
+  sectionBooking: "Prenotazione",
+  sectionGuest: "Ospite",
+  sectionPayment: "Pagamento",
+  sectionRooms: "Camere",
+
+  // Cancellation policy and cancelling
+  cancellationPolicy: "Condizioni di cancellazione",
+  freeCancellationAnytime: "Cancellazione gratuita in qualsiasi momento prima dell’arrivo.",
+  freeCancellationUntil: "Cancellazione gratuita fino al {date}.",
+  freeCancellationEnded: "La cancellazione gratuita era possibile fino al {date}.",
+  afterDeadlineCharge: "Dopo tale data, in caso di cancellazione addebitiamo {penalty}.",
+  noShowCharge: "Mancata presentazione: addebitiamo {penalty}.",
+  penaltyFirstNight: "la prima notte",
+  penaltyFullStay: "l’intero soggiorno",
+  penaltyPercent: "il {n} % del soggiorno",
+  nonRefundableBooking: "Questa prenotazione non è rimborsabile.",
+  nonRefundableNotice: "Questa prenotazione non è rimborsabile e non può essere cancellata online.",
+  cancellationVariesByRoom: "Le condizioni di cancellazione variano per camera: la politica di ogni camera è indicata nella conferma.",
+  cancelBooking: "Cancella prenotazione",
+  cancelConfirm: "Vuole davvero cancellare questa prenotazione? L’operazione è irreversibile.",
+  cancelling: "Cancellazione in corso…",
+  cancelUnavailable: "Questa prenotazione non può più essere cancellata online. La preghiamo di contattarci.",
+  cancelNotAllowed: "Per questa prenotazione la cancellazione online non è disponibile. La preghiamo di contattarci.",
+  bookingCancelled: "Questa prenotazione è stata cancellata.",
+
+  // Payment
+  dueNow: "Da pagare ora",
+  dueAtHotel: "Da pagare in hotel",
+  cardChargedNote: "La sua carta verrà addebitata ora.",
+  cardGuaranteeNote: "Ci serve solo una carta per garantire la prenotazione: oggi non le verrà addebitato nulla.",
+  walletsAccepted: "Accettiamo Apple Pay, Google Pay e carte — pagamento sicuro.",
+  noPaymentInfo: "Nessuna informazione di pagamento.",
+  includesTaxes: "Include {amount} di tasse e supplementi",
+  discount: "Sconto",
+
+  // Promo codes
+  promoCode: "Codice promozionale",
+  applyCode: "Applica",
+  promoApplied: "Codice applicato.",
+  promoInvalid: "Questo codice non è valido.",
+
+  // Calendar availability helpers
+  checkoutOnly: "Solo partenza — in questo giorno non è possibile arrivare",
+  helperClosedToArrival: "Il {date} non è possibile arrivare. Scelga un’altra data di arrivo.",
+  helperClosedToDeparture: "Il {date} non è possibile partire. Scelga un’altra data di partenza.",
+
+  // Paid but not confirmed (checkout failure states)
+  confirmProblemHeading: "Non abbiamo potuto confermare la prenotazione",
+  confirmProblemBody: "Il pagamento è andato a buon fine, ma non abbiamo potuto finalizzare la sua prenotazione presso {hotel}. Il nostro team è stato avvisato e la contatterà a breve. Se non riusciremo a confermarla, le rimborseremo l’intero importo.",
+  confirmRefundedBody: "Il pagamento è andato a buon fine, ma la camera non era più disponibile e non abbiamo potuto confermare la sua prenotazione presso {hotel}. Le abbiamo rimborsato l’intero importo — riceverà un’e-mail di conferma a breve.",
 };
 
 export default IT;

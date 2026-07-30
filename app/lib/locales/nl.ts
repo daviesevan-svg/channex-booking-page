@@ -405,6 +405,75 @@ const NL: Dict = {
   fac_nonSmoking: "Niet-roken",
   hotelResponse: "Reactie van {hotel}",
   reviewStarsRequired: "Kies een algemene beoordeling.",
+
+  // Manage-booking lookup and list
+  manageTitle: "Uw boeking beheren",
+  manageIntro: "Voer uw boekingsnummer in en het e-mailadres waarmee u hebt geboekt.",
+  manageNotFound: "We konden geen boeking vinden met dit boekingsnummer en e-mailadres. Controleer de gegevens en probeer het opnieuw.",
+  manageTooMany: "Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.",
+  findBooking: "Mijn boeking zoeken",
+  bookingReference: "Boekingsnummer",
+  emailAddress: "E-mail",
+  guestName: "Naam",
+  reference: "Referentie",
+  bookedOn: "Geboekt op",
+  yourBookings: "Uw boekingen",
+  noBookingsForEmail: "Nog geen boekingen gevonden voor dit e-mailadres.",
+  signOut: "Afmelden",
+  view: "Bekijken",
+  statusCancelled: "Geannuleerd",
+
+  // Confirmation / manage section headings
+  sectionBooking: "Boeking",
+  sectionGuest: "Gast",
+  sectionPayment: "Betaling",
+  sectionRooms: "Kamers",
+
+  // Cancellation policy and cancelling
+  cancellationPolicy: "Annuleringsvoorwaarden",
+  freeCancellationAnytime: "Gratis annuleren, op elk moment vóór aankomst.",
+  freeCancellationUntil: "Gratis annuleren tot {date}.",
+  freeCancellationEnded: "Gratis annuleren was mogelijk tot {date}.",
+  afterDeadlineCharge: "Daarna brengen wij {penalty} in rekening als u annuleert.",
+  noShowCharge: "No-show: wij brengen {penalty} in rekening.",
+  penaltyFirstNight: "de eerste nacht",
+  penaltyFullStay: "het volledige verblijf",
+  penaltyPercent: "{n} % van het verblijf",
+  nonRefundableBooking: "Deze boeking is niet-terugbetaalbaar.",
+  nonRefundableNotice: "Dit is een niet-terugbetaalbare boeking en kan niet online worden geannuleerd.",
+  cancellationVariesByRoom: "De annuleringsvoorwaarden verschillen per kamer — de voorwaarden per kamer staan in uw bevestiging.",
+  cancelBooking: "Boeking annuleren",
+  cancelConfirm: "Weet u zeker dat u deze boeking wilt annuleren? Dit kan niet worden teruggedraaid.",
+  cancelling: "Annuleren…",
+  cancelUnavailable: "Deze boeking kan niet meer online worden geannuleerd. Neem contact met ons op.",
+  cancelNotAllowed: "Online annuleren is niet mogelijk voor deze boeking. Neem contact met ons op.",
+  bookingCancelled: "Deze boeking is geannuleerd.",
+
+  // Payment
+  dueNow: "Nu te betalen",
+  dueAtHotel: "Te betalen in het hotel",
+  cardChargedNote: "Uw kaart wordt nu belast.",
+  cardGuaranteeNote: "We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.",
+  walletsAccepted: "Apple Pay, Google Pay en kaarten geaccepteerd — veilig afrekenen.",
+  noPaymentInfo: "Nog geen betalingsgegevens.",
+  includesTaxes: "Inclusief {amount} belastingen en toeslagen",
+  discount: "Korting",
+
+  // Promo codes
+  promoCode: "Actiecode",
+  applyCode: "Toepassen",
+  promoApplied: "Actiecode toegepast.",
+  promoInvalid: "Deze code is niet geldig.",
+
+  // Calendar availability helpers
+  checkoutOnly: "Alleen uitchecken — op deze dag kunt u niet aankomen",
+  helperClosedToArrival: "Aankomst is niet mogelijk op {date}. Kies een andere aankomstdatum.",
+  helperClosedToDeparture: "Vertrek is niet mogelijk op {date}. Kies een andere vertrekdatum.",
+
+  // Paid but not confirmed (checkout failure states)
+  confirmProblemHeading: "We konden uw boeking niet bevestigen",
+  confirmProblemBody: "Uw betaling is gelukt, maar we konden uw boeking bij {hotel} niet afronden. Ons team is op de hoogte en neemt binnenkort contact met u op. Als we de boeking niet kunnen bevestigen, krijgt u het volledige bedrag terug.",
+  confirmRefundedBody: "Uw betaling is gelukt, maar de kamer was niet meer beschikbaar, dus we konden uw boeking bij {hotel} niet bevestigen. We hebben het volledige bedrag terugbetaald — u ontvangt binnenkort een bevestigingsmail.",
 };
 
 export default NL;
