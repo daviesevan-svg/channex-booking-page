@@ -11,16 +11,17 @@ import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { displayStatus, normalizeVoucherCode } from "~/lib/vouchers";
 import { packageCheckinOptions, redeemPackageVoucher } from "~/lib/voucher-redeem.server";
 import { getRooms } from "~/lib/catalog.server";
 import { basePath, useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const code = normalizeVoucherCode(params.code);
   const v = await lookupVoucherGuarded(pid, code, request);
   if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
@@ -49,7 +50,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const v = await lookupVoucherGuarded(pid, params.code, request);
   if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
   if (!v) return { error: "Voucher not found." };

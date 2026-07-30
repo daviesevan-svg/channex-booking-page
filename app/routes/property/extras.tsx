@@ -2,7 +2,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
@@ -29,19 +29,21 @@ import {
 import { formatMoney } from "~/lib/money";
 import { partySize, readOccupancy } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
-import { basePath, useBase } from "~/lib/base";
+import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
+  const home = homePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
   const occ = readOccupancy(url.searchParams);
   // :channelId may be a slug — resolve to the real id for data lookups; redirects
   // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolvePropertyId(params.channelId);
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`${base}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
+  const pid = await resolveRequestProperty(params.channelId, request);
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(home);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(home);
 
   // Currency is the property's, not the URL param (no conversion exists).
   const currency = (await getSettings(pid)).currency || "GBP";
@@ -196,6 +198,7 @@ function ExtraSection({
 
 export default function Extras({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
+  const home = useHome();
   const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
     loaderData;
   const { currency: ctxCurrency } = useProperty();

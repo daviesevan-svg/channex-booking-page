@@ -12,6 +12,7 @@ import { accentHex, renderSimpleEmail } from "./email-render.server";
 import { composeVoucherEmail } from "./voucher-email.server";
 import { formatMoney } from "./money";
 import type { PaymentInfo } from "./bookings.server";
+import { basePath } from "./base";
 
 /** Issue the voucher from a prepared pending purchase. Idempotent by (pid,
  *  code): the Stripe return URL and the webhook can both call this; the loser
@@ -100,7 +101,7 @@ export async function sendVoucherEmails(
   pid: string,
   v: VoucherRecord,
   origin: string,
-  channel: string,
+  channel: string | undefined,
 ): Promise<void> {
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
@@ -110,8 +111,8 @@ export async function sendVoucherEmails(
       hotelName: ov.hotelName || "Your hotel",
       accent: accentHex(settings),
       currency: settings.currency || "GBP",
-      voucherUrl: `${base}/${channel}/voucher/${v.code}`,
-      shopUrl: `${base}/${channel}/vouchers`,
+      voucherUrl: `${base}${basePath(channel)}/voucher/${v.code}`,
+      shopUrl: `${base}${basePath(channel)}/vouchers`,
     };
 
     // Buyer receipt.
@@ -146,7 +147,7 @@ export async function sendVoucherReminderEmail(
   pid: string,
   v: VoucherRecord,
   origin: string,
-  channel: string,
+  channel: string | undefined,
 ): Promise<boolean> {
   if (!v.gift?.recipientEmail) return false;
   try {
@@ -158,8 +159,8 @@ export async function sendVoucherReminderEmail(
       hotelName: ov.hotelName || "Your hotel",
       accent: accentHex(settings),
       currency: settings.currency || "GBP",
-      voucherUrl: `${base}/${channel}/voucher/${v.code}`,
-      shopUrl: `${base}/${channel}/vouchers`,
+      voucherUrl: `${base}${basePath(channel)}/voucher/${v.code}`,
+      shopUrl: `${base}${basePath(channel)}/vouchers`,
     });
     const r = await sendEmail({
       to: v.gift.recipientEmail,

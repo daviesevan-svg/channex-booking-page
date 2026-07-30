@@ -14,7 +14,7 @@ import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { getGuestEmail } from "~/lib/guest-auth.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getBooking } from "~/lib/bookings.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
@@ -40,13 +40,13 @@ import { basePath, useBase } from "~/lib/base";
 /** Voucher owned by the signed-in buyer, or a redirect back to the login. */
 async function requireOwnVoucher(
   request: Request,
-  channelId: string,
+  channelId: string | undefined,
   code: string,
 ): Promise<{ pid: string; email: string; v: VoucherRecord }> {
   const manageUrl = `${basePath(channelId)}/manage`;
   const email = await getGuestEmail(request);
   if (!email) throw redirect(manageUrl);
-  const pid = await resolvePropertyId(channelId);
+  const pid = await resolveRequestProperty(channelId, request);
   const v = await lookupVoucherGuarded(pid, code, request);
   if (v === "limited" || !v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(manageUrl);
   return { pid, email, v };

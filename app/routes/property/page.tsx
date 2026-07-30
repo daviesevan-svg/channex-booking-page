@@ -16,13 +16,14 @@ import { langFromRequest } from "~/lib/content";
 import { useT } from "~/lib/i18n";
 import { useProperty } from "~/lib/booking-context";
 import { getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { loadSectionData } from "~/lib/section-data.server";
 import { getRenderPage } from "~/lib/site.server";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const settings = await getSettings(pid);
   if (!settings.websiteEnabled) throw new Response("Not found", { status: 404 });
 

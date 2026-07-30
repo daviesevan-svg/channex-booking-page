@@ -10,13 +10,14 @@ import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
 import { getPageText, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "~/lib/extras";
 import { basePath, useBase } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -33,7 +34,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups; links
   // keep params.channelId so the slug stays in the URL.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
 
   let rooms: { title: string; rate: string }[] = [];
   let total = 0;

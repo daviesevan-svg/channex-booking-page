@@ -13,7 +13,7 @@ import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
 import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
@@ -23,20 +23,22 @@ import { cancellationMessage } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
-import { basePath, useBase } from "~/lib/base";
+import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
+  const home = homePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
   const { adults, childrenAge } = readOccupancy(url.searchParams);
   // :channelId may be a slug — resolve to the real id for data lookups; redirects
   // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
 
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`${base}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(home);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(home);
 
   // Currency is the property's, not the URL param (no conversion exists).
   const settings = await getSettings(pid);
@@ -206,6 +208,7 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
+  const home = useHome();
   const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();

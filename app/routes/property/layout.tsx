@@ -20,16 +20,30 @@ import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getSiteChrome } from "~/lib/site.server";
 import { SiteFooterBlock } from "~/components/site-footer";
 import type { ResolvedFooter } from "~/lib/footer";
-import { getProperty, resolvePropertyId } from "~/lib/properties.server";
+import { getProperty } from "~/lib/properties.server";
+import { propertyIdForHost } from "~/lib/domains.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
-import { basePath, useBase } from "~/lib/base";
+import { basePath, useBase, useHome } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).
   // :channelId may be a slug — resolve it to the real id for data lookups; links
   // keep params.channelId so the slug stays in the URL through the flow.
   const lang = langFromRequest(request);
-  const pid = await resolvePropertyId(params.channelId);
+
+  // This layout serves BOTH mounts. With a path segment the property comes from
+  // it; at the root it comes from the hostname (a hotel's own domain). The
+  // hostname is only consulted when there is no segment, so the shared domain
+  // does no extra lookup.
+  const pid = params.channelId
+    ? await resolveRequestProperty(params.channelId, request)
+    : ((await propertyIdForHost(new URL(request.url).hostname)) ?? "");
+
+  // Root mount on a hostname that isn't a custom domain: this is the shared
+  // domain's own front door. Render nothing but an Outlet — the child is the
+  // property picker, which must not be wrapped in some hotel's branding.
+  if (!pid) return { mode: "passthrough" as const };
   // A property that isn't in the registry (never existed, or was deleted) must
   // 404 — its KV data can linger after removal, so we gate on the registry, not
   // on whether settings/overrides happen to still be readable.
@@ -48,6 +62,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     : null;
 
   return {
+    mode: "property" as const,
     property: { address: overrides.address, phone: overrides.phone, photos: [] },
     currency: settings.currency || "GBP",
     hotelName: overrides.hotelName || "Your hotel",
@@ -151,6 +166,11 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
 }
 
 export default function PropertyLayout({ loaderData, params }: Route.ComponentProps) {
+  // Root mount on the shared domain: no property, so no chrome. The child is the
+  // picker, which brings its own. Bare Outlet rather than a 404 — "/" is a real
+  // page here, just not a hotel's.
+  if (loaderData.mode === "passthrough") return <Outlet />;
+
   const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, contact, termsUrl, privacyUrl } =
     loaderData;
   const font = fontPair(themeFont);
@@ -172,6 +192,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   };
   const step = useStep(params.channelId);
   const base = useBase();
+  const home = useHome();
   // The "Manage booking" / "Gift vouchers" links belong on pages a guest is
   // BROWSING, not on the funnel steps, which stay focused. That's the landing
   // page plus the website's room pages — a room page is somewhere you look
@@ -237,7 +258,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         }}
       >
         <div className="mx-auto flex max-w-[1160px] items-center justify-between gap-4 px-7 py-4">
-          <Link to={base} className="flex items-center gap-3">
+          <Link to={home} className="flex items-center gap-3">
             {logoImage ? (
               // The logo replaces the diamond mark. The hotel name stays beside
               // it by default; hide it (logoHideName) only for logos that already

@@ -4,8 +4,9 @@ import type { Route } from "./+types/checkout.complete";
 import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromSession } from "~/lib/booking-finalize.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { retrieveCheckoutSession } from "~/lib/stripe.server";
+import { basePath, homePath } from "~/lib/base";
 
 // Stripe sends the guest here after paying. We retrieve the session to confirm
 // payment, finalize the booking (idempotent — the webhook may have raced us),
@@ -16,15 +17,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // `channel` is the URL segment (may be a slug) used for redirects so the pretty
   // URL survives; `pid` is the resolved id used to look bookings up.
   const channel = params.channelId;
-  const pid = await resolvePropertyId(channel);
+  const pid = await resolveRequestProperty(channel, request);
   const ref = url.searchParams.get("ref") || "";
   const sessionId = url.searchParams.get("session_id") || "";
 
   const fwd = new URLSearchParams(url.searchParams);
   fwd.delete("session_id");
   fwd.delete("ref");
-  const checkoutUrl = `/${channel}/checkout?${fwd.toString()}`;
-  if (!ref || !sessionId) throw redirect(`/${channel}`);
+  const checkoutUrl = `${basePath(channel)}/checkout?${fwd.toString()}`;
+  if (!ref || !sessionId) throw redirect(homePath(channel));
 
   // Confirmation URL that tells the truth: a booking that failed to finalize
   // (Channex rejected it, or it sold out and was auto-refunded) must NOT land the
@@ -35,7 +36,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       p.set("status", "failed");
       if (rec.payment?.refund) p.set("refunded", "1");
     }
-    return `/${channel}/confirmation/${ref}?${p.toString()}`;
+    return `${basePath(channel)}/confirmation/${ref}?${p.toString()}`;
   };
 
   // Webhook already finalized it → straight to the matching outcome.
@@ -46,7 +47,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const pending = await getPending(ref);
-  if (!pending) throw redirect(`/${channel}`); // expired / unknown
+  if (!pending) throw redirect(homePath(channel)); // expired / unknown
 
   let payment;
   try {

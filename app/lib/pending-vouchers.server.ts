@@ -15,8 +15,9 @@ export interface PendingVoucher {
   record: Omit<VoucherRecord, "payment">;
   /** Whether this was a real (Stripe) sale vs a simulated test-mode one. */
   live: boolean;
-  /** URL segment (may be a slug) for redirects/links. */
-  channel: string;
+  /** URL segment (may be a slug) for redirects/links. Absent on a custom domain,
+   *  where the hostname already identifies the property. */
+  channel: string | undefined;
   /** Site origin captured at purchase, for absolute links in emails. */
   origin: string;
 }

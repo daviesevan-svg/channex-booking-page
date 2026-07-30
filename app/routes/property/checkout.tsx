@@ -43,9 +43,10 @@ import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getOverrides, getPageText } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
-import { basePath, useBase } from "~/lib/base";
+import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 interface Stay {
   channelId: string;
@@ -129,14 +130,15 @@ function deriveOffer(lines: ResolvedLine[]) {
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
+  const home = homePath(params.channelId);
   const url = new URL(request.url);
   // :channelId may be a slug — resolve to the real id and carry it on the stay,
   // so every data lookup + the booking record use the UUID. Redirects/links keep
   // params.channelId so the slug stays in the URL through the flow.
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`${base}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(home);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(home);
 
   const settings = await getSettings(pid);
   // Currency is the property's configured currency — NEVER the URL param. There
@@ -245,13 +247,14 @@ const GuestSchema = z.object({
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
+  const home = homePath(params.channelId);
   const url = new URL(request.url);
   // Resolve slug→id: stay.channelId (the booking's pid, Stripe metadata, etc.)
   // must be the real UUID. Redirect/return URLs keep params.channelId (the slug).
-  const pid = await resolvePropertyId(params.channelId);
+  const pid = await resolveRequestProperty(params.channelId, request);
   const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`${base}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(home);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(home);
 
   // Currency is the property's, never the URL (see loader) — this is the charge
   // path, so the guard matters most here.
@@ -646,6 +649,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
+  const home = useHome();
   const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
