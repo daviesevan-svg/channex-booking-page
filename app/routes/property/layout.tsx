@@ -181,7 +181,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const isHome = here === base;
   // An extra website page is somewhere a guest looks around, like a room page —
   // so the browsing nav belongs there too.
-  const onWebsitePage = pageSlugs.some((s) => here === `${base}/${s}`);
+  const onWebsitePage = pageSlugs.some((s) => here === `${base}/p/${s}`);
   const isBrowsing = isHome || onWebsitePage || here.startsWith(`${base}/room/`);
 
   // React Router doesn't scroll to a #fragment on navigation, so the "Rooms"
@@ -277,7 +277,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             )}
             {isBrowsing &&
               navPages.map((p) => (
-                <Link key={p.slug} to={`${base}/${p.slug}`} className="hover:text-accent">
+                <Link key={p.slug} to={`${base}/p/${p.slug}`} className="hover:text-accent">
                   {p.label}
                 </Link>
               ))}
@@ -312,7 +312,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           hotelName={hotelName}
           links={[
             ...(websiteRooms ? [{ label: tr.t("roomsNav"), to: `${base}#rooms` }] : []),
-            ...navPages.map((p) => ({ label: p.label, to: `${base}/${p.slug}` })),
+            ...navPages.map((p) => ({ label: p.label, to: `${base}/p/${p.slug}` })),
             ...(hasVouchers ? [{ label: tr.t("vouchersTitle"), to: `${base}/vouchers` }] : []),
             { label: tr.t("manageBooking"), to: `${base}/manage` },
             ...(termsUrl ? [{ label: tr.t("termsLink"), to: termsUrl, external: true }] : []),

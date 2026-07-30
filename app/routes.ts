@@ -129,10 +129,15 @@ export default [
     route("manage/voucher/:code", "routes/property/manage-voucher.tsx"),
     route("manage/:id", "routes/property/manage-booking.tsx"),
     route("review/:bookingId", "routes/property/review.tsx"),
-    // Extra website pages ("about", "dining"). MUST stay last: it matches any
-    // single segment, and only React Router's static-beats-dynamic ranking keeps
-    // the funnel routes above from being read as page slugs. An unknown slug
-    // 404s from the loader. See RESERVED_PAGE_SLUGS in app/lib/pages.ts.
-    route(":pageSlug", "routes/property/page.tsx"),
+    // Extra website pages ("about", "dining"). Under /p/ because a single
+    // segment at the ROOT of a custom domain is ambiguous — /parking is a page
+    // there, while /spilmanhotel on the shared domain is a property, and route
+    // matching cannot see the hostname. Static prefix = no ambiguity either way.
+    // See RESERVED_PAGE_SLUGS in app/lib/pages.ts.
+    route("p/:pageSlug", "routes/property/page.tsx"),
+    // Their old address. MUST stay last: it matches any single segment, and only
+    // React Router's static-beats-dynamic ranking keeps the funnel routes above
+    // from being read as page slugs. Redirects real pages, 404s anything else.
+    route(":pageSlug", "routes/property/page-legacy.tsx"),
   ]),
 ] satisfies RouteConfig;
