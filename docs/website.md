@@ -476,6 +476,14 @@ the real owner's TXT record by polling first.
 Activation runs from the admin's "Check status" button **and** from the 6-hourly
 cron, because hotels add their DNS records and don't come back to the page.
 
+**The CNAME target 301s to the canonical host.** The wildcard route means
+`customers.roompanda.com` reaches this Worker like any other hostname, so visiting
+it directly served a full working duplicate of `book.roompanda.com` — indexable,
+admin login included. `canonicalRedirect` in `workers/app.ts` sends it to
+`APP_URL`, path and query intact. Hotel traffic is unaffected: a request for a
+hotel's domain keeps that hostname throughout (the Worker runs before origin
+resolution), so it never arrives as the CNAME target.
+
 ### The apex caveat
 
 `spilmanhotel.co.uk` with no `www` is the one thing that isn't clean. DNS does

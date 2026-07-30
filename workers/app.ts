@@ -9,6 +9,7 @@ import { pruneAri } from "../app/lib/ari.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
+import { getConfig } from "../app/lib/config.server";
 
 
 const requestHandler = createRequestHandler(
@@ -16,9 +17,39 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
+/**
+ * Send the CNAME target's own hostname to the canonical one.
+ *
+ * `customers.roompanda.com` exists for hotels to point a CNAME at. Because the
+ * wildcard Worker route catches every hostname on the zone, visiting it directly
+ * used to serve the full guest picker and the admin login — a working duplicate
+ * of book.roompanda.com that search engines can index.
+ *
+ * Custom-hostname traffic is unaffected: a request for a hotel's domain keeps
+ * that hostname all the way through (the Worker runs before origin resolution),
+ * so it never appears here as the CNAME target.
+ *
+ * Never throws — this is on every request, and a malformed APP_URL must degrade
+ * to "no redirect" rather than 500 the whole site.
+ */
+function canonicalRedirect(request: Request): Response | null {
+  try {
+    const { customHostnameTarget, appUrl } = getConfig();
+    if (!customHostnameTarget) return null;
+    const url = new URL(request.url);
+    if (url.hostname.toLowerCase() !== customHostnameTarget.trim().toLowerCase()) return null;
+    const to = new URL(url.pathname + url.search, appUrl);
+    // Don't bounce to ourselves if APP_URL somehow names this same host.
+    if (to.hostname.toLowerCase() === url.hostname.toLowerCase()) return null;
+    return Response.redirect(to.toString(), 301);
+  } catch {
+    return null;
+  }
+}
+
 export default {
   async fetch(request) {
-    return requestHandler(request);
+    return canonicalRedirect(request) ?? requestHandler(request);
   },
   // Cron (see wrangler.jsonc `triggers.crons`): (1) keep Google's ARI in sync by
   // re-pushing every ARI-enabled property — a backstop to the change-driven and
