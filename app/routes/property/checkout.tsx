@@ -586,6 +586,13 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirect(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 
+// Channex validates arrival_hour as strict HH:MM — offer a fixed list of times
+// instead of free text, so what the guest picks is exactly what the PMS gets.
+const ARRIVAL_TIMES = Array.from(
+  { length: 48 },
+  (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
+);
+
 function Field({
   name,
   label,
@@ -805,7 +812,21 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className="rounded-panel border border-line bg-surface p-[26px]">
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.arrivalSection}</h3>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="arrival" label={tr.t("estimatedArrival")} placeholder="15:00" />
+              <label className="block text-caption font-semibold text-secondary">
+                {tr.t("estimatedArrival")}
+                <select
+                  name="arrival"
+                  defaultValue=""
+                  className="mt-[7px] block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
+                >
+                  <option value="">{tr.t("arrivalUnknown")}</option>
+                  {ARRIVAL_TIMES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <label className="block text-caption font-semibold text-secondary">
               {tr.t("specialRequests")}

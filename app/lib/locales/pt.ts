@@ -307,6 +307,7 @@ const PT: Dict = {
   email: "E-mail",
   phone: "Telefone",
   estimatedArrival: "Hora de chegada prevista",
+  arrivalUnknown: "Ainda não sei",
   specialRequests: "Pedidos especiais",
   yourStayRooms_one: "A sua estadia · {n} quarto",
   yourStayRooms_other: "A sua estadia · {n} quartos",

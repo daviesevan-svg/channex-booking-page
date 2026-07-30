@@ -249,6 +249,7 @@ const IT: Dict = {
   email: "E-mail",
   phone: "Telefono",
   estimatedArrival: "Orario di arrivo previsto",
+  arrivalUnknown: "Non lo so ancora",
   specialRequests: "Richieste speciali",
   yourStayRooms_one: "Il tuo soggiorno · {n} camera",
   yourStayRooms_other: "Il tuo soggiorno · {n} camere",
