@@ -56,7 +56,6 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
 }
 
 export default [
-  index("routes/home.tsx"),
 
   // Public image server (R2-backed)
   route("images/*", "routes/image.tsx"),
@@ -183,9 +182,12 @@ export default [
   // no path segment, so its children sit directly under "/". Every child needs an
   // explicit id because the modules are already used by the mount above.
   //
-  // Deliberately NO index here yet — "/" still belongs to routes/home.tsx (the
-  // property picker). That one URL means two different things depending on the
-  // hostname and is the last piece of this feature; until it lands, a custom
-  // domain's landing page falls through to the picker rather than the hotel.
-  layout("routes/property/layout.tsx", { id: "host" }, guestRoutes("host")),
+  layout("routes/property/layout.tsx", { id: "host" }, [
+    // "/" — a hotel's home page on their own domain, the property picker on ours.
+    // One route, because one URL: search.tsx branches on whether the hostname
+    // resolved to a property. There is no way to express that in the route table,
+    // since matching happens before anything can look at the host.
+    index("routes/property/search.tsx", { id: "host-index" }),
+    ...guestRoutes("host"),
+  ]),
 ] satisfies RouteConfig;

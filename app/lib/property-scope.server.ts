@@ -28,9 +28,24 @@ export async function resolveRequestProperty(
   channelId: string | undefined,
   request: Request,
 ): Promise<string> {
-  if (channelId) return resolvePropertyId(channelId);
-
-  const pid = await propertyIdForHost(new URL(request.url).hostname);
+  const pid = await resolveRequestPropertyOrNull(channelId, request);
   if (!pid) throw new Response("Not found", { status: 404 });
   return pid;
+}
+
+/**
+ * Same resolution, but null instead of a 404 when there is no property.
+ *
+ * Only "/" needs this. That URL is the shared domain's own front door (the
+ * property picker) and a hotel's home page on their custom domain, so "no
+ * property" is a legitimate outcome there rather than a missing page. Everywhere
+ * else, use `resolveRequestProperty` — a guest route with no property has
+ * nothing to render, and returning null would let it half-render instead.
+ */
+export async function resolveRequestPropertyOrNull(
+  channelId: string | undefined,
+  request: Request,
+): Promise<string | null> {
+  if (channelId) return resolvePropertyId(channelId);
+  return propertyIdForHost(new URL(request.url).hostname);
 }

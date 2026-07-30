@@ -348,7 +348,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
           <span className="flex items-center gap-2">
             {tr.t("footerRight")}
-            {isHome && (
+            {/* Only on the shared domain. /admin is refused on a hotel's own
+                hostname (requireCanonicalHost), so on a custom domain this was a
+                dead link to our back office sitting on their public site.
+                `params.channelId` is the tell: absent means the root mount. */}
+            {isHome && params.channelId && (
               <>
                 <span className="text-faint">·</span>
                 <Link to="/admin" className="text-faint hover:text-accent">

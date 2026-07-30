@@ -16,15 +16,19 @@
  * with a trailing `// design-token-exempt: <reason>` on the same line. Give a
  * real reason — "it's easier" is not one.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
 const PATTERN = /\b(?:text|rounded)-\[[0-9.]+(?:px|rem)\]/g;
 const EXEMPT = /\/\/\s*design-token-exempt:/;
 
+// `git ls-files` lists what's tracked, which still includes a file deleted but
+// not yet staged — reading it blind crashes the whole check with ENOENT, and
+// since this runs inside `npm run typecheck` that looks like a type error.
 const files = execSync("git ls-files 'app/**/*.tsx' 'app/*.tsx'", { encoding: "utf8" })
   .split("\n")
-  .filter((f) => f.endsWith(".tsx") && !f.startsWith("app/routes/admin/"));
+  .filter((f) => f.endsWith(".tsx") && !f.startsWith("app/routes/admin/"))
+  .filter((f) => existsSync(f));
 
 const hits = [];
 for (const file of files) {
