@@ -284,7 +284,35 @@ const EN: Record<string, string> = {
   webDnsNotFound: "That domain doesn't resolve yet. If you've just added the record, give it a few minutes.",
   webDnsCheckFailed: "Couldn't check right now: {reason}",
   webDnsNotLiveYet:
-    "We still need to activate the hostname on our side before it serves your pages — that part isn't automatic yet.",
+    "We switch the domain on automatically once we can confirm it's yours — see Activation below.",
+  webProvTitle: "Activation",
+  webProvIntro:
+    "Before your domain can serve your site, we confirm you control it and get a certificate issued for it. Both are done with TXT records you add once.",
+  webProvLivePill: "Live",
+  webProvSaveFirst: "Save the domain first, then finish activation here.",
+  webProvOff:
+    "Automatic activation isn't set up on this deployment yet, so a domain entered here won't serve your site. Ask us to finish it.",
+  webProvError:
+    "Couldn't check with our CDN just now: {message}. Nothing is lost — try again in a moment.",
+  webProvNotStarted:
+    "This domain isn't registered with our CDN yet. Press Check status to register it and get your records.",
+  webProvRecordsTitle: "Add these records to your DNS",
+  webProvRecordsHint:
+    "Add them wherever you manage your domain, alongside the CNAME above. You can add them before pointing your domain at us — that way the certificate is ready and your guests never see a security warning.",
+  webProvRecordFor: "Purpose",
+  webProvForOwnership: "Proves the domain is yours",
+  webProvForCert: "Lets your certificate be issued",
+  webProvLive: "Your domain is live and serving your site.",
+  webProvVerifiedNotLive:
+    "Ownership confirmed. Your domain will start serving your site within a few minutes.",
+  webProvWaiting:
+    "Waiting for the records above. Once they're in place we switch your domain on automatically — you don't need to come back to this page.",
+  webProvCertPending:
+    "The certificate isn't ready yet (status: {status}). This usually takes a few minutes once the records are in place, and until then browsers will warn on your domain.",
+  webProvProblem: "Our CDN reported: {problems}",
+  webProvCheck: "Check status",
+  webProvChecking: "Checking…",
+  webProvCheckHint: "Re-reads your records and switches the domain on if everything is in place.",
 
   // -- website sections editor (sec*) --
   secTitle: "Sections",
@@ -2012,7 +2040,36 @@ const DE: Record<string, string> = {
     "Diese Domain löst noch nicht auf. Wenn Sie den Eintrag gerade erst angelegt haben, warten Sie ein paar Minuten.",
   webDnsCheckFailed: "Prüfung derzeit nicht möglich: {reason}",
   webDnsNotLiveYet:
-    "Wir müssen den Hostnamen auf unserer Seite noch aktivieren, bevor er Ihre Seiten ausliefert — das läuft noch nicht automatisch.",
+    "Wir schalten die Domain automatisch frei, sobald wir bestätigen können, dass sie Ihnen gehört — siehe „Aktivierung“ unten.",
+  webProvTitle: "Aktivierung",
+  webProvIntro:
+    "Bevor Ihre Domain Ihre Website ausliefern kann, bestätigen wir, dass Sie sie kontrollieren, und lassen ein Zertifikat ausstellen. Beides erledigen TXT-Einträge, die Sie einmal anlegen.",
+  webProvLivePill: "Aktiv",
+  webProvSaveFirst: "Speichern Sie die Domain zuerst, dann schließen Sie die Aktivierung hier ab.",
+  webProvOff:
+    "Die automatische Aktivierung ist auf dieser Installation noch nicht eingerichtet, eine hier eingetragene Domain liefert Ihre Website also nicht aus. Bitte melden Sie sich bei uns.",
+  webProvError:
+    "Konnte gerade nicht bei unserem CDN nachfragen: {message}. Es ist nichts verloren — bitte gleich erneut versuchen.",
+  webProvNotStarted:
+    "Diese Domain ist bei unserem CDN noch nicht registriert. Klicken Sie auf „Status prüfen“, um sie zu registrieren und Ihre Einträge zu erhalten.",
+  webProvRecordsTitle: "Legen Sie diese Einträge in Ihrem DNS an",
+  webProvRecordsHint:
+    "Legen Sie sie dort an, wo Sie Ihre Domain verwalten, zusätzlich zum CNAME oben. Sie können sie anlegen, bevor Sie die Domain auf uns richten — dann ist das Zertifikat bereit und Ihre Gäste sehen nie eine Sicherheitswarnung.",
+  webProvRecordFor: "Zweck",
+  webProvForOwnership: "Belegt, dass die Domain Ihnen gehört",
+  webProvForCert: "Ermöglicht die Ausstellung Ihres Zertifikats",
+  webProvLive: "Ihre Domain ist aktiv und liefert Ihre Website aus.",
+  webProvVerifiedNotLive:
+    "Eigentum bestätigt. Ihre Domain liefert Ihre Website innerhalb weniger Minuten aus.",
+  webProvWaiting:
+    "Wir warten auf die Einträge oben. Sobald sie vorhanden sind, schalten wir Ihre Domain automatisch frei — Sie müssen nicht auf diese Seite zurückkommen.",
+  webProvCertPending:
+    "Das Zertifikat ist noch nicht bereit (Status: {status}). Das dauert nach dem Anlegen der Einträge meist wenige Minuten; bis dahin warnen Browser auf Ihrer Domain.",
+  webProvProblem: "Unser CDN meldet: {problems}",
+  webProvCheck: "Status prüfen",
+  webProvChecking: "Wird geprüft…",
+  webProvCheckHint:
+    "Liest Ihre Einträge erneut und schaltet die Domain frei, wenn alles vorhanden ist.",
 
   // -- website sections editor (sec*) --
   secTitle: "Abschnitte",
@@ -3744,7 +3801,35 @@ const PT: Record<string, string> = {
     "Esse domínio ainda não resolve. Se acabou de criar o registo, aguarde alguns minutos.",
   webDnsCheckFailed: "Não foi possível verificar agora: {reason}",
   webDnsNotLiveYet:
-    "Ainda precisamos de ativar o nome de anfitrião do nosso lado antes de servir as suas páginas — essa parte ainda não é automática.",
+    "Ativamos o domínio automaticamente assim que conseguirmos confirmar que é seu — veja “Ativação” abaixo.",
+  webProvTitle: "Ativação",
+  webProvIntro:
+    "Antes de o seu domínio poder servir o seu site, confirmamos que o controla e pedimos a emissão de um certificado. Ambos se resolvem com registos TXT que adiciona uma única vez.",
+  webProvLivePill: "Ativo",
+  webProvSaveFirst: "Guarde primeiro o domínio e depois conclua a ativação aqui.",
+  webProvOff:
+    "A ativação automática ainda não está configurada nesta instalação, pelo que um domínio indicado aqui não servirá o seu site. Fale connosco para concluir.",
+  webProvError:
+    "Não foi possível verificar junto do nosso CDN neste momento: {message}. Nada se perdeu — tente novamente dentro de instantes.",
+  webProvNotStarted:
+    "Este domínio ainda não está registado no nosso CDN. Clique em “Verificar estado” para o registar e obter os seus registos.",
+  webProvRecordsTitle: "Adicione estes registos ao seu DNS",
+  webProvRecordsHint:
+    "Adicione-os onde gere o seu domínio, juntamente com o CNAME acima. Pode adicioná-los antes de apontar o domínio para nós — assim o certificado fica pronto e os seus hóspedes nunca veem um aviso de segurança.",
+  webProvRecordFor: "Finalidade",
+  webProvForOwnership: "Prova que o domínio é seu",
+  webProvForCert: "Permite emitir o seu certificado",
+  webProvLive: "O seu domínio está ativo e a servir o seu site.",
+  webProvVerifiedNotLive:
+    "Propriedade confirmada. O seu domínio começará a servir o seu site dentro de alguns minutos.",
+  webProvWaiting:
+    "Estamos à espera dos registos acima. Assim que estiverem no lugar, ativamos o seu domínio automaticamente — não precisa de voltar a esta página.",
+  webProvCertPending:
+    "O certificado ainda não está pronto (estado: {status}). Depois de os registos estarem no lugar costuma levar poucos minutos e, até lá, os navegadores mostram um aviso no seu domínio.",
+  webProvProblem: "O nosso CDN comunicou: {problems}",
+  webProvCheck: "Verificar estado",
+  webProvChecking: "A verificar…",
+  webProvCheckHint: "Volta a ler os seus registos e ativa o domínio se estiver tudo no lugar.",
 
   // -- website sections editor (sec*) --
   secTitle: "Secções",

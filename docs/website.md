@@ -426,11 +426,23 @@ Cloudflare issues and renews the certificate. We do no certificate work.
 
 ### Setup on our side
 
-1. Fallback origin as an **originless** record: `service.roompanda.com AAAA 100::`
-2. Worker route `*/*` on the zone.
+1. Fallback origin as an **originless** record: `customers.roompanda.com AAAA 100::`,
+   proxied.
+2. Worker route `*/*` on the zone — plus a carve-out, see below.
 
 A wildcard route catches every custom hostname — no per-hostname route, no
 deploy when a hotel is added.
+
+**The marketing site shares this zone.** `roompanda.com` serves it (the static
+site in `/Users/evan/roompanda`); `book.roompanda.com` is this Worker. Worker
+**routes run before Custom Domains** — Cloudflare's docs describe a Custom Domain
+Worker as "treated as an origin", with route Workers running ahead of it — so a
+bare `*/*` intercepts the marketing site. Add `roompanda.com/*` with **Worker:
+None** first, verify the apex still serves marketing, then add `*/*`. Checked
+2026-07-30: no `www` record, no wildcard DNS and no MX on the zone, so the apex is
+the only carve-out needed. The failure mode is loud, not silent — an intercepted
+apex renders the property picker (unknown host → no property → picker) — and
+deleting the route reverts it in seconds.
 
 ### Resolving hostname → property
 
@@ -438,9 +450,31 @@ Cloudflare's docs are explicit that when a Worker route matches, the
 per-hostname `custom_origin_server` setting is **bypassed**, because the Worker
 runs before origin resolution. Routing has to happen in our code.
 
-Use **custom metadata**: store `{ propertyId }` on the custom hostname when we
-create it, then read `request.cf.hostMetadata` at the edge. No KV lookup on the
-request path.
+We use a **KV index** (`domain:{hostname}` → propertyId, one key per hostname),
+not Cloudflare's `custom_metadata`/`request.cf.hostMetadata`. Metadata would save
+a KV read on the request path, but it would be a second copy of the mapping at
+the edge, free to drift from the one the admin writes. One source of truth is
+worth one KV read.
+
+### Ownership: why the index isn't written on save
+
+Nothing stops a tenant typing `marriott.com` into the domain field, so the index
+is written from **Cloudflare's verdict**, never from the form. Two keys per
+hostname:
+
+| Key | Meaning | Written when |
+|---|---|---|
+| `domain-setup:{host}` | this property may set the hostname up | on save (30-day TTL) |
+| `domain:{host}` | this property **is served** here | once Cloudflare reports the hostname `active` |
+
+Cloudflare marks a custom hostname active only once it either CNAMEs into our
+zone or carries the ownership TXT record Cloudflare issued — both require control
+of the domain. The reservation is what ties that proof to a tenant: Cloudflare
+verifies the *domain*, not who asked, so without it any property could ride on
+the real owner's TXT record by polling first.
+
+Activation runs from the admin's "Check status" button **and** from the 6-hourly
+cron, because hotels add their DNS records and don't come back to the page.
 
 ### The apex caveat
 
@@ -483,11 +517,19 @@ Website
   Booking screens  today's home / results / detail / checkout editors
 ```
 
-`CUSTOM_HOSTNAME_TARGET` is read from the environment and is deliberately NOT
-pinned in `wrangler.jsonc` `vars` — it isn't chosen yet, and an empty pinned var
-re-applies on every deploy and would wipe a dashboard value. While it is unset,
-the General page says custom domains aren't available rather than printing a
-target that wouldn't work.
+Custom-domain config, and where each value lives:
+
+| Value | Where | Why |
+|---|---|---|
+| `CUSTOM_HOSTNAME_TARGET` | `wrangler.jsonc` `vars` | Now that it's chosen, pinning is safer than a dashboard var — a plaintext var not listed in `vars` is dropped on the next deploy |
+| `OWN_HOSTS` | `wrangler.jsonc` `vars` | The marketing hostnames on our zone, so no hotel can claim one |
+| `CLOUDFLARE_API_TOKEN` | dashboard **secret** | Needs `SSL and Certificates: Edit` on the zone |
+| `CLOUDFLARE_ZONE_ID` | dashboard **secret** | Not really secret, but secrets survive deploys and losing it would strand every pending domain |
+
+While the target is unset the General page says custom domains aren't available
+rather than printing a target that wouldn't work; while the API credentials are
+unset it says activation isn't set up, rather than accepting a domain that would
+never serve anything.
 
 The section editor is the bulk of the UI work: add, reorder, hide, and a
 settings form per section type, times 14 types, times 8 locales for the copy.

@@ -8,6 +8,7 @@ import { getConfig, getConfigKV } from "./config.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { isSuperadmin } from "./users.server";
 import { releaseDomain } from "./domains.server";
+import { deleteCustomHostname } from "./custom-hostnames.server";
 
 export interface PropertyRef {
   id: string;
@@ -296,7 +297,12 @@ export async function removeProperty(id: string): Promise<void> {
   // index is global, so a leftover entry would both keep the domain
   // unclaimable by anyone else and point guests at a property that now 404s.
   // (The property's own KV and R2 data still survives removal — separate issue.)
-  await releaseDomain(id, (await getSettings(id)).websiteDomain).catch(() => {});
+  const domain = (await getSettings(id)).websiteDomain;
+  const released = await releaseDomain(id, domain).catch(() => false);
+  // Deregister at the edge too, but only on the index's word that the hostname
+  // was ours: a stored domain can name one this property never held, and deleting
+  // on that basis would take the real holder's site down.
+  if (released && domain) await deleteCustomHostname(domain).catch(() => {});
   await write((await getProperties()).filter((p) => p.id !== id));
 }
 

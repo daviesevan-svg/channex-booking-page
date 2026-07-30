@@ -21,6 +21,8 @@
 	//      STRIPE_CONNECT_CLIENT_ID, STRIPE_PLATFORM_FEE_BPS, OPEN_CHANNEL_API_KEY,
 	//      GOOGLE_MAP_KEY, GOOGLE_ARI_PARTNER_KEY, GOOGLE_VR_PARTNER_KEY,
 	//      GOOGLE_ARI_PROXY_KEY, GROUP_ID,
+	//      CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID (both kept as secrets so a
+	//      deploy can't drop them and strand every pending custom domain),
 	//      GOOGLE_TRAVELPARTNER_ACCOUNT_ID / _SA_EMAIL / _SA_PRIVATE_KEY, and
 	//      ADMIN_EMAILS / SUPERADMIN_EMAILS (this repo is public, so admin emails stay
 	//      in the dashboard). (GOOGLE_ARI_BASE_URL is a non-secret proxy URL, pinned
@@ -38,6 +40,14 @@
 		"PCI_URL": "https://pci.vaultera.co",
 		"ALLOW_LIVE_BOOKING": "false",
 		"APP_URL": "https://book.roompanda.com",
+		// Custom domains (Cloudflare for SaaS). The CNAME target hotels point their
+		// own domain at, and our own hostnames on the same zone — the marketing site
+		// lives on the apex, and a wildcard Worker route means requests for it can
+		// reach this Worker, so it must never be claimable as a hotel's domain.
+		// Pinned rather than dashboard-only: a plaintext dashboard var not listed
+		// here is dropped on the next deploy.
+		"CUSTOM_HOSTNAME_TARGET": "customers.roompanda.com",
+		"OWN_HOSTS": "roompanda.com,www.roompanda.com",
 		// Transactional email (SparkPost). Sender + region host are not secret; the
 		// API key stays a dashboard secret. EU account → the .eu host.
 		"EMAIL_FROM": "Bookings <noreply@roompanda.com>",

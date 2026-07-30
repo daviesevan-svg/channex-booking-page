@@ -19,11 +19,29 @@ import { normalizeDomain, sameHost, type DnsVerdict } from "./domains";
 // the same time would silently drop one of them. Per-key writes cannot collide.
 //
 // The index is derived state: `settings.websiteDomain` is the source of truth.
-// It is maintained on save rather than rebuilt on read, and `claimDomain`
-// releases the previous hostname so a rename cannot leave a stale entry
-// pointing at a property that no longer answers for it.
+// It is maintained on save rather than rebuilt on read, and a rename releases the
+// previous hostname so it cannot leave a stale entry pointing at a property that
+// no longer answers for it.
+//
+// TWO keys per hostname, with different meanings:
+//
+//   domain:{host}        this property IS served here. Read on the request path.
+//   domain-setup:{host}  this property is ALLOWED to set this hostname up.
+//
+// The split exists because typing a domain into a form proves nothing. A save
+// takes the setup reservation; the live key is only written once Cloudflare
+// confirms the hotel controls the hostname (see custom-hostnames.server.ts).
+// Without the reservation, two properties could both enter the same domain and
+// whichever polled first after the real owner added the TXT record would win it —
+// so the reservation is what makes the ownership proof land on the right tenant.
 
 const domainKey = (host: string) => `domain:${host}`;
+const SETUP_PREFIX = "domain-setup:";
+const setupKey = (host: string) => `${SETUP_PREFIX}${host}`;
+
+/** A reservation lapses if ownership is never proven, so an abandoned attempt
+ *  can't park a domain nobody can then claim. Saving again renews it. */
+const SETUP_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 /** The property serving `hostname`, or null if no hotel has claimed it. */
 export async function propertyIdForHost(hostname: string): Promise<string | null> {
@@ -107,70 +125,116 @@ export type ClaimResult =
   | { ok: false; reason: "taken"; propertyId: string };
 
 /**
- * Point `domain` at `pid`, releasing `previous` if the hotel is renaming.
+ * Write `key` = `pid`, refusing if another property already holds it.
  *
- * Pass an empty `domain` to only release. A hostname can serve exactly one
- * property — letting two claim it would make which hotel a guest sees depend on
- * KV read order.
+ * KV has no compare-and-swap, so the pre-check is a read-then-write with a
+ * window: two properties claiming the same free hostname at the same moment both
+ * see it unowned and both write. Re-read afterwards and only report success if we
+ * are the one that stuck — otherwise the loser's settings would record a domain
+ * the index points somewhere else.
  */
-export async function claimDomain(
-  pid: string,
-  domain: string,
-  previous?: string,
-): Promise<ClaimResult> {
+async function claimKey(key: string, pid: string, ttl?: number): Promise<ClaimResult> {
   const kv = getConfigKV();
-  const host = normalizeDomain(domain);
-  const old = normalizeDomain(previous ?? "");
-
-  if (host && isOwnHost(host)) return { ok: false, reason: "own_host" };
-  if (host) {
-    const owner = kv ? await kv.get(domainKey(host)) : null;
-    if (owner && owner !== pid) return { ok: false, reason: "taken", propertyId: owner };
-  }
   if (!kv) return { ok: true };
-
-  // Release first, then claim. The reverse order would briefly leave the old
-  // hostname pointing here after the new one already does, and a crash between
-  // the two would strand it that way permanently.
-  //
-  // `previous` is caller-supplied and MUST NOT be trusted: only drop the old
-  // entry when it actually points at this property. Without that check, passing
-  // someone else's hostname as `previous` deletes their claim — their site goes
-  // dark and the domain becomes claimable by anyone. That was reachable through
-  // cloneProperty, which copied `websiteDomain` onto the clone, so editing the
-  // clone's domain released the original's live one.
-  if (old && old !== host && (await kv.get(domainKey(old))) === pid) {
-    await kv.delete(domainKey(old));
-  }
-
-  if (host) {
-    await kv.put(domainKey(host), pid);
-    // KV has no compare-and-swap, so the check above is a read-then-write with a
-    // window: two properties claiming the same free hostname at the same moment
-    // both see it unowned and both write. Re-read and only report success if we
-    // are the one that stuck — otherwise the loser's settings would record a
-    // domain the index points somewhere else.
-    const settled = await kv.get(domainKey(host));
-    if (settled && settled !== pid) {
-      return { ok: false, reason: "taken", propertyId: settled };
-    }
-  }
+  const owner = await kv.get(key);
+  if (owner && owner !== pid) return { ok: false, reason: "taken", propertyId: owner };
+  await kv.put(key, pid, ttl ? { expirationTtl: ttl } : undefined);
+  const settled = await kv.get(key);
+  if (settled && settled !== pid) return { ok: false, reason: "taken", propertyId: settled };
   return { ok: true };
 }
 
 /**
- * Drop `pid`'s claim on `domain` — used when the property itself is removed.
+ * Reserve `domain` for `pid` so it can be set up — NOT yet served.
  *
- * Scoped to the owner for the same reason as `claimDomain`: a property's stored
- * `websiteDomain` can name a hostname it does not actually hold (a clone used to
- * inherit one), and deleting on the strength of that would take the real
- * holder's site down.
+ * Refuses a hostname another property is already serving or already setting up.
+ * Serving starts at `activateDomain`, once ownership is proven.
  */
-export async function releaseDomain(pid: string, domain: string | undefined): Promise<void> {
+export async function claimDomainSetup(pid: string, domain: string): Promise<ClaimResult> {
+  const host = normalizeDomain(domain);
+  if (!host) return { ok: true };
+  if (isOwnHost(host)) return { ok: false, reason: "own_host" };
+  const kv = getConfigKV();
+  // A hostname someone else is live on is taken regardless of reservations.
+  const live = kv ? await kv.get(domainKey(host)) : null;
+  if (live && live !== pid) return { ok: false, reason: "taken", propertyId: live };
+  return claimKey(setupKey(host), pid, SETUP_TTL_SECONDS);
+}
+
+/**
+ * Start serving `domain` from `pid`. Call this ONLY with proof of ownership.
+ *
+ * A hostname can serve exactly one property — letting two claim it would make
+ * which hotel a guest sees depend on KV read order.
+ */
+export async function activateDomain(pid: string, domain: string): Promise<ClaimResult> {
+  const host = normalizeDomain(domain);
+  if (!host) return { ok: true };
+  if (isOwnHost(host)) return { ok: false, reason: "own_host" };
+  const kv = getConfigKV();
+  // The reservation is what ties the proof to a tenant: Cloudflare verifies the
+  // DOMAIN, not who asked, so without this any property could ride on the real
+  // owner's TXT record by polling first.
+  const reserved = kv ? await kv.get(setupKey(host)) : null;
+  const live = kv ? await kv.get(domainKey(host)) : null;
+  if (reserved && reserved !== pid) return { ok: false, reason: "taken", propertyId: reserved };
+  // Claims made before this gate existed have a live key and no reservation;
+  // they stay valid rather than needing every hotel to re-verify.
+  if (!reserved && live !== pid) return { ok: false, reason: "taken", propertyId: live ?? "" };
+  return claimKey(domainKey(host), pid);
+}
+
+/** Who is allowed to set `hostname` up, if anyone. */
+export async function domainSetupOwner(hostname: string): Promise<string | null> {
+  const host = normalizeDomain(hostname);
+  const kv = getConfigKV();
+  if (!host || !kv) return null;
+  return (await kv.get(setupKey(host))) || null;
+}
+
+/**
+ * Drop `pid`'s claim on `domain`, live and reserved. Returns true if anything was
+ * actually removed — the caller uses that as its authority to tear down the
+ * Cloudflare hostname too.
+ *
+ * Scoped to the owner deliberately: a property's stored `websiteDomain` can name
+ * a hostname it does not actually hold (a clone used to inherit one), and
+ * deleting on the strength of that would take the real holder's site down.
+ */
+export async function releaseDomain(pid: string, domain: string | undefined): Promise<boolean> {
   const host = normalizeDomain(domain ?? "");
   const kv = getConfigKV();
-  if (!host || !kv) return;
-  if ((await kv.get(domainKey(host))) === pid) await kv.delete(domainKey(host));
+  if (!host || !kv) return false;
+  let released = false;
+  for (const key of [domainKey(host), setupKey(host)]) {
+    if ((await kv.get(key)) === pid) {
+      await kv.delete(key);
+      released = true;
+    }
+  }
+  return released;
+}
+
+/**
+ * Hostnames reserved by a property but not yet live — what the cron re-checks.
+ *
+ * Bounded by `limit`: this runs on a schedule, and an unbounded scan would grow
+ * with the tenant count until it ate the cron's time budget.
+ */
+export async function pendingDomainSetups(
+  limit = 100,
+): Promise<{ host: string; propertyId: string }[]> {
+  const kv = getConfigKV();
+  if (!kv) return [];
+  const listed = await kv.list({ prefix: SETUP_PREFIX, limit });
+  const out: { host: string; propertyId: string }[] = [];
+  for (const key of listed.keys) {
+    const host = key.name.slice(SETUP_PREFIX.length);
+    if (!host) continue;
+    const [propertyId, live] = await Promise.all([kv.get(key.name), kv.get(domainKey(host))]);
+    if (propertyId && !live) out.push({ host, propertyId });
+  }
+  return out;
 }
 
 const DOH_URL = "https://cloudflare-dns.com/dns-query";
