@@ -35,6 +35,7 @@ import {
   setGiftRecipientEmail,
 } from "~/lib/vouchers.server";
 import { sendVoucherCancelEmails, sendVoucherReminderEmail } from "~/lib/voucher-purchase.server";
+import { basePath, useBase } from "~/lib/base";
 
 /** Voucher owned by the signed-in buyer, or a redirect back to the login. */
 async function requireOwnVoucher(
@@ -42,12 +43,12 @@ async function requireOwnVoucher(
   channelId: string,
   code: string,
 ): Promise<{ pid: string; email: string; v: VoucherRecord }> {
-  const base = `/${channelId}/manage`;
+  const manageUrl = `${basePath(channelId)}/manage`;
   const email = await getGuestEmail(request);
-  if (!email) throw redirect(base);
+  if (!email) throw redirect(manageUrl);
   const pid = await resolvePropertyId(channelId);
   const v = await lookupVoucherGuarded(pid, code, request);
-  if (v === "limited" || !v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(base);
+  if (v === "limited" || !v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(manageUrl);
   return { pid, email, v };
 }
 
@@ -171,6 +172,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function ManageVoucher({ loaderData, actionData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { voucher: v, canCancel, cancelReason, cancelBy, canRemind } = loaderData;
   const tr = useT();
   const { currency } = useProperty();
@@ -190,7 +192,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
   return (
     <main className="mx-auto max-w-[760px] px-7 pb-20 pt-12">
       <Link
-        to={`/${params.channelId}/manage`}
+        to={`${base}/manage`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("manageVouchersTitle")}
@@ -251,7 +253,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
           )}
 
           <div className="mt-4 border-t border-divider pt-4 text-caption">
-            <Link to={`/${params.channelId}/voucher/${v.code}`} className="font-semibold text-accent hover:text-accent-deep">
+            <Link to={`${base}/voucher/${v.code}`} className="font-semibold text-accent hover:text-accent-deep">
               {tr.t("manageVoucherOpen")} →
             </Link>
           </div>

@@ -59,7 +59,6 @@ export default function WebsitePage({ loaderData, params }: Route.ComponentProps
         sections={page.sections}
         data={data}
         tr={tr}
-        channelId={params.channelId}
         hotelName={hotelName}
       />
     </main>

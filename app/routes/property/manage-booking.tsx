@@ -18,6 +18,7 @@ import { cancellationMessage } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
+import { basePath, useBase } from "~/lib/base";
 
 async function ownedBooking(channelId: string, id: string, request: Request) {
   const email = await getGuestEmail(request);
@@ -46,10 +47,11 @@ function cancelState(
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   // :channelId may be a slug — resolve to the real id for data; redirects keep it.
   const pid = await resolvePropertyId(params.channelId);
   const booking = await ownedBooking(pid, params.id, request);
-  if (!booking) throw redirect(`/${params.channelId}/manage`);
+  if (!booking) throw redirect(`${base}/manage`);
 
   const settings = await getSettings(pid);
   const { canCancel, reason } = cancelState(booking, Boolean(settings.allowCancel));
@@ -62,9 +64,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const base = basePath(params.channelId);
   const pid = await resolvePropertyId(params.channelId);
   const booking = await ownedBooking(pid, params.id, request);
-  if (!booking) throw redirect(`/${params.channelId}/manage`);
+  if (!booking) throw redirect(`${base}/manage`);
 
   const form = await request.formData();
   if (form.get("intent") === "cancel") {
@@ -100,7 +103,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       await dispatchWebhook(pid, "booking.cancelled", serializeBooking(finalBooking), Date.now());
     }
   }
-  return redirect(`/${params.channelId}/manage/${params.id}`);
+  return redirect(`${base}/manage/${params.id}`);
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -117,6 +120,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 export default function ManageBooking({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { booking: b, canCancel, cancelReason, afterDeadlineMessage } = loaderData;
   const tr = useT();
   const { currency } = useProperty();
@@ -142,7 +146,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">
       <Link
-        to={`/${params.channelId}/manage`}
+        to={`${base}/manage`}
         className="mb-4 inline-block text-caption font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("yourBookings")}

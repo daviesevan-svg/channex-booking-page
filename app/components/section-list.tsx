@@ -26,12 +26,12 @@ import {
 import type { Translator } from "~/lib/i18n";
 import type { SectionData } from "~/lib/section-data";
 import { numberSetting, settingOf, type ResolvedSection } from "~/lib/sections";
+import { useBase } from "~/lib/base";
 
 export function SectionList({
   sections,
   data,
   tr,
-  channelId,
   hotelName,
   hero,
   highlights = [],
@@ -39,13 +39,13 @@ export function SectionList({
   sections: ResolvedSection[];
   data: SectionData;
   tr: Translator;
-  channelId: string;
   hotelName: string;
   /** The home page's hero, already built. */
   hero?: React.ReactNode;
   /** The home page's three selling points, from Website → Home. */
   highlights?: { title: string; description: string }[];
 }) {
+  const base = useBase();
   const navigate = useNavigate();
 
   return (
@@ -66,7 +66,6 @@ export function SectionList({
                 section={section}
                 tr={tr}
                 rooms={data.rooms}
-                channelId={channelId}
               />
             );
           case "gallery":
@@ -107,7 +106,7 @@ export function SectionList({
                 section={section}
                 tr={tr}
                 hasVouchers={data.hasVouchers}
-                onOpen={() => navigate(`/${channelId}/vouchers`)}
+                onOpen={() => navigate(`${base}/vouchers`)}
               />
             );
           case "map":
@@ -137,7 +136,6 @@ export function SectionList({
                 // Nothing to deliver to: show the details and drop the form
                 // rather than accepting messages that go nowhere.
                 showForm={settingOf(section, "showForm", true) && data.contact.canReceive}
-                channelId={channelId}
                 tr={tr}
               />
             );

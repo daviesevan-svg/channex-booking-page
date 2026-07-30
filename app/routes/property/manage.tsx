@@ -15,6 +15,7 @@ import { resolvePropertyId } from "~/lib/properties.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const email = await getGuestEmail(request);
@@ -51,9 +52,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const base = basePath(params.channelId);
   const form = await request.formData();
   if (form.get("intent") === "logout") {
-    return guestLogout(request, `/${params.channelId}/manage`);
+    return guestLogout(request, `${base}/manage`);
   }
   const pid = await resolvePropertyId(params.channelId);
   // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
@@ -66,13 +68,13 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!reference || !email) return { notFound: true };
 
   const booking = await findBookingByRefAndEmail(pid, reference, email);
-  if (booking) return createGuestSession(email, `/${params.channelId}/manage`);
+  if (booking) return createGuestSession(email, `${base}/manage`);
 
   // Not a booking reference — maybe a voucher code (buyers of vouchers have no
   // booking). Same rule: the code must match together with the buyer's email.
   const voucher = await getVoucherByCode(pid, normalizeVoucherCode(reference)).catch(() => null);
   if (voucher && voucher.buyer.email.trim().toLowerCase() === email.toLowerCase()) {
-    return createGuestSession(email, `/${params.channelId}/manage`);
+    return createGuestSession(email, `${base}/manage`);
   }
   return { notFound: true };
 }
@@ -82,6 +84,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Manage({ loaderData, actionData, params }: Route.ComponentProps) {
+  const base = useBase();
   const tr = useT();
   const { currency } = useProperty();
   const nav = useNavigation();
@@ -133,7 +136,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
           {bookings.map((b, i) => (
             <Link
               key={b.id}
-              to={`/${params.channelId}/manage/${b.id}`}
+              to={`${base}/manage/${b.id}`}
               className={`flex items-center justify-between gap-4 px-6 py-5 hover:bg-field-hover ${
                 i > 0 ? "border-t border-divider" : ""
               }`}
@@ -166,7 +169,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
             {vouchers.map((v, i) => (
               <Link
                 key={v.code}
-                to={`/${params.channelId}/manage/voucher/${v.code}`}
+                to={`${base}/manage/voucher/${v.code}`}
                 className={`flex items-center justify-between gap-4 px-6 py-5 hover:bg-field-hover ${
                   i > 0 ? "border-t border-divider" : ""
                 }`}

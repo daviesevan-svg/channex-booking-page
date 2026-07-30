@@ -11,6 +11,7 @@ import { useFetcher } from "react-router";
 import type { Translator } from "~/lib/i18n";
 import { Diamond } from "~/components/sections";
 import { RichText } from "~/components/rich-text";
+import { useBase } from "~/lib/base";
 
 const FIELD =
   "mt-1.5 w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
@@ -28,14 +29,12 @@ export function ContactSection({
   intro,
   details,
   showForm,
-  channelId,
   tr,
 }: {
   heading: string;
   intro?: string;
   details: ContactDetails;
   showForm: boolean;
-  channelId: string;
   tr: Translator;
 }) {
   const hasDetails = Boolean(
@@ -89,7 +88,7 @@ export function ContactSection({
           </dl>
         )}
 
-        {showForm && <ContactForm channelId={channelId} tr={tr} />}
+        {showForm && <ContactForm tr={tr} />}
       </div>
     </div>
   );
@@ -120,7 +119,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
+function ContactForm({ tr }: { tr: Translator }) {
+  const base = useBase();
   const fetcher = useFetcher<{ ok?: true; error?: string }>();
   const sending = fetcher.state !== "idle";
   const result = fetcher.data;
@@ -151,7 +151,7 @@ function ContactForm({ channelId, tr }: { channelId: string; tr: Translator }) {
   return (
     <fetcher.Form
       method="post"
-      action={`/${channelId}/contact`}
+      action={`${base}/contact`}
       className="rounded-card-lg border border-line bg-surface p-6"
     >
       {/* Honeypot. Hidden from people, irresistible to bots; a filled value is

@@ -23,8 +23,10 @@ import { cancellationMessage } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
@@ -33,8 +35,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // and links keep params.channelId so the slug stays in the URL.
   const pid = await resolvePropertyId(params.channelId);
 
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`${base}`);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
 
   // Currency is the property's, not the URL param (no conversion exists).
   const settings = await getSettings(pid);
@@ -58,8 +60,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!room)
     throw redirect(
       settings.singleUnit
-        ? `/${params.channelId}?${url.searchParams.toString()}`
-        : `/${params.channelId}/rooms?${url.searchParams.toString()}`,
+        ? `${base}?${url.searchParams.toString()}`
+        : `${base}/rooms?${url.searchParams.toString()}`,
     );
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -203,6 +205,7 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 }
 
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
@@ -295,7 +298,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
     if (xt) next.set("xt", xt);
     else next.delete("xt");
     // The extras step redirects straight to results when the room has no add-ons.
-    navigate(`/${params.channelId}/extras?line=${targetIndex}&${next.toString()}`);
+    navigate(`${base}/extras?line=${targetIndex}&${next.toString()}`);
   }
 
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
@@ -306,7 +309,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <Link
-        to={singleUnit ? `/${params.channelId}?${qs}` : `/${params.channelId}/rooms?${qs}`}
+        to={singleUnit ? `${base}?${qs}` : `${base}/rooms?${qs}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {text.backLink}

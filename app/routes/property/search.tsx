@@ -21,6 +21,7 @@ import { settingOf } from "~/lib/sections";
 import { SectionList } from "~/components/section-list";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
+import { useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
@@ -65,6 +66,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { closedDates, content, earliestCheckin, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
@@ -142,7 +144,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     if (lang) qs.set("lang", lang);
     const promo = promoCode.trim();
     if (promo) qs.set("promo", promo);
-    navigate(`/${params.channelId}/rooms?${qs.toString()}`);
+    navigate(`${base}/rooms?${qs.toString()}`);
   }
 
   // The hero stays inline: it owns the search form's state (dates, guests,
@@ -272,7 +274,6 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         sections={sections}
         data={data}
         tr={tr}
-        channelId={params.channelId}
         hotelName={hotelName}
         hero={hero}
         highlights={highlights}

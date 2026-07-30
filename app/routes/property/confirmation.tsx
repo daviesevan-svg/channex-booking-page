@@ -16,8 +16,10 @@ import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "~/lib/extras";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
@@ -129,6 +131,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { reference, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
@@ -153,7 +156,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         </div>
         <div>
           <Link
-            to={`/${params.channelId}`}
+            to={`${base}`}
             className="inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
           >
             {text.newBooking}
@@ -291,7 +294,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
       </div>
 
       <Link
-        to={`/${params.channelId}`}
+        to={`${base}`}
         className="mt-7 inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
       >
         {text.newBooking}
