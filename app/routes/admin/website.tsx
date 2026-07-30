@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/website";
@@ -94,6 +94,20 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (op === "provision") return finishActivation(propertyId);
 
+  if (op === "removeDomain") {
+    // Acts on the SAVED domain, never on what's in the box — the hotel may have
+    // typed a replacement before deciding to remove the old one instead.
+    const saved = (await getSettings(propertyId)).websiteDomain ?? "";
+    const released = await releaseDomain(propertyId, saved);
+    // Same rule as everywhere else: only touch Cloudflare when the index agreed
+    // the hostname was ours.
+    if (released && saved) await deleteCustomHostname(saved).catch(() => {});
+    // Leaves `websiteEnabled` alone. Removing a domain means "serve this from the
+    // shared address again", not "switch my website off".
+    await patchSettings(propertyId, { websiteDomain: "" });
+    return { ok: true as const, removed: true as const };
+  }
+
   if (domain) {
     const err = domainError(domain, [safeHostname(config.appUrl)]);
     if (err) return { error: err };
@@ -187,6 +201,13 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
     loaderData.configured ? loaderData.websiteDomain : "",
   );
 
+  // Removing clears the field too. Without this the box keeps the domain it just
+  // deleted, so the page shows a DNS record for a domain we no longer serve.
+  const removed = Boolean(actionData && "removed" in actionData && actionData.removed);
+  useEffect(() => {
+    if (removed) setTyped("");
+  }, [removed]);
+
   if (!loaderData.configured) {
     return (
       <div className="rounded-[14px] border border-line bg-surface p-6">
@@ -219,7 +240,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
         <h1 className="font-serif text-[26px] font-semibold">{t("webTitle")}</h1>
         {actionData && "ok" in actionData && (
           <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
+            {removed ? t("webDomainRemoved") : t("saved")}
           </span>
         )}
       </div>
@@ -318,6 +339,32 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
               busy={busy}
               t={t}
             />
+          )}
+
+          {/* Only once a domain is actually saved — there is nothing to remove
+              before that, and emptying the box is not a discoverable delete. */}
+          {websiteDomain && (
+            <div className="mt-5 flex flex-wrap items-baseline gap-3 border-t border-divider pt-4">
+              <button
+                type="submit"
+                name="op"
+                value="removeDomain"
+                disabled={busy}
+                // Confirm on the button, not the Form: this Form has three other
+                // submits, and an onSubmit guard would interrogate all of them.
+                onClick={(e) => {
+                  if (!confirm(t("webDomainRemoveConfirm", { domain: websiteDomain }))) {
+                    e.preventDefault();
+                  }
+                }}
+                className="cursor-pointer rounded-[9px] border border-red-200 px-4 py-2 text-[13px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+              >
+                {t("webDomainRemove")}
+              </button>
+              <span className="text-[12px] text-faint">
+                {t("webDomainRemoveHint", { address })}
+              </span>
+            </div>
           )}
         </div>
 
