@@ -467,14 +467,31 @@ hostname:
 | `domain-setup:{host}` | this property may set the hostname up | on save (30-day TTL) |
 | `domain:{host}` | this property **is served** here | once Cloudflare reports the hostname `active` |
 
-Cloudflare marks a custom hostname active only once it either CNAMEs into our
-zone or carries the ownership TXT record Cloudflare issued — both require control
-of the domain. The reservation is what ties that proof to a tenant: Cloudflare
-verifies the *domain*, not who asked, so without it any property could ride on
-the real owner's TXT record by polling first.
+Cloudflare marks a custom hostname active only once the hostname CNAMEs into our
+zone (or carries an ownership TXT it issued) — either way that requires control of
+the domain. The reservation is what ties that proof to a tenant: Cloudflare
+verifies the *domain*, not who asked, so without it any property could ride on the
+real owner's proof by polling first.
 
 Activation runs from the admin's "Check status" button **and** from the 6-hourly
-cron, because hotels add their DNS records and don't come back to the page.
+cron, because hotels add their DNS record and don't come back to the page.
+
+**One record, not three.** The hotel adds the traffic CNAME and nothing else:
+ownership validates from that CNAME, and the certificate uses automatic HTTP DCV
+(`ssl.method: "http"`), where Cloudflare serves the CA's token from the edge.
+
+The accepted cost (Evan, 2026-07-30): the certificate can only be issued *after*
+the CNAME points here, so there is a window — usually minutes — where the hotel's
+domain resolves to us without a valid cert and browsers warn. Removing it means
+asking every hotel for a second record, and one beats two when the domain being
+pointed at us isn't live yet.
+
+**When to revisit:** a hotel migrating an already-live domain. For them that
+window is a real outage, not a blank domain, and they need pre-validation —
+either the ownership TXT plus a cert TXT, or better,
+[delegated DCV](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/security/certificate-management/issue-and-validate/validate-certificates/delegated-dcv/):
+a permanent `_acme-challenge` CNAME that also makes renewals automatic. Add it as
+an "already have a live site?" path, not as everyone's default.
 
 **The CNAME target 301s to the canonical host.** The wildcard route means
 `customers.roompanda.com` reaches this Worker like any other hostname, so visiting
@@ -500,10 +517,11 @@ almost everyone and costs nothing.
 
 ### Two gotchas from the docs
 
-- **Don't use CNAME validation.** Cloudflare recommends TXT or HTTP
-  pre-validation instead: with CNAME validation, traffic can reach the edge
-  before the certificate issues, and the guest gets a TLS warning on the hotel's
-  own domain. Pre-validate, *then* have them cut DNS over.
+- **CNAME validation trades a TLS window for a simpler ask.** Cloudflare
+  recommends TXT or HTTP pre-validation because with CNAME validation traffic can
+  reach the edge before the certificate issues, and the guest gets a TLS warning
+  on the hotel's own domain. We took that trade knowingly — see "One record, not
+  three" above for the reasoning and the condition that should reverse it.
 - **Never create a custom hostname equal to our own zone name.**
 
 ---
