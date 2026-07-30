@@ -469,6 +469,19 @@ const EL: Dict = {
   requestsPlaceholder: "Ήσυχο δωμάτιο, πρόωρη άφιξη, ό,τι πρέπει να γνωρίζουμε…",
   paymentStartFailed: "Δεν μπορέσαμε να ξεκινήσουμε την ασφαλή πληρωμή αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο — αν συνεχιστεί, επικοινωνήστε μαζί μας και θα σας βοηθήσουμε να ολοκληρώσετε την κράτηση.",
   paymentNotConfigured: "Αυτή η τιμή απαιτεί ηλεκτρονική πληρωμή, αλλά οι πληρωμές με κάρτα δεν έχουν ρυθμιστεί ακόμη για αυτό το κατάλυμα. Επικοινωνήστε μαζί μας για να ολοκληρώσετε την κράτηση.",
+
+  // Stripe's hosted payment page: product summary, submit-button message and
+  // the payment-intent description that reaches the guest's receipt
+  yourBookingFallback: "Η κράτησή σας",
+  moreRooms_one: "{n} επιπλέον δωμάτιο",
+  moreRooms_other: "{n} επιπλέον δωμάτια",
+  stripeRef: "κωδ. {ref}",
+  stripeVoucherNote: "{amount} καλύπτονται από τη δωροεπιταγή {code}.",
+  stripeDepositNote: "Προκαταβολή τώρα — υπόλοιπο {balance} πληρωτέο στο κατάλυμα.",
+  stripePaidInFull: "Η διαμονή σας έχει εξοφληθεί.",
+  stripeSubmitDeposit: "Πληρώνετε τώρα {due} για να εξασφαλίσετε τη διαμονή σας στο {hotel}· {balance} πληρώνονται στο κατάλυμα.",
+  stripeSubmitFull: "Πληρώνετε {due} για τη διαμονή σας στο {hotel}.",
+  stripeSubmitGuarantee: "Αποθηκεύουμε την κάρτα σας για να εξασφαλίσουμε τη διαμονή σας στο {hotel} ({room}, {dates}). Δεν θα χρεωθείτε τώρα — η πληρωμή γίνεται στο κατάλυμα.",
 };
 
 export default EL;

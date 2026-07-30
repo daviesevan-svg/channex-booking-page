@@ -481,6 +481,19 @@ const NL: Dict = {
   requestsPlaceholder: "Rustige kamer, vroeg inchecken, alles wat we moeten weten…",
   paymentStartFailed: "We konden de beveiligde betaling nu niet starten. Probeer het over een moment opnieuw — als het blijft gebeuren, neem contact met ons op en we helpen u de boeking af te ronden.",
   paymentNotConfigured: "Voor dit tarief is een online betaling nodig, maar kaartbetalingen zijn nog niet ingesteld voor deze accommodatie. Neem contact met ons op om de boeking af te ronden.",
+
+  // Stripe's hosted payment page: product summary, submit-button message and
+  // the payment-intent description that reaches the guest's receipt
+  yourBookingFallback: "Uw boeking",
+  moreRooms_one: "{n} kamer extra",
+  moreRooms_other: "{n} kamers extra",
+  stripeRef: "ref. {ref}",
+  stripeVoucherNote: "{amount} gedekt door cadeaubon {code}.",
+  stripeDepositNote: "Aanbetaling nu te betalen — restbedrag van {balance} te betalen in het hotel.",
+  stripePaidInFull: "Uw verblijf is volledig betaald.",
+  stripeSubmitDeposit: "U betaalt nu {due} om uw verblijf bij {hotel} vast te leggen; {balance} betaalt u in het hotel.",
+  stripeSubmitFull: "U betaalt {due} voor uw verblijf bij {hotel}.",
+  stripeSubmitGuarantee: "We bewaren uw kaart om uw verblijf bij {hotel} te garanderen ({room}, {dates}). Er wordt nu niets afgeschreven — betaling gebeurt in het hotel.",
 };
 
 export default NL;
