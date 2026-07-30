@@ -480,6 +480,19 @@ const EN: Dict = {
   requestsPlaceholder: "Quiet room, early check-in, anything we should know…",
   paymentStartFailed: "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking.",
   paymentNotConfigured: "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking.",
+
+  // Stripe's hosted payment page: product summary, submit-button message and
+  // the payment-intent description that reaches the guest's receipt
+  yourBookingFallback: "Your booking",
+  moreRooms_one: "{n} more room",
+  moreRooms_other: "{n} more rooms",
+  stripeRef: "ref {ref}",
+  stripeVoucherNote: "{amount} covered by gift voucher {code}.",
+  stripeDepositNote: "Deposit due now — {balance} balance payable at the hotel.",
+  stripePaidInFull: "Your stay is paid in full.",
+  stripeSubmitDeposit: "Paying {due} now to secure your stay at {hotel}; {balance} is due at the hotel.",
+  stripeSubmitFull: "Paying {due} for your stay at {hotel}.",
+  stripeSubmitGuarantee: "Saving your card to guarantee your stay at {hotel} ({room}, {dates}). You won’t be charged now — payment is taken at the hotel.",
 };
 
 export default EN;

@@ -470,6 +470,19 @@ const PT: Dict = {
   requestsPlaceholder: "Quarto tranquilo, entrada antecipada, tudo o que devamos saber…",
   paymentStartFailed: "Não foi possível iniciar o pagamento seguro neste momento. Tente novamente dentro de instantes — se continuar a acontecer, contacte-nos e ajudamos a concluir a sua reserva.",
   paymentNotConfigured: "Esta tarifa exige pagamento online, mas os pagamentos com cartão ainda não estão configurados para este alojamento. Contacte-nos para concluir a sua reserva.",
+
+  // Stripe's hosted payment page: product summary, submit-button message and
+  // the payment-intent description that reaches the guest's receipt
+  yourBookingFallback: "A sua reserva",
+  moreRooms_one: "{n} quarto adicional",
+  moreRooms_other: "{n} quartos adicionais",
+  stripeRef: "ref. {ref}",
+  stripeVoucherNote: "{amount} coberto pelo voucher {code}.",
+  stripeDepositNote: "Depósito a pagar agora — saldo de {balance} a pagar no hotel.",
+  stripePaidInFull: "A sua estadia está totalmente paga.",
+  stripeSubmitDeposit: "Vai pagar {due} agora para garantir a sua estadia em {hotel}; {balance} são pagos no hotel.",
+  stripeSubmitFull: "Vai pagar {due} pela sua estadia em {hotel}.",
+  stripeSubmitGuarantee: "Guardamos o seu cartão para garantir a sua estadia em {hotel} ({room}, {dates}). Nada será cobrado agora — o pagamento é feito no hotel.",
 };
 
 export default PT;

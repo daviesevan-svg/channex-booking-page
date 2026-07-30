@@ -147,6 +147,37 @@ export interface CheckoutSession {
   customer?: string | { id: string };
 }
 
+/**
+ * Locales Stripe's hosted Checkout accepts, verbatim from their API reference.
+ *
+ * An allowlist rather than passing our language straight through, because Stripe
+ * REJECTS an unknown locale and the session never gets created — the guest simply
+ * cannot pay. Every guest language we ship today happens to be on this list, but
+ * adding one that isn't (Welsh is a live possibility for a hotel in Wales) would
+ * otherwise break checkout for that property with no obvious cause.
+ */
+const STRIPE_LOCALES = new Set([
+  "bg", "cs", "da", "de", "el", "en", "en-GB", "es", "es-419", "et", "fi", "fil",
+  "fr", "fr-CA", "hr", "hu", "id", "it", "ja", "ko", "lt", "lv", "ms", "mt", "nb",
+  "nl", "pl", "pt", "pt-BR", "ro", "ru", "sk", "sl", "sv", "th", "tr", "vi", "zh",
+  "zh-HK", "zh-TW",
+]);
+
+/**
+ * A guest language as a Stripe `locale`, or "auto" when Stripe has no such locale.
+ *
+ * "auto" is Stripe's default and means the BROWSER's language — which is why this
+ * has to be passed explicitly: a guest reading the site in German on an
+ * English-language browser was getting an English payment page.
+ */
+export function stripeLocale(lang: string): string {
+  const l = (lang || "").trim();
+  if (STRIPE_LOCALES.has(l)) return l;
+  // Fall back from a region to its base language ("de-AT" -> "de") before giving up.
+  const base = l.split("-")[0];
+  return STRIPE_LOCALES.has(base) ? base : "auto";
+}
+
 /** Create a Checkout Session on a connected account. `params` is passed through
  *  to Stripe form-encoded, so nested objects/arrays use the documented shape. */
 export function createCheckoutSession(
