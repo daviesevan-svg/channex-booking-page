@@ -40,6 +40,7 @@ import { loader as ratesLoader } from "./api.v1.rates";
 import { loader as extrasLoader } from "./api.v1.extras";
 import { loader as bookingLoader } from "./api.v1.bookings.$id";
 import { action as bookingsAction } from "./api.v1.bookings";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
 /** The shape every /v1 handler actually uses. Their generated arg types carry
  *  router context we neither have nor need, so dispatch through this. */
@@ -126,6 +127,8 @@ async function handleRpc(request: Request, req: RpcRequest) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  // Never on a hotel's custom domain — the tool descriptor is served before any key check.
+  requireCanonicalHost(request);
   if (request.method !== "POST") {
     return Response.json(rpcError(null, RPC_ERRORS.invalidRequest, "Use POST."), { status: 405 });
   }
@@ -164,7 +167,10 @@ export async function action({ request }: Route.ActionArgs) {
 
 /** A GET is how some clients probe the endpoint; answer with something useful
  *  rather than a router 404. */
-export function loader() {
+export function loader({ request }: Route.LoaderArgs) {
+  // Unauthenticated, so it needs the host gate in its own right — otherwise this
+  // descriptor advertises our platform from every hotel's own domain.
+  requireCanonicalHost(request);
   return Response.json({
     protocol: "mcp",
     protocolVersion: PROTOCOL_VERSION,

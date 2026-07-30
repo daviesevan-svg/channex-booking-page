@@ -2,8 +2,11 @@
 // Registered at /feeds/google-hotels.xml in routes.ts. Resource route: a loader
 // returning a Response, no component.
 import { buildHotelListFeed } from "~/lib/hotel-list-feed.server";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
+  // Our feed, not the hotel's — don't serve it from their domain.
+  requireCanonicalHost(request);
   const xml = await buildHotelListFeed();
   return new Response(xml, {
     headers: {

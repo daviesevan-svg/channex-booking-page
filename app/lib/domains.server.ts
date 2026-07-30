@@ -37,15 +37,67 @@ export async function propertyIdForHost(hostname: string): Promise<string | null
   return (await kv.get(domainKey(host))) || null;
 }
 
-/** True when `host` is an address of ours rather than a hotel's own domain. */
+/**
+ * True when `host` is an address of ours rather than a hotel's own domain.
+ *
+ * Covers the app's own hostname, the CNAME target hotels point at (claiming the
+ * fallback origin itself would be a self-inflicted outage), Workers preview
+ * URLs, and localhost.
+ *
+ * Deliberately NOT "anything under our registrable domain". Deriving that from
+ * `book.roompanda.com` means taking the last two labels, which is right for
+ * .com and catastrophically wrong for a .co.uk app hostname — it would reject
+ * every hotel domain in the UK. Extra hosts of ours belong in OWN_HOSTS, listed
+ * explicitly, rather than guessed with a heuristic that has no public suffix
+ * list behind it.
+ */
 export function isOwnHost(host: string): boolean {
   const h = normalizeDomain(host);
-  if (!h || h === "localhost" || h.endsWith(".localhost")) return true;
+  if (!h) return true;
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  if (h.endsWith(".workers.dev")) return true;
+  const config = getConfig();
+  const own = new Set<string>();
   try {
-    return h === normalizeDomain(new URL(getConfig().appUrl).hostname);
+    own.add(normalizeDomain(new URL(config.appUrl).hostname));
   } catch {
-    return false;
+    /* malformed APP_URL — fall through to the rest */
   }
+  if (config.customHostnameTarget) own.add(normalizeDomain(config.customHostnameTarget));
+  for (const extra of (config.ownHosts ?? "").split(",")) {
+    const e = normalizeDomain(extra);
+    if (e) own.add(e);
+  }
+  own.delete("");
+  return own.has(h);
+}
+
+/**
+ * Refuse to serve this request unless it arrived on one of our own hostnames.
+ *
+ * The Cloudflare for SaaS setup routes EVERY custom hostname to this Worker
+ * through a single wildcard Worker route, so without this the admin panel, /v1,
+ * /mcp and the feeds are all reachable at `https://www.anyhotel.co.uk/admin` —
+ * our login
+ * form served on a domain the hotel (and their DNS provider, and anyone able to
+ * tamper with their zone) controls. That is a credential-phishing surface handed
+ * to every tenant.
+ *
+ * 404 rather than a redirect: a redirect would confirm the path exists and hand
+ * over the canonical URL, and there is no legitimate reason for these routes to
+ * be discoverable on a hotel's domain at all.
+ *
+ * Guest routes deliberately do NOT call this — serving them on a hotel's own
+ * hostname is the entire feature.
+ */
+export function requireCanonicalHost(request: Request): void {
+  let host = "";
+  try {
+    host = new URL(request.url).hostname;
+  } catch {
+    throw new Response("Not found", { status: 404 });
+  }
+  if (!isOwnHost(host)) throw new Response("Not found", { status: 404 });
 }
 
 export type ClaimResult =
@@ -80,16 +132,45 @@ export async function claimDomain(
   // Release first, then claim. The reverse order would briefly leave the old
   // hostname pointing here after the new one already does, and a crash between
   // the two would strand it that way permanently.
-  if (old && old !== host) await kv.delete(domainKey(old));
-  if (host) await kv.put(domainKey(host), pid);
+  //
+  // `previous` is caller-supplied and MUST NOT be trusted: only drop the old
+  // entry when it actually points at this property. Without that check, passing
+  // someone else's hostname as `previous` deletes their claim — their site goes
+  // dark and the domain becomes claimable by anyone. That was reachable through
+  // cloneProperty, which copied `websiteDomain` onto the clone, so editing the
+  // clone's domain released the original's live one.
+  if (old && old !== host && (await kv.get(domainKey(old))) === pid) {
+    await kv.delete(domainKey(old));
+  }
+
+  if (host) {
+    await kv.put(domainKey(host), pid);
+    // KV has no compare-and-swap, so the check above is a read-then-write with a
+    // window: two properties claiming the same free hostname at the same moment
+    // both see it unowned and both write. Re-read and only report success if we
+    // are the one that stuck — otherwise the loser's settings would record a
+    // domain the index points somewhere else.
+    const settled = await kv.get(domainKey(host));
+    if (settled && settled !== pid) {
+      return { ok: false, reason: "taken", propertyId: settled };
+    }
+  }
   return { ok: true };
 }
 
-/** Drop a property's claim — used when the property itself is removed. */
-export async function releaseDomain(domain: string | undefined): Promise<void> {
+/**
+ * Drop `pid`'s claim on `domain` — used when the property itself is removed.
+ *
+ * Scoped to the owner for the same reason as `claimDomain`: a property's stored
+ * `websiteDomain` can name a hostname it does not actually hold (a clone used to
+ * inherit one), and deleting on the strength of that would take the real
+ * holder's site down.
+ */
+export async function releaseDomain(pid: string, domain: string | undefined): Promise<void> {
   const host = normalizeDomain(domain ?? "");
   const kv = getConfigKV();
-  if (host && kv) await kv.delete(domainKey(host));
+  if (!host || !kv) return;
+  if ((await kv.get(domainKey(host))) === pid) await kv.delete(domainKey(host));
 }
 
 const DOH_URL = "https://cloudflare-dns.com/dns-query";

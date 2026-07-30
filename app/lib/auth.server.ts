@@ -3,6 +3,7 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
 import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
+import { requireCanonicalHost } from "./domains.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -121,6 +122,10 @@ export async function getAdminEmail(request: Request): Promise<string | null> {
 }
 
 export async function requireAdmin(request: Request): Promise<string> {
+  // Our admin panel must never be served on a hotel's custom domain — the
+  // wildcard Worker route sends every custom hostname here, so without this the login
+  // form appears at https://www.anyhotel.co.uk/admin.
+  requireCanonicalHost(request);
   const email = await getAdminEmail(request);
   if (!email) throw redirect("/admin/login");
   return email;

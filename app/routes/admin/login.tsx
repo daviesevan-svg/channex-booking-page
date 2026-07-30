@@ -9,8 +9,11 @@ import {
   sendMagicLink,
 } from "~/lib/auth.server";
 import { adminLangFromRequest, adminT } from "~/lib/admin-i18n";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // Never on a hotel's custom domain — the login form is exactly what a tenant would want to phish with.
+  requireCanonicalHost(request);
   if (await getAdminEmail(request)) throw redirect("/admin");
   // A team invite links here with ?email= so the invitee's address is pre-filled.
   const email = new URL(request.url).searchParams.get("email") ?? "";
@@ -18,6 +21,8 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 export async function action({ request }: Route.ActionArgs) {
+  // Never on a hotel's custom domain — the login form is exactly what a tenant would want to phish with.
+  requireCanonicalHost(request);
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Enter your email address." };

@@ -11,6 +11,7 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { Route } from "./+types/go.booking";
 import { getProperty } from "~/lib/properties.server";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
 // Channex's Google Hotel ARI landing endpoint — where we forward hotels that
 // aren't ours, unchanged.
@@ -19,6 +20,8 @@ const CHANNEX_BOOKING_LINK = "https://app.channex.io/api/v1/meta/googlehotelari/
 const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // Our feed, not the hotel's — don't serve it from their domain.
+  requireCanonicalHost(request);
   const url = new URL(request.url);
   const q = url.searchParams;
   const channelId = (q.get("channel_id") || "").trim();
