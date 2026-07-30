@@ -263,6 +263,11 @@ const EN: Record<string, string> = {
   webDomainIntro:
     "Use your own web address instead. Your booking pages keep working exactly as they do now — same pages, your domain.",
   webDomainLabel: "Your domain",
+  webDomainRemove: "Remove domain",
+  webDomainRemoveHint: "Your pages stay available at {address}.",
+  webDomainRemoveConfirm:
+    "Remove {domain}?\n\nGuests using that address will no longer reach your site, and anyone else could then claim it. Your pages stay available at your Roompanda address.",
+  webDomainRemoved: "Domain removed",
   webDomainUnavailable:
     "Custom domains aren't switched on for this deployment yet. You can save your domain here now, and the DNS record you need will appear once they are.",
   webDnsTitle: "DNS record",
@@ -2012,6 +2017,11 @@ const DE: Record<string, string> = {
   webDomainIntro:
     "Verwenden Sie stattdessen Ihre eigene Webadresse. Ihre Buchungsseiten funktionieren genau wie bisher — dieselben Seiten, Ihre Domain.",
   webDomainLabel: "Ihre Domain",
+  webDomainRemove: "Domain entfernen",
+  webDomainRemoveHint: "Ihre Seiten bleiben unter {address} erreichbar.",
+  webDomainRemoveConfirm:
+    "{domain} entfernen?\n\nGäste, die diese Adresse verwenden, erreichen Ihre Website nicht mehr, und danach könnte sie sich jemand anderes sichern. Ihre Seiten bleiben unter Ihrer Roompanda-Adresse erreichbar.",
+  webDomainRemoved: "Domain entfernt",
   webDomainUnavailable:
     "Eigene Domains sind für diese Installation noch nicht freigeschaltet. Sie können Ihre Domain hier bereits speichern; der benötigte DNS-Eintrag erscheint, sobald sie es sind.",
   webDnsTitle: "DNS-Eintrag",
@@ -3767,6 +3777,11 @@ const PT: Record<string, string> = {
   webDomainIntro:
     "Use antes o seu próprio endereço web. As suas páginas de reserva continuam a funcionar exatamente como agora — as mesmas páginas, no seu domínio.",
   webDomainLabel: "O seu domínio",
+  webDomainRemove: "Remover domínio",
+  webDomainRemoveHint: "As suas páginas continuam disponíveis em {address}.",
+  webDomainRemoveConfirm:
+    "Remover {domain}?\n\nOs hóspedes que usarem esse endereço deixarão de chegar ao seu site e, depois disso, outra pessoa poderá reclamá-lo. As suas páginas continuam disponíveis no seu endereço Roompanda.",
+  webDomainRemoved: "Domínio removido",
   webDomainUnavailable:
     "Os domínios próprios ainda não estão ativos nesta instalação. Pode guardar já aqui o seu domínio; o registo DNS necessário aparecerá quando estiverem.",
   webDnsTitle: "Registo DNS",
