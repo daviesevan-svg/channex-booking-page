@@ -462,6 +462,13 @@ const EL: Dict = {
   fac_nonSmoking: "Χώρος μη καπνιστών",
   hotelResponse: "Απάντηση από το {hotel}",
   reviewStarsRequired: "Επιλέξτε συνολική βαθμολογία.",
+
+  // Checkout field validation and payment failures (were hardcoded in the
+  // component, so they showed in English whatever the guest picked)
+  fieldRequired: "Υποχρεωτικό",
+  requestsPlaceholder: "Ήσυχο δωμάτιο, πρόωρη άφιξη, ό,τι πρέπει να γνωρίζουμε…",
+  paymentStartFailed: "Δεν μπορέσαμε να ξεκινήσουμε την ασφαλή πληρωμή αυτή τη στιγμή. Δοκιμάστε ξανά σε λίγο — αν συνεχιστεί, επικοινωνήστε μαζί μας και θα σας βοηθήσουμε να ολοκληρώσετε την κράτηση.",
+  paymentNotConfigured: "Αυτή η τιμή απαιτεί ηλεκτρονική πληρωμή, αλλά οι πληρωμές με κάρτα δεν έχουν ρυθμιστεί ακόμη για αυτό το κατάλυμα. Επικοινωνήστε μαζί μας για να ολοκληρώσετε την κράτηση.",
 };
 
 export default EL;

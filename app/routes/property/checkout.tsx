@@ -236,11 +236,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
+// Messages are translation KEYS, not English. Zod runs in the action, which has
+// no translator — and these reach the guest as field errors, so an English
+// "Required" under a German label is a visible bug. Resolved at render below.
 const GuestSchema = z.object({
-  firstName: z.string().min(1, "Required"),
-  lastName: z.string().min(1, "Required"),
-  email: z.string().email("Enter a valid email"),
-  phone: z.string().min(3, "Required"),
+  firstName: z.string().min(1, "fieldRequired"),
+  lastName: z.string().min(1, "fieldRequired"),
+  email: z.string().email("invalidEmail"),
+  phone: z.string().min(3, "fieldRequired"),
   arrival: z.string().optional(),
   requests: z.string().optional(),
 });
@@ -792,8 +795,8 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       {actionData?.paymentError && (
         <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
           {actionData.paymentError === "failed"
-            ? "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking."
-            : "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking."}
+            ? tr.t("paymentStartFailed")
+            : tr.t("paymentNotConfigured")}
         </div>
       )}
 
@@ -802,10 +805,10 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className="rounded-panel border border-line bg-surface p-[26px]">
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName} />
-              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" error={errors?.lastName} />
-              <Field name="email" label={tr.t("email")} type="email" placeholder="jamie@email.com" error={errors?.email} />
-              <Field name="phone" label={tr.t("phone")} placeholder="+44 …" error={errors?.phone} />
+              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName?.map((k) => tr.t(k))} />
+              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" error={errors?.lastName?.map((k) => tr.t(k))} />
+              <Field name="email" label={tr.t("email")} type="email" placeholder="jamie@email.com" error={errors?.email?.map((k) => tr.t(k))} />
+              <Field name="phone" label={tr.t("phone")} placeholder="+44 …" error={errors?.phone?.map((k) => tr.t(k))} />
             </div>
           </section>
 
@@ -833,7 +836,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               <textarea
                 name="requests"
                 rows={3}
-                placeholder="Quiet room, early check-in, anything we should know…"
+                placeholder={tr.t("requestsPlaceholder")}
                 className="mt-[7px] block w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
               />
             </label>
