@@ -111,10 +111,18 @@ function asState(e: unknown): ProvisionState {
   };
 }
 
+/** Zone-scoped call: `path` is appended to /zones/{our zone id}. */
 async function cf<T>(path: string, init?: RequestInit): Promise<T> {
-  const { cloudflareApiToken, cloudflareZoneId } = getConfig();
-  if (!cloudflareApiToken || !cloudflareZoneId) throw new CfError("Not configured.", true);
-  const res = await fetch(`${API}/zones/${cloudflareZoneId}${path}`, {
+  const { cloudflareZoneId } = getConfig();
+  if (!cloudflareZoneId) throw new CfError("Not configured.", true);
+  return api<T>(`/zones/${cloudflareZoneId}${path}`, init);
+}
+
+/** Any Cloudflare API path, including ones outside our zone (token verify). */
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const { cloudflareApiToken } = getConfig();
+  if (!cloudflareApiToken) throw new CfError("Not configured.", true);
+  const res = await fetch(`${API}${path}`, {
     ...init,
     headers: {
       authorization: `Bearer ${cloudflareApiToken}`,
@@ -134,18 +142,96 @@ async function cf<T>(path: string, init?: RequestInit): Promise<T> {
       .map((e) => e.message)
       .filter(Boolean)
       .join("; ");
-    // Cloudflare understood us and said no, in one of two flavours — verified
-    // against the live API, because the status is not what you'd guess:
-    //   400 + code 9106 "Authentication failed (status: 400)" = bad token value
-    //   404 + "Could not route to /client/v4/zones/…"          = bad zone id
-    // A wrong zone id is a 404, NOT a 400, so leaving 404 out (as I first did)
-    // reports the single most likely setup mistake — pasting the ACCOUNT id,
-    // which sits beside the zone id in the same dashboard sidebar — as something
-    // to retry in a moment, forever.
+    // Cloudflare understood us and said no. Statuses verified against the live
+    // API, because they are not what you'd guess:
+    //   400 + code 9106 "Authentication failed (status: 400)"
+    //        = the token value is wrong, OR the token cannot reach THIS zone
+    //          (a well-formed zone id belonging to another zone lands here too)
+    //   404 + "Could not route to /client/v4/zones/…"
+    //        = the zone id is malformed — e.g. the ACCOUNT id, which sits beside
+    //          the zone id in the same dashboard sidebar
+    // Because 9106 covers both a bad token and a wrong-but-valid zone id, the
+    // message alone cannot tell them apart — that's what verifyCredentials is
+    // for. Neither improves on a retry, so don't invite one.
     const rejected = [400, 401, 403, 404].includes(res.status);
     throw new CfError(detail || `Cloudflare returned ${res.status}.`, rejected);
   }
   return body.result as T;
+}
+
+/**
+ * Is our Cloudflare credential actually usable? A superadmin-only diagnostic.
+ *
+ * Exists because "Authentication failed (status: 400)" is ambiguous: it means the
+ * token value is wrong OR the token can't reach the zone id we hold — and from
+ * the outside those look identical. Debugging that by re-pasting secrets is a
+ * guessing loop, so this asks Cloudflare three questions instead:
+ *
+ *   1. is the token itself valid?      (/user/tokens/verify)
+ *   2. WHICH zone is our id?           (/zones/{id} → name)
+ *   3. can we do the thing we need?    (/zones/{id}/custom_hostnames)
+ *
+ * (2) is the one that pays for this: a wrong-but-valid zone id is invisible in
+ * every error message, and seeing the zone's real NAME come back settles it at a
+ * glance. (3) is the verdict, because it needs exactly the permission we use.
+ *
+ * Never returns or logs the token — only what Cloudflare says about it.
+ */
+export interface CredentialCheck {
+  configured: boolean;
+  /** Echoed back so a wrong paste is visible. Not a secret. */
+  zoneId: string;
+  token: string;
+  /** The zone that id actually points at, per Cloudflare. */
+  zone: string;
+  /** Whether the exact call provisioning makes is permitted. */
+  customHostnames: string;
+  ok: boolean;
+}
+
+export async function verifyCredentials(): Promise<CredentialCheck> {
+  const { cloudflareApiToken, cloudflareZoneId } = getConfig();
+  const zoneId = cloudflareZoneId ?? "";
+  if (!cloudflareApiToken || !cloudflareZoneId) {
+    return {
+      configured: false,
+      zoneId,
+      token: cloudflareApiToken ? "set" : "MISSING",
+      zone: cloudflareZoneId ? "" : "MISSING",
+      customHostnames: "not attempted",
+      ok: false,
+    };
+  }
+
+  const say = async (fn: () => Promise<string>): Promise<string> => {
+    try {
+      return await fn();
+    } catch (e) {
+      return `FAILED — ${e instanceof Error ? e.message : String(e)}`;
+    }
+  };
+
+  const token = await say(async () => {
+    const r = await api<{ status?: string }>("/user/tokens/verify");
+    return r?.status === "active" ? "valid and active" : `unexpected status: ${r?.status}`;
+  });
+
+  // Reading the zone needs Zone:Read, which our token deliberately may not have —
+  // so a failure here is informative, not fatal, and must not be read as "the
+  // zone id is wrong".
+  const zone = await say(async () => {
+    const z = await api<{ name?: string }>(`/zones/${cloudflareZoneId}`);
+    return z?.name ? `${z.name}` : "no name returned";
+  });
+
+  let ok = false;
+  const customHostnames = await say(async () => {
+    const list = await cf<CfCustomHostname[]>("/custom_hostnames?per_page=1");
+    ok = true;
+    return `allowed (${(list ?? []).length} returned)`;
+  });
+
+  return { configured: true, zoneId, token, zone, customHostnames, ok };
 }
 
 /** Cloudflare reports `active` and `active_redeploying` for a verified hostname. */

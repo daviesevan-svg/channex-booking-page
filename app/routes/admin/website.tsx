@@ -21,13 +21,16 @@ import {
   ensureCustomHostname,
   findCustomHostname,
   provisioningConfigured,
+  verifyCredentials,
+  type CredentialCheck,
   type ProvisionState,
 } from "~/lib/custom-hostnames.server";
+import { isSuperadmin } from "~/lib/users.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
 
@@ -60,6 +63,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     cnameTarget: config.customHostnameTarget ?? "",
     // So the field validates client-side exactly as the action will.
     ownHost: safeHostname(config.appUrl),
+    // Gates the credential diagnostic below. Hotels must never see our infra
+    // state — and a zone id is ours, not theirs.
+    isSuperadmin: await isSuperadmin(email),
   };
 }
 
@@ -72,7 +78,7 @@ function safeHostname(url: string): string {
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No property selected." };
 
@@ -93,6 +99,13 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (op === "provision") return finishActivation(propertyId);
+
+  if (op === "testCf") {
+    // Superadmin only: this reports OUR Cloudflare configuration, which is none
+    // of a hotel's business even though nothing here is a secret.
+    if (!(await isSuperadmin(email))) return { error: "Not allowed." };
+    return { credentials: await verifyCredentials() };
+  }
 
   if (op === "removeDomain") {
     // Acts on the SAVED domain, never on what's in the box — the hotel may have
@@ -341,6 +354,15 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
             />
           )}
 
+          {loaderData.isSuperadmin && (
+            <CredentialDiagnostic
+              check={
+                actionData && "credentials" in actionData ? actionData.credentials : undefined
+              }
+              busy={busy}
+            />
+          )}
+
           {/* Only once a domain is actually saved — there is nothing to remove
               before that, and emptying the box is not a discoverable delete. */}
           {websiteDomain && (
@@ -535,6 +557,50 @@ function Activation({
           </button>
           <span className="text-[12px] text-faint">{t("webProvCheckHint")}</span>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Superadmin-only: what Cloudflare says about OUR credentials.
+ *
+ * Deliberately English-only and unstyled-plain — it is an operator tool, not part
+ * of the hotel's product, and it exists because "Authentication failed" alone
+ * can't distinguish a bad token from a zone id pointing at the wrong zone.
+ */
+function CredentialDiagnostic({ check, busy }: { check?: CredentialCheck; busy: boolean }) {
+  return (
+    <div className="mt-5 rounded-[12px] border border-dashed border-line-alt bg-surface-alt p-4">
+      <div className="mb-2 flex flex-wrap items-center gap-3">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.08em] text-faint">
+          Roompanda only — CDN credentials
+        </span>
+        <button
+          type="submit"
+          name="op"
+          value="testCf"
+          disabled={busy}
+          className="cursor-pointer rounded-[9px] border border-line px-3 py-1.5 text-[12px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+        >
+          {busy ? "Testing…" : "Test credentials"}
+        </button>
+      </div>
+      {check && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-[12px]">
+          <dt className="text-muted">Zone id in use</dt>
+          <dd className="break-all font-mono text-ink">{check.zoneId || "—"}</dd>
+          <dt className="text-muted">API token</dt>
+          <dd className="break-words text-ink">{check.token}</dd>
+          <dt className="text-muted">That zone is</dt>
+          <dd className="break-words text-ink">{check.zone || "—"}</dd>
+          <dt className="text-muted">Custom hostnames</dt>
+          <dd className="break-words text-ink">{check.customHostnames}</dd>
+          <dt className="text-muted">Verdict</dt>
+          <dd className={check.ok ? "font-semibold text-[#3f7a52]" : "font-semibold text-red-700"}>
+            {check.ok ? "Working" : "Not working"}
+          </dd>
+        </dl>
       )}
     </div>
   );
