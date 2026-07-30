@@ -5,8 +5,9 @@
 // every admin route flows through getVisibleProperties()/currentPropertyId().
 import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
-import { getOverrides } from "./overrides.server";
+import { getOverrides, getSettings } from "./overrides.server";
 import { isSuperadmin } from "./users.server";
+import { releaseDomain } from "./domains.server";
 
 export interface PropertyRef {
   id: string;
@@ -291,6 +292,11 @@ export async function setPropertyDirectoryListed(id: string, listed: boolean): P
 /** Removes a property from the registry. Its KV/D1 data is left intact (so a
  *  mistaken removal can be undone by re-adding the same id). */
 export async function removeProperty(id: string): Promise<void> {
+  // Release the custom hostname before dropping the registry row. The hostname
+  // index is global, so a leftover entry would both keep the domain
+  // unclaimable by anyone else and point guests at a property that now 404s.
+  // (The property's own KV and R2 data still survives removal — separate issue.)
+  await releaseDomain((await getSettings(id)).websiteDomain).catch(() => {});
   await write((await getProperties()).filter((p) => p.id !== id));
 }
 

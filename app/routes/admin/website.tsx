@@ -8,7 +8,7 @@ import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { domainError, isWwwSubdomain, normalizeDomain, type DnsVerdict } from "~/lib/domains";
-import { checkDns } from "~/lib/domains.server";
+import { checkDns, claimDomain } from "~/lib/domains.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -65,6 +65,21 @@ export async function action({ request }: Route.ActionArgs) {
   if (domain) {
     const err = domainError(domain, [safeHostname(config.appUrl)]);
     if (err) return { error: err };
+  }
+
+  // Claim the hostname BEFORE saving the setting. A guest arriving on a custom
+  // domain is routed by the hostname index, so if the claim fails the setting
+  // must not be stored — a property showing a domain it doesn't actually serve
+  // is worse than a rejected save.
+  const previous = (await getSettings(propertyId)).websiteDomain;
+  const claim = await claimDomain(propertyId, domain, previous);
+  if (!claim.ok) {
+    return {
+      error:
+        claim.reason === "own_host"
+          ? "That's already our own address — enter the hotel's own domain."
+          : "Another property on this account is already using that domain.",
+    };
   }
 
   await patchSettings(propertyId, {
