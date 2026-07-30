@@ -299,6 +299,8 @@ const EN: Record<string, string> = {
     "Automatic activation isn't set up on this deployment yet, so a domain entered here won't serve your site. Ask us to finish it.",
   webProvError:
     "Couldn't check with our CDN just now: {message}. Nothing is lost — try again in a moment.",
+  webProvErrorConfig:
+    "Our CDN rejected the request: {message}. That's a setup problem on our side, not something you can fix, and retrying won't clear it — please let us know.",
   webProvNotStarted:
     "This domain isn't registered with our CDN yet. Press Check status to register it and get your records.",
   webProvLive: "Your domain is live and serving your site.",
@@ -2054,6 +2056,8 @@ const DE: Record<string, string> = {
     "Die automatische Aktivierung ist auf dieser Installation noch nicht eingerichtet, eine hier eingetragene Domain liefert Ihre Website also nicht aus. Bitte melden Sie sich bei uns.",
   webProvError:
     "Konnte gerade nicht bei unserem CDN nachfragen: {message}. Es ist nichts verloren — bitte gleich erneut versuchen.",
+  webProvErrorConfig:
+    "Unser CDN hat die Anfrage abgelehnt: {message}. Das ist ein Einrichtungsproblem auf unserer Seite, das Sie nicht beheben können, und erneutes Versuchen hilft nicht — bitte informieren Sie uns.",
   webProvNotStarted:
     "Diese Domain ist bei unserem CDN noch nicht registriert. Klicken Sie auf „Status prüfen“, um sie zu registrieren und Ihre Einträge zu erhalten.",
   webProvLive: "Ihre Domain ist aktiv und liefert Ihre Website aus.",
@@ -3814,6 +3818,8 @@ const PT: Record<string, string> = {
     "A ativação automática ainda não está configurada nesta instalação, pelo que um domínio indicado aqui não servirá o seu site. Fale connosco para concluir.",
   webProvError:
     "Não foi possível verificar junto do nosso CDN neste momento: {message}. Nada se perdeu — tente novamente dentro de instantes.",
+  webProvErrorConfig:
+    "O nosso CDN rejeitou o pedido: {message}. É um problema de configuração do nosso lado, que não pode resolver, e tentar novamente não ajuda — avise-nos, por favor.",
   webProvNotStarted:
     "Este domínio ainda não está registado no nosso CDN. Clique em “Verificar estado” para o registar e obter os seus registos.",
   webProvLive: "O seu domínio está ativo e a servir o seu site.",

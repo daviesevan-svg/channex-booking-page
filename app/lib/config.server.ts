@@ -92,6 +92,11 @@ function read(key: string, fallback = ""): string {
   return value ?? fallback;
 }
 
+/** Strip whitespace and one wrapping pair of quotes from a pasted credential. */
+function clean(value: string): string {
+  return value.trim().replace(/^(['"])(.*)\1$/s, "$2").trim();
+}
+
 // The placeholder used when SESSION_SECRET is unset. It's published in this
 // public repo, so it must NEVER sign real sessions/tokens/API-key hashes — a
 // production deploy that forgot the secret would be trivially forgeable. We fail
@@ -120,8 +125,13 @@ export function getConfig(): AppConfig {
     appUrl: read("APP_URL", "http://localhost:5173"),
     customHostnameTarget: read("CUSTOM_HOSTNAME_TARGET") || undefined,
     ownHosts: read("OWN_HOSTS") || undefined,
-    cloudflareApiToken: read("CLOUDFLARE_API_TOKEN") || undefined,
-    cloudflareZoneId: read("CLOUDFLARE_ZONE_ID") || undefined,
+    // Trimmed and unquoted: these are pasted into `wrangler secret put`, which
+    // takes the value literally, so a trailing newline or a wrapping pair of
+    // quotes ends up inside the Bearer header and Cloudflare answers
+    // "Authentication failed (status: 400)" — an hour of debugging a token that
+    // was correct. Neither a token nor a zone id can legitimately contain either.
+    cloudflareApiToken: clean(read("CLOUDFLARE_API_TOKEN")) || undefined,
+    cloudflareZoneId: clean(read("CLOUDFLARE_ZONE_ID")) || undefined,
     stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
     stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
     stripeWebhookSecret: read("STRIPE_WEBHOOK_SECRET") || undefined,
