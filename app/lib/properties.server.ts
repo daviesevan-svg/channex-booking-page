@@ -296,7 +296,7 @@ export async function removeProperty(id: string): Promise<void> {
   // index is global, so a leftover entry would both keep the domain
   // unclaimable by anyone else and point guests at a property that now 404s.
   // (The property's own KV and R2 data still survives removal — separate issue.)
-  await releaseDomain((await getSettings(id)).websiteDomain).catch(() => {});
+  await releaseDomain(id, (await getSettings(id)).websiteDomain).catch(() => {});
   await write((await getProperties()).filter((p) => p.id !== id));
 }
 

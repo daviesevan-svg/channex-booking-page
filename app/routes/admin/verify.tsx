@@ -2,8 +2,11 @@ import { Link } from "react-router";
 
 import type { Route } from "./+types/verify";
 import { canSignIn, createAdminSession, verifyMagicToken } from "~/lib/auth.server";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // Never on a hotel's custom domain — the magic-link target must only ever be our own host.
+  requireCanonicalHost(request);
   const token = new URL(request.url).searchParams.get("token") ?? "";
   const email = await verifyMagicToken(token);
   if (!email || !(await canSignIn(email))) {

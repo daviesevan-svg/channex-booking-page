@@ -73,6 +73,12 @@ export interface AppConfig extends ChannexConfig {
    *  deploy. Unset = the admin page says custom domains aren't available yet
    *  rather than printing a target that wouldn't work. */
   customHostnameTarget?: string;
+  /** Extra hostnames that are ours, comma-separated — e.g. a marketing site or
+   *  staging host on the same zone. Listed explicitly because the registrable
+   *  domain can't be derived safely without a public suffix list. Used to refuse
+   *  admin/API traffic arriving on a hotel's custom domain, and to stop a hotel
+   *  claiming one of our own addresses. */
+  ownHosts?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -107,6 +113,7 @@ export function getConfig(): AppConfig {
     sessionSecret: read("SESSION_SECRET") || DEFAULT_SESSION_SECRET,
     appUrl: read("APP_URL", "http://localhost:5173"),
     customHostnameTarget: read("CUSTOM_HOSTNAME_TARGET") || undefined,
+    ownHosts: read("OWN_HOSTS") || undefined,
     stripeSecretKey: read("STRIPE_SECRET_KEY") || undefined,
     stripeConnectClientId: read("STRIPE_CONNECT_CLIENT_ID") || undefined,
     stripeWebhookSecret: read("STRIPE_WEBHOOK_SECRET") || undefined,

@@ -3,6 +3,7 @@
 // HMAC-SHA256 hash. A global reverse index maps hash → { pid, keyId } for O(1)
 // auth lookup. test-mode keys force simulated bookings (no Channex push).
 import { getConfig, getConfigKV } from "./config.server";
+import { requireCanonicalHost } from "./domains.server";
 
 export type ApiKeyMode = "live" | "test";
 
@@ -108,6 +109,9 @@ export async function revokeApiKey(pid: string, keyId: string): Promise<boolean>
 /** Resolve the API key on a request. Returns the auth context, or a ready-to-
  *  return JSON error Response (401). */
 export async function authenticateApiKey(request: Request): Promise<ApiAuth | Response> {
+  // Same reasoning as the admin gate: /v1 and /mcp are ours, not something to
+  // expose on a hotel's own hostname.
+  requireCanonicalHost(request);
   const header = request.headers.get("Authorization") || "";
   const raw = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
   if (!raw || !/^sk_(live|test)_/.test(raw)) {

@@ -78,7 +78,10 @@ export async function action({ request }: Route.ActionArgs) {
       error:
         claim.reason === "own_host"
           ? "That's already our own address — enter the hotel's own domain."
-          : "Another property on this account is already using that domain.",
+          // Deliberately neutral: the index is GLOBAL, so the holder is often
+          // another tenant entirely. Naming them, or even saying "on this
+          // account", both leaks and misleads.
+          : "That domain is already in use.",
     };
   }
 

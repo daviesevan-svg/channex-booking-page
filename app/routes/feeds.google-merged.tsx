@@ -10,6 +10,7 @@ import {
   getSavedMergedGoogleFeed,
   saveMergedGoogleFeed,
 } from "~/lib/google-merged-feed.server";
+import { requireCanonicalHost } from "~/lib/domains.server";
 
 function xml(body: string, builtAt?: number): Response {
   return new Response(body, {
@@ -21,7 +22,9 @@ function xml(body: string, builtAt?: number): Response {
   });
 }
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
+  // Our feed, not the hotel's — don't serve it from their domain.
+  requireCanonicalHost(request);
   // Fast path: serve the stored snapshot.
   const saved = await getSavedMergedGoogleFeed();
   if (saved) return xml(saved.xml, saved.builtAt);

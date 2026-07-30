@@ -47,6 +47,11 @@ export async function cloneProperty(sourceId: string, owner?: string): Promise<s
       // languages, amenities…) carries over.
       const settings = JSON.parse(raw) as SiteSettings & { connectedSystem?: string };
       delete settings.connectedSystem;
+      // The clone is a new property and does NOT hold the original's custom
+      // domain. Inheriting it made the clone's admin page show a hostname it
+      // didn't serve, and editing that field then released the ORIGINAL's live
+      // claim — taking a real hotel's site down.
+      delete settings.websiteDomain;
       delete settings.liveBooking;
       settings.googleAriPush = false;
       await kv.put(`${prefix}:${id}`, JSON.stringify(settings));
