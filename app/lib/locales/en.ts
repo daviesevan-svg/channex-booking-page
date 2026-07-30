@@ -473,6 +473,13 @@ const EN: Dict = {
   fac_nonSmoking: "Non-smoking",
   hotelResponse: "Response from {hotel}",
   reviewStarsRequired: "Please choose an overall rating.",
+
+  // Checkout field validation and payment failures (were hardcoded in the
+  // component, so they showed in English whatever the guest picked)
+  fieldRequired: "Required",
+  requestsPlaceholder: "Quiet room, early check-in, anything we should know…",
+  paymentStartFailed: "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking.",
+  paymentNotConfigured: "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking.",
 };
 
 export default EN;

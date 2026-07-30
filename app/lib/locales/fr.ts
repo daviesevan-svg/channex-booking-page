@@ -474,6 +474,13 @@ const FR: Dict = {
   confirmProblemHeading: "Nous n’avons pas pu confirmer votre réservation",
   confirmProblemBody: "Votre paiement a bien été effectué, mais nous n’avons pas pu finaliser votre réservation à {hotel}. Notre équipe a été prévenue et vous contactera très prochainement. Si nous ne pouvons pas la confirmer, vous serez intégralement remboursé.",
   confirmRefundedBody: "Votre paiement a bien été effectué, mais la chambre n’était plus disponible : nous n’avons pas pu confirmer votre réservation à {hotel}. Nous vous avons intégralement remboursé — vous recevrez un e-mail de confirmation sous peu.",
+
+  // Checkout field validation and payment failures (were hardcoded in the
+  // component, so they showed in English whatever the guest picked)
+  fieldRequired: "Obligatoire",
+  requestsPlaceholder: "Chambre calme, arrivée tôt, tout ce que nous devrions savoir…",
+  paymentStartFailed: "Nous n’avons pas pu lancer le paiement sécurisé à l’instant. Merci de réessayer dans un moment — si cela persiste, contactez-nous et nous vous aiderons à finaliser votre réservation.",
+  paymentNotConfigured: "Ce tarif nécessite un paiement en ligne, mais les paiements par carte ne sont pas encore configurés pour cet établissement. Merci de nous contacter pour finaliser votre réservation.",
 };
 
 export default FR;

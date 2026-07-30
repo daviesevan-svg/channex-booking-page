@@ -474,6 +474,13 @@ const NL: Dict = {
   confirmProblemHeading: "We konden uw boeking niet bevestigen",
   confirmProblemBody: "Uw betaling is gelukt, maar we konden uw boeking bij {hotel} niet afronden. Ons team is op de hoogte en neemt binnenkort contact met u op. Als we de boeking niet kunnen bevestigen, krijgt u het volledige bedrag terug.",
   confirmRefundedBody: "Uw betaling is gelukt, maar de kamer was niet meer beschikbaar, dus we konden uw boeking bij {hotel} niet bevestigen. We hebben het volledige bedrag terugbetaald — u ontvangt binnenkort een bevestigingsmail.",
+
+  // Checkout field validation and payment failures (were hardcoded in the
+  // component, so they showed in English whatever the guest picked)
+  fieldRequired: "Verplicht",
+  requestsPlaceholder: "Rustige kamer, vroeg inchecken, alles wat we moeten weten…",
+  paymentStartFailed: "We konden de beveiligde betaling nu niet starten. Probeer het over een moment opnieuw — als het blijft gebeuren, neem contact met ons op en we helpen u de boeking af te ronden.",
+  paymentNotConfigured: "Voor dit tarief is een online betaling nodig, maar kaartbetalingen zijn nog niet ingesteld voor deze accommodatie. Neem contact met ons op om de boeking af te ronden.",
 };
 
 export default NL;
