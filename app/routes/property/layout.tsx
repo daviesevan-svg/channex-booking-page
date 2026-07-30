@@ -22,6 +22,7 @@ import { SiteFooterBlock } from "~/components/site-footer";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty, resolvePropertyId } from "~/lib/properties.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).
@@ -91,9 +92,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 type Step = "search" | "results" | "detail" | "checkout" | "confirmation";
 
-function useStep(channelId: string): Step {
+function useStep(channelId: string | undefined): Step {
   const { pathname } = useLocation();
-  const rest = pathname.slice(`/${channelId}`.length).replace(/\/$/, "");
+  const rest = pathname.slice(basePath(channelId).length).replace(/\/$/, "");
   if (rest === "") return "search";
   if (rest.startsWith("/rooms/")) return "detail";
   if (rest === "/rooms") return "results";
@@ -170,7 +171,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
     );
   };
   const step = useStep(params.channelId);
-  const base = `/${params.channelId}`;
+  const base = useBase();
   // The "Manage booking" / "Gift vouchers" links belong on pages a guest is
   // BROWSING, not on the funnel steps, which stay focused. That's the landing
   // page plus the website's room pages — a room page is somewhere you look

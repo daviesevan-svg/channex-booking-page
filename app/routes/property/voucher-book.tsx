@@ -16,14 +16,16 @@ import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { displayStatus, normalizeVoucherCode } from "~/lib/vouchers";
 import { packageCheckinOptions, redeemPackageVoucher } from "~/lib/voucher-redeem.server";
 import { getRooms } from "~/lib/catalog.server";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const pid = await resolvePropertyId(params.channelId);
   const code = normalizeVoucherCode(params.code);
   const v = await lookupVoucherGuarded(pid, code, request);
   if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
-  if (!v || v.kind !== "package" || !v.product.package) throw redirect(`/${params.channelId}/voucher/${params.code}`);
-  if (displayStatus(v) !== "active") throw redirect(`/${params.channelId}/voucher/${params.code}`);
+  if (!v || v.kind !== "package" || !v.product.package) throw redirect(`${base}/voucher/${params.code}`);
+  if (displayStatus(v) !== "active") throw redirect(`${base}/voucher/${params.code}`);
 
   const [options, rooms] = await Promise.all([
     packageCheckinOptions(pid, v.product.package, v.expiresAt),
@@ -46,6 +48,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const base = basePath(params.channelId);
   const pid = await resolvePropertyId(params.channelId);
   const v = await lookupVoucherGuarded(pid, params.code, request);
   if (v === "limited") throw new Response("Too many attempts — try again shortly.", { status: 429 });
@@ -85,7 +88,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
   // The generic confirmation page reconstructs from cart URL params (rate
   // pricing) — wrong for a package. The voucher page shows the booked stay.
-  return redirect(`/${params.channelId}/voucher/${v.code}?booked=1`);
+  return redirect(`${base}/voucher/${v.code}?booked=1`);
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -93,6 +96,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function VoucherBook({ loaderData, actionData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { code, title, nights, adults, children, recipientName, options, rooms } = loaderData;
   const tr = useT();
   const nav = useNavigation();
@@ -111,7 +115,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
   return (
     <main className="mx-auto max-w-[820px] px-7 pb-[72px] pt-8">
       <Link
-        to={`/${params.channelId}/voucher/${code}`}
+        to={`${base}/voucher/${code}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("voucherCodeLabel")} {code}

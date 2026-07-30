@@ -39,8 +39,10 @@ import {
   roomCapacity,
   roomFits,
 } from "~/lib/occupancy";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
@@ -51,10 +53,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
 
   if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
-    throw redirect(`/${params.channelId}`);
+    throw redirect(`${base}`);
   }
   if (isTooLastMinute(checkin, await getBookingCutoff(pid))) {
-    throw redirect(`/${params.channelId}`);
+    throw redirect(`${base}`);
   }
 
   // Currency is the property's, not the URL param — there's no conversion, so a
@@ -118,7 +120,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // one unit's page (this catches landing searches AND widget/deep-link hits on
   // /rooms). Once a room is in the cart we fall through and render the review.
   if (settings.singleUnit && parseCart(url.searchParams).length === 0 && rooms.length > 0) {
-    throw redirect(`/${params.channelId}/rooms/${rooms[0].id}?${url.searchParams.toString()}`);
+    throw redirect(`${base}/rooms/${rooms[0].id}?${url.searchParams.toString()}`);
   }
 
   const cheapest = (room: RoomWithRates) =>
@@ -233,6 +235,7 @@ function RoomCard({
   qs: string;
   inCart: number;
 }) {
+  const base = useBase();
   const tr = useT();
   const available = roomAvailability(room);
   const remaining = Number.isFinite(available) ? available - inCart : Infinity;
@@ -251,7 +254,7 @@ function RoomCard({
     ...(room.facilities ?? []),
   ].slice(0, 4);
   const { maxAdults, capacity } = roomCapacity(room);
-  const detailHref = `/${channelId}/rooms/${room.id}?${qs}`;
+  const detailHref = `${base}/rooms/${room.id}?${qs}`;
 
   return (
     <div
@@ -379,6 +382,7 @@ function CartPanel({
   extrasCounts: number[];
   extrasSum: number;
 }) {
+  const base = useBase();
   const tr = useT();
   return (
     <aside
@@ -396,7 +400,7 @@ function CartPanel({
             <div key={`${l.roomId}-${l.rateId}-${i}`} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <Link
-                  to={`/${channelId}/rooms/${l.roomId}?edit=${i}&${qs}`}
+                  to={`${base}/rooms/${l.roomId}?edit=${i}&${qs}`}
                   className="group block"
                   title={tr.t("updateRoom")}
                 >
@@ -410,7 +414,7 @@ function CartPanel({
                   </div>
                 </Link>
                 <Link
-                  to={`/${channelId}/extras?line=${i}&${qs}`}
+                  to={`${base}/extras?line=${i}&${qs}`}
                   className="mt-1 inline-block text-label font-semibold text-accent hover:underline"
                 >
                   {extrasCounts[i] ? tr.t("editExtrasCount", { n: extrasCounts[i] }) : tr.t("addExtras")}
@@ -486,6 +490,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
@@ -512,12 +517,12 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
     else next.delete("sel");
     if (xt) next.set("xt", xt);
     else next.delete("xt");
-    navigate(`/${params.channelId}/rooms?${next.toString()}`);
+    navigate(`${base}/rooms?${next.toString()}`);
   };
   const onContinue = () => {
     setContinuePending(true);
     // Extras are now collected per room during selection, so go straight to checkout.
-    navigate(`/${params.channelId}/checkout?${searchParams.toString()}`);
+    navigate(`${base}/checkout?${searchParams.toString()}`);
   };
 
   // Per-line extras count, for the "Edit extras" affordance in the cart.
@@ -544,7 +549,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
             {summary}
             <span className="mx-1.5 text-line-alt">·</span>
             <Link
-              to={`/${params.channelId}?${qs}`}
+              to={`${base}?${qs}`}
               className="font-semibold text-accent underline-offset-2 hover:underline"
             >
               {text.editSearch}
@@ -552,7 +557,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           </div>
         </div>
         <Link
-          to={`/${params.channelId}?${qs}`}
+          to={`${base}?${qs}`}
           className="rounded-control border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
         >
           {text.editSearch}
@@ -567,7 +572,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           <p className="text-body text-secondary">
             {tr.t("capacityBody", { max: maxCapacity })}{" "}
             <Link
-              to={`/${params.channelId}?${qs}`}
+              to={`${base}?${qs}`}
               className="font-semibold text-accent underline-offset-2 hover:underline"
             >
               {text.editSearch}
@@ -579,7 +584,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       {rooms.length === 0 ? (
         <p className="text-secondary">
           {tr.t("noAvailability")}{" "}
-          <Link to={`/${params.channelId}?${qs}`} className="font-semibold text-accent">
+          <Link to={`${base}?${qs}`} className="font-semibold text-accent">
             {tr.t("tryDifferentDates")}
           </Link>
           .

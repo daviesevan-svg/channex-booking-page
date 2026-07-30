@@ -25,6 +25,7 @@ import { earliestCheckinDate } from "~/lib/dates";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { useDateRange } from "~/lib/use-date-range";
+import { useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
@@ -80,6 +81,7 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 }
 
 export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { room, rateNames, closedDates, earliestCheckin, currency } = loaderData;
   const tr = useT();
   const navigate = useNavigate();
@@ -109,7 +111,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
     );
     const lang = searchParams.get("lang");
     if (lang) qs.set("lang", lang);
-    navigate(`/${params.channelId}/rooms/${room.id}?${qs.toString()}`);
+    navigate(`${base}/rooms/${room.id}?${qs.toString()}`);
   }
 
   const cover = room.images[photo] ?? room.images[0];
@@ -117,7 +119,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
       <Link
-        to={`/${params.channelId}`}
+        to={`${base}`}
         className="mb-6 inline-flex items-center gap-1.5 text-body font-semibold text-muted hover:text-accent"
       >
         ‹ {tr.t("backToHome")}

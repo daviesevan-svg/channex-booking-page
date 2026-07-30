@@ -17,6 +17,7 @@ import { imageProps, IMAGE_SIZES } from "~/lib/image-srcset";
 import type { ResolvedGalleryImage } from "~/lib/gallery";
 import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
+import { useBase } from "~/lib/base";
 
 export type { ReviewView };
 
@@ -277,8 +278,8 @@ export function RoomsSection({
   section,
   tr,
   rooms,
-  channelId,
-}: Common & { rooms: RoomCardView[]; channelId: string }) {
+}: Common & { rooms: RoomCardView[] }) {
+  const base = useBase();
   const limit = numberSetting(section, "limit", 6);
   const shown = rooms.slice(0, limit);
   if (!shown.length) return null;
@@ -334,7 +335,7 @@ export function RoomsSection({
                   a "from" figure with no dates and no taxes would be a number
                   we'd have to walk back at checkout. */}
               <Link
-                to={`/${channelId}/room/${room.id}`}
+                to={`${base}/room/${room.id}`}
                 className="mt-auto inline-block self-start rounded-control border border-accent px-4 py-2 text-body font-semibold text-accent hover:bg-accent-soft"
               >
                 {tr.t("secRoomsCta")}

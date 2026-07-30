@@ -9,6 +9,7 @@ import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getActiveVoucherProducts, soldCount } from "~/lib/vouchers.server";
+import { useBase } from "~/lib/base";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
@@ -41,6 +42,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { products } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
@@ -63,7 +65,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
           {products.map((p) => (
             <Link
               key={p.id}
-              to={`/${params.channelId}/vouchers/${p.id}`}
+              to={`${base}/vouchers/${p.id}`}
               className="group overflow-hidden rounded-panel border border-line bg-surface transition-shadow hover:shadow-md"
             >
               <div className="h-[170px] overflow-hidden" style={{ background: stripe }}>

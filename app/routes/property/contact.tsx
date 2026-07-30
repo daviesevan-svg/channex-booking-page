@@ -14,6 +14,7 @@ import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { langFromRequest } from "~/lib/content";
+import { basePath } from "~/lib/base";
 
 const MAX_NAME = 100;
 const MAX_EMAIL = 200;
@@ -22,7 +23,8 @@ const MAX_MESSAGE = 2000;
 /** Anything reaching this by GET is a stray link or a crawler — send it home
  *  rather than rendering an empty layout. */
 export async function loader({ params }: Route.LoaderArgs) {
-  return redirect(`/${params.channelId}`);
+  const base = basePath(params.channelId);
+  return redirect(`${base}`);
 }
 
 export async function action({ params, request }: Route.ActionArgs) {

@@ -23,11 +23,13 @@ import { generateReference } from "~/lib/bookings.server";
 import { stashPendingVoucher, type PendingVoucher } from "~/lib/pending-vouchers.server";
 import { finalizeVoucher } from "~/lib/voucher-purchase.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const pid = await resolvePropertyId(params.channelId);
   const product = await getVoucherProduct(pid, params.productId);
-  if (!product || !product.active) throw redirect(`/${params.channelId}/vouchers`);
+  if (!product || !product.active) throw redirect(`${base}/vouchers`);
   const soldOut = product.cap != null && (await soldCount(pid, product.id).catch(() => 0)) >= product.cap;
 
   // Rooms feed the gallery + "where you'll stay" cards: a package shows its
@@ -76,6 +78,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const base = basePath(params.channelId);
   const pid = await resolvePropertyId(params.channelId);
   const product = await getVoucherProduct(pid, params.productId);
   if (!product || !product.active) return { error: "This voucher is no longer on sale." };
@@ -155,7 +158,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!live) {
     // Test mode: issue a simulated voucher directly — same as simulated bookings.
     const issued = await finalizeVoucher(pending, undefined);
-    return redirect(`/${params.channelId}/voucher/${issued.code}?issued=1`);
+    return redirect(`${base}/voucher/${issued.code}?issued=1`);
   }
 
   const reference = generateReference();
@@ -174,8 +177,8 @@ export async function action({ params, request }: Route.ActionArgs) {
         metadata: { kind: "voucher", reference, pid },
         // Same 60-min payment window inside the 3h pending stash as bookings.
         expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-        success_url: `${url.origin}/${params.channelId}/vouchers/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}`,
-        cancel_url: `${url.origin}/${params.channelId}/vouchers/${product.id}`,
+        success_url: `${url.origin}${base}/vouchers/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}`,
+        cancel_url: `${url.origin}${base}/vouchers/${product.id}`,
         mode: "payment",
         payment_intent_data: {
           description: `${hotelName} voucher · ${product.title} (${record.code})`,
@@ -262,6 +265,7 @@ function Faq({ items }: { items: { q: string; a: string }[] }) {
 }
 
 export default function VoucherBuy({ loaderData, actionData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { product: p, gallery, roomCards, soldOut } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
@@ -343,7 +347,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
     <main className="mx-auto max-w-[1160px] px-7 pb-24 pt-6 min-[900px]:pb-20">
       {/* Breadcrumb */}
       <div className="mb-4 flex items-center gap-2 text-caption text-muted-2">
-        <Link to={`/${params.channelId}/vouchers`} className="hover:text-accent">
+        <Link to={`${base}/vouchers`} className="hover:text-accent">
           {tr.t("vouchersTitle")}
         </Link>
         <span>›</span>

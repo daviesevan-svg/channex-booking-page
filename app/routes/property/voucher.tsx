@@ -13,6 +13,7 @@ import { resolvePropertyId } from "~/lib/properties.server";
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { getBooking } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
+import { useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolvePropertyId(params.channelId);
@@ -87,6 +88,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function Voucher({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { voucher: v, issued, justBooked, booking } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
@@ -184,14 +186,14 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           <div className="flex flex-wrap justify-center gap-3">
             {v.kind === "package" && v.status === "active" && (
               <Link
-                to={`/${params.channelId}/voucher/${v.code}/book`}
+                to={`${base}/voucher/${v.code}/book`}
                 className="rounded-card bg-accent px-6 py-3.5 text-lead font-semibold text-white hover:bg-accent-deep"
               >
                 {tr.t("voucherBookStay")}
               </Link>
             )}
             <a
-              href={`/${params.channelId}/voucher/${v.code}/pdf`}
+              href={`${base}/voucher/${v.code}/pdf`}
               className="rounded-card border border-line-alt bg-surface px-6 py-3.5 text-lead font-semibold text-secondary hover:border-accent hover:text-accent"
             >
               {tr.t("voucherDownloadPdf")}

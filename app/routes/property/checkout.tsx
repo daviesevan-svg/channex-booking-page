@@ -45,6 +45,7 @@ import { langFromRequest } from "~/lib/content";
 import { getOverrides, getPageText } from "~/lib/overrides.server";
 import { resolvePropertyId } from "~/lib/properties.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
+import { basePath, useBase } from "~/lib/base";
 
 interface Stay {
   channelId: string;
@@ -127,14 +128,15 @@ function deriveOffer(lines: ResolvedLine[]) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   // :channelId may be a slug — resolve to the real id and carry it on the stay,
   // so every data lookup + the booking record use the UUID. Redirects/links keep
   // params.channelId so the slug stays in the URL through the flow.
   const pid = await resolvePropertyId(params.channelId);
   const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`${base}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
 
   const settings = await getSettings(pid);
   // Currency is the property's configured currency — NEVER the URL param. There
@@ -145,7 +147,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
-    throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+    throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
@@ -242,13 +244,14 @@ const GuestSchema = z.object({
 });
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   // Resolve slug→id: stay.channelId (the booking's pid, Stripe metadata, etc.)
   // must be the real UUID. Redirect/return URLs keep params.channelId (the slug).
   const pid = await resolvePropertyId(params.channelId);
   const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
+  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(`${base}`);
+  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
 
   // Currency is the property's, never the URL (see loader) — this is the charge
   // path, so the guard matters most here.
@@ -261,7 +264,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
-    throw redirect(`/${params.channelId}/rooms?${url.searchParams.toString()}`);
+    throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
   }
   const totals = cartCoverage(lines);
   // The automatic offer is baked into the line totals; snapshot it on the booking.
@@ -485,8 +488,8 @@ export async function action({ params, request }: Route.ActionArgs) {
       // stash expired would be charged with no booking created. 60 min hold,
       // comfortably inside the stash TTL.
       expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-      success_url: `${url.origin}/${params.channelId}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
-      cancel_url: `${url.origin}/${params.channelId}/checkout?${url.searchParams.toString()}`,
+      success_url: `${url.origin}${base}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
+      cancel_url: `${url.origin}${base}/checkout?${url.searchParams.toString()}`,
     };
     // A human-readable summary of the stay for Stripe's hosted page.
     const hotelName = (await getOverrides(stay.channelId, pending.record.lang)).hotelName || "Your booking";
@@ -577,7 +580,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   // No card needed (or a guarantee rate with Stripe not connected): book now.
   const record = await finalizeBooking(pending, undefined, url.origin);
   if (record.status === "failed") return { bookingError: record.error };
-  return redirect(`/${params.channelId}/confirmation/${reference}?${next.toString()}`);
+  return redirect(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 
 function Field({
@@ -642,6 +645,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 
 
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
@@ -755,7 +759,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
       <Link
-        to={`/${params.channelId}/rooms?${searchParams.toString()}`}
+        to={`${base}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("allRooms")}

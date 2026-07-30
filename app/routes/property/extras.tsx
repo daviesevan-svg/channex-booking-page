@@ -29,8 +29,10 @@ import {
 import { formatMoney } from "~/lib/money";
 import { partySize, readOccupancy } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
+import { basePath, useBase } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const base = basePath(params.channelId);
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
@@ -38,15 +40,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // :channelId may be a slug — resolve to the real id for data lookups; redirects
   // and links keep params.channelId so the slug stays in the URL.
   const pid = await resolvePropertyId(params.channelId);
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`/${params.channelId}`);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`/${params.channelId}`);
+  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(`${base}`);
+  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(`${base}`);
 
   // Currency is the property's, not the URL param (no conversion exists).
   const currency = (await getSettings(pid)).currency || "GBP";
 
   const sp = url.searchParams.toString();
   const lineIndex = Number(url.searchParams.get("line"));
-  if (!Number.isInteger(lineIndex) || lineIndex < 0) throw redirect(`/${params.channelId}/rooms?${sp}`);
+  if (!Number.isInteger(lineIndex) || lineIndex < 0) throw redirect(`${base}/rooms?${sp}`);
 
   const cartLines = await resolveCartByOccupancy(
     pid,
@@ -55,7 +57,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { adults: occ.adults, childrenAge: occ.childrenAge },
   );
   const line = cartLines[lineIndex];
-  if (!line) throw redirect(`/${params.channelId}/rooms?${sp}`);
+  if (!line) throw redirect(`${base}/rooms?${sp}`);
 
   // Room-scoped extras eligible for this room+rate; booking-scoped extras are
   // offered once, on the first room's step.
@@ -65,7 +67,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const bookingExtras = isFirst ? catalog.filter((e) => scopeOf(e) === "booking") : [];
   // Nothing to offer for this room → skip the step entirely.
   if (roomExtras.length === 0 && bookingExtras.length === 0) {
-    throw redirect(`/${params.channelId}/rooms?${sp}`);
+    throw redirect(`${base}/rooms?${sp}`);
   }
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -193,6 +195,7 @@ function ExtraSection({
 }
 
 export default function Extras({ loaderData, params }: Route.ComponentProps) {
+  const base = useBase();
   const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
     loaderData;
   const { currency: ctxCurrency } = useProperty();
@@ -216,13 +219,13 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
     const xt = serializeExtrasState(state);
     if (xt) next.set("xt", xt);
     else next.delete("xt");
-    navigate(`/${params.channelId}/rooms?${next.toString()}`);
+    navigate(`${base}/rooms?${next.toString()}`);
   };
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
       <Link
-        to={`/${params.channelId}/rooms?${searchParams.toString()}`}
+        to={`${base}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
       >
         ← {tr.t("allRooms")}
