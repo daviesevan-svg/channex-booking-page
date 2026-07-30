@@ -405,6 +405,75 @@ const FR: Dict = {
   fac_nonSmoking: "Non-fumeur",
   hotelResponse: "Réponse de {hotel}",
   reviewStarsRequired: "Veuillez choisir une note globale.",
+
+  // Manage-booking lookup and list
+  manageTitle: "Gérer votre réservation",
+  manageIntro: "Saisissez votre numéro de réservation et l’e-mail utilisé lors de la réservation.",
+  manageNotFound: "Nous n’avons trouvé aucune réservation avec ce numéro et cet e-mail. Merci de vérifier et de réessayer.",
+  manageTooMany: "Trop de tentatives. Merci de patienter quelques minutes avant de réessayer.",
+  findBooking: "Trouver ma réservation",
+  bookingReference: "Numéro de réservation",
+  emailAddress: "E-mail",
+  guestName: "Nom",
+  reference: "Référence",
+  bookedOn: "Réservé le",
+  yourBookings: "Vos réservations",
+  noBookingsForEmail: "Aucune réservation trouvée pour cet e-mail pour le moment.",
+  signOut: "Se déconnecter",
+  view: "Voir",
+  statusCancelled: "Annulée",
+
+  // Confirmation / manage section headings
+  sectionBooking: "Réservation",
+  sectionGuest: "Client",
+  sectionPayment: "Paiement",
+  sectionRooms: "Chambres",
+
+  // Cancellation policy and cancelling
+  cancellationPolicy: "Conditions d’annulation",
+  freeCancellationAnytime: "Annulation gratuite à tout moment avant l’arrivée.",
+  freeCancellationUntil: "Annulation gratuite jusqu’au {date}.",
+  freeCancellationEnded: "L’annulation gratuite était possible jusqu’au {date}.",
+  afterDeadlineCharge: "Passé ce délai, nous facturons {penalty} en cas d’annulation.",
+  noShowCharge: "Non-présentation : nous facturons {penalty}.",
+  penaltyFirstNight: "la première nuit",
+  penaltyFullStay: "le séjour complet",
+  penaltyPercent: "{n} % du séjour",
+  nonRefundableBooking: "Cette réservation n’est pas remboursable.",
+  nonRefundableNotice: "Cette réservation n’est pas remboursable et ne peut pas être annulée en ligne.",
+  cancellationVariesByRoom: "Les conditions d’annulation varient selon la chambre — celles de chaque chambre figurent dans votre confirmation.",
+  cancelBooking: "Annuler la réservation",
+  cancelConfirm: "Voulez-vous vraiment annuler cette réservation ? Cette action est irréversible.",
+  cancelling: "Annulation…",
+  cancelUnavailable: "Cette réservation ne peut plus être annulée en ligne. Merci de nous contacter.",
+  cancelNotAllowed: "L’annulation en ligne n’est pas disponible pour cette réservation. Merci de nous contacter.",
+  bookingCancelled: "Cette réservation a été annulée.",
+
+  // Payment
+  dueNow: "À payer maintenant",
+  dueAtHotel: "À payer à l’hôtel",
+  cardChargedNote: "Votre carte va être débitée maintenant.",
+  cardGuaranteeNote: "Nous avons simplement besoin d’une carte pour garantir la réservation — aucun débit aujourd’hui.",
+  walletsAccepted: "Apple Pay, Google Pay et cartes acceptés — paiement sécurisé.",
+  noPaymentInfo: "Aucune information de paiement pour le moment.",
+  includesTaxes: "Comprend {amount} de taxes et frais",
+  discount: "Remise",
+
+  // Promo codes
+  promoCode: "Code promo",
+  applyCode: "Appliquer",
+  promoApplied: "Code appliqué.",
+  promoInvalid: "Ce code n’est pas valide.",
+
+  // Calendar availability helpers
+  checkoutOnly: "Départ uniquement — arrivée impossible ce jour-là",
+  helperClosedToArrival: "L’arrivée n’est pas possible le {date}. Merci de choisir une autre date d’arrivée.",
+  helperClosedToDeparture: "Le départ n’est pas possible le {date}. Merci de choisir une autre date de départ.",
+
+  // Paid but not confirmed (checkout failure states)
+  confirmProblemHeading: "Nous n’avons pas pu confirmer votre réservation",
+  confirmProblemBody: "Votre paiement a bien été effectué, mais nous n’avons pas pu finaliser votre réservation à {hotel}. Notre équipe a été prévenue et vous contactera très prochainement. Si nous ne pouvons pas la confirmer, vous serez intégralement remboursé.",
+  confirmRefundedBody: "Votre paiement a bien été effectué, mais la chambre n’était plus disponible : nous n’avons pas pu confirmer votre réservation à {hotel}. Nous vous avons intégralement remboursé — vous recevrez un e-mail de confirmation sous peu.",
 };
 
 export default FR;

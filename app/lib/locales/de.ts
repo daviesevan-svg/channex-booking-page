@@ -405,6 +405,75 @@ const DE: Dict = {
   fac_nonSmoking: "Nichtraucher",
   hotelResponse: "Antwort von {hotel}",
   reviewStarsRequired: "Bitte wählen Sie eine Gesamtbewertung.",
+
+  // Manage-booking lookup and list
+  manageTitle: "Ihre Buchung verwalten",
+  manageIntro: "Geben Sie Ihre Buchungsnummer und die E-Mail-Adresse ein, mit der Sie gebucht haben.",
+  manageNotFound: "Wir konnten keine Buchung mit dieser Buchungsnummer und E-Mail-Adresse finden. Bitte prüfen Sie die Angaben und versuchen Sie es erneut.",
+  manageTooMany: "Zu viele Versuche. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
+  findBooking: "Meine Buchung finden",
+  bookingReference: "Buchungsnummer",
+  emailAddress: "E-Mail",
+  guestName: "Name",
+  reference: "Referenz",
+  bookedOn: "Gebucht",
+  yourBookings: "Ihre Buchungen",
+  noBookingsForEmail: "Für diese E-Mail-Adresse wurden noch keine Buchungen gefunden.",
+  signOut: "Abmelden",
+  view: "Ansehen",
+  statusCancelled: "Storniert",
+
+  // Confirmation / manage section headings
+  sectionBooking: "Buchung",
+  sectionGuest: "Gast",
+  sectionPayment: "Zahlung",
+  sectionRooms: "Zimmer",
+
+  // Cancellation policy and cancelling
+  cancellationPolicy: "Stornierungsbedingungen",
+  freeCancellationAnytime: "Kostenlose Stornierung jederzeit vor der Anreise.",
+  freeCancellationUntil: "Kostenlose Stornierung bis {date}.",
+  freeCancellationEnded: "Kostenlose Stornierung war bis {date} möglich.",
+  afterDeadlineCharge: "Danach berechnen wir bei einer Stornierung {penalty}.",
+  noShowCharge: "Nichterscheinen: Wir berechnen {penalty}.",
+  penaltyFirstNight: "die erste Nacht",
+  penaltyFullStay: "den gesamten Aufenthalt",
+  penaltyPercent: "{n} % des Aufenthalts",
+  nonRefundableBooking: "Diese Buchung ist nicht erstattungsfähig.",
+  nonRefundableNotice: "Dies ist eine nicht erstattungsfähige Buchung und kann online nicht storniert werden.",
+  cancellationVariesByRoom: "Die Stornierungsbedingungen unterscheiden sich je Zimmer — die Bedingungen für jedes Zimmer stehen in Ihrer Bestätigung.",
+  cancelBooking: "Buchung stornieren",
+  cancelConfirm: "Möchten Sie diese Buchung wirklich stornieren? Das kann nicht rückgängig gemacht werden.",
+  cancelling: "Wird storniert…",
+  cancelUnavailable: "Diese Buchung kann online nicht mehr storniert werden. Bitte kontaktieren Sie uns.",
+  cancelNotAllowed: "Für diese Buchung ist keine Online-Stornierung möglich. Bitte kontaktieren Sie uns.",
+  bookingCancelled: "Diese Buchung wurde storniert.",
+
+  // Payment
+  dueNow: "Jetzt fällig",
+  dueAtHotel: "Im Hotel fällig",
+  cardChargedNote: "Ihre Karte wird jetzt belastet.",
+  cardGuaranteeNote: "Wir benötigen nur eine Karte zur Absicherung der Buchung — heute wird nichts abgebucht.",
+  walletsAccepted: "Apple Pay, Google Pay und Karten akzeptiert — sichere Bezahlung.",
+  noPaymentInfo: "Noch keine Zahlungsinformationen.",
+  includesTaxes: "Enthält {amount} Steuern und Gebühren",
+  discount: "Rabatt",
+
+  // Promo codes
+  promoCode: "Aktionscode",
+  applyCode: "Anwenden",
+  promoApplied: "Aktionscode angewendet.",
+  promoInvalid: "Dieser Code ist nicht gültig.",
+
+  // Calendar availability helpers
+  checkoutOnly: "Nur Abreise — an diesem Tag ist keine Anreise möglich",
+  helperClosedToArrival: "Am {date} ist keine Anreise möglich. Bitte wählen Sie ein anderes Anreisedatum.",
+  helperClosedToDeparture: "Am {date} ist keine Abreise möglich. Bitte wählen Sie ein anderes Abreisedatum.",
+
+  // Paid but not confirmed (checkout failure states)
+  confirmProblemHeading: "Wir konnten Ihre Buchung nicht bestätigen",
+  confirmProblemBody: "Ihre Zahlung war erfolgreich, aber wir konnten Ihre Buchung im {hotel} nicht abschließen. Unser Team ist informiert und meldet sich in Kürze bei Ihnen. Sollten wir die Buchung nicht bestätigen können, erhalten Sie den vollen Betrag zurück.",
+  confirmRefundedBody: "Ihre Zahlung war erfolgreich, aber das Zimmer war nicht mehr verfügbar, sodass wir Ihre Buchung im {hotel} nicht bestätigen konnten. Wir haben Ihnen den vollen Betrag zurückerstattet — Sie erhalten in Kürze eine Bestätigungs-E-Mail.",
 };
 
 export default DE;
