@@ -26,10 +26,15 @@ interface LayoutData {
  *  generated `matches` tuple is assignable to this. */
 type MetaMatch = { id: string; loaderData?: unknown } | undefined;
 
-const LAYOUT_ID = "routes/property/layout";
+// The layout is mounted twice — once under `:channelId` with its file-derived id,
+// once at the root with an explicit one (see guestRoutes() in routes.ts). Both
+// have to be recognised here. Matching only the first meant that on a hotel's
+// custom domain every title lost the hotel name AND `lang` fell back to the
+// default, so meta descriptions came out in English whatever the guest picked.
+const LAYOUT_IDS = ["routes/property/layout", "host"];
 
 function chrome(matches: readonly MetaMatch[]): { lang: string; hotelName: string } {
-  const data = matches.find((m) => m?.id === LAYOUT_ID)?.loaderData as
+  const data = matches.find((m) => m && LAYOUT_IDS.includes(m.id))?.loaderData as
     | Partial<LayoutData>
     | undefined;
   return { lang: data?.lang ?? DEFAULT_LANG, hotelName: data?.hotelName ?? "" };

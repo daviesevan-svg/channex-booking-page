@@ -22,12 +22,20 @@ import { SectionList } from "~/components/section-list";
 import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
-import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
+import { loadPicker } from "~/lib/picker.server";
+import { PropertyPicker } from "~/components/property-picker";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups.
-  const pid = await resolveRequestProperty(params.channelId, request);
+  //
+  // This route is BOTH "/spilmanhotel" and "/". At the root with a hostname that
+  // isn't a custom domain there is no property, and that is not an error — it is
+  // the shared domain's front door, which lists everything bookable instead.
+  // Route matching cannot see the hostname, so the branch has to be here.
+  const pid = await resolveRequestPropertyOrNull(params.channelId, request);
+  if (!pid) return { mode: "picker" as const, picker: await loadPicker() };
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
@@ -54,6 +62,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
   return {
+    mode: "property" as const,
     closedDates,
     content,
     earliestCheckin: earliestCheckinDate(cutoff, now),
@@ -62,11 +71,24 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 }
 
-export function meta({ matches }: Route.MetaArgs) {
+export function meta({ matches, loaderData }: Route.MetaArgs) {
+  // The picker is ours, not a hotel's — it must not inherit a property's title.
+  if (loaderData?.mode === "picker") {
+    return [
+      { title: "Book direct — Roompanda" },
+      {
+        name: "description",
+        content: "Browse and book hotels and apartments directly, commission-free.",
+      },
+    ];
+  }
   return pageMeta(matches, { titleKey: "metaHome", descKey: "metaDescHome" });
 }
 
 export default function Search({ loaderData, params }: Route.ComponentProps) {
+  // Shared domain root: no property to search, so show what there is to book.
+  if (loaderData.mode === "picker") return <PropertyPicker {...loaderData.picker} />;
+
   const base = useBase();
   const { closedDates, content, earliestCheckin, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
