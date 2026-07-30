@@ -492,7 +492,14 @@ function Activation({
       ) : state.kind === "off" ? (
         <Note tone="wait">{t("webProvOff")}</Note>
       ) : state.kind === "error" ? (
-        <Note tone="plain">{t("webProvError", { message: state.message })}</Note>
+        // "Try again in a moment" is wrong advice for a rejected credential, and
+        // wrong advice is worse than none when someone is trying to get a domain
+        // live. Say which kind of failure it is.
+        <Note tone={state.permanent ? "wait" : "plain"}>
+          {state.permanent
+            ? t("webProvErrorConfig", { message: state.message })
+            : t("webProvError", { message: state.message })}
+        </Note>
       ) : state.kind === "missing" ? (
         <Note tone="plain">{t("webProvNotStarted")}</Note>
       ) : (

@@ -45,8 +45,11 @@ export type ProvisionState =
   | { kind: "off" }
   /** Configured, but this hostname hasn't been registered with Cloudflare yet. */
   | { kind: "missing" }
-  /** The API call itself failed — say so rather than implying the domain is wrong. */
-  | { kind: "error"; message: string }
+  /** The API call itself failed — say so rather than implying the domain is wrong.
+   *  `permanent` separates "our credentials are wrong" from "Cloudflare hiccuped":
+   *  telling a hotel to try again in a moment is actively misleading when the fix
+   *  is on our side and no amount of retrying will help. */
+  | { kind: "error"; message: string; permanent: boolean }
   | {
       kind: "hostname";
       id: string;
@@ -87,9 +90,30 @@ export function provisioningConfigured(): boolean {
   return Boolean(c.cloudflareApiToken && c.cloudflareZoneId);
 }
 
+/** An API failure that carries whether retrying could ever help. */
+class CfError extends Error {
+  constructor(
+    message: string,
+    readonly permanent: boolean,
+  ) {
+    super(message);
+  }
+}
+
+function asState(e: unknown): ProvisionState {
+  return {
+    kind: "error",
+    message: e instanceof Error ? e.message : String(e),
+    // Anything other than a CfError is a network/timeout failure, which IS worth
+    // retrying — default to transient and only claim "permanent" when Cloudflare
+    // rejected the request itself.
+    permanent: e instanceof CfError && e.permanent,
+  };
+}
+
 async function cf<T>(path: string, init?: RequestInit): Promise<T> {
   const { cloudflareApiToken, cloudflareZoneId } = getConfig();
-  if (!cloudflareApiToken || !cloudflareZoneId) throw new Error("Not configured.");
+  if (!cloudflareApiToken || !cloudflareZoneId) throw new CfError("Not configured.", true);
   const res = await fetch(`${API}/zones/${cloudflareZoneId}${path}`, {
     ...init,
     headers: {
@@ -110,7 +134,16 @@ async function cf<T>(path: string, init?: RequestInit): Promise<T> {
       .map((e) => e.message)
       .filter(Boolean)
       .join("; ");
-    throw new Error(detail || `Cloudflare returned ${res.status}.`);
+    // Cloudflare understood us and said no, in one of two flavours — verified
+    // against the live API, because the status is not what you'd guess:
+    //   400 + code 9106 "Authentication failed (status: 400)" = bad token value
+    //   404 + "Could not route to /client/v4/zones/…"          = bad zone id
+    // A wrong zone id is a 404, NOT a 400, so leaving 404 out (as I first did)
+    // reports the single most likely setup mistake — pasting the ACCOUNT id,
+    // which sits beside the zone id in the same dashboard sidebar — as something
+    // to retry in a moment, forever.
+    const rejected = [400, 401, 403, 404].includes(res.status);
+    throw new CfError(detail || `Cloudflare returned ${res.status}.`, rejected);
   }
   return body.result as T;
 }
@@ -150,7 +183,7 @@ export async function findCustomHostname(hostname: string): Promise<ProvisionSta
     const match = (list ?? []).find((h) => normalizeDomain(h.hostname) === host);
     return match ? describe(match) : { kind: "missing" };
   } catch (e) {
-    return { kind: "error", message: e instanceof Error ? e.message : String(e) };
+    return asState(e);
   }
 }
 
@@ -184,7 +217,7 @@ export async function ensureCustomHostname(hostname: string): Promise<ProvisionS
       }),
     });
   } catch (e) {
-    return { kind: "error", message: e instanceof Error ? e.message : String(e) };
+    return asState(e);
   }
 
   // Read back rather than trusting the POST body: the create response reports a
