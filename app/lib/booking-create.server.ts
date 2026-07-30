@@ -14,6 +14,22 @@ import { resolveBookingCancellation } from "./policy.server";
 import { getRates, rateChannexId } from "./catalog.server";
 import { getProperty } from "./properties.server";
 
+/** Channex validates arrival_hour as strict HH:MM, but our arrival field is
+ *  free text ("10 am ", "ca. 16 Uhr"). Extract a time when one is recognisable
+ *  and drop the field otherwise — an unparseable arrival note must never fail
+ *  the booking push. The raw text still reaches the hotel via the record. */
+export function normalizeArrivalHour(raw: string | undefined): string | undefined {
+  const m = raw?.match(/\b(\d{1,2})(?:[:.h](\d{2})|h)?\s*(am|pm)?\b/i);
+  if (!m) return undefined;
+  let hour = Number(m[1]);
+  const minute = m[2] ? Number(m[2]) : 0;
+  const meridiem = m[3]?.toLowerCase();
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+  if (hour > 23 || minute > 59) return undefined;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 export interface PreparePendingInput {
   pid: string;
   reference: string;
@@ -111,7 +127,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     currency,
     arrival_date: checkin,
     departure_date: checkout,
-    arrival_hour: guest.arrival || undefined,
+    arrival_hour: normalizeArrivalHour(guest.arrival),
     customer: { name: guest.firstName, surname: guest.lastName, mail: guest.email, phone: guest.phone },
     rooms: lines.map((l, index) => {
       const lineTotal = Math.round(l.total * ratio * 100) / 100;
