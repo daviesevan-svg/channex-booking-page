@@ -26,6 +26,7 @@ export const MAX_PAGES = 12;
  */
 export const RESERVED_PAGE_SLUGS = new Set([
   // live routes
+  "p", // pages themselves live under /p/ — a page slugged "p" gives /p/p
   "rooms",
   "room",
   "contact",
