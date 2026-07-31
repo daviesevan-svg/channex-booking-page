@@ -254,17 +254,18 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   //
   // Last, so a style could override a theme value; nothing does today, and a
   // style fighting the theme's accent would be a bug rather than a feature.
-  Object.assign(themeStyle, style.vars ?? {});
+  Object.assign(themeStyle, style.vars ?? {}, style.headings ?? {});
 
   return (
     <SiteStyleProvider id={siteStyleId ?? undefined}>
     <div
       className="flex min-h-screen flex-col font-sans text-ink"
       data-theme={isCustom ? undefined : theme}
-      // Typography the template can't deliver as a token — see the
-      // `[data-style]` rules in app.css. Always set, so `classic` is an explicit
-      // value rather than "no attribute means the old look".
       data-style={style.id}
+      // Switches on the generic heading rule in app.css. Present only for a
+      // style that declares heading typography, so `classic` keeps the
+      // per-call-site utilities it has always had.
+      data-headings={style.headings ? "" : undefined}
       style={themeStyle}
     >
       {/* Non-blocking, same as the default pair in root — see FontStylesheet.

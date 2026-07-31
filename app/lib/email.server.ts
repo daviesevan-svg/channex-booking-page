@@ -24,7 +24,7 @@
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
-import { accentHex, composeEmail, composeReviewEmail, renderSimpleEmail } from "./email-render.server";
+import { accentHex, composeEmail, composeReviewEmail, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 
 export interface SendEmailOptions {
@@ -105,11 +105,11 @@ export async function sendGuestBookingEmail(pid: string, booking: BookingRecord,
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
-    const accent = accentHex(settings);
+    const brand = await emailBrand(pid, accentHex(settings));
     const from = senderFrom(settings, getConfig());
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
     const gtext = await getEmailTemplate(pid, "booking_confirmation", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, accent, manageUrl });
+    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, brand, manageUrl });
     const r = await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
     return r.sent;
   } catch (e) {
@@ -124,7 +124,7 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
-    const accent = accentHex(settings);
+    const brand = await emailBrand(pid, accentHex(settings));
     const from = senderFrom(settings, getConfig());
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
@@ -133,7 +133,7 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (settings.notifyHostOnBooking !== false && hostTo) {
       const htext = await getEmailTemplate(pid, "host_notification", booking.lang);
-      const h = composeEmail({ def: emailDef("host_notification")!, text: htext, booking, hotelName, accent, manageUrl });
+      const h = composeEmail({ def: emailDef("host_notification")!, text: htext, booking, hotelName, brand, manageUrl });
       await sendEmail({ to: hostTo, subject: h.subject, html: h.html, from, replyTo: booking.guest.email });
     }
   } catch (e) {
@@ -150,7 +150,7 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
     const hotelName = ov.hotelName || "Your hotel";
     const from = senderFrom(settings, getConfig());
     const text = await getEmailTemplate(pid, "booking_failed", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, accent: accentHex(settings), manageUrl: "" });
+    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl: "" });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
   } catch (e) {
     console.log(`[email] sendBookingFailedEmail failed: ${e instanceof Error ? e.message : e}`);
@@ -181,7 +181,7 @@ export async function sendReviewRequestEmail(
       text,
       booking,
       hotelName,
-      accent: accentHex(settings),
+      brand: await emailBrand(pid, accentHex(settings)),
       reviewUrl,
     });
     const r = await sendEmail({
@@ -209,7 +209,7 @@ export async function sendTeamInviteEmail(
     const hotelName = ov.hotelName || "the property";
     const html = renderSimpleEmail({
       hotelName,
-      accent: accentHex(settings),
+      brand: await emailBrand(pid, accentHex(settings)),
       heading: `You've been added to ${hotelName}`,
       body:
         `${invitedBy} has given you access to manage ${hotelName} on Roompanda.\n\n` +
@@ -294,7 +294,7 @@ export async function sendCollectionMembershipEmail(args: {
       replyTo: settings.emailReplyTo,
       html: renderSimpleEmail({
         hotelName,
-        accent: accentHex(settings),
+        brand: await emailBrand(args.pid, accentHex(settings)),
         heading: copy.heading,
         body: copy.body,
         cta: { label: copy.label, url: args.manageUrl },
@@ -330,7 +330,7 @@ export async function sendCollectionRequestEmail(args: {
       subject: `${args.propertyName} would like to join ${args.collectionName}`,
       html: renderSimpleEmail({
         hotelName: args.collectionName,
-        accent: accentHex(settings),
+        brand: await emailBrand(args.pid, accentHex(settings)),
         heading: `A property has asked to join ${args.collectionName}`,
         body:
           `${args.propertyName}${where} has asked to be listed in ${args.collectionName}.\n\n` +
@@ -366,7 +366,7 @@ export async function sendContactEmail(args: {
       replyTo: args.guestEmail,
       html: renderSimpleEmail({
         hotelName: args.hotelName,
-        accent: accentHex(settings),
+        brand: await emailBrand(args.pid, accentHex(settings)),
         heading: "New enquiry from your website",
         body:
           `${args.guestName} <${args.guestEmail}> wrote:\n\n${args.message}\n\n` +
@@ -384,18 +384,18 @@ export async function sendCancellationEmails(pid: string, booking: BookingRecord
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
-    const accent = accentHex(settings);
+    const brand = await emailBrand(pid, accentHex(settings));
     const from = senderFrom(settings, getConfig());
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
     const gtext = await getEmailTemplate(pid, "booking_cancellation", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking, hotelName, accent, manageUrl });
+    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking, hotelName, brand, manageUrl });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
 
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (settings.notifyHostOnCancel !== false && hostTo) {
       const htext = await getEmailTemplate(pid, "cancellation_notification", booking.lang);
-      const h = composeEmail({ def: emailDef("cancellation_notification")!, text: htext, booking, hotelName, accent, manageUrl });
+      const h = composeEmail({ def: emailDef("cancellation_notification")!, text: htext, booking, hotelName, brand, manageUrl });
       await sendEmail({ to: hostTo, subject: h.subject, html: h.html, from, replyTo: booking.guest.email });
     }
   } catch (e) {

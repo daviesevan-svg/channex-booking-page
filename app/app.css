@@ -197,38 +197,51 @@ body {
    rules cover that half, keyed off `data-style` on the guest wrapper, the same
    way the themes above key off `data-theme`.
 
-   Why a descendant rule and not a class: `[data-style="…"] main h2` outranks a
-   single utility class, so it can set letter-spacing without fighting the
-   `tracking-*` utilities already on those headings. A plain `.h-section` class
-   would win against them too — unlayered CSS beats a layered utility — but only
-   by accident, and it would have to be added at ~60 call sites to do it.
-
    Scoped to `main` so the header and footer keep their own treatment: the site
-   name is a wordmark, not a heading. */
-[data-style="editorial"] main h1 {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+   name is a wordmark, not a heading.
+
+   ONE rule for every style, present and future: the values come from custom
+   properties the style declares in site-style.ts, so adding a template never
+   means editing this file.
+
+   Gated on `[data-headings]`, which the wrapper sets ONLY for a style that
+   declares heading typography. That gate is what keeps `classic` alone: its
+   headings come from per-call-site utilities (`font-serif`, `tracking-[-0.02em]`,
+   and several different tracking values), and a rule with one fallback would
+   flatten that variation into something subtly wrong.
+
+   Specificity is deliberate: `[data-headings] main h1` is (0,1,2), which outranks
+   the utilities already on those headings. A plain `main h1` at (0,0,2) would
+   lose to `.font-serif` and silently do nothing.
+
+   Every property has a fallback, because a style may declare some and not
+   others — an undefined custom property makes the declaration invalid at
+   computed-value time, which would reset the property rather than leave it be.
+
+   h2 and h3 share a treatment because the funnel uses h3 where the website uses
+   h2, for both panel headings ("Your stay", "Payment") and item titles (a room,
+   an extra). Splitting them is what made a room called GARDEN SUITE on the
+   website turn back into Garden Suite one click later. */
+[data-headings] main h1 {
+  font-family: var(--h1-font, var(--font-serif));
+  font-style: var(--h1-style, normal);
+  font-weight: var(--h1-weight, 500);
+  text-transform: var(--h1-case, none);
+  letter-spacing: var(--h1-tracking, -0.02em);
 }
-/* Everything below the page title is the small-caps sans half of the pairing.
-   h3 is in here because the funnel uses it where the website uses h2 — panel
-   headings ("Your stay", "Payment") and item titles (a room, an extra). Leaving
-   it out is what made a room called GARDEN SUITE on the website turn back into
-   Garden Suite one click later. Every one of them is a short title; nothing
-   prose-length is an h3 on a guest page. */
-[data-style="editorial"] main :is(h2, h3) {
-  font-family: var(--font-sans);
-  font-style: normal;
-  font-weight: 600;
-  text-transform: uppercase;
+[data-headings] main :is(h2, h3) {
+  font-family: var(--h2-font, var(--font-serif));
+  font-style: var(--h2-style, normal);
+  font-weight: var(--h2-weight, 600);
+  text-transform: var(--h2-case, none);
 }
-[data-style="editorial"] main h2 {
-  letter-spacing: 0.16em;
+[data-headings] main h2 {
+  letter-spacing: var(--h2-tracking, normal);
 }
-/* Tighter: an h3 can be a 24px room title, and 0.16em at that size sprawls. */
-[data-style="editorial"] main h3 {
-  letter-spacing: 0.08em;
+/* Falls back to the h2 value, so a style only sets this to say "an h3 is bigger
+   than an h2 here, give it less" — a 24px room title at 0.16em sprawls. */
+[data-headings] main h3 {
+  letter-spacing: var(--h3-tracking, var(--h2-tracking, normal));
 }
 
 /* Eyebrow / field-label helpers used across screens */

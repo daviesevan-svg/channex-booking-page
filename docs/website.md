@@ -245,11 +245,20 @@ for it, and the funnel has no reason to. Two mechanisms cover the rest:
   zero and squares roughly 230 call sites without touching any of them. This is
   precisely what the token conversion was for; prefer a var over a slot whenever
   the difference is expressible as a token.
-- **`[data-style="…"]` rules in app.css** for the handful of properties a token
-  can't carry — heading family, case and tracking. Keyed off an attribute on the
-  guest wrapper, the same way the themes are. A descendant rule rather than a
-  class, because it outranks the `tracking-*` utilities already on those headings
-  and needs no edits at ~60 call sites.
+- **`headings` — the same idea for heading type**, which no existing token
+  carries. The style declares `--h1-style`, `--h2-case`, `--h2-tracking` and
+  friends; ONE generic rule in app.css reads them. The rule is gated on a
+  `[data-headings]` attribute the wrapper sets only for a style that declares
+  them, which is what leaves `classic` — with several different per-call-site
+  tracking values — exactly as it was. A descendant rule rather than a class,
+  because `[data-headings] main h2` at (0,1,2) outranks the `tracking-*`
+  utilities already on those headings and needs no edits at ~60 call sites.
+- **`emailBrandFor()` — the template as literal values for emails**, which can't
+  read a custom property at all (Outlook), so the renderer writes inline styles.
+  Radii are read back out of the style's own token overrides rather than restated,
+  so squaring the site and squaring its emails can't drift apart. Only the label
+  case carries from the type treatment: there's no web font in an email, so a
+  display face would land somewhere arbitrary.
 
 Deliberately left alone: `--radius-mark` (the diamond is the brand) and
 Tailwind's `rounded-full` (squaring stepper dots and status pills reads as broken
@@ -262,6 +271,24 @@ One thing to know about heading levels: the funnel uses `h3` where the website
 uses `h2` — panel headings and item titles both. The typography rules cover
 `h2, h3` together for exactly that reason, which is what stops a room called
 GARDEN SUITE on the website turning back into Garden Suite one click later.
+
+### Adding a template
+
+One block in `app/lib/site-style.ts` — `slots`, `vars`, `headings`, `hero`,
+`band`, all optional deltas over `classic` — plus two admin strings (name and
+description) per language. It appears in the picker on its own, applies to the
+whole journey including emails, and needs no changes in app.css or any component.
+
+What still needs code rather than data:
+
+- **A new hero arrangement.** `HeroArrangement` is `"stacked" | "overlay"`,
+  branched on in `search.tsx`. Different corners and type are free; "photo left,
+  copy right, full-bleed" is not.
+- **The bespoke voucher email** (`voucher-email.server.ts`) keeps its own design —
+  it has its own layout with VML fallbacks for Outlook, so it doesn't share the
+  shell the other emails use and the brand doesn't reach it.
+- **The booking and voucher PDFs.** They take the accent and nothing else.
+- **A live preview.** A hotel applies a template and then looks at it.
 
 ---
 

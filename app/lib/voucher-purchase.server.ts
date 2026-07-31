@@ -8,7 +8,7 @@ import { paymentFromSession } from "./booking-finalize.server";
 import { retrieveCheckoutSession } from "./stripe.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { sendEmail } from "./email.server";
-import { accentHex, renderSimpleEmail } from "./email-render.server";
+import { accentHex, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { composeVoucherEmail } from "./voucher-email.server";
 import { formatMoney } from "./money";
 import type { PaymentInfo } from "./bookings.server";
@@ -62,7 +62,7 @@ async function sendVoucherSaleHostEmail(pid: string, v: VoucherRecord, origin: s
       subject: `Voucher sold — ${v.product.title} (${v.code})`,
       html: renderSimpleEmail({
         hotelName: ov.hotelName || "Your hotel",
-        accent: accentHex(settings),
+        brand: await emailBrand(pid, accentHex(settings)),
         heading: "You sold a voucher 🎉",
         body:
           `${v.buyer.name} (${v.buyer.email}) bought "${v.product.title}" — a ${kindLabel}. ${paid}\n\n` +
@@ -186,6 +186,7 @@ export async function sendVoucherCancelEmails(
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
     const hotelName = ov.hotelName || "Your hotel";
     const accent = accentHex(settings);
+    const brand = await emailBrand(pid, accent);
     const currency = settings.currency || "GBP";
     const money = (n: number) => formatMoney(n, currency);
 
@@ -194,7 +195,7 @@ export async function sendVoucherCancelEmails(
       subject: `Your ${hotelName} voucher has been cancelled`,
       html: renderSimpleEmail({
         hotelName,
-        accent,
+        brand,
         heading: "Voucher cancelled",
         body:
           `Hi ${v.buyer.name} — your voucher "${v.product.title}" (${v.code}) has been cancelled as requested.\n\n` +
@@ -214,7 +215,7 @@ export async function sendVoucherCancelEmails(
         subject: `Voucher ${v.code} cancelled by the buyer`,
         html: renderSimpleEmail({
           hotelName,
-          accent,
+          brand,
           heading: "A voucher was cancelled",
           body:
             `${v.buyer.name} (${v.buyer.email}) cancelled "${v.product.title}" (${v.code}) within the cooling-off window.\n\n` +

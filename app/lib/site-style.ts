@@ -120,6 +120,20 @@ export interface SiteStyleDef {
    */
   vars?: Record<string, string>;
   /**
+   * Heading typography, for every guest page rather than only the sections.
+   *
+   * Separate from `vars` because its presence is the switch: the wrapper gets a
+   * `data-headings` attribute only when a style declares this, and one generic
+   * rule in app.css reads these properties. A style that says nothing about type
+   * keeps the per-call-site utilities, which is what leaves `classic` — with its
+   * several different tracking values — exactly as it was.
+   *
+   * Values are plain CSS, so `var(--font-sans)` composes with the theme's chosen
+   * font pair rather than hardcoding a family. See the rule in app.css for the
+   * property names and their fallbacks.
+   */
+  headings?: Record<string, string>;
+  /**
    * Full-width bands behind each section, cycled by position.
    *
    * Undefined means NO wrapper element is emitted at all — not a wrapper with no
@@ -189,6 +203,7 @@ const STYLE_DEFS: Record<
     hero?: HeroArrangement;
     band?: SiteStyleDef["band"];
     vars?: Record<string, string>;
+    headings?: Record<string, string>;
     slots: Partial<StyleSlots>;
   }
 > = {
@@ -221,6 +236,21 @@ const STYLE_DEFS: Record<
       "--radius-panel-lg": "0px",
       "--radius-well": "0px",
       "--radius-well-lg": "0px",
+    },
+    // Serif italic for the page title, small-caps sans below it — on every guest
+    // page, not just the sections. The section slots below say the same thing for
+    // the parts of the website that set their own classes; this reaches the
+    // funnel, the voucher flow and the manage pages, which don't.
+    headings: {
+      "--h1-style": "italic",
+      "--h1-weight": "400",
+      "--h1-tracking": "-0.01em",
+      "--h2-font": "var(--font-sans)",
+      "--h2-weight": "600",
+      "--h2-case": "uppercase",
+      "--h2-tracking": "0.16em",
+      // An h3 here is often a room title at 24px, where 0.16em sprawls.
+      "--h3-tracking": "0.08em",
     },
     band: {
       // Two entries, so sections alternate. Position drives it, which means
@@ -287,6 +317,7 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
       hero: STYLE_DEFS[id].hero ?? "stacked",
       band: STYLE_DEFS[id].band,
       vars: STYLE_DEFS[id].vars,
+      headings: STYLE_DEFS[id].headings,
       slots: { ...CLASSIC, ...STYLE_DEFS[id].slots },
     },
   ]),
@@ -295,6 +326,59 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
 /** A stored (or hand-edited, or from a newer deploy) style id, made safe. */
 export function siteStyle(id: string | undefined): SiteStyleDef {
   return SITE_STYLES[(id ?? "") as SiteStyleId] ?? SITE_STYLES[DEFAULT_SITE_STYLE];
+}
+
+/**
+ * The style as literal values an email can use.
+ *
+ * Emails can't read a custom property — Outlook has no support for them, which is
+ * why the renderer writes inline styles — so the template has to arrive as plain
+ * numbers and keywords. Without this, a guest books through a square, small-caps
+ * site and gets a rounded confirmation email: the last incoherent step in the
+ * journey.
+ */
+export interface EmailBrand {
+  /** Already email-safe hex, from the theme. Unrelated to the style. */
+  accent: string;
+  radiusButton: number;
+  radiusPanel: number;
+  radiusShell: number;
+  /** `text-transform` for the details block's labels. */
+  labelCase: string;
+  labelTracking: string;
+}
+
+/** The email's own long-standing values. NOT read from the radius tokens: these
+ *  were picked for email clients, and only happen to sit near the web ones. What
+ *  the style contributes is the CHANGE, below. */
+const EMAIL_DEFAULTS = { radiusButton: 10, radiusPanel: 12, radiusShell: 14 };
+
+/**
+ * Fold a style into email-safe values.
+ *
+ * Radii are read from the style's own token overrides rather than restated, so
+ * squaring the site and squaring its emails can't drift apart — there is one
+ * place that says "this template has no corners".
+ */
+export function emailBrandFor(accent: string, styleId: string | undefined): EmailBrand {
+  const style = siteStyle(styleId);
+  const vars = style.vars ?? {};
+  const px = (token: string, fallback: number) => {
+    const raw = vars[token];
+    if (!raw) return fallback;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+  };
+  return {
+    accent,
+    radiusButton: px("--radius-control", EMAIL_DEFAULTS.radiusButton),
+    radiusPanel: px("--radius-card", EMAIL_DEFAULTS.radiusPanel),
+    radiusShell: px("--radius-card-lg", EMAIL_DEFAULTS.radiusShell),
+    // Only the label case carries: the display face doesn't, because a web font
+    // isn't there to load and the fallback stack would land somewhere arbitrary.
+    labelCase: style.headings?.["--h2-case"] ?? "none",
+    labelTracking: style.headings?.["--h2-tracking"] ?? "normal",
+  };
 }
 
 /** Join class fragments, dropping the empty ones. A style that clears a slot

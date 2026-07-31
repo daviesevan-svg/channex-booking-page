@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
-import { accentHex, bookingVars, composeEmail, composeReviewEmail, sampleBooking } from "~/lib/email-render.server";
+import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail } from "~/lib/email.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -34,8 +34,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
   const { subject, html } =
     def.id === "review_request"
-      ? composeReviewEmail({ text, booking: sample, hotelName, accent: accentHex(settings), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-      : composeEmail({ def, text, booking: sample, hotelName, accent: accentHex(settings), manageUrl });
+      ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
+      : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl });
 
   // Example value per token, for the "variables" reference table.
   const vars = bookingVars(sample, hotelName, manageUrl);
@@ -80,8 +80,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     const hotelName = ov.hotelName || "Your hotel";
     const { subject, html } =
       def.id === "review_request"
-        ? composeReviewEmail({ text, booking: sample, hotelName, accent: accentHex(settings), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-        : composeEmail({ def, text, booking: sample, hotelName, accent: accentHex(settings), manageUrl });
+        ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
+        : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl });
     const { sent, error } = await sendEmail({ to: adminEmail, subject, html, replyTo: settings.emailReplyTo });
     return sent
       ? { ok: true as const, message: `Test sent to ${adminEmail}.` }
