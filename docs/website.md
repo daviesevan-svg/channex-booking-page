@@ -179,21 +179,59 @@ details, is not a trade worth making for markup convenience. Built — see
 
 Orthogonal, and both non-destructive.
 
-**A template** is a named preset that produces a `SiteConfig`. Applying one
-replaces page structure and never touches property data, so switching template
-is always safe and reversible.
+**A template is a design, not a section preset.** Built, and this is where it
+landed differently from the original plan below.
 
-| Template | Sections |
+`app/lib/site-style.ts` holds one table of class strings per style, asked for by
+role — shell and rhythm, type, surfaces, grids, plus a hero arrangement and an
+optional set of full-width bands. `classic` is the look this booking page always
+had and is the base every other style is merged over, so a style is a *delta*:
+adding one means writing only what differs, and a slot nobody overrides can't
+silently go missing. Delivered by context from the guest layout, on the chrome
+read it already does.
+
+| Style | Look |
 |---|---|
-| Boutique | hero · richText · rooms · gallery · reviews · map · contact |
-| Resort | hero · booking · facilities · rooms · extras · gallery · offers · reviews · map |
-| Apartment *(single-unit)* | hero · booking · gallery · facilities · richText · map · faq |
-| Minimal | hero(+booking) · rooms · richText · contact |
+| `classic` | One column on a warm background, serif headings, rounded cards |
+| `editorial` | Alternating full-width bands, centred small-caps sans headings, square corners, square photo mosaic, bleeding cover photo |
+
+Two rules make this safe, and both are load-bearing:
+
+- **An empty slot emits no element** — not a wrapper with no classes. That's what
+  let the refactor be proven inert, tag for tag, against a live page.
+- **A template writes one field.** It never touches `pages` or `copy`, so trying
+  one costs nothing and switching back needs no undo. There is deliberately no
+  confirm dialog, because there is nothing to lose.
+
+The one thing a style *does* override is the hero's split/wide setting — the
+arrangement of the page is what a template is for, and the hotel's setting is
+still there when they switch back.
+
+**What a template is NOT:** it doesn't reorder or replace sections. The original
+plan (below) had templates applying a section stack, which is the destructive
+half — it would drop sections a hotel had filled in, and prose and photos with
+them. If that's ever wanted it should go through `savePageSections` /
+`saveSiteCopy`, which already GC orphaned images and copy, and it should keep
+every existing `richText` section rather than deleting hotel-written pages.
+
+> Original plan, kept because the section stacks are still a good starting point
+> for a "suggested layout" feature, and because three of the types they need
+> (`booking`, `offers`/`extras`, `faq`/`cta`) don't exist yet:
+>
+> | Template | Sections |
+> |---|---|
+> | Boutique | hero · richText · rooms · gallery · reviews · map · contact |
+> | Resort | hero · booking · facilities · rooms · extras · gallery · offers · reviews · map |
+> | Apartment *(single-unit)* | hero · booking · gallery · facilities · richText · map · faq |
+> | Minimal | hero(+booking) · rooms · richText · contact |
 
 **A theme** is the existing token system, unchanged: 5 accents plus custom, 8
-font pairs. Add a `SiteStyle` with 2–3 layout variants — header treatment,
-section rhythm, corner radius — so two hotels on Boutique/Terracotta don't come
-out identical.
+font pairs. Themes and styles compose — the style decides the shape of the page,
+the theme its colour and typeface.
+
+Not yet styled: the header and footer. They are chrome shared with the booking
+funnel, where a *website* style has no business changing anything, so "header
+treatment" needs a way to scope it to website pages first.
 
 ---
 
@@ -571,9 +609,9 @@ roughly doubles the build and is the easiest thing to add later.
 |---|---|---|
 | **1** ✅ | Gallery, facilities, per-page SEO, `<title>` fix | Useful on its own — better cards, better structured data — even if the website never ships |
 | **2** ✅ | Section engine + 8 sections, home page only, opt-in | The real v1. A one-page hotel site |
-| **3** | Multi-page, nav, footer, templates | A website product — pages, nav and footer done; **templates still to do** |
-| **4** | Custom domains | Makes it sellable |
-| **5** | Remaining sections, live preview | Polish |
+| **3** ✅ | Multi-page, nav, footer, templates | A website product. Two templates ship: a hotel picks a design and their content is untouched |
+| **4** ✅ | Custom domains | Makes it sellable |
+| **5** | Remaining sections (`booking`, `offers`, `extras`, `faq`, `cta`), header/footer styling, live preview | Polish |
 
 Phase 1 has value independent of the rest, which makes it the right place to
 start — if the product stalls after it, nothing is wasted.
