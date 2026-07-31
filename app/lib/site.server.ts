@@ -42,6 +42,7 @@ import {
   type SitePage,
   type SiteSection,
 } from "./sections";
+import type { SiteStyleId } from "./site-style";
 
 const key = (pid: string) => `site:${pid}`;
 const HOME_SLUG = "";
@@ -62,6 +63,10 @@ async function read(pid: string): Promise<SiteConfig> {
       copy: parsed.copy ?? {},
       footer: parsed.footer,
       footerCopy: parsed.footerCopy ?? {},
+      // Not validated here: `siteStyle()` resolves an unknown id to the default
+      // at render time, so a value from a newer deploy or a hand edit degrades to
+      // classic instead of being silently rewritten on the next save.
+      style: parsed.style,
     };
   } catch {
     return empty();
@@ -548,11 +553,34 @@ export interface NavPage {
   label: string;
 }
 
+/** The stored layout style, for the admin editor to show as selected. */
+export async function getSiteStyle(pid: string): Promise<string | undefined> {
+  return (await read(pid)).style;
+}
+
+/**
+ * Switch the layout style.
+ *
+ * Content-safe by construction: it writes one field and leaves `pages` and
+ * `copy` exactly as they were, so a hotel can try a style and switch back with
+ * nothing to restore.
+ */
+export async function saveSiteStyle(pid: string, style: SiteStyleId): Promise<void> {
+  const config = await read(pid);
+  await write(pid, { ...config, style });
+}
+
 /** One KV read for everything the layout needs on every website page. */
 export async function getSiteChrome(
   pid: string,
   lang: string,
-): Promise<{ hasRoomsSection: boolean; footer: ResolvedFooter; navPages: NavPage[]; pageSlugs: string[] }> {
+): Promise<{
+  hasRoomsSection: boolean;
+  footer: ResolvedFooter;
+  navPages: NavPage[];
+  pageSlugs: string[];
+  style: string | undefined;
+}> {
   const config = await read(pid);
   const pages = pagesOf(config);
   const home = pages.find(isHome)!;
@@ -560,6 +588,9 @@ export async function getSiteChrome(
 
   return {
     hasRoomsSection: home.sections.some((s) => s.type === "rooms" && !s.hidden),
+    // The layout reads this to style every website page. It rides along on the
+    // chrome read the layout already does, rather than costing a second one.
+    style: config.style,
     footer: resolveFooter(config, lang),
     // A page with no title in any language would be a blank menu item, so it's
     // left out of the nav rather than shown as a gap you can still click.

@@ -25,6 +25,8 @@ import { useBase } from "~/lib/base";
 import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
 import { loadPicker } from "~/lib/picker.server";
 import { PropertyPicker } from "~/components/property-picker";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
@@ -93,6 +95,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -177,9 +180,11 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
     <div className={split ? "" : "max-w-[680px]"}>
       <div className="eyebrow mb-[18px]">{eyebrow}</div>
       <h1
-        className={`mb-[18px] font-serif font-medium leading-[1.05] tracking-[-0.02em] ${
-          split ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl"
-        }`}
+        className={cx(
+          "mb-[18px]",
+          s.heroDisplay,
+          split ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl",
+        )}
       >
         {heading}
       </h1>
@@ -207,7 +212,13 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               the photo to the text, with a floor so a one-line intro doesn't
               leave a sliver and a ceiling so a long one doesn't produce a
               1,000px portrait. */}
-          <div className="min-h-[320px] overflow-hidden rounded-panel-lg bg-surface-alt lg:h-full lg:max-h-[560px]">
+          <div
+            className={cx(
+              "min-h-[320px] overflow-hidden",
+              s.mediaLarge,
+              "bg-surface-alt lg:h-full lg:max-h-[560px]",
+            )}
+          >
             <img
               {...imageProps(heroSplit, IMAGE_SIZES.heroSplit)}
               alt={hotelName}
@@ -222,7 +233,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       {/* search card — `#book` is the anchor the room cards jump to */}
       <div className="relative max-w-[920px]" id="book">
         <div
-          className="flex flex-wrap items-stretch gap-1.5 rounded-panel-lg border border-line bg-surface p-3.5"
+          className={cx("flex flex-wrap items-stretch gap-1.5", s.strip, "p-3.5")}
           style={{ boxShadow: "var(--shadow-card)" }}
         >
           <button
@@ -292,7 +303,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   );
 
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
+    <main className={s.page}>
       <SectionList
         sections={sections}
         data={data}

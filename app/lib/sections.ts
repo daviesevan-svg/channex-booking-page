@@ -8,6 +8,7 @@
 // card details.
 
 import type { SiteFooter } from "./footer";
+import type { SiteStyleId } from "./site-style";
 
 export const SECTION_TYPES = [
   "hero",
@@ -83,6 +84,10 @@ export interface SiteConfig {
    *  section, so a replace is right there) — sharing one map would mean the
    *  sections editor silently wiped the footer's text and vice versa. */
   footerCopy?: Record<string, Record<string, string>>;
+  /** Which layout style the pages render with. Structural, so it lives out here
+   *  beside `pages` and not in `copy` — a style is not a translation. Unset means
+   *  `classic`, which is every site that existed before styles did. */
+  style?: SiteStyleId;
 }
 
 // ---- field definitions ----

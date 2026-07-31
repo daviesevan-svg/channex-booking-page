@@ -7,6 +7,12 @@
 //
 // The markup is lifted verbatim from the booking landing page, so with the
 // website layer off the page renders exactly what it always did.
+//
+// Every layout decision — rhythm, column width, type treatment, card surfaces,
+// grid shapes — comes from the style slots (`useSlots`) rather than being written
+// here, so a second template is a table of class strings in site-style.ts and not
+// a second copy of these components. The `classic` slots hold exactly the strings
+// this file used to inline, which is why swapping to them changed no markup.
 
 import { Link } from "react-router";
 
@@ -18,6 +24,8 @@ import type { ResolvedGalleryImage } from "~/lib/gallery";
 import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
 import { useBase } from "~/lib/base";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export type { ReviewView };
 
@@ -43,6 +51,27 @@ export function sectionHeading(
   return key ? tr.t(key) : "";
 }
 
+/**
+ * A section's heading.
+ *
+ * `gap` stays at the call site because the space under a heading says how tightly
+ * it belongs to what follows — an intro paragraph sits closer than a grid. The
+ * type treatment and the alignment are the style's business, and centring every
+ * section heading is most of what makes one template not look like another.
+ */
+export function SectionH2({
+  gap,
+  className = "",
+  children,
+}: {
+  gap: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const s = useSlots();
+  return <h2 className={cx(gap, s.h2, s.headingAlign, className)}>{children}</h2>;
+}
+
 export function Diamond({ size = 9, className = "" }: { size?: number; className?: string }) {
   return (
     <span
@@ -64,9 +93,10 @@ export function HighlightsSection({
 }: {
   highlights: { title: string; description: string }[];
 }) {
+  const s = useSlots();
   if (!highlights.length) return null;
   return (
-    <div className="mt-12 grid max-w-[920px] grid-cols-1 gap-[18px] sm:grid-cols-3">
+    <div className={cx(s.gap, "grid", s.measure, s.highlightsGrid)}>
       {highlights.map((h, i) => (
         <div key={i} className="flex items-start gap-3.5">
           <Diamond className="mt-1.5" />
@@ -88,11 +118,12 @@ export function FacilitiesSection({
   facilities,
   facilitiesExtra,
 }: Common & { facilities: string[]; facilitiesExtra: string[] }) {
+  const s = useSlots();
   if (!facilities.length && !facilitiesExtra.length) return null;
   return (
-    <div className="mt-12 max-w-[920px]">
-      <h2 className="mb-5 font-serif text-title-3xl font-semibold">{sectionHeading(section, tr)}</h2>
-      <ul className="grid grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3">
+    <div className={cx(s.gap, s.measure)}>
+      <SectionH2 gap="mb-5">{sectionHeading(section, tr)}</SectionH2>
+      <ul className={cx("grid", s.facilitiesGrid)}>
         {facilities.map((key) => (
           <li key={key} className="flex items-start gap-3 text-body-lg">
             <Diamond className="mt-[7px]" size={7} />
@@ -121,24 +152,28 @@ export function ReviewsSection({
   reviews: { average: number; count: number; reviews: ReviewView[] };
   hotelName: string;
 }) {
+  const s = useSlots();
   const minStars = numberSetting(section, "minStars", 1);
   const limit = numberSetting(section, "limit", 4);
   const shown = reviews.reviews.filter((r) => r.stars >= minStars).slice(0, limit);
   if (reviews.count === 0 || shown.length === 0) return null;
 
   return (
-    <div className="mt-12 max-w-[920px]">
-      <div className="mb-5 flex items-baseline gap-3">
-        <h2 className="font-serif text-title-3xl font-semibold">{sectionHeading(section, tr)}</h2>
+    <div className={cx(s.gap, s.measure)}>
+      {/* The score sits beside the heading, so a centred style has to centre the
+          ROW — putting `headingAlign` on the h2 inside a flex row would do
+          nothing at all. */}
+      <div className={cx("mb-5 flex items-baseline gap-3", s.headingAlign && "justify-center")}>
+        <h2 className={cx(s.h2)}>{sectionHeading(section, tr)}</h2>
         <span className="text-body text-secondary">
           {/* Decorative: the figure follows it. */}
           <span aria-hidden style={{ color: STAR_GOLD }}>★</span>{" "}
           <span className="font-semibold text-ink">{reviews.average}</span>/5 · {reviews.count}
         </span>
       </div>
-      <div className="grid grid-cols-1 gap-[18px] sm:grid-cols-2">
+      <div className={cx("grid", s.reviewsGrid)}>
         {shown.map((r) => (
-          <div key={r.id} className="rounded-card-lg border border-line bg-surface p-5">
+          <div key={r.id} className={cx(s.card, "p-5")}>
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <span className="text-body font-semibold">{r.guestName}</span>
               <span
@@ -177,12 +212,22 @@ export function VouchersSection({
   hasVouchers,
   onOpen,
 }: Common & { hasVouchers: boolean; onOpen: () => void }) {
+  const s = useSlots();
   if (!hasVouchers) return null;
   const body = section.text?.body?.trim() || tr.t("vouchersTeaserBody");
   return (
-    <div className="mt-12 flex max-w-[920px] flex-wrap items-center justify-between gap-4 rounded-panel-lg border border-line bg-surface px-7 py-6">
+    <div
+      className={cx(
+        s.gap,
+        "flex",
+        s.measure,
+        "flex-wrap items-center justify-between gap-4",
+        s.strip,
+        "px-7 py-6",
+      )}
+    >
       <div>
-        <h2 className="mb-1 font-serif text-title-xl font-semibold">{sectionHeading(section, tr)}</h2>
+        <h2 className={cx("mb-1", s.h2Inline)}>{sectionHeading(section, tr)}</h2>
         <div className="max-w-[520px]">
           <RichText text={body} className="text-body leading-[1.55] text-muted" />
         </div>
@@ -190,7 +235,11 @@ export function VouchersSection({
       <button
         type="button"
         onClick={onOpen}
-        className="flex-none cursor-pointer rounded-card border border-accent px-6 py-3 text-body-lg font-semibold text-accent hover:bg-accent-soft"
+        className={cx(
+          "flex-none cursor-pointer",
+          s.ctaOutline,
+          "px-6 py-3 text-body-lg font-semibold text-accent hover:bg-accent-soft",
+        )}
       >
         {tr.t("vouchersTeaserCta")}
       </button>
@@ -213,12 +262,13 @@ export function GallerySection({
    *  has always ended on, so turning nothing on loses nothing. */
   fallbackPhoto?: string;
 }) {
+  const s = useSlots();
   const limit = numberSetting(section, "limit", 12);
   const photos = gallery.slice(0, limit);
 
   if (photos.length === 0) {
     return (
-      <div className="relative mt-12 h-[300px] overflow-hidden rounded-panel-lg">
+      <div className={cx("relative", s.gap, "h-[300px] overflow-hidden", s.mediaLarge)}>
         {fallbackPhoto ? (
           <img
             {...imageProps(fallbackPhoto, IMAGE_SIZES.full)}
@@ -239,12 +289,12 @@ export function GallerySection({
   }
 
   return (
-    <div className="mt-12">
-      <h2 className="mb-5 font-serif text-title-3xl font-semibold">{sectionHeading(section, tr)}</h2>
-      <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-4">
+    <div className={cx(s.gap)}>
+      <SectionH2 gap="mb-5">{sectionHeading(section, tr)}</SectionH2>
+      <div className={cx("grid", s.galleryGrid)}>
         {photos.map((photo) => (
           <figure key={photo.id}>
-            <div className="aspect-[4/3] overflow-hidden rounded-card-lg bg-surface-alt">
+            <div className={cx(s.galleryTile, "overflow-hidden", s.media, "bg-surface-alt")}>
               <img
                 {...imageProps(photo.url, IMAGE_SIZES.galleryGrid)}
                 alt={photo.alt ?? hotelName}
@@ -280,30 +330,28 @@ export function RoomsSection({
   rooms,
 }: Common & { rooms: RoomCardView[] }) {
   const base = useBase();
+  const s = useSlots();
   const limit = numberSetting(section, "limit", 6);
   const shown = rooms.slice(0, limit);
   if (!shown.length) return null;
   const intro = section.text?.intro?.trim();
 
   return (
-    <div className="mt-12 scroll-mt-24" id="rooms">
-      <h2 className="mb-2 font-serif text-title-3xl font-semibold">{sectionHeading(section, tr)}</h2>
+    <div className={cx(s.gap, "scroll-mt-24")} id="rooms">
+      <SectionH2 gap="mb-2">{sectionHeading(section, tr)}</SectionH2>
       {intro && (
-        <div className="mb-5 max-w-[620px]">
+        <div className={cx("mb-5 max-w-[620px]", s.headingAlign && "mx-auto")}>
           <RichText text={intro} className="text-body-lg leading-[1.6] text-muted" />
         </div>
       )}
-      <div className={`grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${intro ? "" : "mt-5"}`}>
+      <div className={cx("grid", s.roomsGrid, !intro && "mt-5")}>
         {shown.map((room) => (
-          <div
-            key={room.id}
-            className="flex flex-col overflow-hidden rounded-panel border border-line bg-surface"
-          >
+          <div key={room.id} className={cx("flex flex-col overflow-hidden", s.panel)}>
             {/* flex-none + overflow-hidden are load-bearing: this box is a flex
                 item, so its default `min-height: auto` lets a tall photo push it
                 past the 3/2 ratio. Landscape photos looked fine and portrait
                 ones didn't, which is why the cards came out uneven. */}
-            <div className="aspect-[3/2] w-full flex-none overflow-hidden bg-surface-alt">
+            <div className={cx(s.roomPhoto, "w-full flex-none overflow-hidden bg-surface-alt")}>
               {room.photo ? (
                 <img
                   {...imageProps(room.photo, IMAGE_SIZES.roomCard)}
@@ -322,7 +370,7 @@ export function RoomsSection({
               )}
             </div>
             <div className="flex flex-1 flex-col p-5">
-              <h3 className="mb-1 font-serif text-title-sm font-semibold">{room.title}</h3>
+              <h3 className={cx("mb-1", s.h3)}>{room.title}</h3>
               <div className="mb-2 text-caption text-muted-2">
                 {tr.t("sleeps", { n: room.maxGuests })}
               </div>
@@ -336,7 +384,11 @@ export function RoomsSection({
                   we'd have to walk back at checkout. */}
               <Link
                 to={`${base}/room/${room.id}`}
-                className="mt-auto inline-block self-start rounded-control border border-accent px-4 py-2 text-body font-semibold text-accent hover:bg-accent-soft"
+                className={cx(
+                  "mt-auto inline-block self-start",
+                  s.linkOutline,
+                  "px-4 py-2 text-body font-semibold text-accent hover:bg-accent-soft",
+                )}
               >
                 {tr.t("secRoomsCta")}
               </Link>
@@ -354,6 +406,7 @@ export function RichTextSection({
   section,
   hotelName,
 }: Pick<Common, "section"> & { hotelName?: string }) {
+  const s = useSlots();
   const heading = section.text?.heading?.trim();
   const body = section.text?.body?.trim();
   const images = section.images ?? [];
@@ -361,7 +414,9 @@ export function RichTextSection({
 
   const copy = (
     <div>
-      {heading && <h2 className="mb-3 font-serif text-title-3xl font-semibold">{heading}</h2>}
+      {/* Not SectionH2: the style's own alignment must not override the hotel's
+          per-section `align` choice, which this section alone offers. */}
+      {heading && <h2 className={cx("mb-3", s.h2)}>{heading}</h2>}
       {body && <RichText text={body} className="text-lead leading-[1.7] text-secondary" />}
     </div>
   );
@@ -371,7 +426,7 @@ export function RichTextSection({
   if (!images.length) {
     const centered = (section.settings?.align ?? "left") === "center";
     return (
-      <div className={`mt-12 max-w-[720px] ${centered ? "mx-auto text-center" : ""}`}>{copy}</div>
+      <div className={cx(s.gap, s.measureProse, centered && "mx-auto text-center")}>{copy}</div>
     );
   }
 
@@ -393,14 +448,14 @@ export function RichTextSection({
           alt={section.text?.[`alt_${img.id}`] || heading || hotelName || ""}
           loading="lazy"
           // h-auto so the intrinsic width/height above don't fix the drawn size.
-          className="h-auto w-full rounded-card-lg border border-line bg-surface-alt"
+          className={cx("h-auto w-full", s.media, "border border-line bg-surface-alt")}
         />
       ))}
     </div>
   );
 
   return (
-    <div className="mt-12 grid grid-cols-1 items-start gap-10 lg:grid-cols-2">
+    <div className={cx(s.gap, "grid grid-cols-1 items-start gap-10 lg:grid-cols-2")}>
       {copy}
       {stack}
     </div>
