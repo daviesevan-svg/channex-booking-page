@@ -15,6 +15,10 @@
 // missing from a style, the classic value shows through — a style is a delta,
 // not a fresh start.
 
+// Type-only, both ways: sections.ts names SiteStyleId and this file names
+// SectionType. `import type` is erased, so the cycle never exists at runtime.
+import type { SectionType } from "./sections";
+
 /** Class strings the renderer asks for by role. */
 export interface StyleSlots {
   // ---- shell and rhythm ----
@@ -35,6 +39,22 @@ export interface StyleSlots {
   h3: string;
   /** The hero's display heading, minus its size (the hero picks that by layout). */
   heroDisplay: string;
+  /**
+   * Container around the search card, for a hero whose photo bleeds past the
+   * band's gutters — the card still has to line up with the rest of the page.
+   *
+   * Empty for a style whose page shell already constrains the width, and the
+   * empty case emits no element at all (same reason as `band`).
+   */
+  heroInner: string;
+  /**
+   * Container around an extra page's `<h1>`.
+   *
+   * The page title is rendered by the route, not by the section list, so it gets
+   * no band — without this a band style leaves it with no gutters and nothing
+   * between it and the header. Empty emits no element.
+   */
+  pageHead: string;
   /** Alignment applied to section headings — the visible half of a centred style. */
   headingAlign: string;
 
@@ -66,10 +86,24 @@ export interface StyleSlots {
   roomPhoto: string;
 }
 
+/**
+ * How the hero arranges itself.
+ *
+ * "stacked" is copy, then the search card underneath, with the hotel's own
+ * `layout` setting deciding whether a photo sits beside the copy.
+ *
+ * "overlay" puts the copy ON the photo and ignores that setting. Overriding a
+ * hotel's choice is deliberate: the arrangement of the page is exactly what a
+ * template is for, and the setting comes back untouched if they switch style
+ * again.
+ */
+export type HeroArrangement = "stacked" | "overlay";
+
 export interface SiteStyleDef {
   id: SiteStyleId;
   /** Admin i18n key naming the style. */
   labelKey: string;
+  hero: HeroArrangement;
   /**
    * Full-width bands behind each section, cycled by position.
    *
@@ -77,7 +111,19 @@ export interface SiteStyleDef {
    * classes. That's what keeps `classic` rendering the markup it always did,
    * which is the only way a style refactor can be proven to change nothing.
    */
-  band?: { outer: string[]; inner: string };
+  band?: {
+    outer: string[];
+    inner: string;
+    /**
+     * Section types whose band gets NO inner container, so they run the full
+     * width of the viewport.
+     *
+     * A list rather than a flag per section, so "which things bleed" is a
+     * property of the design and adding one is an edit to this table. A bleeding
+     * section is responsible for its own gutters — see the `heroInner` slot.
+     */
+    bleed?: SectionType[];
+  };
   slots: StyleSlots;
 }
 
@@ -99,6 +145,8 @@ const CLASSIC: StyleSlots = {
   h2Inline: "font-serif text-title-xl font-semibold",
   h3: "font-serif text-title-sm font-semibold",
   heroDisplay: "font-serif font-medium leading-[1.05] tracking-[-0.02em]",
+  heroInner: "",
+  pageHead: "",
   headingAlign: "",
 
   card: "rounded-card-lg border border-line bg-surface",
@@ -119,9 +167,78 @@ const CLASSIC: StyleSlots = {
 };
 
 /** A style is a delta over classic, so adding one means writing only what differs. */
-const STYLE_DEFS: Record<SiteStyleId, { labelKey: string; band?: SiteStyleDef["band"]; slots: Partial<StyleSlots> }> = {
+const STYLE_DEFS: Record<
+  SiteStyleId,
+  {
+    labelKey: string;
+    hero?: HeroArrangement;
+    band?: SiteStyleDef["band"];
+    slots: Partial<StyleSlots>;
+  }
+> = {
   classic: { labelKey: "styleClassic", slots: {} },
-  editorial: { labelKey: "styleEditorial", slots: {} },
+
+  // Full-width chapters instead of one narrow column: the page alternates
+  // surfaces, headings are centred small-caps sans over serif prose, corners are
+  // square, and the photography runs edge to edge. Same sections, same words —
+  // the hotel's content is untouched by any of this.
+  editorial: {
+    labelKey: "styleEditorial",
+    hero: "overlay",
+    band: {
+      // Two entries, so sections alternate. Position drives it, which means
+      // reordering sections in the admin re-stripes the page automatically.
+      outer: ["", "bg-surface-alt"],
+      inner: "mx-auto max-w-[1160px] px-7 py-[clamp(44px,6vw,80px)]",
+      // The cover photo runs the full width of the viewport. Boxed inside the
+      // band's gutters it read as a picture in a frame rather than as a cover,
+      // which is the whole point of the arrangement.
+      bleed: ["hero"],
+    },
+    slots: {
+      // The bands own the gutters and the vertical rhythm now, so the page shell
+      // and the per-section margin both have to get out of the way — otherwise
+      // every section is indented twice and spaced twice.
+      page: "",
+      gap: "",
+      // Sections run the full band width; only prose stays narrow, and centred.
+      measure: "",
+      measureProse: "mx-auto max-w-[760px]",
+
+      h1: "font-serif text-display-2xl font-normal italic leading-[1.15]",
+      h2: "font-sans text-title-md font-semibold uppercase tracking-[0.16em]",
+      h2Inline: "font-sans text-title-sm font-semibold uppercase tracking-[0.12em]",
+      h3: "font-sans text-title-xs font-semibold uppercase tracking-[0.08em]",
+      heroDisplay: "font-serif font-normal italic leading-[1.08] tracking-[-0.01em]",
+      // The hero bleeds, so the search card carries the page's gutters itself and
+      // the bottom padding the band would have given the section.
+      heroInner: "mx-auto max-w-[1160px] px-7 pb-[clamp(44px,6vw,80px)]",
+      pageHead: "mx-auto max-w-[1160px] px-7 pt-[clamp(44px,6vw,80px)]",
+      headingAlign: "text-center",
+
+      // Cards lose their box and keep a hairline: a review reads as a pull quote
+      // and a room as a plate, not as a widget.
+      card: "rounded-none border-t border-line bg-transparent",
+      panel: "rounded-none bg-transparent",
+      // The strip keeps its border — the search card has to stay a legible
+      // control, and a borderless one on a tinted band disappears.
+      strip: "rounded-none border border-line bg-surface",
+      media: "rounded-none",
+      mediaLarge: "rounded-none",
+      ctaOutline: "rounded-none border border-accent",
+      linkOutline: "rounded-none border border-accent",
+
+      highlightsGrid: "grid-cols-1 gap-8 sm:grid-cols-3",
+      facilitiesGrid: "grid-cols-2 gap-x-10 gap-y-3 sm:grid-cols-3 lg:grid-cols-4",
+      reviewsGrid: "grid-cols-1 gap-8 sm:grid-cols-2",
+      // A tight square mosaic rather than a widely spaced 4-up grid.
+      galleryGrid: "grid-cols-2 gap-1.5 sm:grid-cols-3",
+      galleryTile: "aspect-square",
+      // Two tall plates. Fewer, larger rooms per row is most of the difference.
+      roomsGrid: "grid-cols-1 gap-10 sm:grid-cols-2",
+      roomPhoto: "aspect-[4/5]",
+    },
+  },
 };
 
 export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries(
@@ -130,6 +247,7 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
     {
       id,
       labelKey: STYLE_DEFS[id].labelKey,
+      hero: STYLE_DEFS[id].hero ?? "stacked",
       band: STYLE_DEFS[id].band,
       slots: { ...CLASSIC, ...STYLE_DEFS[id].slots },
     },

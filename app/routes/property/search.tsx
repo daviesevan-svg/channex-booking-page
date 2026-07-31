@@ -25,7 +25,7 @@ import { useBase } from "~/lib/base";
 import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
 import { loadPicker } from "~/lib/picker.server";
 import { PropertyPicker } from "~/components/property-picker";
-import { useSlots } from "~/components/site-style";
+import { useSiteStyle } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -95,7 +95,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const { closedDates, content, earliestCheckin, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
-  const s = useSlots();
+  const style = useSiteStyle();
+  const s = style.slots;
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -148,9 +149,14 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   // The hero photo, else the first gallery photo — on a website with a gallery
   // the hero image was otherwise never shown at all.
   const heroSection = sections.find((s) => s.type === "hero");
+  const heroImage = heroPhoto || data.gallery[0]?.url;
+  // The style's arrangement wins over the hotel's split/wide setting — the layout
+  // of the page is what a template is for. With no photo at all there's nothing
+  // to lay copy over, so it falls back to the same wide column as `split` does.
+  const overlayPhoto = heroSection && style.hero === "overlay" ? heroImage : undefined;
   const heroSplit =
-    heroSection && settingOf(heroSection, "layout", "split") === "split"
-      ? heroPhoto || data.gallery[0]?.url
+    !overlayPhoto && heroSection && settingOf(heroSection, "layout", "split") === "split"
+      ? heroImage
       : undefined;
 
   function searchRooms() {
@@ -176,27 +182,56 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   // The hero stays inline: it owns the search form's state (dates, guests,
   // promo, calendar), and lifting it out would mean threading all of that
   // through the section renderer for nothing.
-  const heroCopy = (split: boolean) => (
-    <div className={split ? "" : "max-w-[680px]"}>
-      <div className="eyebrow mb-[18px]">{eyebrow}</div>
+  const heroCopy = (mode: "split" | "wide" | "overlay") => (
+    <div
+      className={cx(
+        mode === "wide" && "max-w-[680px]",
+        mode === "overlay" && "max-w-[760px] text-center",
+      )}
+    >
+      {/* Overlay spells the eyebrow out in utilities instead of reusing the
+          `.eyebrow` class: that rule is unlayered CSS setting `color: accent`, so
+          it would beat a `text-white` utility and leave the eyebrow unreadable on
+          a dark photo. Same 13px/0.16em, different colour. */}
+      <div
+        className={cx(
+          mode === "overlay"
+            ? "text-caption font-semibold uppercase tracking-[0.16em] text-white/85"
+            : "eyebrow",
+          "mb-[18px]",
+        )}
+      >
+        {eyebrow}
+      </div>
       <h1
         className={cx(
           "mb-[18px]",
           s.heroDisplay,
-          split ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl",
+          mode === "split" ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl",
+          mode === "overlay" && "text-white",
         )}
       >
         {heading}
       </h1>
       <p
-        className={`whitespace-pre-line text-title-xs leading-[1.6] text-secondary ${
-          split ? "mb-0" : "mb-9 max-w-[560px]"
-        }`}
+        className={cx(
+          "whitespace-pre-line text-title-xs leading-[1.6]",
+          mode === "overlay" ? "text-white/90" : "text-secondary",
+          mode === "split" && "mb-0",
+          mode === "wide" && "mb-9 max-w-[560px]",
+          mode === "overlay" && "mx-auto mb-0 max-w-[560px]",
+        )}
       >
         {intro}
       </p>
     </div>
   );
+
+  // The search card and the promo toggle. Wrapped only when the style asks for
+  // it (a bleeding hero has no container of its own to sit in) — an empty
+  // `heroInner` emits no element, so the classic markup is untouched.
+  const heroBooking = (fields: React.ReactNode) =>
+    s.heroInner ? <div className={s.heroInner}>{fields}</div> : fields;
 
   const hero = (
     <div key="hero">
@@ -205,9 +240,24 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           falls back to the single full-width column when there isn't one —
           better a narrow column than an empty half. The search card spans the
           full width below either way, so it stays the most prominent thing. */}
-      {heroSplit ? (
+      {overlayPhoto ? (
+        <div className="relative mb-9 overflow-hidden">
+          <img
+            {...imageProps(overlayPhoto, IMAGE_SIZES.full)}
+            alt={hotelName}
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* A scrim, not a tint: the copy is white over a photo nobody has
+              vetted, and a bright sky would otherwise leave the heading
+              unreadable. */}
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative flex min-h-[420px] items-center justify-center px-7 py-16">
+            {heroCopy("overlay")}
+          </div>
+        </div>
+      ) : heroSplit ? (
         <div className="mb-9 grid grid-cols-1 gap-10 lg:grid-cols-[1.1fr_1fr]">
-          {heroCopy(true)}
+          {heroCopy("split")}
           {/* The COPY sets the row height, not the photo: grid stretch matches
               the photo to the text, with a floor so a one-line intro doesn't
               leave a sliver and a ceiling so a long one doesn't produce a
@@ -227,11 +277,13 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           </div>
         </div>
       ) : (
-        heroCopy(false)
+        heroCopy("wide")
       )}
 
+      {heroBooking(
+        <>
       {/* search card — `#book` is the anchor the room cards jump to */}
-      <div className="relative max-w-[920px]" id="book">
+      <div className={cx("relative max-w-[920px]", s.headingAlign && "mx-auto")} id="book">
         <div
           className={cx("flex flex-wrap items-stretch gap-1.5", s.strip, "p-3.5")}
           style={{ boxShadow: "var(--shadow-card)" }}
@@ -299,6 +351,8 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           />
         )}
       </div>
+        </>,
+      )}
     </div>
   );
 
