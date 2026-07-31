@@ -13,8 +13,11 @@
 import { useState } from "react";
 
 import { RichText } from "~/components/rich-text";
+import { SectionH2 } from "~/components/sections";
 import { loadGoogleMaps } from "~/lib/google-maps-client";
 import type { Translator } from "~/lib/i18n";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 /** A plausible street map, drawn rather than fetched. Deliberately not the
  *  property's real surroundings — it's a placeholder for a button, and every
@@ -88,14 +91,20 @@ export function MapSection({
 }) {
   const [show, setShow] = useState(false);
   const [failed, setFailed] = useState(false);
+  const s = useSlots();
 
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 
   return (
-    <div className="mt-12">
-      <h2 className="mb-2 font-serif text-title-3xl font-semibold">{heading}</h2>
+    <div className={cx(s.gap)}>
+      <SectionH2 gap="mb-2">{heading}</SectionH2>
       {(address || directions) && (
-        <div className="mb-5 max-w-[620px] text-body-lg leading-[1.6] text-muted">
+        <div
+          className={cx(
+            "mb-5 max-w-[620px] text-body-lg leading-[1.6] text-muted",
+            s.headingAlign && "mx-auto",
+          )}
+        >
           {address && <p className="whitespace-pre-line">{address}</p>}
           {directions && (
             <div className="mt-2">
@@ -105,7 +114,13 @@ export function MapSection({
         </div>
       )}
 
-      <div className="relative h-[340px] overflow-hidden rounded-panel-lg border border-line bg-surface-alt">
+      <div
+        className={cx(
+          "relative h-[340px] overflow-hidden",
+          s.mediaLarge,
+          "border border-line bg-surface-alt",
+        )}
+      >
         {show && !failed ? (
           <LiveMap
             lat={lat}

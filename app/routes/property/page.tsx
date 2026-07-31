@@ -16,6 +16,8 @@ import { langFromRequest } from "~/lib/content";
 import { useT } from "~/lib/i18n";
 import { useProperty } from "~/lib/booking-context";
 import { getSettings } from "~/lib/overrides.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 import { loadSectionData } from "~/lib/section-data.server";
 import { getRenderPage } from "~/lib/site.server";
@@ -47,11 +49,12 @@ export default function WebsitePage({ loaderData, params }: Route.ComponentProps
   const { page, data } = loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
 
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-16">
+    <main className={s.page}>
       {page.title && (
-        <h1 className="max-w-[720px] font-serif text-display-3xl font-medium leading-[1.1] tracking-[-0.02em]">
+        <h1 className={cx(s.measureProse, s.h1, s.headingAlign, s.headingAlign && "mx-auto")}>
           {page.title}
         </h1>
       )}

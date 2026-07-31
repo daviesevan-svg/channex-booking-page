@@ -27,6 +27,7 @@ import type { Translator } from "~/lib/i18n";
 import type { SectionData } from "~/lib/section-data";
 import { numberSetting, settingOf, type ResolvedSection } from "~/lib/sections";
 import { useBase } from "~/lib/base";
+import { Band } from "~/components/site-style";
 
 export function SectionList({
   sections,
@@ -48,10 +49,10 @@ export function SectionList({
   const base = useBase();
   const navigate = useNavigate();
 
-  return (
-    <>
-      {sections.map((section) => {
-        switch (section.type) {
+  // One section's markup. Pulled out of the map so the band wrapper can go
+  // around it without indenting the whole switch.
+  const renderSection = (section: ResolvedSection) => {
+    switch (section.type) {
           case "hero":
             // A page without a hero simply renders nothing here — the section
             // list is normalized per page, so this only happens if the home
@@ -142,7 +143,15 @@ export function SectionList({
           case "richText":
             return <RichTextSection key={section.id} section={section} hotelName={hotelName} />;
         }
-      })}
+  };
+
+  return (
+    <>
+      {sections.map((section, index) => (
+        <Band key={section.id} index={index}>
+          {renderSection(section)}
+        </Band>
+      ))}
     </>
   );
 }

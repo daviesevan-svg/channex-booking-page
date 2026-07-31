@@ -9,9 +9,11 @@
 import { useFetcher } from "react-router";
 
 import type { Translator } from "~/lib/i18n";
-import { Diamond } from "~/components/sections";
+import { Diamond, SectionH2 } from "~/components/sections";
 import { RichText } from "~/components/rich-text";
 import { useBase } from "~/lib/base";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 const FIELD =
   "mt-1.5 w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
@@ -37,16 +39,17 @@ export function ContactSection({
   showForm: boolean;
   tr: Translator;
 }) {
+  const s = useSlots();
   const hasDetails = Boolean(
     details.address || details.phone || details.email || details.checkinTime,
   );
   if (!hasDetails && !showForm) return null;
 
   return (
-    <div className="mt-12 scroll-mt-24" id="contact">
-      <h2 className="mb-2 font-serif text-title-3xl font-semibold">{heading}</h2>
+    <div className={cx(s.gap, "scroll-mt-24")} id="contact">
+      <SectionH2 gap="mb-2">{heading}</SectionH2>
       {intro && (
-        <div className="mb-6 max-w-[620px]">
+        <div className={cx("mb-6 max-w-[620px]", s.headingAlign && "mx-auto")}>
           <RichText text={intro} className="text-body-lg leading-[1.6] text-muted" />
         </div>
       )}
@@ -121,13 +124,16 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 
 function ContactForm({ tr }: { tr: Translator }) {
   const base = useBase();
+  const s = useSlots();
   const fetcher = useFetcher<{ ok?: true; error?: string }>();
   const sending = fetcher.state !== "idle";
   const result = fetcher.data;
 
   if (result?.ok) {
+    // Keeps its own green border and fill — a success state reads as success in
+    // every style, so only the corner treatment follows the style here.
     return (
-      <div className="rounded-card-lg border border-[#cfe3d3] bg-[#eef5ef] p-6">
+      <div className={cx(s.media, "border border-[#cfe3d3] bg-[#eef5ef] p-6")}>
         <p className="text-body-lg font-semibold text-[#3f7a52]">{tr.t("contactSentTitle")}</p>
         <p className="mt-1 text-body leading-[1.55] text-[#4a6b52]">{tr.t("contactSentBody")}</p>
       </div>
@@ -152,7 +158,7 @@ function ContactForm({ tr }: { tr: Translator }) {
     <fetcher.Form
       method="post"
       action={`${base}/contact`}
-      className="rounded-card-lg border border-line bg-surface p-6"
+      className={cx(s.card, "p-6")}
     >
       {/* Honeypot. Hidden from people, irresistible to bots; a filled value is
           accepted and dropped server-side. */}

@@ -19,6 +19,7 @@ import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getSiteChrome } from "~/lib/site.server";
 import { SiteFooterBlock } from "~/components/site-footer";
+import { SiteStyleProvider } from "~/components/site-style";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty } from "~/lib/properties.server";
 import { propertyIdForHost } from "~/lib/domains.server";
@@ -87,6 +88,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     navPages: chrome?.navPages ?? [],
     pageSlugs: chrome?.pageSlugs ?? [],
     footer: chrome?.footer ?? null,
+    // Which layout style the website pages render with. Null with the website
+    // off, which resolves to `classic` — the legacy booking page's look, and the
+    // only one it has ever had.
+    siteStyle: chrome?.style ?? null,
     contact: {
       // Full postal address, not just the street line — same fix as the map and
       // contact sections.
@@ -171,7 +176,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, contact, termsUrl, privacyUrl } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle, contact, termsUrl, privacyUrl } =
     loaderData;
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
@@ -320,7 +325,13 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       {step !== "search" && <Stepper step={step} tr={tr} singleUnit={singleUnit} />}
 
       <div className="flex-1">
-        <Outlet context={context} />
+        {/* A context provider, so this adds no markup — the style only reaches
+            the section renderer, which is what a template controls. The header
+            and footer above are chrome shared with the booking funnel, where a
+            website style has no business changing anything. */}
+        <SiteStyleProvider id={siteStyle ?? undefined}>
+          <Outlet context={context} />
+        </SiteStyleProvider>
       </div>
 
       {/* Not on checkout or confirmation. The header's nav is already hidden on
