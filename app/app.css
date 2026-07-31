@@ -187,6 +187,50 @@ body {
   animation: nav-progress-slide 1s ease-in-out infinite;
 }
 
+/* Website template typography, for the pages a template can't reach any other
+   way.
+
+   The section renderer takes its heading treatment from the style slots in
+   site-style.ts, but the booking funnel, the voucher flow and the manage pages
+   don't render sections — and a guest who crosses from a small-caps website into
+   serif headings the moment they pick a room sees two different sites. These
+   rules cover that half, keyed off `data-style` on the guest wrapper, the same
+   way the themes above key off `data-theme`.
+
+   Why a descendant rule and not a class: `[data-style="…"] main h2` outranks a
+   single utility class, so it can set letter-spacing without fighting the
+   `tracking-*` utilities already on those headings. A plain `.h-section` class
+   would win against them too — unlayered CSS beats a layered utility — but only
+   by accident, and it would have to be added at ~60 call sites to do it.
+
+   Scoped to `main` so the header and footer keep their own treatment: the site
+   name is a wordmark, not a heading. */
+[data-style="editorial"] main h1 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+/* Everything below the page title is the small-caps sans half of the pairing.
+   h3 is in here because the funnel uses it where the website uses h2 — panel
+   headings ("Your stay", "Payment") and item titles (a room, an extra). Leaving
+   it out is what made a room called GARDEN SUITE on the website turn back into
+   Garden Suite one click later. Every one of them is a short title; nothing
+   prose-length is an h3 on a guest page. */
+[data-style="editorial"] main :is(h2, h3) {
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+[data-style="editorial"] main h2 {
+  letter-spacing: 0.16em;
+}
+/* Tighter: an h3 can be a 24px room title, and 0.16em at that size sprawls. */
+[data-style="editorial"] main h3 {
+  letter-spacing: 0.08em;
+}
+
 /* Eyebrow / field-label helpers used across screens */
 .eyebrow {
   font-size: 13px;

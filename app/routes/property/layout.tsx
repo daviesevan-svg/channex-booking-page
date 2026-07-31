@@ -20,6 +20,7 @@ import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getSiteChrome } from "~/lib/site.server";
 import { SiteFooterBlock } from "~/components/site-footer";
 import { SiteStyleProvider } from "~/components/site-style";
+import { siteStyle } from "~/lib/site-style";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty } from "~/lib/properties.server";
 import { propertyIdForHost } from "~/lib/domains.server";
@@ -176,8 +177,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle, contact, termsUrl, privacyUrl } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl } =
     loaderData;
+  // Resolved once: its token overrides go on the wrapper below, and the same
+  // definition is what the provider hands the section renderer.
+  const style = siteStyle(siteStyleId ?? undefined);
   const font = fontPair(themeFont);
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) => {
@@ -243,11 +247,24 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   if (font.id !== "default") {
     Object.assign(themeStyle, { "--font-serif": font.heading, "--font-sans": font.body });
   }
+  // The template's token overrides, on the wrapper around EVERY guest page — so
+  // the template carries through the whole journey, funnel and voucher flow and
+  // manage pages included. They draw their corners and type sizes from these
+  // tokens, so this needs no change at any of those call sites.
+  //
+  // Last, so a style could override a theme value; nothing does today, and a
+  // style fighting the theme's accent would be a bug rather than a feature.
+  Object.assign(themeStyle, style.vars ?? {});
 
   return (
+    <SiteStyleProvider id={siteStyleId ?? undefined}>
     <div
       className="flex min-h-screen flex-col font-sans text-ink"
       data-theme={isCustom ? undefined : theme}
+      // Typography the template can't deliver as a token — see the
+      // `[data-style]` rules in app.css. Always set, so `classic` is an explicit
+      // value rather than "no attribute means the old look".
+      data-style={style.id}
       style={themeStyle}
     >
       {/* Non-blocking, same as the default pair in root — see FontStylesheet.
@@ -324,14 +341,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
       {step !== "search" && <Stepper step={step} tr={tr} singleUnit={singleUnit} />}
 
+      {/* The provider wraps the header and footer too, not just the Outlet: they
+          are part of the journey a guest sees, and a template that stopped at the
+          content was the whole complaint. It emits no markup. */}
       <div className="flex-1">
-        {/* A context provider, so this adds no markup — the style only reaches
-            the section renderer, which is what a template controls. The header
-            and footer above are chrome shared with the booking funnel, where a
-            website style has no business changing anything. */}
-        <SiteStyleProvider id={siteStyle ?? undefined}>
-          <Outlet context={context} />
-        </SiteStyleProvider>
+        <Outlet context={context} />
       </div>
 
       {/* Not on checkout or confirmation. The header's nav is already hidden on
@@ -375,5 +389,6 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         </div>
       </footer>
     </div>
+    </SiteStyleProvider>
   );
 }

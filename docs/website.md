@@ -229,9 +229,39 @@ every existing `richText` section rather than deleting hotel-written pages.
 font pairs. Themes and styles compose — the style decides the shape of the page,
 the theme its colour and typeface.
 
-Not yet styled: the header and footer. They are chrome shared with the booking
-funnel, where a *website* style has no business changing anything, so "header
-treatment" needs a way to scope it to website pages first.
+### The template covers the whole journey, not just the website
+
+Reversing an earlier decision here (Evan, 2026-07-31): a template that stopped at
+the marketing pages meant a guest crossed from a square, small-caps website into
+rounded cards and serif headings the moment they picked a room. It has to be one
+site all the way through, funnel and voucher flow and manage pages included.
+
+Slots can't do that on their own — a slot only reaches the components that ask
+for it, and the funnel has no reason to. Two mechanisms cover the rest:
+
+- **`vars` — design tokens the style overrides**, applied to the guest wrapper.
+  The tokens in app.css compile to `var()` references, so one entry restyles
+  every surface reading that token at once. `editorial` sets ten radius tokens to
+  zero and squares roughly 230 call sites without touching any of them. This is
+  precisely what the token conversion was for; prefer a var over a slot whenever
+  the difference is expressible as a token.
+- **`[data-style="…"]` rules in app.css** for the handful of properties a token
+  can't carry — heading family, case and tracking. Keyed off an attribute on the
+  guest wrapper, the same way the themes are. A descendant rule rather than a
+  class, because it outranks the `tracking-*` utilities already on those headings
+  and needs no edits at ~60 call sites.
+
+Deliberately left alone: `--radius-mark` (the diamond is the brand) and
+Tailwind's `rounded-full` (squaring stepper dots and status pills reads as broken
+rather than as a style).
+
+The funnel does **not** get the alternating bands. Those belong to a marketing
+page; a checkout in stripes is a worse checkout.
+
+One thing to know about heading levels: the funnel uses `h3` where the website
+uses `h2` — panel headings and item titles both. The typography rules cover
+`h2, h3` together for exactly that reason, which is what stops a room called
+GARDEN SUITE on the website turning back into Garden Suite one click later.
 
 ---
 
