@@ -7,6 +7,8 @@ import type { BookingRecord } from "./bookings.server";
 import type { EmailDef, SiteSettings } from "./content";
 import { THEMES, type ThemeId } from "./content";
 import { formatMoney } from "./money";
+import { getSiteStyle } from "./site.server";
+import { emailBrandFor, type EmailBrand } from "./site-style";
 
 // Email clients need plain hex, not the oklch theme tokens. Hand-picked to
 // match each [data-theme] accent closely enough for a header band.
@@ -93,13 +95,30 @@ export function bookingVars(
 
 const LABEL = "color:#8a8a8a;font-size:13px;";
 const VALUE = "color:#1f1f1f;font-size:14px;font-weight:600;text-align:right;";
-const ROW = (label: string, value: string, strong = false) =>
-  `<tr><td style="padding:6px 0;${LABEL}">${esc(label)}</td><td style="padding:6px 0;${VALUE}${strong ? "font-size:16px;" : ""}">${esc(value)}</td></tr>`;
+/** The label half follows the template's small-caps treatment; the VALUE half
+ *  never does, because a reference or a date read in caps is harder, not smarter. */
+const labelStyle = (b: EmailBrand) =>
+  `${LABEL}text-transform:${b.labelCase};letter-spacing:${b.labelTracking};`;
+const row = (b: EmailBrand) => (label: string, value: string, strong = false) =>
+  `<tr><td style="padding:6px 0;${labelStyle(b)}">${esc(label)}</td><td style="padding:6px 0;${VALUE}${strong ? "font-size:16px;" : ""}">${esc(value)}</td></tr>`;
+
+/**
+ * The property's template as literal values, for an email.
+ *
+ * One extra KV read per send, off the critical path — a mail is already several
+ * reads deep and never blocks a booking. Falls back to the default look if the
+ * read fails, because an email that looks slightly wrong beats one that doesn't
+ * arrive.
+ */
+export async function emailBrand(pid: string, accent: string): Promise<EmailBrand> {
+  return emailBrandFor(accent, await getSiteStyle(pid).catch(() => undefined));
+}
 
 function detailsHtml(
   booking: BookingRecord,
-  opts: { recipient: "guest" | "host"; manageUrl: string; accent: string },
+  opts: { recipient: "guest" | "host"; manageUrl: string; brand: EmailBrand },
 ): string {
+  const ROW = row(opts.brand);
   const money = (n: number) => formatMoney(n, booking.currency);
   // What was actually captured wins over the policy's "due now": a guest who has
   // already paid must see "Paid", not an amount still owing. (mode "setup" only
@@ -149,7 +168,7 @@ function detailsHtml(
 
   const manageBtn =
     opts.recipient === "guest" && opts.manageUrl
-      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:10px;background:${opts.accent};">
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:${opts.brand.radiusButton}px;background:${opts.brand.accent};">
            <a href="${esc(opts.manageUrl)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Manage booking</a>
          </td></tr></table>`
       : "";
@@ -164,7 +183,7 @@ function detailsHtml(
          </table>`
       : "";
 
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;border:1px solid #ececec;border-radius:12px;padding:18px;background:#fbfafa;">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;border:1px solid #ececec;border-radius:${opts.brand.radiusPanel}px;padding:18px;background:#fbfafa;">
     <tr><td>
       <table role="presentation" width="100%">
         ${ROW("Reference", booking.reference)}
@@ -191,7 +210,7 @@ function detailsHtml(
 
 function shell(args: {
   hotelName: string;
-  accent: string;
+  brand: EmailBrand;
   heading: string;
   introHtml: string;
   details: string;
@@ -200,8 +219,8 @@ function shell(args: {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f1ee;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ee;padding:24px 0;">
     <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-        <tr><td style="background:${args.accent};padding:20px 28px;">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:${args.brand.radiusShell}px;overflow:hidden;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+        <tr><td style="background:${args.brand.accent};padding:20px 28px;">
           <span style="color:#ffffff;font-size:18px;font-weight:700;">${esc(args.hotelName)}</span>
         </td></tr>
         <tr><td style="padding:28px;">
@@ -225,7 +244,7 @@ export function composeEmail(args: {
   text: Record<string, string>;
   booking: BookingRecord;
   hotelName: string;
-  accent: string;
+  brand: EmailBrand;
   manageUrl: string;
 }): { subject: string; html: string } {
   const vars = bookingVars(args.booking, args.hotelName, args.manageUrl);
@@ -236,11 +255,11 @@ export function composeEmail(args: {
   const details = detailsHtml(args.booking, {
     recipient: args.def.recipient,
     manageUrl: args.manageUrl,
-    accent: args.accent,
+    brand: args.brand,
   });
   return {
     subject,
-    html: shell({ hotelName: args.hotelName, accent: args.accent, heading, introHtml, details, outroHtml }),
+    html: shell({ hotelName: args.hotelName, brand: args.brand, heading, introHtml, details, outroHtml }),
   };
 }
 
@@ -250,19 +269,19 @@ export function composeEmail(args: {
  *  blank-line-separated blocks become paragraphs. */
 export function renderSimpleEmail(args: {
   hotelName: string;
-  accent: string;
+  brand: EmailBrand;
   heading: string;
   body: string;
   cta?: { label: string; url: string };
 }): string {
   const button = args.cta
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:10px;background:${args.accent};">
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:${args.brand.radiusButton}px;background:${args.brand.accent};">
          <a href="${esc(args.cta.url)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${esc(args.cta.label)}</a>
        </td></tr></table>`
     : "";
   return shell({
     hotelName: args.hotelName,
-    accent: args.accent,
+    brand: args.brand,
     heading: esc(args.heading),
     introHtml: paragraphs(args.body),
     details: button,
@@ -304,7 +323,7 @@ export function composeReviewEmail(args: {
   text: Record<string, string>;
   booking: BookingRecord;
   hotelName: string;
-  accent: string;
+  brand: EmailBrand;
   reviewUrl: string;
 }): { subject: string; html: string } {
   const vars = reviewVars(args.booking, args.hotelName);
@@ -316,10 +335,10 @@ export function composeReviewEmail(args: {
     subject,
     html: shell({
       hotelName: args.hotelName,
-      accent: args.accent,
+      brand: args.brand,
       heading,
       introHtml,
-      details: reviewStarsHtml(args.reviewUrl, args.accent),
+      details: reviewStarsHtml(args.reviewUrl, args.brand.accent),
       outroHtml,
     }),
   };
