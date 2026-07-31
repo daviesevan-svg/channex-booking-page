@@ -105,6 +105,21 @@ export interface SiteStyleDef {
   labelKey: string;
   hero: HeroArrangement;
   /**
+   * Design tokens the style overrides, applied to the guest wrapper.
+   *
+   * This is how a template reaches the parts of the journey the section renderer
+   * never touches. The tokens in app.css compile to `var()` references — a
+   * `rounded-card` anywhere becomes `border-radius: var(--radius-card)` — so one
+   * entry here restyles the booking funnel, the voucher flow, the manage pages
+   * and the header and footer at the same time as the website, with no changes at
+   * any of those call sites.
+   *
+   * That is exactly what the token conversion was for. Prefer a var over a slot
+   * whenever the difference is expressible as a token: a slot only reaches the
+   * components that ask for it, and the funnel deliberately doesn't.
+   */
+  vars?: Record<string, string>;
+  /**
    * Full-width bands behind each section, cycled by position.
    *
    * Undefined means NO wrapper element is emitted at all — not a wrapper with no
@@ -173,6 +188,7 @@ const STYLE_DEFS: Record<
     labelKey: string;
     hero?: HeroArrangement;
     band?: SiteStyleDef["band"];
+    vars?: Record<string, string>;
     slots: Partial<StyleSlots>;
   }
 > = {
@@ -185,6 +201,27 @@ const STYLE_DEFS: Record<
   editorial: {
     labelKey: "styleEditorial",
     hero: "overlay",
+    // Square corners everywhere, in one place. These reach the whole journey —
+    // results, room detail, extras, checkout, confirmation, the voucher flow, the
+    // manage pages, the header and the footer — because they all draw their
+    // corners from these tokens. A guest shouldn't cross from a square website
+    // into rounded cards the moment they pick a room.
+    //
+    // `--radius-mark` (the diamond) and Tailwind's own `rounded-full` are left
+    // alone deliberately: the marker is the brand, and squaring the stepper dots
+    // and status pills reads as broken rather than as a style.
+    vars: {
+      "--radius-chip": "0px",
+      "--radius-chip-lg": "0px",
+      "--radius-control": "0px",
+      "--radius-field": "0px",
+      "--radius-card": "0px",
+      "--radius-card-lg": "0px",
+      "--radius-panel": "0px",
+      "--radius-panel-lg": "0px",
+      "--radius-well": "0px",
+      "--radius-well-lg": "0px",
+    },
     band: {
       // Two entries, so sections alternate. Position drives it, which means
       // reordering sections in the admin re-stripes the page automatically.
@@ -249,6 +286,7 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
       labelKey: STYLE_DEFS[id].labelKey,
       hero: STYLE_DEFS[id].hero ?? "stacked",
       band: STYLE_DEFS[id].band,
+      vars: STYLE_DEFS[id].vars,
       slots: { ...CLASSIC, ...STYLE_DEFS[id].slots },
     },
   ]),
