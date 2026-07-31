@@ -8,6 +8,7 @@
 
 import { createContext, useContext } from "react";
 
+import type { SectionType } from "~/lib/sections";
 import {
   DEFAULT_SITE_STYLE,
   siteStyle,
@@ -48,11 +49,24 @@ export function useSlots(): StyleSlots {
  * band list, so "alternate the background" is data rather than a special case in
  * the renderer.
  */
-export function Band({ index, children }: { index: number; children: React.ReactNode }) {
+export function Band({
+  index,
+  type,
+  children,
+}: {
+  index: number;
+  type: SectionType;
+  children: React.ReactNode;
+}) {
   const { band } = useSiteStyle();
   if (!band) return <>{children}</>;
+  const outer = band.outer[index % band.outer.length];
+  // A bleeding section gets the band's background but not its container, so it
+  // runs the full width. It supplies its own gutters for anything that still
+  // needs to line up with the rest of the page.
+  if (band.bleed?.includes(type)) return <div className={outer}>{children}</div>;
   return (
-    <div className={band.outer[index % band.outer.length]}>
+    <div className={outer}>
       <div className={band.inner}>{children}</div>
     </div>
   );

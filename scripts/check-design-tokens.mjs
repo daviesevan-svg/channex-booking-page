@@ -22,12 +22,18 @@ import { execSync } from "node:child_process";
 const PATTERN = /\b(?:text|rounded)-\[[0-9.]+(?:px|rem)\]/g;
 const EXEMPT = /\/\/\s*design-token-exempt:/;
 
+// The one .ts file in scope: the website style table now holds the class strings
+// the components used to inline, which makes it exactly where this debt would
+// re-accrue unnoticed.
+const EXTRA = ["app/lib/site-style.ts"];
+
 // `git ls-files` lists what's tracked, which still includes a file deleted but
 // not yet staged — reading it blind crashes the whole check with ENOENT, and
 // since this runs inside `npm run typecheck` that looks like a type error.
 const files = execSync("git ls-files 'app/**/*.tsx' 'app/*.tsx'", { encoding: "utf8" })
   .split("\n")
   .filter((f) => f.endsWith(".tsx") && !f.startsWith("app/routes/admin/"))
+  .concat(EXTRA)
   .filter((f) => existsSync(f));
 
 const hits = [];

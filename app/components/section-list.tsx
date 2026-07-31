@@ -148,7 +148,7 @@ export function SectionList({
   return (
     <>
       {sections.map((section, index) => (
-        <Band key={section.id} index={index}>
+        <Band key={section.id} index={index} type={section.type}>
           {renderSection(section)}
         </Band>
       ))}

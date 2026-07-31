@@ -51,13 +51,17 @@ export default function WebsitePage({ loaderData, params }: Route.ComponentProps
   const tr = useT();
   const s = useSlots();
 
+  // `measureProse` carries the centring for styles that want it, so there's no
+  // `mx-auto` here — adding one produced it twice on the same element.
+  const title = page.title && (
+    <h1 className={cx(s.measureProse, s.h1, s.headingAlign)}>{page.title}</h1>
+  );
+
   return (
     <main className={s.page}>
-      {page.title && (
-        <h1 className={cx(s.measureProse, s.h1, s.headingAlign, s.headingAlign && "mx-auto")}>
-          {page.title}
-        </h1>
-      )}
+      {/* Wrapped only when the style asks: an empty `pageHead` emits no element,
+          so the classic markup is exactly what it was. */}
+      {s.pageHead ? <div className={s.pageHead}>{title}</div> : title}
       {/* Sections carry their own top margin, so the heading needs none. */}
       <SectionList
         sections={page.sections}

@@ -23,10 +23,13 @@ import { uploadSectionImage } from "~/lib/images.server";
 import {
   addSectionImages,
   getPageEditor,
+  getSiteStyle,
   listPages,
   savePageSections,
   saveSiteCopy,
+  saveSiteStyle,
 } from "~/lib/site.server";
+import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/site-style";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -39,10 +42,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   // ?page=<id> edits an extra page; no parameter means the home page, which is
   // what this screen has always been.
   const pageId = new URL(request.url).searchParams.get("page") || HOME_PAGE_ID;
-  const [editor, settings, pages] = await Promise.all([
+  const [editor, settings, pages, style] = await Promise.all([
     getPageEditor(propertyId, pageId, lang),
     getSettings(propertyId),
     listPages(propertyId, lang),
+    getSiteStyle(propertyId),
   ]);
   // A deleted page's bookmark must not silently edit the home page instead.
   if (!editor) throw new Response("Page not found", { status: 404 });
@@ -57,6 +61,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     text: editor.text,
     baseText: editor.baseText,
     websiteEnabled: settings.websiteEnabled ?? false,
+    // Resolved rather than raw, so an unknown stored id shows as the default
+    // selected instead of leaving every radio unchecked.
+    style: siteStyle(style).id,
   };
 }
 
@@ -68,6 +75,16 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const lang = pickLang(String(form.get("lang") ?? ""));
   const pageId = String(form.get("pageId") ?? "") || HOME_PAGE_ID;
+
+  // The template picker is its own small form, so it returns before any of the
+  // section parsing below — a style change must not depend on, or rewrite, the
+  // page structure. Content-safe: it writes one field.
+  if (form.get("op") === "style") {
+    const wanted = String(form.get("style") ?? "");
+    if (!SITE_STYLE_IDS.includes(wanted as SiteStyleId)) return { error: "Unknown template." };
+    await saveSiteStyle(propertyId, wanted as SiteStyleId);
+    return { styled: true as const };
+  }
 
   // Order and identity travel together in one field per section, so the
   // ordering can't drift out of step with a parallel list of types.
@@ -166,7 +183,8 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled } = loaderData;
+  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style } =
+    loaderData;
   const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
     <Editor
@@ -186,11 +204,75 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       text={text}
       baseText={baseText}
       websiteEnabled={websiteEnabled}
+      style={style}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
+      styled={Boolean(actionData && "styled" in actionData)}
       error={error}
       t={t}
     />
+  );
+}
+
+/**
+ * Which design the pages render with.
+ *
+ * Its own form, and deliberately NOT part of the sections form below: a template
+ * here changes only how the page looks. The sections, their settings, the photos
+ * and every word stay exactly as they are, so trying one costs nothing and
+ * switching back restores the old look with nothing to redo.
+ */
+function TemplatePicker({
+  current,
+  saving,
+  applied,
+  t,
+}: {
+  current: string;
+  saving: boolean;
+  applied: boolean;
+  t: ReturnType<typeof useAdminT>;
+}) {
+  return (
+    <Form method="post" className="mb-6 rounded-[14px] border border-line bg-surface p-5">
+      <input type="hidden" name="op" value="style" />
+      <div className="mb-1 flex items-center justify-between gap-3">
+        <div className="font-serif text-[18px] font-semibold">{t("secTemplate")}</div>
+        {applied && (
+          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
+            {t("secTemplateApplied")}
+          </span>
+        )}
+      </div>
+      <p className="mb-4 text-[13px] leading-[1.55] text-muted">{t("secTemplateIntro")}</p>
+
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {SITE_STYLE_IDS.map((id) => (
+          <label
+            key={id}
+            className={`cursor-pointer rounded-[12px] border p-4 ${
+              id === current ? "border-accent bg-accent-soft" : "border-line hover:border-accent"
+            }`}
+          >
+            <span className="flex items-center gap-2.5 text-[14px] font-semibold">
+              <input type="radio" name="style" value={id} defaultChecked={id === current} />
+              {t(SITE_STYLES[id].labelKey)}
+            </span>
+            <span className="mt-1.5 block text-[12px] leading-[1.5] text-muted">
+              {t(`${SITE_STYLES[id].labelKey}Note`)}
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving}
+        className="cursor-pointer rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+      >
+        {t("secTemplateSave")}
+      </button>
+    </Form>
   );
 }
 
@@ -203,8 +285,10 @@ function Editor({
   text,
   baseText,
   websiteEnabled,
+  style,
   saving,
   saved,
+  styled,
   error,
   t,
 }: {
@@ -216,8 +300,10 @@ function Editor({
   text: Record<string, string>;
   baseText: Record<string, string>;
   websiteEnabled: boolean;
+  style: string;
   saving: boolean;
   saved: boolean;
+  styled: boolean;
   error: string | null;
   t: ReturnType<typeof useAdminT>;
 }) {
@@ -290,6 +376,12 @@ function Editor({
         <p className="mb-5 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-medium text-red-700">
           {error}
         </p>
+      )}
+
+      {/* Home page only. The template is site-wide, and offering it again on
+          every extra page would read as a per-page choice. */}
+      {isHome && (
+        <TemplatePicker current={style} saving={saving} applied={styled} t={t} />
       )}
 
       {/* multipart because the text-block sections upload their own pictures.

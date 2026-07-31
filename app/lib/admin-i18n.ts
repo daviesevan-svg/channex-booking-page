@@ -317,6 +317,17 @@ const EN: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Sections",
+  secTemplate: "Template",
+  secTemplateIntro:
+    "How your pages look. Your sections, photos and words stay exactly as they are — only the design changes, and you can switch back at any time.",
+  secTemplateSave: "Use this template",
+  secTemplateApplied: "Template changed",
+  styleClassic: "Classic",
+  styleClassicNote:
+    "One calm column on a warm background, serif headings, rounded cards. The look this booking page has always had.",
+  styleEditorial: "Editorial",
+  styleEditorialNote:
+    "Full-width bands in alternating shades, centred small-caps headings, square corners, a square-cropped photo mosaic, and a cover photo that runs edge to edge.",
   secIntro:
     "What appears on your home page, and in what order. Each section is filled from content you already have elsewhere in the admin.",
   secAddPropertyFirst: "Add a property first to build its home page.",
@@ -2075,6 +2086,17 @@ const DE: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Abschnitte",
+  secTemplate: "Vorlage",
+  secTemplateIntro:
+    "Wie Ihre Seiten aussehen. Ihre Abschnitte, Fotos und Texte bleiben genau so, wie sie sind — nur das Design ändert sich, und Sie können jederzeit zurückwechseln.",
+  secTemplateSave: "Diese Vorlage verwenden",
+  secTemplateApplied: "Vorlage geändert",
+  styleClassic: "Klassisch",
+  styleClassicNote:
+    "Eine ruhige Spalte auf warmem Hintergrund, Serifen-Überschriften, abgerundete Karten. Das Aussehen, das diese Buchungsseite immer hatte.",
+  styleEditorial: "Editorial",
+  styleEditorialNote:
+    "Bänder über die volle Breite in wechselnden Tönen, zentrierte Kapitälchen-Überschriften, eckige Ecken, ein quadratisches Foto-Mosaik und ein Titelbild von Rand zu Rand.",
   secIntro:
     "Was auf Ihrer Startseite erscheint und in welcher Reihenfolge. Jeder Abschnitt wird aus Inhalten befüllt, die Sie bereits an anderer Stelle gepflegt haben.",
   secAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Startseite zu gestalten.",
@@ -3836,6 +3858,17 @@ const PT: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Secções",
+  secTemplate: "Modelo",
+  secTemplateIntro:
+    "O aspeto das suas páginas. As suas secções, fotografias e textos ficam exatamente como estão — muda apenas o design, e pode voltar atrás a qualquer momento.",
+  secTemplateSave: "Usar este modelo",
+  secTemplateApplied: "Modelo alterado",
+  styleClassic: "Clássico",
+  styleClassicNote:
+    "Uma coluna serena sobre fundo quente, títulos com serifa, cartões arredondados. O aspeto que esta página de reservas sempre teve.",
+  styleEditorial: "Editorial",
+  styleEditorialNote:
+    "Faixas de largura total em tons alternados, títulos centrados em maiúsculas pequenas, cantos retos, um mosaico de fotografias quadradas e uma imagem de capa de bordo a bordo.",
   secIntro:
     "O que aparece na sua página inicial e por que ordem. Cada secção é preenchida com conteúdos que já tem noutras partes da administração.",
   secAddPropertyFirst: "Adicione primeiro uma propriedade para criar a sua página inicial.",
