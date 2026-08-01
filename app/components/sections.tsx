@@ -301,6 +301,7 @@ export function GallerySection({
   fallbackPhoto?: string;
 }) {
   const s = useSlots();
+  const refill = useBleedFallback("gallery");
   const limit = numberSetting(section, "limit", 12);
   const photos = gallery.slice(0, limit);
 
@@ -328,7 +329,16 @@ export function GallerySection({
 
   return (
     <div className={cx(s.gap)}>
-      <SectionH2 gap="mb-5">{sectionHeading(section, tr)}</SectionH2>
+      {/* The GRID may run to the page edges, but the heading over it must not —
+          type flush against the viewport reads as a bug. So when this section is
+          bleeding, the heading puts the gutters back for itself. */}
+      {refill ? (
+        <div className={refill}>
+          <SectionH2 gap="mb-5">{sectionHeading(section, tr)}</SectionH2>
+        </div>
+      ) : (
+        <SectionH2 gap="mb-5">{sectionHeading(section, tr)}</SectionH2>
+      )}
       <div className={cx("grid", s.galleryGrid)}>
         {photos.map((photo) => (
           <figure key={photo.id}>
@@ -497,9 +507,9 @@ export function RichTextSection({
             className="h-full w-full object-cover"
           />
         </div>
-        <div className={cx(s.splitProse)}>
-          <div className={cx(s.measureProse)}>{copy}</div>
-        </div>
+        {/* `splitProse` owns the measure here, not `measureProse`: prose beside a
+            cover photo wants a narrower column than the same prose in a band. */}
+        <div className={cx(s.splitProse)}>{copy}</div>
       </div>
     );
   }

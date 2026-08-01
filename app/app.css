@@ -235,6 +235,11 @@ body {
   font-weight: var(--h2-weight, 600);
   text-transform: var(--h2-case, none);
 }
+/* Falls back to the h2 weight, so a style sets this only when its h3 is lighter
+   than its h2 — which it is whenever the two aren't the same size. */
+[data-headings] main h3 {
+  font-weight: var(--h3-weight, var(--h2-weight, 600));
+}
 [data-headings] main h2 {
   letter-spacing: var(--h2-tracking, normal);
 }

@@ -203,7 +203,7 @@ export interface SiteStyleDef {
   slots: StyleSlots;
 }
 
-export const SITE_STYLE_IDS = ["classic", "editorial"] as const;
+export const SITE_STYLE_IDS = ["classic", "editorial", "welcoming"] as const;
 export type SiteStyleId = (typeof SITE_STYLE_IDS)[number];
 
 export const DEFAULT_SITE_STYLE: SiteStyleId = "classic";
@@ -362,6 +362,107 @@ const STYLE_DEFS: Record<
       // Two tall plates. Fewer, larger rooms per row is most of the difference.
       roomsGrid: "grid-cols-1 gap-10 sm:grid-cols-2",
       roomPhoto: "aspect-[4/5]",
+    },
+  },
+
+  // Big serif headings on white, photographs to the edge of the screen, and no
+  // card outlines: the house shown in full-width chapters rather than tiles.
+  //
+  // For the properties Classic serves least well — B&Bs, guesthouses, farm
+  // stays — where the host's own words and a handful of photographs do the
+  // selling, and there is often little content on day one. Hence the emphasis on
+  // sections that look deliberate while nearly empty.
+  //
+  // Corners are 2px rather than 0. Editorial owns square; 2px reads as trimmed,
+  // and it leaves the round status pills and the diamond mark looking like two
+  // deliberate exceptions rather than four.
+  welcoming: {
+    labelKey: "styleWelcoming",
+    hero: "overlay",
+    vouchers: "band",
+    band: {
+      // White and off-white, not the warm page tone. The page colour survives in
+      // the hairlines, the chips and the striped photo placeholder.
+      outer: ["bg-surface", "bg-surface-alt"],
+      inner: "mx-auto max-w-[1120px] px-10 py-20",
+      // The map is NOT here: its half-bleed row is the one part of the design
+      // still to build, and the handoff sanctions the in-gutter fallback.
+      bleed: ["hero", "gallery", "vouchers", "richText"],
+    },
+    vars: {
+      "--radius-control": "2px",
+      "--radius-field": "2px",
+      "--radius-card": "2px",
+      "--radius-card-lg": "2px",
+      "--radius-panel": "2px",
+      "--radius-panel-lg": "2px",
+      "--radius-well": "2px",
+      "--radius-well-lg": "2px",
+      "--radius-chip-lg": "8px",
+    },
+    headings: {
+      "--h1-weight": "700",
+      "--h1-tracking": "-0.02em",
+      "--h2-weight": "700",
+      "--h2-tracking": "-0.02em",
+      "--h3-weight": "600",
+      "--h3-tracking": "-0.015em",
+      // The one place small caps are used: the wordmark. Everywhere else,
+      // uppercase headings are Editorial's signature and read corporate here.
+      "--wordmark-case": "uppercase",
+      "--wordmark-tracking": "0.14em",
+    },
+    slots: {
+      // The bands own the gutters and the rhythm.
+      page: "",
+      gap: "",
+      measure: "",
+      measureProse: "max-w-[640px]",
+
+      h1: "font-serif text-display-3xl font-bold leading-[1.12]",
+      h2: "font-serif text-display-xl font-bold",
+      h2Inline: "font-serif text-display-xs font-semibold",
+      h3: "font-serif text-title-xl font-semibold",
+      heroDisplay: "font-serif font-bold leading-[1.08]",
+      // The search card overlaps the hero photograph by 36px.
+      heroInner: "mx-auto max-w-[1120px] px-10 pb-20 -mt-9",
+      pageHead: "mx-auto max-w-[1120px] px-10 py-16 text-center",
+      headingAlign: "",
+
+      // No card chrome anywhere: a review is an indented quote, a room is a
+      // photograph with a caption. Only the things carrying money keep a border.
+      card: "border-l border-line bg-transparent",
+      panel: "bg-transparent",
+      strip: "rounded-panel border border-line-alt bg-surface",
+      media: "rounded-card",
+      // A large single image or the map bleeds, so it has no corners to round.
+      mediaLarge: "rounded-none",
+      ctaOutline: "rounded-card border border-accent",
+      // Not a box — a lettered link with a rule under it.
+      linkOutline: "border-b border-accent",
+
+      // The funnel keeps its borders where money is involved and loses them
+      // everywhere else, matching the website's plates-not-cards logic.
+      well: "rounded-control border-l-2 border-accent bg-surface-alt",
+      field: "rounded-field border border-line-alt bg-surface",
+      btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
+      btnSecondary: "rounded-control border border-line-alt bg-surface",
+      rule: "border-line",
+
+      splitRow: "grid grid-cols-1 items-stretch lg:grid-cols-2",
+      splitMedia: "min-h-[400px] lg:min-h-[440px]",
+      // 608 = the design's 480 of prose plus its 64 of padding either side, so
+      // the text column measures what the mock does rather than 128 less.
+      splitProse: "flex flex-col justify-center px-5 py-12 lg:mx-auto lg:max-w-[608px] lg:px-16",
+
+      highlightsGrid: "grid-cols-1 gap-12 sm:grid-cols-3",
+      facilitiesGrid: "grid-cols-1 gap-x-16 gap-y-0 sm:grid-cols-2",
+      reviewsGrid: "grid-cols-1 gap-16 sm:grid-cols-2",
+      // Three across, no gutters, straight to both page edges.
+      galleryGrid: "grid-cols-2 gap-0 sm:grid-cols-3",
+      galleryTile: "aspect-[4/3]",
+      roomsGrid: "grid-cols-1 gap-x-10 gap-y-14 sm:grid-cols-2",
+      roomPhoto: "aspect-[4/3]",
     },
   },
 };
