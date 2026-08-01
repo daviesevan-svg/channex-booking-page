@@ -10,7 +10,10 @@
  * whatever rate we ship features.
  *
  * app/routes/admin/** is exempt on purpose: the admin UI is never templated, so
- * there is nothing for a token to buy there.
+ * there is nothing for a token to buy there. `app/components/admin-*` is exempt
+ * for the same reason — an admin panel that happens to live beside the guest
+ * components is still admin UI, and the prefix is the existing convention
+ * (admin-form.tsx).
  *
  * Genuine one-offs (an optical nudge that is not a design decision) can opt out
  * with a trailing `// design-token-exempt: <reason>` on the same line. Give a
@@ -32,7 +35,12 @@ const EXTRA = ["app/lib/site-style.ts"];
 // since this runs inside `npm run typecheck` that looks like a type error.
 const files = execSync("git ls-files 'app/**/*.tsx' 'app/*.tsx'", { encoding: "utf8" })
   .split("\n")
-  .filter((f) => f.endsWith(".tsx") && !f.startsWith("app/routes/admin/"))
+  .filter(
+    (f) =>
+      f.endsWith(".tsx") &&
+      !f.startsWith("app/routes/admin/") &&
+      !f.startsWith("app/components/admin-"),
+  )
   .concat(EXTRA)
   .filter((f) => existsSync(f));
 

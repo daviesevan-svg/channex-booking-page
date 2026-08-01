@@ -317,6 +317,11 @@ const EN: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Sections",
+  previewTitle: "Preview",
+  previewIntro:
+    "Your own home page, shown with the choices above. Nothing is saved until you press the buttons — this is just what it would look like.",
+  previewUnsaved: "Not saved yet",
+  previewOpen: "Open in a new tab",
   brandTitle: "Colour & type",
   brandIntro:
     "Your accent colour and typeface. These apply everywhere a guest goes — the website, the booking pages and your confirmation emails.",
@@ -328,6 +333,7 @@ const EN: Record<string, string> = {
     "How your pages look. Your sections, photos and words stay exactly as they are — only the design changes, and you can switch back at any time.",
   secTemplateSave: "Use this template",
   secTemplateApplied: "Template changed",
+  secTemplateInUse: "In use",
   styleClassic: "Classic",
   styleClassicNote:
     "One calm column on a warm background, serif headings, rounded cards. The look this booking page has always had.",
@@ -2096,6 +2102,11 @@ const DE: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Abschnitte",
+  previewTitle: "Vorschau",
+  previewIntro:
+    "Ihre eigene Startseite mit den Auswahlen von oben. Nichts wird gespeichert, bis Sie auf die Schaltflächen klicken — so würde es aussehen.",
+  previewUnsaved: "Noch nicht gespeichert",
+  previewOpen: "In neuem Tab öffnen",
   brandTitle: "Farbe & Schrift",
   brandIntro:
     "Ihre Akzentfarbe und Schriftart. Sie gelten überall, wo ein Gast hinkommt — Website, Buchungsseiten und Bestätigungs-E-Mails.",
@@ -2107,6 +2118,7 @@ const DE: Record<string, string> = {
     "Wie Ihre Seiten aussehen. Ihre Abschnitte, Fotos und Texte bleiben genau so, wie sie sind — nur das Design ändert sich, und Sie können jederzeit zurückwechseln.",
   secTemplateSave: "Diese Vorlage verwenden",
   secTemplateApplied: "Vorlage geändert",
+  secTemplateInUse: "Aktiv",
   styleClassic: "Klassisch",
   styleClassicNote:
     "Eine ruhige Spalte auf warmem Hintergrund, Serifen-Überschriften, abgerundete Karten. Das Aussehen, das diese Buchungsseite immer hatte.",
@@ -3878,6 +3890,11 @@ const PT: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Secções",
+  previewTitle: "Pré-visualização",
+  previewIntro:
+    "A sua página inicial com as escolhas acima. Nada é guardado até carregar nos botões — é apenas o aspeto que teria.",
+  previewUnsaved: "Ainda não guardado",
+  previewOpen: "Abrir num novo separador",
   brandTitle: "Cor e tipografia",
   brandIntro:
     "A sua cor de destaque e tipografia. Aplicam-se em todo o percurso do hóspede — site, páginas de reserva e e-mails de confirmação.",
@@ -3889,6 +3906,7 @@ const PT: Record<string, string> = {
     "O aspeto das suas páginas. As suas secções, fotografias e textos ficam exatamente como estão — muda apenas o design, e pode voltar atrás a qualquer momento.",
   secTemplateSave: "Usar este modelo",
   secTemplateApplied: "Modelo alterado",
+  secTemplateInUse: "Em uso",
   styleClassic: "Clássico",
   styleClassicNote:
     "Uma coluna serena sobre fundo quente, títulos com serifa, cartões arredondados. O aspeto que esta página de reservas sempre teve.",

@@ -4,7 +4,7 @@ import { Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/website-sections";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { langParam, pickLang, type SiteSettings } from "~/lib/content";
 import { getSettings, saveBrand } from "~/lib/overrides.server";
 import { HOME_PAGE_ID, PAGE_TEXT_FIELDS, pageTextKey, sectionIdFor } from "~/lib/pages";
@@ -31,7 +31,8 @@ import {
 } from "~/lib/site.server";
 import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/site-style";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
-import { BrandPanel } from "~/components/brand-panel";
+import { BrandPanel } from "~/components/admin-brand-panel";
+import { DesignPreview } from "~/components/admin-design-preview";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -43,11 +44,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   // ?page=<id> edits an extra page; no parameter means the home page, which is
   // what this screen has always been.
   const pageId = new URL(request.url).searchParams.get("page") || HOME_PAGE_ID;
-  const [editor, settings, pages, style] = await Promise.all([
+  const [editor, settings, pages, style, property] = await Promise.all([
     getPageEditor(propertyId, pageId, lang),
     getSettings(propertyId),
     listPages(propertyId, lang),
     getSiteStyle(propertyId),
+    getProperty(propertyId),
   ]);
   // A deleted page's bookmark must not silently edit the home page instead.
   if (!editor) throw new Response("Page not found", { status: 404 });
@@ -66,6 +68,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     // selected instead of leaving every radio unchecked.
     style: siteStyle(style).id,
     settings,
+    // Prefer the slug — it is the address guests see, and the preview should be
+    // the real page at its real URL.
+    previewPath: `/${property?.slug || propertyId}`,
   };
 }
 
@@ -193,7 +198,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style, settings } =
+  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style, settings, previewPath } =
     loaderData;
   const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
@@ -216,6 +221,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       websiteEnabled={websiteEnabled}
       style={style}
       settings={settings}
+      previewPath={previewPath}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
       styled={Boolean(actionData && "styled" in actionData)}
@@ -235,11 +241,17 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
  */
 function TemplatePicker({
   current,
+  selected,
+  onSelect,
   saving,
   applied,
   t,
 }: {
+  /** What is stored. */
   current: string;
+  /** What the preview shows — the same until the operator picks another. */
+  selected: string;
+  onSelect: (id: string) => void;
   saving: boolean;
   applied: boolean;
   t: ReturnType<typeof useAdminT>;
@@ -262,12 +274,25 @@ function TemplatePicker({
           <label
             key={id}
             className={`cursor-pointer rounded-[12px] border p-4 ${
-              id === current ? "border-accent bg-accent-soft" : "border-line hover:border-accent"
+              id === selected ? "border-accent bg-accent-soft" : "border-line hover:border-accent"
             }`}
           >
             <span className="flex items-center gap-2.5 text-[14px] font-semibold">
-              <input type="radio" name="style" value={id} defaultChecked={id === current} />
+              <input
+                type="radio"
+                name="style"
+                value={id}
+                checked={id === selected}
+                onChange={() => onSelect(id)}
+              />
               {t(SITE_STYLES[id].labelKey)}
+              {/* Which one guests are actually seeing, so moving the selection
+                  away from it reads as "trying" rather than "done". */}
+              {id === current && (
+                <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">
+                  {t("secTemplateInUse")}
+                </span>
+              )}
             </span>
             <span className="mt-1.5 block text-[12px] leading-[1.5] text-muted">
               {t(`${SITE_STYLES[id].labelKey}Note`)}
@@ -298,6 +323,7 @@ function Editor({
   websiteEnabled,
   style,
   settings,
+  previewPath,
   saving,
   saved,
   styled,
@@ -314,12 +340,17 @@ function Editor({
   websiteEnabled: boolean;
   style: string;
   settings: SiteSettings;
+  previewPath: string;
   saving: boolean;
   saved: boolean;
   styled: boolean;
   error: string | null;
   t: ReturnType<typeof useAdminT>;
 }) {
+  // What the operator is LOOKING at, which is the saved value until they touch a
+  // control. The preview reads these; the forms still submit their own fields.
+  const [pickStyle, setPickStyle] = useState(style);
+  const [pickFont, setPickFont] = useState(settings.themeFont ?? "default");
   const [list, setList] = useState(initial);
   const [adding, setAdding] = useState<SectionType | "">("");
 
@@ -398,8 +429,27 @@ function Editor({
           the admin. */}
       {isHome && (
         <>
-          <TemplatePicker current={style} saving={saving} applied={styled} t={t} />
-          <BrandPanel settings={settings} saving={saving} saved={styled} />
+          <TemplatePicker
+            current={style}
+            selected={pickStyle}
+            onSelect={setPickStyle}
+            saving={saving}
+            applied={styled}
+            t={t}
+          />
+          <BrandPanel
+            settings={settings}
+            font={pickFont}
+            onFont={setPickFont}
+            saving={saving}
+            saved={styled}
+          />
+          <DesignPreview
+            path={previewPath}
+            style={pickStyle}
+            font={pickFont}
+            saved={{ style, font: settings.themeFont ?? "default" }}
+          />
         </>
       )}
 

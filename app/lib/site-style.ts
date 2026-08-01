@@ -214,6 +214,11 @@ export type SiteStyleId = (typeof SITE_STYLE_IDS)[number];
 
 export const DEFAULT_SITE_STYLE: SiteStyleId = "classic";
 
+/** Narrow an untrusted string — a query param, a stored value — to a real id. */
+export function isSiteStyleId(value: string): value is SiteStyleId {
+  return (SITE_STYLE_IDS as readonly string[]).includes(value);
+}
+
 /** Every string the renderer hardcoded before styles existed. Don't "tidy" these
  *  — they are a snapshot, and a hotel's live page is the test. */
 const CLASSIC: StyleSlots = {

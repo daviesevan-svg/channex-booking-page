@@ -19,10 +19,16 @@ const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 export function BrandPanel({
   settings,
+  font,
+  onFont,
   saving,
   saved,
 }: {
   settings: SiteSettings;
+  /** The pairing currently SHOWN — the saved one until the operator picks another,
+   *  so the preview beside this can follow along before anything is written. */
+  font: string;
+  onFont: (id: string) => void;
   saving: boolean;
   saved: boolean;
 }) {
@@ -153,7 +159,8 @@ export function BrandPanel({
               type="radio"
               name="themeFont"
               value={pair.id}
-              defaultChecked={(settings.themeFont ?? "default") === pair.id}
+              checked={font === pair.id}
+              onChange={() => onFont(pair.id)}
               className="peer sr-only"
             />
             <span className="block rounded-[12px] border-2 border-line-alt p-3 transition-colors peer-checked:border-accent peer-checked:bg-field-hover">
