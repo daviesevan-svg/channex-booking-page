@@ -38,6 +38,19 @@ export function useSlots(): StyleSlots {
 }
 
 /**
+ * The container a bleeding section has to put back for itself.
+ *
+ * A section can be declared full-width and then find it can't use that layout —
+ * a rich-text block with no picture, or with three. Its band has already
+ * withheld the gutters, so without this the prose would run to the viewport
+ * edge. Empty whenever the section isn't bleeding, so it costs nothing.
+ */
+export function useBleedFallback(type: SectionType): string {
+  const { band } = useSiteStyle();
+  return band?.bleed?.includes(type) ? band.inner : "";
+}
+
+/**
  * The band behind one section.
  *
  * A style with no bands renders NO element — not a `<div>` with no classes. The

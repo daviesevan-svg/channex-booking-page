@@ -24,7 +24,7 @@ import type { ResolvedGalleryImage } from "~/lib/gallery";
 import type { ReviewView } from "~/lib/section-data";
 import { facilityLabelKey } from "~/lib/content";
 import { useBase } from "~/lib/base";
-import { useSlots } from "~/components/site-style";
+import { useBleedFallback, useSiteStyle, useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export type { ReviewView };
@@ -211,10 +211,48 @@ export function VouchersSection({
   tr,
   hasVouchers,
   onOpen,
-}: Common & { hasVouchers: boolean; onOpen: () => void }) {
+  photo,
+}: Common & { hasVouchers: boolean; onOpen: () => void; photo?: string }) {
   const s = useSlots();
+  const { vouchers } = useSiteStyle();
   if (!hasVouchers) return null;
   const body = section.text?.body?.trim() || tr.t("vouchersTeaserBody");
+
+  if (vouchers === "band") {
+    return (
+      <div className="relative overflow-hidden bg-ink">
+        {photo && (
+          <img
+            {...imageProps(photo, IMAGE_SIZES.full)}
+            alt=""
+            aria-hidden
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover opacity-45"
+          />
+        )}
+        {/* A FIXED layer, not a gradient tuned to a photo we haven't seen: the
+            copy is reversed out over whatever the hotel uploaded, and the
+            contrast has to hold for all of them. With no photo at all the band
+            is simply this colour, which still reads as a deliberate break. */}
+        <div className="absolute inset-0 bg-ink/45" />
+        <div className="relative mx-auto max-w-[720px] px-7 py-16 text-center">
+          <h2 className={cx("mb-3 text-white", s.h2)}>{sectionHeading(section, tr)}</h2>
+          <RichText text={body} className="text-lead leading-[1.6] text-white/90" />
+          <button
+            type="button"
+            onClick={onOpen}
+            className={cx(
+              "mt-7 cursor-pointer border border-white px-6 py-3 text-body-lg font-semibold text-white hover:bg-white/10",
+              s.media,
+            )}
+          >
+            {tr.t("vouchersTeaserCta")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cx(
@@ -407,6 +445,8 @@ export function RichTextSection({
   hotelName,
 }: Pick<Common, "section"> & { hotelName?: string }) {
   const s = useSlots();
+  // Non-empty only when this section's band withheld the gutters — see below.
+  const refill = useBleedFallback("richText");
   const heading = section.text?.heading?.trim();
   const body = section.text?.body?.trim();
   const images = section.images ?? [];
@@ -425,9 +465,10 @@ export function RichTextSection({
   // included — a section a hotel already wrote must not move.
   if (!images.length) {
     const centered = (section.settings?.align ?? "left") === "center";
-    return (
+    const column = (
       <div className={cx(s.gap, s.measureProse, centered && "mx-auto text-center")}>{copy}</div>
     );
+    return refill ? <div className={refill}>{column}</div> : column;
   }
 
   // With pictures it becomes two columns, so the copy no longer runs the width
@@ -437,6 +478,31 @@ export function RichTextSection({
   // the heading tells you nothing — so the order is swapped in CSS at lg, not by
   // reordering the DOM.
   const left = section.settings?.imageSide === "photosLeft";
+
+  // The half-bleed row: one picture running to a page edge, the prose against it.
+  //
+  // Only with EXACTLY one picture. A cover-cropped half can show one photograph;
+  // with two or more there is nowhere for the rest to go, and silently dropping a
+  // picture a hotel uploaded is worse than a quieter layout — so those fall back
+  // to the column below, and `Bleeding` re-adds the gutters the band withheld.
+  if (s.splitRow && images.length === 1) {
+    const img = images[0];
+    return (
+      <div className={cx(s.gap, s.splitRow)}>
+        <div className={cx("overflow-hidden bg-surface-alt", s.splitMedia, left && "lg:order-first")}>
+          <img
+            {...imageProps(img.url, IMAGE_SIZES.heroSplit)}
+            alt={section.text?.[`alt_${img.id}`] || heading || hotelName || ""}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        </div>
+        <div className={cx(s.splitProse)}>
+          <div className={cx(s.measureProse)}>{copy}</div>
+        </div>
+      </div>
+    );
+  }
   const stack = (
     <div className={`flex flex-col gap-4 ${left ? "lg:order-first" : ""}`}>
       {images.map((img) => (
@@ -454,10 +520,11 @@ export function RichTextSection({
     </div>
   );
 
-  return (
+  const columns = (
     <div className={cx(s.gap, "grid grid-cols-1 items-start gap-10 lg:grid-cols-2")}>
       {copy}
       {stack}
     </div>
   );
+  return refill ? <div className={refill}>{columns}</div> : columns;
 }

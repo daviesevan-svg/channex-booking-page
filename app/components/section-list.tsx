@@ -107,6 +107,10 @@ export function SectionList({
                 section={section}
                 tr={tr}
                 hasVouchers={data.hasVouchers}
+                // The section has no picture of its own, so a style that wants a
+                // photographic band borrows the property's — the same one the
+                // gallery falls back to. With neither it renders flat.
+                photo={data.fallbackPhoto ?? data.gallery[0]?.url}
                 onOpen={() => navigate(`${base}/vouchers`)}
               />
             );

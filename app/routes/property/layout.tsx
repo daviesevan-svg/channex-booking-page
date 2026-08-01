@@ -289,7 +289,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
               <>
                 <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
                 {!logoHideName && (
-                  <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">
+                  <span className="wordmark font-serif text-title-lg font-semibold tracking-[-0.01em]">
                     {hotelName}
                   </span>
                 )}
@@ -300,7 +300,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                   className="inline-block h-[13px] w-[13px] rounded-mark-lg bg-accent"
                   style={{ transform: "rotate(45deg)" }}
                 />
-                <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">
+                <span className="wordmark font-serif text-title-lg font-semibold tracking-[-0.01em]">
                   {hotelName}
                 </span>
               </>

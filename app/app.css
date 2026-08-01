@@ -243,6 +243,13 @@ body {
 [data-headings] main h3 {
   letter-spacing: var(--h3-tracking, var(--h2-tracking, normal));
 }
+/* The header's hotel name. Outside `main` and not a heading — it's a wordmark —
+   so it takes its own properties rather than the h1 treatment, and defaults to
+   leaving the existing utilities alone. */
+[data-headings] .wordmark {
+  text-transform: var(--wordmark-case, none);
+  letter-spacing: var(--wordmark-tracking, -0.01em);
+}
 
 /* Eyebrow / field-label helpers used across screens */
 .eyebrow {
