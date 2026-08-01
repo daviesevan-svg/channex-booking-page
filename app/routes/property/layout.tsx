@@ -9,6 +9,7 @@ import {
   DEFAULT_THEME,
   enabledLanguages,
   fontPair,
+  isFontPairId,
   langFromRequest,
   LANG_COOKIE,
 } from "~/lib/content";
@@ -20,13 +21,14 @@ import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getSiteChrome } from "~/lib/site.server";
 import { SiteFooterBlock } from "~/components/site-footer";
 import { SiteStyleProvider } from "~/components/site-style";
-import { siteStyle } from "~/lib/site-style";
+import { isSiteStyleId, siteStyle } from "~/lib/site-style";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty } from "~/lib/properties.server";
 import { propertyIdForHost } from "~/lib/domains.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 import { basePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { getAdminEmail } from "~/lib/auth.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).
@@ -63,6 +65,25 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     ? await getSiteChrome(pid, lang).catch(() => null)
     : null;
 
+  // Preview: the design screen renders this page in an iframe with the template
+  // and typeface the operator is CONSIDERING, before anything is saved.
+  //
+  // Gated on a signed-in admin, so a link with `?style=` on it shows a guest
+  // exactly what the property stored. Presentation-only either way — every value
+  // comes from our own tables — but a hotel's shared link should never render as
+  // a design they didn't choose. The session is only read when a param is
+  // present, so ordinary traffic pays nothing.
+  const url = new URL(request.url);
+  const wantStyle = url.searchParams.get("style");
+  const wantFont = url.searchParams.get("font");
+  const preview =
+    (wantStyle || wantFont) && (await getAdminEmail(request))
+      ? {
+          style: wantStyle && isSiteStyleId(wantStyle) ? wantStyle : null,
+          font: wantFont && isFontPairId(wantFont) ? wantFont : null,
+        }
+      : null;
+
   return {
     mode: "property" as const,
     property: { address: overrides.address, phone: overrides.phone, photos: [] },
@@ -78,7 +99,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
-    themeFont: settings.themeFont,
+    themeFont: preview?.font ?? settings.themeFont,
     singleUnit: settings.singleUnit ?? false,
     lang,
     languages: enabledLanguages(settings),
@@ -92,7 +113,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // Which layout style the website pages render with. Null with the website
     // off, which resolves to `classic` — the legacy booking page's look, and the
     // only one it has ever had.
-    siteStyle: chrome?.style ?? null,
+    siteStyle: preview?.style ?? chrome?.style ?? null,
     contact: {
       // Full postal address, not just the street line — same fix as the map and
       // contact sections.
