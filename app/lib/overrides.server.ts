@@ -298,14 +298,35 @@ function safeUrl(v: FormDataEntryValue | null): string | undefined {
   }
 }
 
-export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
+/**
+ * The look: brand colour and typeface.
+ *
+ * A MERGE, like `savePropertyMeta` — these live on the design screen beside the
+ * template, not on General, so General's save must not touch them. They used to
+ * be read straight out of General's form, which meant any save there rewrote
+ * them from whatever fields happened to be present.
+ */
+export async function saveBrand(pid: string, form: FormData): Promise<SiteSettings> {
   const existing = await getSettings(pid);
   const themeRaw = String(form.get("theme") ?? "").trim();
+  const font = String(form.get("themeFont") ?? "").trim();
   const next: SiteSettings = {
     ...existing,
     theme: themeRaw === "custom" || isThemeId(themeRaw) ? (themeRaw as SiteSettings["theme"]) : undefined,
     customColor: normalizeHex(String(form.get("customColor") ?? "")),
     customBg: normalizeHex(String(form.get("customBg") ?? "")),
+    // Only one of the curated pairings, or unset for the default — never an
+    // arbitrary family, which would be a font nobody has loaded.
+    themeFont: isFontPairId(font) && font !== "default" ? font : undefined,
+  };
+  await writeJson(settingsKey(pid), next);
+  return next;
+}
+
+export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
+  const existing = await getSettings(pid);
+  const next: SiteSettings = {
+    ...existing,
     currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),

@@ -317,6 +317,12 @@ const EN: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Sections",
+  brandTitle: "Colour & type",
+  brandIntro:
+    "Your accent colour and typeface. These apply everywhere a guest goes — the website, the booking pages and your confirmation emails.",
+  brandTypeface: "Typeface",
+  brandTypeSample: "Reserve your stay",
+  brandSave: "Save colour & type",
   secTemplate: "Template",
   secTemplateIntro:
     "How your pages look. Your sections, photos and words stay exactly as they are — only the design changes, and you can switch back at any time.",
@@ -681,6 +687,7 @@ const EN: Record<string, string> = {
   genLiveAtPrefix: "Live at",
   genLiveAtSuffix: "— the long id keeps working too.",
   genBrandColour: "Brand colour",
+  genBrandMoved: "Your accent colour and typeface now live with the template, under",
   genBrandColourHint: "Sets the accent colour across the booking pages.",
   genCustom: "Custom",
   genAccentColour: "Accent colour",
@@ -2089,6 +2096,12 @@ const DE: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Abschnitte",
+  brandTitle: "Farbe & Schrift",
+  brandIntro:
+    "Ihre Akzentfarbe und Schriftart. Sie gelten überall, wo ein Gast hinkommt — Website, Buchungsseiten und Bestätigungs-E-Mails.",
+  brandTypeface: "Schriftart",
+  brandTypeSample: "Reservieren Sie Ihren Aufenthalt",
+  brandSave: "Farbe & Schrift speichern",
   secTemplate: "Vorlage",
   secTemplateIntro:
     "Wie Ihre Seiten aussehen. Ihre Abschnitte, Fotos und Texte bleiben genau so, wie sie sind — nur das Design ändert sich, und Sie können jederzeit zurückwechseln.",
@@ -2454,6 +2467,7 @@ const DE: Record<string, string> = {
   genLiveAtPrefix: "Erreichbar unter",
   genLiveAtSuffix: "— die lange ID funktioniert weiterhin.",
   genBrandColour: "Markenfarbe",
+  genBrandMoved: "Akzentfarbe und Schriftart finden Sie jetzt bei der Vorlage, unter",
   genBrandColourHint: "Legt die Akzentfarbe auf allen Buchungsseiten fest.",
   genCustom: "Benutzerdefiniert",
   genAccentColour: "Akzentfarbe",
@@ -3864,6 +3878,12 @@ const PT: Record<string, string> = {
 
   // -- website sections editor (sec*) --
   secTitle: "Secções",
+  brandTitle: "Cor e tipografia",
+  brandIntro:
+    "A sua cor de destaque e tipografia. Aplicam-se em todo o percurso do hóspede — site, páginas de reserva e e-mails de confirmação.",
+  brandTypeface: "Tipografia",
+  brandTypeSample: "Reserve a sua estadia",
+  brandSave: "Guardar cor e tipografia",
   secTemplate: "Modelo",
   secTemplateIntro:
     "O aspeto das suas páginas. As suas secções, fotografias e textos ficam exatamente como estão — muda apenas o design, e pode voltar atrás a qualquer momento.",
@@ -4229,6 +4249,7 @@ const PT: Record<string, string> = {
   genLiveAtPrefix: "Ativo em",
   genLiveAtSuffix: "— o id longo continua a funcionar.",
   genBrandColour: "Cor da marca",
+  genBrandMoved: "A cor de destaque e a tipografia estão agora junto do modelo, em",
   genBrandColourHint: "Define a cor de destaque em todas as páginas de reserva.",
   genCustom: "Personalizada",
   genAccentColour: "Cor de destaque",
