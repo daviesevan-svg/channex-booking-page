@@ -644,7 +644,7 @@ function Field({
         name={name}
         type={type}
         placeholder={placeholder}
-        className={cx("mt-[7px] block w-full", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
+        className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
       />
       {error?.[0] && (
         <span className="mt-1 block text-label font-normal text-red-600">{error[0]}</span>
@@ -849,7 +849,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 <select
                   name="arrival"
                   defaultValue=""
-                  className={cx("mt-[7px] block w-full", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
+                  className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
                 >
                   <option value="">{tr.t("arrivalUnknown")}</option>
                   {ARRIVAL_TIMES.map((t) => (
@@ -866,7 +866,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 name="requests"
                 rows={3}
                 placeholder={tr.t("requestsPlaceholder")}
-                className={cx("mt-[7px] block w-full resize-y", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
+                className={cx("mt-[7px] block w-full resize-y", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
               />
             </label>
           </section>
@@ -993,7 +993,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={promoCodeValue}
                 placeholder="SUMMER10"
                 autoComplete="off"
-                className={cx("min-w-0 flex-1", s.well, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
+                className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
               />
               <button
                 type="submit"
@@ -1001,7 +1001,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyPromo"
                 formNoValidate
                 disabled={submitting}
-                className={cx("flex-none", s.field, "px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+                className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
               >
                 {tr.t("applyCode")}
               </button>
@@ -1023,7 +1023,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={voucherCodeValue}
                 placeholder="RP-XXXX-XXXX"
                 autoComplete="off"
-                className={cx("min-w-0 flex-1", s.well, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
+                className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
               />
               <button
                 type="submit"
@@ -1031,7 +1031,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyVoucher"
                 formNoValidate
                 disabled={submitting}
-                className={cx("flex-none", s.field, "px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+                className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
               >
                 {tr.t("applyCode")}
               </button>

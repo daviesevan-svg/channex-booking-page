@@ -80,9 +80,15 @@ export interface StyleSlots {
   // `card`, `panel` and `strip` above for their surfaces — one vocabulary, so a
   // template that says "rooms are plates, not cards" means it everywhere. These
   // five are the constructs the website has no equivalent of.
-  /** A tinted inset inside a panel: a policy note, a total block. ×12 */
+  /**
+   * A tinted inset inside a panel: a policy note, a total block.
+   *
+   * Rarer than the first audit suggested. Counting the STRING said twelve; going
+   * back and looking at what each one was attached to said eight of them are
+   * text inputs and only one is an inset. Count constructs, not substrings.
+   */
   well: string;
-  /** Input chrome. Padding stays at the call site — it varies by field size. ×5 */
+  /** Input chrome. Padding stays at the call site — it varies by field size. ×8 */
   field: string;
   /** The money button: search, select, continue, pay. ×9 */
   btnPrimary: string;
@@ -234,7 +240,9 @@ const CLASSIC: StyleSlots = {
   linkOutline: "rounded-control border border-accent",
 
   well: "rounded-control border border-line-alt bg-surface-alt",
-  field: "rounded-control border border-line-alt bg-surface",
+  // Same string as `well` in classic — they only diverge in a style that treats
+  // a form control differently from a note, which is most of them.
+  field: "rounded-control border border-line-alt bg-surface-alt",
   btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
   btnSecondary: "rounded-control border border-line-alt bg-surface-alt",
   rule: "border-divider",
@@ -443,8 +451,12 @@ const STYLE_DEFS: Record<
 
       // The funnel keeps its borders where money is involved and loses them
       // everywhere else, matching the website's plates-not-cards logic.
+      // A note is a tinted block with an accent rule down its left edge.
       well: "rounded-control border-l-2 border-accent bg-surface-alt",
-      field: "rounded-field border border-line-alt bg-surface",
+      // Text fields are underline-only, per the design — the one exception is
+      // the card fields, which stay fully boxed so the payment area reads as an
+      // enclosed control. Those are Stripe's own iframe, so they already do.
+      field: "rounded-none border-0 border-b border-line-alt bg-transparent",
       btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
       btnSecondary: "rounded-control border border-line-alt bg-surface",
       rule: "border-line",

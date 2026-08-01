@@ -162,7 +162,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="publicText"
             rows={5}
             defaultValue={loaderData.initialPublicText}
-            className={cx("w-full resize-y", s.well, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
+            className={cx("w-full resize-y", s.field, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
           />
           <span className="mt-1 block text-label text-muted">{tr.t("publicReviewHint")}</span>
         </label>
@@ -173,7 +173,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="privateNote"
             rows={3}
             defaultValue={loaderData.initialPrivateNote}
-            className={cx("w-full resize-y", s.well, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
+            className={cx("w-full resize-y", s.field, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
           />
           <span className="mt-1 block text-label text-muted">{tr.t("privateNoteHint")}</span>
         </label>

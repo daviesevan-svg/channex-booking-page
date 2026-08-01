@@ -392,7 +392,7 @@ function ExtraCard({
             <button
               type="button"
               onClick={onConfigure}
-              className={cx("w-full", s.field, "py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
+              className={cx("w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
             >
               {configurable ? tr.t("chooseOption") : tr.t("add")}
             </button>
@@ -405,7 +405,7 @@ function ExtraCard({
             <button
               type="button"
               onClick={onAdd}
-              className={cx("w-full", s.field, "py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
+              className={cx("w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
             >
               + {tr.t("add")}
             </button>
@@ -527,7 +527,7 @@ function ConfigureModal({
                       value={info[f.id] ?? ""}
                       onChange={(e) => setInfo((prev) => ({ ...prev, [f.id]: e.target.value }))}
                       placeholder={f.placeholder}
-                      className={cx("mt-1.5 block w-full", s.well, "px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent")}
+                      className={cx("mt-1.5 block w-full", s.field, "px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent")}
                     />
                   </label>
                 ))}
