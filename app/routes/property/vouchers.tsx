@@ -11,6 +11,8 @@ import { formatMoney } from "~/lib/money";
 import { getActiveVoucherProducts, soldCount } from "~/lib/vouchers.server";
 import { useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolveRequestProperty(params.channelId, request);
@@ -47,6 +49,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
   const { products } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const money = (n: number) => formatMoney(n, currency);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
 
@@ -58,7 +61,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
       </div>
 
       {products.length === 0 ? (
-        <div className="rounded-card-lg border border-line bg-surface p-8 text-body-lg text-secondary">
+        <div className={cx(s.card, "p-8 text-body-lg text-secondary")}>
           {tr.t("vouchersEmpty")}
         </div>
       ) : (
@@ -67,7 +70,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
             <Link
               key={p.id}
               to={`${base}/vouchers/${p.id}`}
-              className="group overflow-hidden rounded-panel border border-line bg-surface transition-shadow hover:shadow-md"
+              className={cx("group overflow-hidden", s.panel, "transition-shadow hover:shadow-md")}
             >
               <div className="h-[170px] overflow-hidden" style={{ background: stripe }}>
                 {p.image && (

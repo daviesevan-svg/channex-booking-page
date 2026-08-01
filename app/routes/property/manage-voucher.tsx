@@ -36,6 +36,8 @@ import {
 } from "~/lib/vouchers.server";
 import { sendVoucherCancelEmails, sendVoucherReminderEmail } from "~/lib/voucher-purchase.server";
 import { basePath, useBase } from "~/lib/base";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 /** Voucher owned by the signed-in buyer, or a redirect back to the login. */
 async function requireOwnVoucher(
@@ -175,6 +177,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
   const base = useBase();
   const { voucher: v, canCancel, cancelReason, cancelBy, canRemind } = loaderData;
   const tr = useT();
+  const s = useSlots();
   const { currency } = useProperty();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
@@ -231,7 +234,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
           )}
 
           {v.activity.length > 0 && (
-            <div className="mt-4 border-t border-divider pt-4">
+            <div className={cx("mt-4 border-t", s.rule, "pt-4")}>
               <div className="mb-2 text-label font-semibold uppercase tracking-[0.1em] text-muted-2">
                 {tr.t("voucherManageActivity")}
               </div>
@@ -252,7 +255,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
             </div>
           )}
 
-          <div className="mt-4 border-t border-divider pt-4 text-caption">
+          <div className={cx("mt-4 border-t", s.rule, "pt-4 text-caption")}>
             <Link to={`${base}/voucher/${v.code}`} className="font-semibold text-accent hover:text-accent-deep">
               {tr.t("manageVoucherOpen")} →
             </Link>

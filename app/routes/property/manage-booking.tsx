@@ -20,6 +20,8 @@ import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 async function ownedBooking(channelId: string, id: string, request: Request) {
   const email = await getGuestEmail(request);
@@ -124,6 +126,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   const base = useBase();
   const { booking: b, canCancel, cancelReason, afterDeadlineMessage } = loaderData;
   const tr = useT();
+  const s = useSlots();
   const { currency } = useProperty();
   const nav = useNavigation();
   const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
@@ -177,7 +180,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
       )}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <section className="rounded-panel border border-line bg-surface p-5">
+        <section className={cx(s.panel, "p-5")}>
           <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionBooking")}</h2>
           <Row label={tr.t("reference")} value={<span className="font-mono text-caption">{b.reference}</span>} />
           <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
@@ -186,7 +189,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           <Row label={tr.t("bookedOn")} value={fmt(b.createdAt, "d MMM yyyy, HH:mm")} />
         </section>
 
-        <section className="rounded-panel border border-line bg-surface p-5">
+        <section className={cx(s.panel, "p-5")}>
           <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionGuest")}</h2>
           <Row label={tr.t("guestName")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
           <Row
@@ -203,7 +206,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         </section>
       </div>
 
-      <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+      <section className={cx("mt-5", s.panel, "p-5")}>
         <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionRooms")}</h2>
         <div className="flex flex-col divide-y divide-divider">
           {b.rooms.map((r, i) => (
@@ -219,7 +222,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           ))}
         </div>
         {b.extras && b.extras.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2 border-t border-divider pt-3">
+          <div className={cx("mt-3 flex flex-col gap-2 border-t", s.rule, "pt-3")}>
             <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
             {groupExtrasByRoom(b.extras).map((g, gi) => (
               <div key={gi} className="flex flex-col gap-1.5">
@@ -256,20 +259,20 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             <span className="font-semibold">−{formatMoney(b.promo.discount, cur)}</span>
           </div>
         )}
-        <div className="mt-4 flex items-baseline justify-between border-t border-divider pt-4">
+        <div className={cx("mt-4 flex items-baseline justify-between border-t", s.rule, "pt-4")}>
           <span className="text-lead font-semibold">{tr.t("total")}</span>
           <span className="font-serif text-display-sm font-semibold">{formatMoney(b.total, cur)}</span>
         </div>
       </section>
 
       {cancellationText && (
-        <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+        <section className={cx("mt-5", s.panel, "p-5")}>
           <h2 className="mb-2 font-serif text-title-xs font-semibold">{tr.t("cancellationPolicy")}</h2>
           <p className="text-body text-secondary">{cancellationText}</p>
         </section>
       )}
 
-      <section className="mt-5 rounded-panel border border-line bg-surface p-5">
+      <section className={cx("mt-5", s.panel, "p-5")}>
         <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionPayment")}</h2>
         <p className="text-body text-muted-2">{tr.t("noPaymentInfo")}</p>
       </section>

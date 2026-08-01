@@ -18,6 +18,8 @@ import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "~/lib/extras";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -137,6 +139,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
 
   // Finalize failed after payment — never show the success card. Tell the guest
   // the truth (auto-refunded, or that we'll follow up) instead of "Confirmed".
@@ -180,7 +183,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
       {simulated && (
-        <div className="mb-6 rounded-control border border-line-alt bg-surface-alt px-4 py-3 text-caption text-muted">
+        <div className={cx("mb-6", s.well, "px-4 py-3 text-caption text-muted")}>
           {tr.t("demoMode")}
         </div>
       )}
@@ -210,10 +213,10 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
       </div>
 
       <div
-        className="rounded-panel-lg border border-line bg-surface p-[26px] text-left"
+        className={cx(s.strip, "p-[26px] text-left")}
         style={{ boxShadow: "var(--shadow-confirm)" }}
       >
-        <div className="flex flex-col gap-4 border-b border-divider pb-5">
+        <div className={cx("flex flex-col gap-4 border-b", s.rule, "pb-5")}>
           {rooms.map((r, i) => (
             <div key={i} className="flex items-center gap-[18px]">
               <div className="h-16 w-[84px] flex-none rounded-card" style={{ background: stripe }} />
@@ -279,7 +282,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             </div>
           ))}
           {total > 0 && (
-            <div className="flex items-baseline justify-between border-t border-divider pt-3">
+            <div className={cx("flex items-baseline justify-between border-t", s.rule, "pt-3")}>
               <span className="text-secondary">{tr.t("total")}</span>
               <span className="font-serif text-title-3xl font-semibold">
                 {formatMoney(grandTotal, currency)}

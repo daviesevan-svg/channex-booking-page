@@ -74,6 +74,28 @@ export interface StyleSlots {
   /** The smaller outlined link on a room card. */
   linkOutline: string;
 
+  // ---- the funnel ----
+  // Derived by counting what results, detail, extras, checkout, confirmation,
+  // the voucher flow and the manage pages actually draw. Those pages reuse
+  // `card`, `panel` and `strip` above for their surfaces — one vocabulary, so a
+  // template that says "rooms are plates, not cards" means it everywhere. These
+  // five are the constructs the website has no equivalent of.
+  /** A tinted inset inside a panel: a policy note, a total block. ×12 */
+  well: string;
+  /** Input chrome. Padding stays at the call site — it varies by field size. ×5 */
+  field: string;
+  /** The money button: search, select, continue, pay. ×9 */
+  btnPrimary: string;
+  /** The quieter one beside it. */
+  btnSecondary: string;
+  /**
+   * A hairline between rows — the funnel's most common construct at 28 uses.
+   *
+   * Colour and style only; the call site keeps `border-t` / `border-b`, because
+   * which edge a rule sits on is about the content, not the template.
+   */
+  rule: string;
+
   // ---- grids ----
   highlightsGrid: string;
   facilitiesGrid: string;
@@ -185,6 +207,12 @@ const CLASSIC: StyleSlots = {
   mediaLarge: "rounded-panel-lg",
   ctaOutline: "rounded-card border border-accent",
   linkOutline: "rounded-control border border-accent",
+
+  well: "rounded-control border border-line-alt bg-surface-alt",
+  field: "rounded-control border border-line-alt bg-surface",
+  btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
+  btnSecondary: "rounded-control border border-line-alt bg-surface-alt",
+  rule: "border-divider",
 
   highlightsGrid: "grid-cols-1 gap-[18px] sm:grid-cols-3",
   facilitiesGrid: "grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3",

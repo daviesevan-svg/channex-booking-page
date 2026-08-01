@@ -47,6 +47,8 @@ import { getOverrides, getPageText } from "~/lib/overrides.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 interface Stay {
   channelId: string;
@@ -634,6 +636,7 @@ function Field({
   placeholder?: string;
   error?: string[];
 }) {
+  const s = useSlots();
   return (
     <label className="block text-caption font-semibold text-secondary">
       {label}
@@ -641,7 +644,7 @@ function Field({
         name={name}
         type={type}
         placeholder={placeholder}
-        className="mt-[7px] block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
+        className={cx("mt-[7px] block w-full", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
       />
       {error?.[0] && (
         <span className="mt-1 block text-label font-normal text-red-600">{error[0]}</span>
@@ -688,6 +691,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [searchParams] = useSearchParams();
   const nav = useNavigation();
@@ -827,7 +831,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
       <Form method="post" className="flex flex-wrap items-start gap-9">
         <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
-          <section className="rounded-panel border border-line bg-surface p-[26px]">
+          <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName?.map((k) => tr.t(k))} />
@@ -837,7 +841,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </div>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-[26px]">
+          <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.arrivalSection}</h3>
             <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <label className="block text-caption font-semibold text-secondary">
@@ -845,7 +849,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 <select
                   name="arrival"
                   defaultValue=""
-                  className="mt-[7px] block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
+                  className={cx("mt-[7px] block w-full", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
                 >
                   <option value="">{tr.t("arrivalUnknown")}</option>
                   {ARRIVAL_TIMES.map((t) => (
@@ -862,12 +866,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 name="requests"
                 rows={3}
                 placeholder={tr.t("requestsPlaceholder")}
-                className="mt-[7px] block w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent"
+                className={cx("mt-[7px] block w-full resize-y", s.well, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
               />
             </label>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-[26px]">
+          <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-3 font-serif text-title-md font-semibold">{text.paymentSection}</h3>
 
             {/* The due-now/at-hotel split only makes sense when a card is really
@@ -914,12 +918,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </p>
 
             {mixedCancellation ? (
-              <div className="mb-[18px] border-t border-divider pt-3.5 text-caption text-secondary">
+              <div className={cx("mb-[18px] border-t", s.rule, "pt-3.5 text-caption text-secondary")}>
                 {tr.t("cancellationVariesByRoom")}
               </div>
             ) : (
               (cancellationText || latePhrase || noShowPhrase) && (
-                <div className="mb-[18px] flex flex-col gap-1.5 border-t border-divider pt-3.5 text-caption text-secondary">
+                <div className={cx("mb-[18px] flex flex-col gap-1.5 border-t", s.rule, "pt-3.5 text-caption text-secondary")}>
                   {cancellationText && <div>{cancellationText}</div>}
                   {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
                   {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
@@ -931,13 +935,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
         {/* summary */}
         <aside
-          className="sticky top-24 min-w-[300px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
+          className={cx("sticky top-24 min-w-[300px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-4 font-serif text-title-lg font-semibold">
             {tr.p("yourStayRooms", lines.length)}
           </h3>
-          <div className="flex flex-col gap-3 border-b border-divider pb-4">
+          <div className={cx("flex flex-col gap-3 border-b", s.rule, "pb-4")}>
             {lines.map((l, i) => (
               <div key={`${l.roomId}-${i}`} className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -950,14 +954,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </div>
             ))}
           </div>
-          <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
+          <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
             <Row label={tr.t("checkIn")} value={fmt(parseISO(stay.checkin), "EEE d MMM")} />
             <Row label={tr.t("checkOut")} value={fmt(parseISO(stay.checkout), "EEE d MMM")} />
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
           {(offer || (discount > 0 && appliedPromo)) && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
+            <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
               <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
                 <div className="flex justify-between text-[#3f7a52]">
@@ -979,7 +983,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           )}
 
           {/* promo code */}
-          <div className="border-b border-divider py-4">
+          <div className={cx("border-b", s.rule, "py-4")}>
             <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("promoCode")}
             </label>
@@ -989,7 +993,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={promoCodeValue}
                 placeholder="SUMMER10"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-control border border-line-alt bg-surface-alt px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
+                className={cx("min-w-0 flex-1", s.well, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
               />
               <button
                 type="submit"
@@ -997,7 +1001,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyPromo"
                 formNoValidate
                 disabled={submitting}
-                className="flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+                className={cx("flex-none", s.field, "px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
               >
                 {tr.t("applyCode")}
               </button>
@@ -1009,7 +1013,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </div>
 
           {/* gift voucher — pays (part of) the amount due today */}
-          <div className="border-b border-divider py-4">
+          <div className={cx("border-b", s.rule, "py-4")}>
             <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
               {tr.t("voucherHave")}
             </label>
@@ -1019,7 +1023,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 defaultValue={voucherCodeValue}
                 placeholder="RP-XXXX-XXXX"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-control border border-line-alt bg-surface-alt px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
+                className={cx("min-w-0 flex-1", s.well, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
               />
               <button
                 type="submit"
@@ -1027,7 +1031,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 value="applyVoucher"
                 formNoValidate
                 disabled={submitting}
-                className="flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60"
+                className={cx("flex-none", s.field, "px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
               >
                 {tr.t("applyCode")}
               </button>
@@ -1044,7 +1048,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </div>
 
           {extraLines.length > 0 && (
-            <div className="flex flex-col gap-3 border-b border-divider py-4 text-body">
+            <div className={cx("flex flex-col gap-3 border-b", s.rule, "py-4 text-body")}>
               <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
               {groupExtrasByRoom(extraLines).map((g, gi) => (
                 <div key={gi} className="flex flex-col gap-1.5">
@@ -1067,7 +1071,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           )}
 
           {(pricing.charges.length > 0 || pricing.taxLines.length > 0) && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4 text-body">
+            <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
               {pricing.charges.map((c, i) => (
                 <Row key={`charge-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
               ))}
@@ -1090,7 +1094,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           )}
 
           {/* consent — required ticks sit directly above the booking button */}
-          <div className="mb-3 flex flex-col gap-2.5 border-t border-divider pt-4">
+          <div className={cx("mb-3 flex flex-col gap-2.5 border-t", s.rule, "pt-4")}>
             <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
               <input
                 type="checkbox"
@@ -1161,7 +1165,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 setConsentError(true);
               }
             }}
-            className="w-full rounded-card bg-accent py-[15px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
+            className={cx("w-full", s.btnPrimary, "py-[15px] text-lead font-semibold transition-colors disabled:opacity-60")}
           >
             {submitting ? tr.t("confirming") : text.completeButton}
           </button>
