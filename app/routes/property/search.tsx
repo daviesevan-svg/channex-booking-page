@@ -251,8 +251,13 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               vetted, and a bright sky would otherwise leave the heading
               unreadable. */}
           <div className="absolute inset-0 bg-black/40" />
+          {/* The copy block carries its own floor as well as the band's: a
+              two-word hotel name at display size, centred in 420px of
+              photograph, otherwise reads as a mistake. */}
           <div className="relative flex min-h-[420px] items-center justify-center px-7 py-16">
-            {heroCopy("overlay")}
+            <div className="flex min-h-[180px] flex-col justify-center">
+              {heroCopy("overlay")}
+            </div>
           </div>
         </div>
       ) : heroSplit ? (

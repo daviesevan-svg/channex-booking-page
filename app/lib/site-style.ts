@@ -96,6 +96,21 @@ export interface StyleSlots {
    */
   rule: string;
 
+  // ---- the half-bleed row ----
+  // `richText` and `map` normally put their picture in a column beside the prose,
+  // inside the page gutters. A style can instead run the picture to one page edge
+  // and the prose to the other. Empty means the in-gutter layout, which is what
+  // keeps every existing site as it was.
+  //
+  // Which side the picture takes comes from the hotel's existing `imageSide`
+  // field, so three rich-text sections that alternate it weave down the page.
+  /** The 50/50 row. Empty = don't use this layout at all. */
+  splitRow: string;
+  /** The picture half. It fills, so it needs a height rather than a ratio. */
+  splitMedia: string;
+  /** The prose half, which carries the gutters the band no longer provides. */
+  splitProse: string;
+
   // ---- grids ----
   highlightsGrid: string;
   facilitiesGrid: string;
@@ -121,11 +136,21 @@ export interface StyleSlots {
  */
 export type HeroArrangement = "stacked" | "overlay";
 
+/**
+ * How the vouchers teaser is built.
+ *
+ * "strip" is a bordered row with the copy left and the button right. "band" runs
+ * it the full width of the viewport with the property's photograph behind it,
+ * darkened, and the copy reversed out and centred.
+ */
+export type VouchersArrangement = "strip" | "band";
+
 export interface SiteStyleDef {
   id: SiteStyleId;
   /** Admin i18n key naming the style. */
   labelKey: string;
   hero: HeroArrangement;
+  vouchers: VouchersArrangement;
   /**
    * Design tokens the style overrides, applied to the guest wrapper.
    *
@@ -214,6 +239,10 @@ const CLASSIC: StyleSlots = {
   btnSecondary: "rounded-control border border-line-alt bg-surface-alt",
   rule: "border-divider",
 
+  splitRow: "",
+  splitMedia: "",
+  splitProse: "",
+
   highlightsGrid: "grid-cols-1 gap-[18px] sm:grid-cols-3",
   facilitiesGrid: "grid-cols-1 gap-x-8 gap-y-2.5 sm:grid-cols-2 lg:grid-cols-3",
   reviewsGrid: "grid-cols-1 gap-[18px] sm:grid-cols-2",
@@ -229,6 +258,7 @@ const STYLE_DEFS: Record<
   {
     labelKey: string;
     hero?: HeroArrangement;
+    vouchers?: VouchersArrangement;
     band?: SiteStyleDef["band"];
     vars?: Record<string, string>;
     headings?: Record<string, string>;
@@ -343,6 +373,7 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
       id,
       labelKey: STYLE_DEFS[id].labelKey,
       hero: STYLE_DEFS[id].hero ?? "stacked",
+      vouchers: STYLE_DEFS[id].vouchers ?? "strip",
       band: STYLE_DEFS[id].band,
       vars: STYLE_DEFS[id].vars,
       headings: STYLE_DEFS[id].headings,
