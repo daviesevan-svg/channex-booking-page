@@ -328,6 +328,9 @@ const EN: Record<string, string> = {
   styleEditorial: "Editorial",
   styleEditorialNote:
     "Full-width bands in alternating shades, centred small-caps headings, square corners, a square-cropped photo mosaic, and a cover photo that runs edge to edge.",
+  styleWelcoming: "Welcoming",
+  styleWelcomingNote:
+    "Big serif headings on white, photographs that run to the edge of the screen, and no card outlines: your house shown in full-width chapters.",
   secIntro:
     "What appears on your home page, and in what order. Each section is filled from content you already have elsewhere in the admin.",
   secAddPropertyFirst: "Add a property first to build its home page.",
@@ -2097,6 +2100,9 @@ const DE: Record<string, string> = {
   styleEditorial: "Editorial",
   styleEditorialNote:
     "Bänder über die volle Breite in wechselnden Tönen, zentrierte Kapitälchen-Überschriften, eckige Ecken, ein quadratisches Foto-Mosaik und ein Titelbild von Rand zu Rand.",
+  styleWelcoming: "Einladend",
+  styleWelcomingNote:
+    "Große Serifen-Überschriften auf Weiß, Fotos bis zum Bildschirmrand und keine Kartenrahmen: Ihr Haus in Kapiteln über die volle Breite.",
   secIntro:
     "Was auf Ihrer Startseite erscheint und in welcher Reihenfolge. Jeder Abschnitt wird aus Inhalten befüllt, die Sie bereits an anderer Stelle gepflegt haben.",
   secAddPropertyFirst: "Legen Sie zuerst eine Unterkunft an, um deren Startseite zu gestalten.",
@@ -3869,6 +3875,9 @@ const PT: Record<string, string> = {
   styleEditorial: "Editorial",
   styleEditorialNote:
     "Faixas de largura total em tons alternados, títulos centrados em maiúsculas pequenas, cantos retos, um mosaico de fotografias quadradas e uma imagem de capa de bordo a bordo.",
+  styleWelcoming: "Acolhedor",
+  styleWelcomingNote:
+    "Títulos grandes com serifa sobre branco, fotografias que chegam à extremidade do ecrã e sem contornos de cartão: a sua casa mostrada em capítulos de largura total.",
   secIntro:
     "O que aparece na sua página inicial e por que ordem. Cada secção é preenchida com conteúdos que já tem noutras partes da administração.",
   secAddPropertyFirst: "Adicione primeiro uma propriedade para criar a sua página inicial.",
