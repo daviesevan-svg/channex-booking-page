@@ -398,6 +398,12 @@ const STYLE_DEFS: Record<
       bleed: ["hero", "gallery", "vouchers", "richText"],
     },
     vars: {
+      // White, not the warm page tone. This is the one place a style overrides a
+      // THEME value, and it's deliberate: "big serif headings on white" is the
+      // design, and the bands, the funnel and the manage pages all sit on this.
+      // A hotel on a custom colour loses their page tint while this template is
+      // selected — their accent is untouched, and switching template restores it.
+      "--page": "#ffffff",
       "--radius-control": "2px",
       "--radius-field": "2px",
       "--radius-card": "2px",
@@ -441,7 +447,9 @@ const STYLE_DEFS: Record<
       // photograph with a caption. Only the things carrying money keep a border.
       card: "border-l border-line bg-transparent",
       panel: "bg-transparent",
-      strip: "rounded-panel border border-line-alt bg-surface",
+      // A shade off the white page, so the summary and the search card read as
+      // blocks rather than as an outline drawn on nothing.
+      strip: "rounded-panel border border-line-alt bg-surface-alt",
       media: "rounded-card",
       // A large single image or the map bleeds, so it has no corners to round.
       mediaLarge: "rounded-none",
