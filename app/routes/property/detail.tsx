@@ -25,6 +25,8 @@ import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -212,6 +214,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   // Full-screen photo viewer; null = closed, otherwise the galleryPhotos index.
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -408,7 +411,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
         {/* rate card */}
         <div
-          className="sticky top-24 min-w-[320px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
+          className={cx("sticky top-24 min-w-[320px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-1 font-serif text-title-lg font-semibold">{text.rateTitle}</h3>
@@ -534,7 +537,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               ) : null}
             </div>
           )}
-          <div className="mb-4 flex items-baseline justify-between border-t border-divider pt-4">
+          <div className={cx("mb-4 flex items-baseline justify-between border-t", s.rule, "pt-4")}>
             <span className="text-sm text-secondary">
               {tr.t("totalNights", { n: nights })}
             </span>
@@ -557,7 +560,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             type="button"
             onClick={addToStay}
             disabled={adding}
-            className="w-full rounded-card bg-accent py-[15px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
+            className={cx("w-full", s.btnPrimary, "py-[15px] text-lead font-semibold transition-colors disabled:opacity-70")}
           >
             {adding ? "…" : editIndex != null ? tr.t("updateRoom") : text.addButton}
           </button>

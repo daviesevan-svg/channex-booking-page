@@ -18,6 +18,8 @@ import { packageCheckinOptions, redeemPackageVoucher } from "~/lib/voucher-redee
 import { getRooms } from "~/lib/catalog.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -100,6 +102,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
   const base = useBase();
   const { code, title, nights, adults, children, recipientName, options, rooms } = loaderData;
   const tr = useT();
+  const s = useSlots();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const [checkin, setCheckin] = useState<string | null>(null);
@@ -208,7 +211,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         {checkin && roomId && (
           <section>
             <h2 className="mb-3 font-serif text-title-md font-semibold">3 · {tr.t("voucherYourDetails")}</h2>
-            <div className="grid grid-cols-1 gap-4 rounded-card-lg border border-line bg-surface p-5 sm:grid-cols-2">
+            <div className={cx("grid grid-cols-1 gap-4", s.card, "p-5 sm:grid-cols-2")}>
               <label className="block text-caption font-semibold text-secondary">
                 {tr.t("firstName")}
                 <input name="firstName" required defaultValue={recipientName?.split(/\s+/)[0] ?? ""} className={input} />
@@ -243,7 +246,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
             <button
               type="submit"
               disabled={busy}
-              className="rounded-card bg-accent px-8 py-4 text-lead font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+              className={cx(s.btnPrimary, "px-8 py-4 text-lead font-semibold disabled:opacity-60")}
             >
               {busy ? "…" : tr.t("voucherConfirm")}
             </button>

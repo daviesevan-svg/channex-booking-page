@@ -16,6 +16,8 @@ import { useProperty } from "~/lib/booking-context";
 import { fmtDate } from "~/lib/dates";
 import { useT } from "~/lib/i18n";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 const clampStars = (v: unknown): number | undefined => {
   const n = parseInt(String(v ?? ""), 10);
@@ -108,6 +110,7 @@ function Stars({
 export default function Review({ loaderData, actionData }: Route.ComponentProps) {
   const { hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
   const [stars, setStars] = useState(loaderData.initialStars);
@@ -132,7 +135,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
         {fmtDate(loaderData.checkin, "d MMM")} — {fmtDate(loaderData.checkout, "d MMM yyyy")}
       </p>
 
-      <Form method="post" className="flex flex-col gap-6 rounded-panel border border-line bg-surface p-[26px]">
+      <Form method="post" className={cx("flex flex-col gap-6", s.panel, "p-[26px]")}>
         <div>
           <div className={label}>{tr.t("overallRating")}</div>
           <Stars name="stars" value={stars} onChange={setStars} size={38} />
@@ -159,7 +162,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="publicText"
             rows={5}
             defaultValue={loaderData.initialPublicText}
-            className="w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-3 text-body-lg outline-none focus:border-accent"
+            className={cx("w-full resize-y", s.well, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
           />
           <span className="mt-1 block text-label text-muted">{tr.t("publicReviewHint")}</span>
         </label>
@@ -170,7 +173,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
             name="privateNote"
             rows={3}
             defaultValue={loaderData.initialPrivateNote}
-            className="w-full resize-y rounded-control border border-line-alt bg-surface-alt px-3.5 py-3 text-body-lg outline-none focus:border-accent"
+            className={cx("w-full resize-y", s.well, "px-3.5 py-3 text-body-lg outline-none focus:border-accent")}
           />
           <span className="mt-1 block text-label text-muted">{tr.t("privateNoteHint")}</span>
         </label>

@@ -15,6 +15,8 @@ import { getBooking } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
 import { useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolveRequestProperty(params.channelId, request);
@@ -93,6 +95,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
   const { voucher: v, issued, justBooked, booking } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const money = (n: number) => formatMoney(n, currency);
   const statusLabel = tr.t(`voucherStatus_${v.status}`);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
@@ -122,7 +125,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-panel-lg border border-line bg-surface" style={{ boxShadow: "var(--shadow-card)" }}>
+      <div className={cx("overflow-hidden", s.strip)} style={{ boxShadow: "var(--shadow-card)" }}>
         <div className="h-[190px] overflow-hidden" style={{ background: stripe }}>
           {v.product.image && <img src={v.product.image} alt="" className="h-full w-full object-cover" />}
         </div>
@@ -188,7 +191,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
             {v.kind === "package" && v.status === "active" && (
               <Link
                 to={`${base}/voucher/${v.code}/book`}
-                className="rounded-card bg-accent px-6 py-3.5 text-lead font-semibold text-white hover:bg-accent-deep"
+                className={cx(s.btnPrimary, "px-6 py-3.5 text-lead font-semibold")}
               >
                 {tr.t("voucherBookStay")}
               </Link>
@@ -208,7 +211,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           )}
 
           {v.product.terms && (
-            <p className="mt-6 border-t border-divider pt-4 text-label leading-[1.6] text-muted-2">
+            <p className={cx("mt-6 border-t", s.rule, "pt-4 text-label leading-[1.6] text-muted-2")}>
               {tr.t("voucherTermsTitle")}: {v.product.terms}
             </p>
           )}

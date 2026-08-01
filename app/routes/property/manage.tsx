@@ -17,6 +17,8 @@ import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const email = await getGuestEmail(request);
@@ -87,6 +89,7 @@ export function meta({ matches }: Route.MetaArgs) {
 export default function Manage({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const tr = useT();
+  const s = useSlots();
   const { currency } = useProperty();
   const nav = useNavigation();
   const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
@@ -129,11 +132,11 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
       </div>
 
       {bookings.length === 0 ? (
-        <div className="rounded-card-lg border border-line bg-surface p-6 text-body-lg text-secondary">
+        <div className={cx(s.card, "p-6 text-body-lg text-secondary")}>
           {tr.t("noBookingsForEmail")}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-panel border border-line bg-surface">
+        <div className={cx("overflow-hidden", s.panel)}>
           {bookings.map((b, i) => (
             <Link
               key={b.id}
@@ -166,7 +169,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
           <h2 className="mb-4 mt-10 font-serif text-title-3xl font-semibold tracking-[-0.01em]">
             {tr.t("manageVouchersTitle")}
           </h2>
-          <div className="overflow-hidden rounded-panel border border-line bg-surface">
+          <div className={cx("overflow-hidden", s.panel)}>
             {vouchers.map((v, i) => (
               <Link
                 key={v.code}
@@ -211,6 +214,7 @@ function ManageLogin({
   tooMany: boolean;
 }) {
   const tr = useT();
+  const s = useSlots();
   const inputCls =
     "mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent";
 
@@ -223,7 +227,7 @@ function ManageLogin({
 
       <Form
         method="post"
-        className="flex flex-col gap-4 rounded-panel border border-line bg-surface p-6"
+        className={cx("flex flex-col gap-4", s.panel, "p-6")}
       >
         <label className="block text-caption font-semibold text-secondary">
           {tr.t("manageRefOrCode")}
@@ -241,7 +245,7 @@ function ManageLogin({
         <button
           type="submit"
           disabled={submitting}
-          className="mt-1 w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-60"
+          className={cx("mt-1 w-full", s.btnPrimary, "py-[14px] text-lead font-semibold transition-colors disabled:opacity-60")}
         >
           {tr.t("findBooking")}
         </button>

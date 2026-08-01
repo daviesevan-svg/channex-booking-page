@@ -25,6 +25,8 @@ import { finalizeVoucher } from "~/lib/voucher-purchase.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -235,9 +237,10 @@ function Diamond({ size, className = "" }: { size: number; className?: string })
 /** Single-open FAQ accordion ("Good to know"): + icon rotates 45°, the answer
  *  panel animates via max-height. */
 function Faq({ items }: { items: { q: string; a: string }[] }) {
+  const s = useSlots();
   const [open, setOpen] = useState(0);
   return (
-    <div className="overflow-hidden rounded-panel border border-line bg-surface-alt">
+    <div className={cx("overflow-hidden", s.panel, "-alt")}>
       {items.map((item, i) => (
         <div key={i} className={i === 0 ? "" : "border-t border-divider"}>
           <button
@@ -270,6 +273,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
   const { product: p, gallery, roomCards, soldOut } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
+  const s = useSlots();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
   const [isGift, setIsGift] = useState(false);
@@ -442,7 +446,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
               </h2>
               <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
                 {roomCards.map((r) => (
-                  <div key={r.name} className="overflow-hidden rounded-panel-lg border border-line bg-surface-alt">
+                  <div key={r.name} className={cx("overflow-hidden", s.strip, "-alt")}>
                     {r.img && (
                       <div className="h-[150px] overflow-hidden bg-line">
                         <img src={r.img} alt={r.name} className="h-full w-full object-cover" />
@@ -504,7 +508,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                       </button>
                     </>
                   ) : (
-                    <Form method="post" className="flex flex-col gap-4 border-t border-divider pt-4">
+                    <Form method="post" className={cx("flex flex-col gap-4 border-t", s.rule, "pt-4")}>
                       <h2 className="m-0 font-serif text-title-md font-semibold">{tr.t("voucherYourDetails")}</h2>
                       <label className="block text-caption font-semibold text-secondary">
                         {tr.t("buyerName")}
@@ -570,7 +574,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2.5 border-t border-divider bg-chip px-6 py-3.5 text-caption text-secondary">
+            <div className={cx("flex items-center gap-2.5 border-t", s.rule, "bg-chip px-6 py-3.5 text-caption text-secondary")}>
               <Diamond size={7} />
               {pkg ? tr.t("voucherStripDates") : p.kind === "experience" ? tr.t("voucherStripExperience") : tr.t("voucherStripBalance")}
             </div>

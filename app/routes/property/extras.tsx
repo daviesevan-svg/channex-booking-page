@@ -31,6 +31,8 @@ import { partySize, readOccupancy } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -204,6 +206,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
   const { currency: ctxCurrency } = useProperty();
   const cur = ctxCurrency || currency;
   const tr = useT();
+  const s = useSlots();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [roomSel, setRoomSel] = useState<ExtraSelection[]>(loaderData.roomSelection);
@@ -261,11 +264,11 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
         {/* summary */}
         <aside
-          className="sticky top-24 min-w-[300px] flex-1 rounded-panel-lg border border-line bg-surface p-6"
+          className={cx("sticky top-24 min-w-[300px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
           <h3 className="mb-4 font-serif text-title-lg font-semibold">{roomTitle}</h3>
-          <div className="flex items-start justify-between gap-3 border-b border-divider pb-4">
+          <div className={cx("flex items-start justify-between gap-3 border-b", s.rule, "pb-4")}>
             <div className="min-w-0">
               <div className="text-label text-muted-2">{rateTitle}</div>
             </div>
@@ -273,7 +276,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           </div>
 
           {allLines.length > 0 && (
-            <div className="flex flex-col gap-2.5 border-b border-divider py-4">
+            <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4")}>
               <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{text.summaryLabel}</div>
               {allLines.map((l) => (
                 <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3">
@@ -298,7 +301,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           <button
             type="button"
             onClick={() => go(false)}
-            className="w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep"
+            className={cx("w-full", s.btnPrimary, "py-[14px] text-lead font-semibold transition-colors")}
           >
             {text.continueButton}
           </button>
@@ -340,6 +343,7 @@ function ExtraCard({
   onRemove: () => void;
   tr: Tr;
 }) {
+  const s = useSlots();
   const configurable = isConfigurable(extra);
   const has = !!selection;
   const lines = resolveExtras(extra ? [extra] : [], selection ? [selection] : [], nights, guests);
@@ -388,7 +392,7 @@ function ExtraCard({
             <button
               type="button"
               onClick={onConfigure}
-              className="w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent"
+              className={cx("w-full", s.field, "py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
             >
               {configurable ? tr.t("chooseOption") : tr.t("add")}
             </button>
@@ -401,7 +405,7 @@ function ExtraCard({
             <button
               type="button"
               onClick={onAdd}
-              className="w-full rounded-control border border-line-alt bg-surface py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent"
+              className={cx("w-full", s.field, "py-2.5 text-body font-semibold text-ink hover:border-accent hover:text-accent")}
             >
               + {tr.t("add")}
             </button>
@@ -433,6 +437,7 @@ function ConfigureModal({
   onRemove: () => void;
   tr: Tr;
 }) {
+  const s = useSlots();
   const configurable = isConfigurable(extra);
   const [optionId, setOptionId] = useState<string | undefined>(current?.optionId);
   const [qty, setQty] = useState(current?.qty ?? 1);
@@ -522,7 +527,7 @@ function ConfigureModal({
                       value={info[f.id] ?? ""}
                       onChange={(e) => setInfo((prev) => ({ ...prev, [f.id]: e.target.value }))}
                       placeholder={f.placeholder}
-                      className="mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent"
+                      className={cx("mt-1.5 block w-full", s.well, "px-3.5 py-[11px] text-body-lg text-ink outline-none focus:border-accent")}
                     />
                   </label>
                 ))}
@@ -531,7 +536,7 @@ function ConfigureModal({
           ) : null}
         </div>
 
-        <div className="flex-none border-t border-divider p-5">
+        <div className={cx("flex-none border-t", s.rule, "p-5")}>
           {!canAdd && <p className="mb-2.5 text-label text-[#b08968]">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
             <span className="font-serif text-title-xl font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>

@@ -40,6 +40,8 @@ import {
   roomFits,
 } from "~/lib/occupancy";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { useSlots } from "~/components/site-style";
+import { cx } from "~/lib/site-style";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -238,6 +240,7 @@ function RoomCard({
   inCart: number;
 }) {
   const base = useBase();
+  const s = useSlots();
   const home = useHome();
   const tr = useT();
   const available = roomAvailability(room);
@@ -261,9 +264,12 @@ function RoomCard({
 
   return (
     <div
-      className={`flex flex-wrap overflow-hidden rounded-panel border border-line bg-surface transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_40px_-26px_rgba(70,55,35,0.4)] ${
-        isBestMatch ? "ring-2 ring-accent" : ""
-      }`}
+      className={cx(
+        "flex flex-wrap overflow-hidden",
+        s.panel,
+        "transition-all duration-200 hover:-translate-y-[3px] hover:shadow-[0_20px_40px_-26px_rgba(70,55,35,0.4)]",
+        isBestMatch && "ring-2 ring-accent",
+      )}
     >
       <Link to={detailHref} className="relative min-h-[200px] w-[230px] flex-none self-stretch">
         {photo ? (
@@ -386,11 +392,12 @@ function CartPanel({
   extrasSum: number;
 }) {
   const base = useBase();
+  const s = useSlots();
   const home = useHome();
   const tr = useT();
   return (
     <aside
-      className="sticky top-24 w-full min-w-[280px] flex-1 self-start rounded-panel-lg border border-line bg-surface p-6"
+      className={cx("sticky top-24 w-full min-w-[280px] flex-1 self-start", s.strip, "p-6")}
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
       {cartTitle && <h3 className="mb-1 font-serif text-title-lg font-semibold">{cartTitle}</h3>}
@@ -399,7 +406,7 @@ function CartPanel({
       </div>
 
       {lines.length > 0 && (
-        <div className="mb-4 flex flex-col gap-3 border-b border-divider pb-4">
+        <div className={cx("mb-4 flex flex-col gap-3 border-b", s.rule, "pb-4")}>
           {lines.map((l, i) => (
             <div key={`${l.roomId}-${l.rateId}-${i}`} className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -481,7 +488,11 @@ function CartPanel({
         type="button"
         onClick={onContinue}
         disabled={!covered || continuePending}
-        className="w-full rounded-card bg-accent py-[14px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+        className={cx(
+          "w-full",
+          s.btnPrimary,
+          "py-[14px] text-lead font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        )}
       >
         {continuePending ? tr.t("loading") : continueLabel}
       </button>
@@ -495,6 +506,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Results({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
+  const s = useSlots();
   const home = useHome();
   const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
@@ -563,7 +575,10 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
         </div>
         <Link
           to={`${base}?${qs}`}
-          className="rounded-control border border-line-alt bg-surface-alt px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+          className={cx(
+            s.btnSecondary,
+            "px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent",
+          )}
         >
           {text.editSearch}
         </Link>
