@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, useNavigation } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
 import { adminMeta } from "~/lib/admin-meta";
@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
-import { DEFAULT_LANG, DEFAULT_THEME, LANGUAGES, THEMES } from "~/lib/content";
+import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
@@ -93,21 +93,13 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
   }
 
   const { settings, slug, host, envLive, timezones } = loaderData;
-  const activeTheme = settings.theme ?? DEFAULT_THEME;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
   // "1".."7" = require that many days before arrival.
   const [cutoff, setCutoff] = useState<string>(
     settings.bookingCutoffDays == null ? "off" : String(settings.bookingCutoffDays),
   );
-  const [hex, setHex] = useState(settings.customColor || "#b5651d");
-  const validHex = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex);
-  const [bgHex, setBgHex] = useState(settings.customBg || "");
-  const validBg = bgHex === "" || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(bgHex);
 
-  const pickerCls = "h-10 w-12 cursor-pointer rounded-[8px] border border-line-alt bg-surface-alt p-1";
-  const hexCls =
-    "w-36 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[9px] font-mono text-[14px] text-ink outline-none focus:border-accent";
   const fieldCls =
     "mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent";
   const cutoffSummary =
@@ -162,100 +154,17 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           )}
         </section>
 
-        {/* Theme */}
+        {/* Colour and typeface moved to Website → Sections, beside the template
+            picker: choosing a design and making it yours is one screen. */}
         <section>
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genBrandColour")}</div>
-          <p className="mb-4 text-[13px] text-muted">{t("genBrandColourHint")}</p>
-          <div className="flex flex-wrap gap-3">
-            {THEMES.map((t) => (
-              <label key={t.id} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="theme"
-                  value={t.id}
-                  defaultChecked={activeTheme === t.id}
-                  className="peer sr-only"
-                />
-                <span className="flex w-[92px] flex-col items-center gap-2 rounded-[12px] border-2 border-line-alt p-3 transition-colors peer-checked:border-accent peer-checked:bg-field-hover">
-                  <span className="h-8 w-8 rounded-full" style={{ background: t.accent }} />
-                  <span className="text-[12px] font-semibold">{t.label}</span>
-                </span>
-              </label>
-            ))}
-
-            {/* Custom colour */}
-            <label className="cursor-pointer">
-              <input
-                type="radio"
-                name="theme"
-                value="custom"
-                defaultChecked={activeTheme === "custom"}
-                className="peer sr-only"
-              />
-              <span className="flex w-[92px] flex-col items-center gap-2 rounded-[12px] border-2 border-line-alt p-3 transition-colors peer-checked:border-accent peer-checked:bg-field-hover">
-                <span
-                  className="h-8 w-8 rounded-full"
-                  style={{ background: validHex ? hex : "conic-gradient(red,orange,gold,green,blue,violet,red)" }}
-                />
-                <span className="text-[12px] font-semibold">{t("genCustom")}</span>
-              </span>
-            </label>
-          </div>
-
-          <div className="mt-4 grid max-w-md grid-cols-1 gap-4">
-            <div>
-              <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("genAccentColour")}</div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={validHex ? hex : "#b5651d"}
-                  onChange={(e) => setHex(e.target.value)}
-                  aria-label={t("genAccentColour")}
-                  className={pickerCls}
-                />
-                <input
-                  type="text"
-                  name="customColor"
-                  value={hex}
-                  onChange={(e) => setHex(e.target.value)}
-                  placeholder="#b5651d"
-                  className={hexCls}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("genBackgroundColour")}</div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={validBg && bgHex ? bgHex : "#f5f2ec"}
-                  onChange={(e) => setBgHex(e.target.value)}
-                  aria-label={t("genBackgroundColour")}
-                  className={pickerCls}
-                />
-                <input
-                  type="text"
-                  name="customBg"
-                  value={bgHex}
-                  onChange={(e) => setBgHex(e.target.value)}
-                  placeholder={t("genAutoFromAccent")}
-                  className={hexCls}
-                />
-                {bgHex && (
-                  <button
-                    type="button"
-                    onClick={() => setBgHex("")}
-                    className="text-[12px] font-semibold text-muted hover:text-accent"
-                  >
-                    {t("genAuto")}
-                  </button>
-                )}
-              </div>
-            </div>
-            <span className="text-[12px] text-muted">
-              {t("genHexHintPrefix")} <strong>{t("genCustom")}</strong> {t("genHexHintSuffix")}
-            </span>
-          </div>
+          <p className="text-[13px] text-muted">
+            {t("genBrandMoved")}{" "}
+            <Link to="/admin/website/sections" className="font-semibold text-accent hover:underline">
+              {t("navSections")}
+            </Link>
+            .
+          </p>
         </section>
 
         {/* Currency */}

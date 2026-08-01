@@ -5,8 +5,8 @@ import type { Route } from "./+types/website-sections";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { langParam, pickLang } from "~/lib/content";
-import { getSettings } from "~/lib/overrides.server";
+import { langParam, pickLang, type SiteSettings } from "~/lib/content";
+import { getSettings, saveBrand } from "~/lib/overrides.server";
 import { HOME_PAGE_ID, PAGE_TEXT_FIELDS, pageTextKey, sectionIdFor } from "~/lib/pages";
 import {
   addableTypes,
@@ -31,6 +31,7 @@ import {
 } from "~/lib/site.server";
 import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/site-style";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { BrandPanel } from "~/components/brand-panel";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -64,6 +65,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Resolved rather than raw, so an unknown stored id shows as the default
     // selected instead of leaving every radio unchecked.
     style: siteStyle(style).id,
+    settings,
   };
 }
 
@@ -75,6 +77,14 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const lang = pickLang(String(form.get("lang") ?? ""));
   const pageId = String(form.get("pageId") ?? "") || HOME_PAGE_ID;
+
+  // The design screen also owns colour and typeface. `saveBrand` is a merge, so
+  // this can't touch the sections below it — and General can no longer touch
+  // these, which it used to do on every save.
+  if (form.get("op") === "brand") {
+    await saveBrand(propertyId, form);
+    return { styled: true as const };
+  }
 
   // The template picker is its own small form, so it returns before any of the
   // section parsing below — a style change must not depend on, or rewrite, the
@@ -183,7 +193,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style } =
+  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style, settings } =
     loaderData;
   const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
@@ -205,6 +215,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       baseText={baseText}
       websiteEnabled={websiteEnabled}
       style={style}
+      settings={settings}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
       styled={Boolean(actionData && "styled" in actionData)}
@@ -286,6 +297,7 @@ function Editor({
   baseText,
   websiteEnabled,
   style,
+  settings,
   saving,
   saved,
   styled,
@@ -301,6 +313,7 @@ function Editor({
   baseText: Record<string, string>;
   websiteEnabled: boolean;
   style: string;
+  settings: SiteSettings;
   saving: boolean;
   saved: boolean;
   styled: boolean;
@@ -380,8 +393,14 @@ function Editor({
 
       {/* Home page only. The template is site-wide, and offering it again on
           every extra page would read as a per-page choice. */}
+      {/* The design screen: what it looks like, then what it says. Choosing a
+          template and making it yours used to be two pages in two sections of
+          the admin. */}
       {isHome && (
-        <TemplatePicker current={style} saving={saving} applied={styled} t={t} />
+        <>
+          <TemplatePicker current={style} saving={saving} applied={styled} t={t} />
+          <BrandPanel settings={settings} saving={saving} saved={styled} />
+        </>
       )}
 
       {/* multipart because the text-block sections upload their own pictures.
