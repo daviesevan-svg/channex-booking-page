@@ -207,7 +207,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         className={cx(
           "mb-[18px]",
           s.heroDisplay,
-          mode === "split" ? "text-display-4xl lg:text-display-5xl" : "text-display-6xl",
+          mode === "split" ? "text-display-lg lg:text-display-xl" : "text-display-xl",
           mode === "overlay" && "text-white",
         )}
       >
@@ -215,7 +215,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       </h1>
       <p
         className={cx(
-          "whitespace-pre-line text-title-xs leading-[1.6]",
+          "whitespace-pre-line text-title-sm leading-[1.6]",
           mode === "overlay" ? "text-white/90" : "text-secondary",
           mode === "split" && "mb-0",
           mode === "wide" && "mb-9 max-w-[560px]",
@@ -300,7 +300,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           >
             <div className="field-label mb-1.5">{tr.t("checkIn")}</div>
             <div
-              className="text-lead-lg font-semibold"
+              className="text-lead font-semibold"
               style={{ color: dates.checkin ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkinLabel}
@@ -314,7 +314,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           >
             <div className="field-label mb-1.5">{tr.t("checkOut")}</div>
             <div
-              className="text-lead-lg font-semibold"
+              className="text-lead font-semibold"
               style={{ color: dates.checkout ? "var(--color-ink)" : "var(--color-faint-2)" }}
             >
               {dates.checkoutLabel}
@@ -341,7 +341,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           onClick={() => setShowPromo((v) => !v)}
           className="flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-accent"
         >
-          <span className="text-title-xs leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
+          <span className="text-title-sm leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
           {promoText}
         </button>
         {showPromo && (

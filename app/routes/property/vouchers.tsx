@@ -56,8 +56,8 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-12">
       <div className="mb-9 max-w-[620px]">
-        <h1 className="mb-3 font-serif text-display-3xl font-medium tracking-[-0.02em]">{tr.t("vouchersTitle")}</h1>
-        <p className="text-lead-lg leading-[1.6] text-secondary">{tr.t("vouchersIntro", { hotel: hotelName })}</p>
+        <h1 className="mb-3 font-serif text-display-lg font-medium tracking-[-0.02em]">{tr.t("vouchersTitle")}</h1>
+        <p className="text-lead leading-[1.6] text-secondary">{tr.t("vouchersIntro", { hotel: hotelName })}</p>
       </div>
 
       {products.length === 0 ? (
@@ -95,7 +95,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
                 <h2 className="mb-1 font-serif text-title-md font-semibold">{p.title}</h2>
                 <p className="mb-3 line-clamp-2 text-caption leading-[1.5] text-muted">{p.description}</p>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-title-xs font-semibold text-accent-deep">{money(p.price)}</span>
+                  <span className="text-title-sm font-semibold text-accent-deep">{money(p.price)}</span>
                   <span className="text-label text-muted-2">
                     {p.kind === "gift"
                       ? tr.t("voucherValue", { amount: money(p.value ?? p.price) })

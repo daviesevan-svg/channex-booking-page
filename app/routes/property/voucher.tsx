@@ -138,7 +138,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
               {statusLabel}
             </span>
           </div>
-          <h1 className="mb-1 font-serif text-display-md font-medium tracking-[-0.01em]">{v.product.title}</h1>
+          <h1 className="mb-1 font-serif text-display-sm font-medium tracking-[-0.01em]">{v.product.title}</h1>
           <p className="mb-5 text-body text-muted">{hotelName}</p>
 
           {v.gift && (
@@ -151,13 +151,13 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           {/* the code */}
           <div className="mb-5 rounded-card-lg border-2 border-dashed border-accent bg-accent-soft/40 px-5 py-4 text-center">
             <div className="mb-1 text-micro font-semibold uppercase tracking-widest text-muted">{tr.t("voucherCodeLabel")}</div>
-            <div className="font-mono text-display-xs font-bold tracking-[0.08em] text-accent-deep">{v.code}</div>
+            <div className="font-mono text-display-sm font-bold tracking-[0.08em] text-accent-deep">{v.code}</div>
           </div>
 
           {v.kind === "gift" ? (
             <div className="mb-5 text-center">
               <span className="text-body-lg text-secondary">{tr.t("voucherBalance")}: </span>
-              <span className="text-title-xl font-bold text-accent-deep">{money(v.balance ?? 0)}</span>
+              <span className="text-title-md font-bold text-accent-deep">{money(v.balance ?? 0)}</span>
             </div>
           ) : (
             v.product.package && (

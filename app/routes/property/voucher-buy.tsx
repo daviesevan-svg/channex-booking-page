@@ -250,7 +250,7 @@ function Faq({ items }: { items: { q: string; a: string }[] }) {
           >
             <span className="text-lead font-semibold text-ink">{item.q}</span>
             <span
-              className="flex-none text-title-xl leading-none text-accent transition-transform duration-200"
+              className="flex-none text-title-md leading-none text-accent transition-transform duration-200"
               style={{ transform: open === i ? "rotate(45deg)" : "rotate(0deg)" }}
             >
               +
@@ -405,7 +405,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
             </p>
           )}
           {p.description && (
-            <p className="mb-7 max-w-[60ch] text-lead-lg leading-[1.6] text-secondary">{p.description}</p>
+            <p className="mb-7 max-w-[60ch] text-lead leading-[1.6] text-secondary">{p.description}</p>
           )}
 
           {/* Facts strip — hairline dividers via 1px gaps over the border color */}
@@ -453,7 +453,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                       </div>
                     )}
                     <div className="px-[18px] pb-5 pt-[18px]">
-                      <div className="mb-1.5 font-serif text-title-lg font-semibold tracking-[-0.01em]">{r.name}</div>
+                      <div className="mb-1.5 font-serif text-title-md font-semibold tracking-[-0.01em]">{r.name}</div>
                       {r.desc && <div className="line-clamp-3 text-body leading-[1.55] text-secondary">{r.desc}</div>}
                     </div>
                   </div>
@@ -483,7 +483,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
               ) : (
                 <>
                   <div className="mb-0.5 flex items-baseline gap-2">
-                    <span className="font-serif text-display-3xl font-semibold leading-none tracking-[-0.01em]">
+                    <span className="font-serif text-display-lg font-semibold leading-none tracking-[-0.01em]">
                       {money(p.price)}
                     </span>
                   </div>
@@ -593,7 +593,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           }}
         >
           <div>
-            <div className="font-serif text-title-3xl font-semibold leading-none">{money(p.price)}</div>
+            <div className="font-serif text-title-lg font-semibold leading-none">{money(p.price)}</div>
             <div className="text-label text-muted-2">{priceSub}</div>
           </div>
           <a

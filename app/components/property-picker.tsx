@@ -29,7 +29,7 @@ export function PropertyPicker({ items, subtitle }: { items: PickerCard[]; subti
           className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark-lg bg-accent"
           style={{ transform: "rotate(45deg)" }}
         />
-        <h1 className="font-serif text-display-3xl font-medium tracking-[-0.02em]">Roompanda</h1>
+        <h1 className="font-serif text-display-lg font-medium tracking-[-0.02em]">Roompanda</h1>
         <p className="mt-4 text-secondary">
           Open <code className="rounded bg-chip px-1.5 py-0.5">/your-property-id</code> to book, or
           create a collection / mark a property “Public” in the admin to list it here.
@@ -87,7 +87,7 @@ export function PropertyPicker({ items, subtitle }: { items: PickerCard[]; subti
                     {c.meta}
                   </div>
                 )}
-                <h3 className="font-serif text-title-xl font-semibold tracking-[-0.01em] group-hover:text-accent">
+                <h3 className="font-serif text-title-md font-semibold tracking-[-0.01em] group-hover:text-accent">
                   {c.name}
                 </h3>
                 {c.blurb && (

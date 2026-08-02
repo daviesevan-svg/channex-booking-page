@@ -116,7 +116,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
   return (
     <main className="mx-auto max-w-[760px] px-7 pb-20 pt-12">
       <div className="mb-7 flex items-center justify-between gap-4">
-        <h1 className="font-serif text-display-xl font-medium tracking-[-0.02em]">
+        <h1 className="font-serif text-display-md font-medium tracking-[-0.02em]">
           {tr.t("yourBookings")}
         </h1>
         <Form method="post">
@@ -154,7 +154,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
                 </div>
               </div>
               <div className="flex flex-none items-center gap-4">
-                <span className="font-serif text-title-xs font-semibold">
+                <span className="font-serif text-title-sm font-semibold">
                   {formatMoney(b.total, b.currency || currency)}
                 </span>
                 <span className="text-caption font-semibold text-accent">{tr.t("view")} →</span>
@@ -166,7 +166,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
 
       {vouchers.length > 0 && (
         <>
-          <h2 className="mb-4 mt-10 font-serif text-title-3xl font-semibold tracking-[-0.01em]">
+          <h2 className="mb-4 mt-10 font-serif text-title-lg font-semibold tracking-[-0.01em]">
             {tr.t("manageVouchersTitle")}
           </h2>
           <div className={cx("overflow-hidden", s.panel)}>
@@ -220,7 +220,7 @@ function ManageLogin({
 
   return (
     <main className="mx-auto max-w-[460px] px-7 pb-20 pt-16">
-      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">
+      <h1 className="mb-2 font-serif text-display-md font-medium tracking-[-0.02em]">
         {tr.t("manageTitle")}
       </h1>
       <p className="mb-7 text-body-lg leading-[1.6] text-secondary">{tr.t("manageIntro")}</p>

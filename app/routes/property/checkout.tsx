@@ -807,7 +807,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       >
         ← {tr.t("allRooms")}
       </Link>
-      <h1 className="mb-7 font-serif text-display-2xl font-medium tracking-[-0.02em]">{text.heading}</h1>
+      <h1 className="mb-7 font-serif text-display-lg font-medium tracking-[-0.02em]">{text.heading}</h1>
 
       {bookingError && (
         <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
@@ -938,7 +938,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           className={cx("sticky top-24 min-w-[300px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-4 font-serif text-title-lg font-semibold">
+          <h3 className="mb-4 font-serif text-title-md font-semibold">
             {tr.p("yourStayRooms", lines.length)}
           </h3>
           <div className={cx("flex flex-col gap-3 border-b", s.rule, "pb-4")}>
@@ -1083,7 +1083,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
           <div className="flex items-baseline justify-between pt-4">
             <span className="text-lead font-semibold">{tr.t("total")}</span>
-            <span className="font-serif text-display-md font-semibold">
+            <span className="font-serif text-display-sm font-semibold">
               {formatMoney(grandTotal, currency)}
             </span>
           </div>

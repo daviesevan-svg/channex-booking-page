@@ -168,7 +168,7 @@ function Stepper({
   onInc: () => void;
 }) {
   const btn =
-    "flex h-8 w-8 flex-none items-center justify-center rounded-chip border border-line-alt text-lead-lg leading-none text-ink disabled:opacity-40 enabled:hover:border-accent enabled:hover:text-accent";
+    "flex h-8 w-8 flex-none items-center justify-center rounded-chip border border-line-alt text-lead leading-none text-ink disabled:opacity-40 enabled:hover:border-accent enabled:hover:text-accent";
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} disabled={value <= min} className={btn}>−</button>
@@ -383,11 +383,11 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
 
       <div className="flex flex-wrap items-start gap-10">
         <div className="min-w-[320px] flex-[1.6]">
-          <h1 className="mb-2 font-serif text-display-3xl font-medium tracking-[-0.02em]">
+          <h1 className="mb-2 font-serif text-display-lg font-medium tracking-[-0.02em]">
             {room.title}
           </h1>
           {room.description && (
-            <p className="mb-7 max-w-[560px] text-lead-lg leading-[1.65] text-[#5e5547]">
+            <p className="mb-7 max-w-[560px] text-lead leading-[1.65] text-[#5e5547]">
               {room.description}
             </p>
           )}
@@ -414,7 +414,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
           className={cx("sticky top-24 min-w-[320px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-1 font-serif text-title-lg font-semibold">{text.rateTitle}</h3>
+          <h3 className="mb-1 font-serif text-title-md font-semibold">{text.rateTitle}</h3>
           <div className="mb-4 text-caption text-muted-2">{summary}</div>
 
           {/* Per-room occupancy — book this room for a specific party. */}
@@ -545,7 +545,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               {chosen ? (
                 <>
                   {chosenPrice.hasOffer && (
-                    <span className="mr-2 text-title-xs font-normal text-muted-2 line-through">
+                    <span className="mr-2 text-title-sm font-normal text-muted-2 line-through">
                       {formatMoney(chosenPrice.gross, currency)}
                     </span>
                   )}

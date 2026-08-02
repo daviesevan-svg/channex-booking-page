@@ -119,8 +119,8 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
   if (actionData && "ok" in actionData && actionData.ok) {
     return (
       <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-16 text-center">
-        <div className="mb-4 text-display-4xl">🎉</div>
-        <h1 className="mb-3 font-serif text-display-lg font-medium">{tr.t("reviewThanksTitle")}</h1>
+        <div className="mb-4 text-display-lg">🎉</div>
+        <h1 className="mb-3 font-serif text-display-md font-medium">{tr.t("reviewThanksTitle")}</h1>
         <p className="text-body-lg leading-[1.65] text-secondary">{tr.t("reviewThanksBody")}</p>
       </main>
     );
@@ -129,7 +129,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
   const label = "mb-1.5 block text-caption font-semibold text-secondary";
   return (
     <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-10">
-      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
+      <h1 className="mb-2 font-serif text-display-md font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
       <p className="mb-1 text-body-lg text-secondary">{tr.t("reviewIntro", { hotel: hotelName })}</p>
       <p className="mb-7 text-caption text-muted-2">
         {fmtDate(loaderData.checkin, "d MMM")} — {fmtDate(loaderData.checkout, "d MMM yyyy")}

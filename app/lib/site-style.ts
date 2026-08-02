@@ -227,9 +227,9 @@ const CLASSIC: StyleSlots = {
   measure: "max-w-[920px]",
   measureProse: "max-w-[720px]",
 
-  h1: "font-serif text-display-3xl font-medium leading-[1.1] tracking-[-0.02em]",
-  h2: "font-serif text-title-3xl font-semibold",
-  h2Inline: "font-serif text-title-xl font-semibold",
+  h1: "font-serif text-display-lg font-medium leading-[1.1] tracking-[-0.02em]",
+  h2: "font-serif text-title-lg font-semibold",
+  h2Inline: "font-serif text-title-md font-semibold",
   h3: "font-serif text-title-sm font-semibold",
   heroDisplay: "font-serif font-medium leading-[1.05] tracking-[-0.02em]",
   heroInner: "",
@@ -343,10 +343,10 @@ const STYLE_DEFS: Record<
       measure: "",
       measureProse: "mx-auto max-w-[760px]",
 
-      h1: "font-serif text-display-2xl font-normal italic leading-[1.15]",
+      h1: "font-serif text-display-lg font-normal italic leading-[1.15]",
       h2: "font-sans text-title-md font-semibold uppercase tracking-[0.16em]",
       h2Inline: "font-sans text-title-sm font-semibold uppercase tracking-[0.12em]",
-      h3: "font-sans text-title-xs font-semibold uppercase tracking-[0.08em]",
+      h3: "font-sans text-title-sm font-semibold uppercase tracking-[0.08em]",
       heroDisplay: "font-serif font-normal italic leading-[1.08] tracking-[-0.01em]",
       // The hero bleeds, so the search card carries the page's gutters itself and
       // the bottom padding the band would have given the section.
@@ -438,10 +438,10 @@ const STYLE_DEFS: Record<
       measure: "",
       measureProse: "max-w-[640px]",
 
-      h1: "font-serif text-display-3xl font-bold leading-[1.12]",
-      h2: "font-serif text-display-xl font-bold",
-      h2Inline: "font-serif text-display-xs font-semibold",
-      h3: "font-serif text-title-xl font-semibold",
+      h1: "font-serif text-display-lg font-bold leading-[1.12]",
+      h2: "font-serif text-display-md font-bold",
+      h2Inline: "font-serif text-display-sm font-semibold",
+      h3: "font-serif text-title-md font-semibold",
       heroDisplay: "font-serif font-bold leading-[1.08]",
       // The search card overlaps the hero photograph by 36px.
       heroInner: "mx-auto max-w-[1120px] px-10 pb-20 -mt-9",

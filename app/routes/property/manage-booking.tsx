@@ -156,7 +156,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         ← {tr.t("yourBookings")}
       </Link>
 
-      <h1 className="mb-1 font-serif text-display-xl font-medium tracking-[-0.02em]">
+      <h1 className="mb-1 font-serif text-display-md font-medium tracking-[-0.02em]">
         {fmt(b.checkin, "EEE d MMM")} — {fmt(b.checkout, "EEE d MMM yyyy")}
       </h1>
       <div className="mb-7 flex flex-wrap items-center gap-2.5">
@@ -181,7 +181,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
 
       <div className="grid gap-5 sm:grid-cols-2">
         <section className={cx(s.panel, "p-5")}>
-          <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionBooking")}</h2>
+          <h2 className="mb-3 font-serif text-title-sm font-semibold">{tr.t("sectionBooking")}</h2>
           <Row label={tr.t("reference")} value={<span className="font-mono text-caption">{b.reference}</span>} />
           <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
           <Row label={tr.t("checkOut")} value={fmt(b.checkout, "EEE d MMM yyyy")} />
@@ -190,7 +190,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         </section>
 
         <section className={cx(s.panel, "p-5")}>
-          <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionGuest")}</h2>
+          <h2 className="mb-3 font-serif text-title-sm font-semibold">{tr.t("sectionGuest")}</h2>
           <Row label={tr.t("guestName")} value={`${b.guest.firstName} ${b.guest.lastName}`} />
           <Row
             label={tr.t("emailAddress")}
@@ -207,7 +207,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
       </div>
 
       <section className={cx("mt-5", s.panel, "p-5")}>
-        <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionRooms")}</h2>
+        <h2 className="mb-3 font-serif text-title-sm font-semibold">{tr.t("sectionRooms")}</h2>
         <div className="flex flex-col divide-y divide-divider">
           {b.rooms.map((r, i) => (
             <div key={i} className="flex items-start justify-between gap-4 py-3 first:pt-0">
@@ -267,13 +267,13 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
 
       {cancellationText && (
         <section className={cx("mt-5", s.panel, "p-5")}>
-          <h2 className="mb-2 font-serif text-title-xs font-semibold">{tr.t("cancellationPolicy")}</h2>
+          <h2 className="mb-2 font-serif text-title-sm font-semibold">{tr.t("cancellationPolicy")}</h2>
           <p className="text-body text-secondary">{cancellationText}</p>
         </section>
       )}
 
       <section className={cx("mt-5", s.panel, "p-5")}>
-        <h2 className="mb-3 font-serif text-title-xs font-semibold">{tr.t("sectionPayment")}</h2>
+        <h2 className="mb-3 font-serif text-title-sm font-semibold">{tr.t("sectionPayment")}</h2>
         <p className="text-body text-muted-2">{tr.t("noPaymentInfo")}</p>
       </section>
 

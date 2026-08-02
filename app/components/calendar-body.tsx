@@ -48,7 +48,7 @@ export function CalendarNav({ state, title }: { state: DateRangeState; title?: s
         onClick={state.prevMonth}
         disabled={!state.canPrev}
         aria-label={tr.t("prevMonth")}
-        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-xs leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ‹
       </button>
@@ -58,7 +58,7 @@ export function CalendarNav({ state, title }: { state: DateRangeState; title?: s
         onClick={state.nextMonth}
         disabled={!state.canNext}
         aria-label={tr.t("nextMonth")}
-        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-xs leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ›
       </button>
@@ -75,7 +75,7 @@ export function CalendarMonths({ state }: { state: DateRangeState }) {
       <div className="flex flex-wrap gap-7">
         {state.months.map((month) => (
           <div key={month.title} className="min-w-[240px] flex-1">
-            <div className="mb-3 text-center font-serif text-lead-lg font-semibold">
+            <div className="mb-3 text-center font-serif text-lead font-semibold">
               {month.title}
             </div>
             <div className="mb-1 grid grid-cols-7 gap-0.5">
