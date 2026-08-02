@@ -97,13 +97,16 @@ export interface AriActor {
 export const CHANNEX_ACTOR: AriActor = { source: "channex", actor: "Channex" };
 
 export interface AriLogEntry {
-  kind: "availability" | "price" | "restriction";
+  // Only these two are written now; "restriction" rows exist from before that and
+  // still have to READ back, which is why AriLogRow.kind stays a plain string.
+  kind: "availability" | "price";
   roomTypeId: string;
   ratePlanId: string | null;
   date: string;
-  // avail | price | min_stay | cta | ctd. `stop_sell` is no longer written (see
-  // diffInventory) but still appears in rows recorded before that, so anything
-  // RENDERING a field has to keep handling it until they age out.
+  // `avail` or `price`. The restriction fields (stop_sell, min_stay, cta, ctd)
+  // are no longer written — see diffInventory — but still appear in rows recorded
+  // before that, so anything RENDERING a field has to keep handling them until
+  // they age out of the 30-day window.
   field: string;
   oldValue: string | null;
   newValue: string | null;
@@ -135,32 +138,24 @@ function diffInventory(before: InventoryData, after: InventoryData): AriLogEntry
     entries.push({ kind: "price", roomTypeId, ratePlanId, date, field: "price", oldValue: o?.toString() ?? null, newValue: n?.toString() ?? null });
   }
 
-  const rKeys = new Set([...Object.keys(before.restrictions), ...Object.keys(after.restrictions)]);
-  // `stop_sell` is deliberately NOT logged. It was 33% of every row in the audit
-  // log — 193k rows across 27 days — because a restriction row that doesn't exist
-  // yet reads as `false` here (see `dflt` below), so simply CREATING a row logs a
-  // false→true transition. The counts show what that does to the signal:
-  // false→true 162,034 times against true→false only 31,395. A field that flips
-  // on five times for every time it flips off isn't recording reality, and the
-  // storage cost is real. The grid itself still shows the current value; only the
-  // change history drops it.
-  const rFields: [string, keyof RestrictionCell][] = [
-    ["min_stay", "minStay"],
-    ["cta", "cta"],
-    ["ctd", "ctd"],
-  ];
-  for (const k of rKeys) {
-    const o = before.restrictions[k];
-    const n = after.restrictions[k];
-    const [roomTypeId, ratePlanId, date] = k.split("|");
-    for (const [field, prop] of rFields) {
-      const dflt = prop === "minStay" ? 0 : false;
-      const ov = o?.[prop] ?? dflt;
-      const nv = n?.[prop] ?? dflt;
-      if (ov === nv) continue;
-      entries.push({ kind: "restriction", roomTypeId, ratePlanId, date, field, oldValue: String(ov), newValue: String(nv) });
-    }
-  }
+  // Restrictions — stop_sell, min_stay, cta, ctd — are deliberately NOT logged,
+  // for two reasons.
+  //
+  // They could not be measured honestly here. A restriction row that doesn't
+  // exist yet is indistinguishable from one set to its default, so simply
+  // CREATING a row registered as a change. The asymmetry that produced is not
+  // subtle: stop_sell went false→true 162,034 times against true→false 31,395,
+  // and min_stay went 0→1 136,643 times against 1→0 just 14,162. Fields that
+  // switch on ten times for every time they switch off are describing our write
+  // pattern, not the hotel's decisions. Together they were 73% of a log that had
+  // reached 584k rows — nearly twice the size of all the live ARI it described.
+  //
+  // And they need not be. Channex keeps three months of full logs of everything
+  // it sent, and it is the source of 99.9% of these rows, so it is already the
+  // system of record for them. This log answers a narrower, more immediate
+  // question — what moved recently — and for that, availability and price are
+  // the answer. The inventory grid still shows every current restriction value;
+  // only the change history stops carrying them.
   return entries;
 }
 
