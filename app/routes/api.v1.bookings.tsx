@@ -34,6 +34,13 @@ import { stashPending } from "~/lib/pending-bookings.server";
 import { rateLimit } from "~/lib/rate-limit.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
 
+// A booking that takes no card at all holds real inventory with nothing
+// securing it and nothing to refund, so it gets its own much tighter ceiling on
+// top of the general per-key throttle. See the call site for when this path is
+// reached — it is narrower than it sounds.
+const NO_CARD_LIMIT = 1;
+const NO_CARD_WINDOW_SEC = 3600;
+
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request);
@@ -393,6 +400,32 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // No online payment needed — create the booking now.
+  //
+  // This is the only path where an agent gets a confirmed booking without a card
+  // ever being involved: it needs BOTH no Stripe account on the property AND
+  // nothing due, because a card policy is always `guarantee` or
+  // `charge_at_booking` (never "none"), so a connected property always reaches
+  // Stripe above even at zero. Everything else either charges or takes a
+  // guarantee card, which is friction an abusive caller has to get past and a
+  // hold the hotel can act on. Here there is neither — the reservation is real,
+  // the room comes off sale, and nothing was staked on it.
+  //
+  // Hence one an hour, against the 60-per-10-minutes every other booking gets.
+  // It has to be checked here rather than beside that one, because whether a
+  // card is involved isn't known until the rate's policy has been priced.
+  //
+  // Test keys are exempt on purpose. They never reach the channel manager, so
+  // they can't consume the inventory this protects, and a 1/hour ceiling would
+  // make the agent API impractical to develop against — which would push
+  // integrators onto live keys, the opposite of what this is for.
+  if (mode === "live" && !(await rateLimit(`apibook_nocard:${pid}:${auth.keyId}`, NO_CARD_LIMIT, NO_CARD_WINDOW_SEC))) {
+    return apiError(
+      429,
+      "rate_limited",
+      "This rate takes no card, and unpaid bookings are limited to 1 per hour per API key. " +
+        "Wait and retry, or book a rate that takes a deposit or a card guarantee — those aren't limited.",
+    );
+  }
   const record = await finalizeBooking(pending, undefined, origin);
   return respond(201, { data: serializeBooking(record) });
 }
