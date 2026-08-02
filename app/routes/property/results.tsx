@@ -585,7 +585,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       </div>
 
       {rooms.length > 0 && !fitsParty && (
-        <div className="mb-6 rounded-card-lg border border-accent/40 bg-[#f9ede6] p-5">
+        <div className="mb-6 rounded-card border border-accent/40 bg-[#f9ede6] p-5">
           <div className="mb-1 font-serif text-title-sm font-semibold text-[#8a4a2f]">
             {tr.t("capacityTitle", { n: party })}
           </div>

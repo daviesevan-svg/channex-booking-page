@@ -15,7 +15,7 @@ const HATCH =
 function Diamond({ size = 13 }: { size?: number }) {
   return (
     <span
-      className="inline-block flex-none rounded-mark-lg bg-accent"
+      className="inline-block flex-none rounded-mark bg-accent"
       style={{ width: size, height: size, transform: "rotate(45deg)" }}
     />
   );
@@ -26,7 +26,7 @@ export function PropertyPicker({ items, subtitle }: { items: PickerCard[]; subti
     return (
       <main className="mx-auto max-w-2xl px-7 py-24 text-center">
         <span
-          className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark-lg bg-accent"
+          className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark bg-accent"
           style={{ transform: "rotate(45deg)" }}
         />
         <h1 className="font-serif text-display-lg font-medium tracking-[-0.02em]">Roompanda</h1>

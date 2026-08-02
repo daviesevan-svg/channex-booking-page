@@ -49,7 +49,7 @@ export function CalendarPopover({
       <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
         ref={ref}
-        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-panel-lg border border-line bg-surface p-[22px_22px_18px]"
+        className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-panel border border-line bg-surface p-[22px_22px_18px]"
         style={{ boxShadow: "var(--shadow-popover)", maxHeight: maxH ? `${maxH}px` : undefined }}
       >
         <CalendarNav state={state} />

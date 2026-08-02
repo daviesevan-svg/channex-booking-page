@@ -149,7 +149,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           )}
 
           {/* the code */}
-          <div className="mb-5 rounded-card-lg border-2 border-dashed border-accent bg-accent-soft/40 px-5 py-4 text-center">
+          <div className="mb-5 rounded-card border-2 border-dashed border-accent bg-accent-soft/40 px-5 py-4 text-center">
             <div className="mb-1 text-micro font-semibold uppercase tracking-widest text-muted">{tr.t("voucherCodeLabel")}</div>
             <div className="font-mono text-display-sm font-bold tracking-[0.08em] text-accent-deep">{v.code}</div>
           </div>
