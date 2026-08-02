@@ -427,7 +427,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-[1420px] items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-4">
           <div className="flex items-center gap-3">
             <Diamond size={13} />
-            <span className="font-serif text-title-lg font-semibold tracking-[-0.01em]">{name}</span>
+            <span className="font-serif text-title-md font-semibold tracking-[-0.01em]">{name}</span>
           </div>
           <div className="flex items-center gap-6 text-body" style={{ color: "var(--color-muted)" }}>
             <span className="cursor-pointer hover:text-accent">{tr.t("manageBooking")}</span>
@@ -567,7 +567,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                       {p.area}
                     </div>
                   )}
-                  <h3 className="mb-3 font-serif text-title-2xl font-semibold tracking-[-0.01em]">{p.name}</h3>
+                  <h3 className="mb-3 font-serif text-title-lg font-semibold tracking-[-0.01em]">{p.name}</h3>
                   {p.chips.length > 0 && (
                     <div className="flex flex-wrap gap-2">
                       {p.chips.map((c) => (

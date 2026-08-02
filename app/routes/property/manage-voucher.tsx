@@ -202,7 +202,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
       </Link>
 
       <div className="mb-2 flex flex-wrap items-center gap-3">
-        <h1 className="font-serif text-display-xl font-medium tracking-[-0.02em]">{v.title}</h1>
+        <h1 className="font-serif text-display-md font-medium tracking-[-0.02em]">{v.title}</h1>
         <span
           className={`rounded-full px-3 py-1.5 text-label font-semibold ${STATUS_STYLE[v.status] ?? "bg-chip text-muted"}`}
         >

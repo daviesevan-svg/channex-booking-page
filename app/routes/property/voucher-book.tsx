@@ -124,7 +124,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
       >
         ← {tr.t("voucherCodeLabel")} {code}
       </Link>
-      <h1 className="mb-2 font-serif text-display-xl font-medium tracking-[-0.02em]">{tr.t("voucherRedeemTitle")}</h1>
+      <h1 className="mb-2 font-serif text-display-md font-medium tracking-[-0.02em]">{tr.t("voucherRedeemTitle")}</h1>
       <p className="mb-8 max-w-[560px] text-lead leading-[1.6] text-secondary">
         {tr.t("voucherRedeemIntro", { title, nights: String(nights) })}
       </p>

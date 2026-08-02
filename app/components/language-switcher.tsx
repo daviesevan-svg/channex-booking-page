@@ -52,7 +52,7 @@ export function LanguageSwitcher({
         <span className="text-body-lg leading-none">{langFlag(current)}</span>
         <span>{langLabel(current)}</span>
         <span
-          className={`text-nano leading-none text-muted-2 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`text-micro leading-none text-muted-2 transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden
         >
           ▼

@@ -103,7 +103,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc: () => void }) {
   const btn =
-    "flex h-9 w-9 flex-none items-center justify-center rounded-chip-lg border border-line-alt text-title-xs leading-none text-ink hover:border-accent hover:text-accent";
+    "flex h-9 w-9 flex-none items-center justify-center rounded-chip-lg border border-line-alt text-title-sm leading-none text-ink hover:border-accent hover:text-accent";
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} className={btn}>−</button>
@@ -155,7 +155,7 @@ function ExtraSection({
   if (extras.length === 0) return null;
   return (
     <section className="mb-9">
-      <h2 className="mb-1 font-serif text-title-3xl font-medium tracking-[-0.01em]">{title}</h2>
+      <h2 className="mb-1 font-serif text-title-lg font-medium tracking-[-0.01em]">{title}</h2>
       {subtitle && <p className="mb-4 text-body text-secondary">{subtitle}</p>}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         {extras.map((e) => (
@@ -267,7 +267,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
           className={cx("sticky top-24 min-w-[300px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
-          <h3 className="mb-4 font-serif text-title-lg font-semibold">{roomTitle}</h3>
+          <h3 className="mb-4 font-serif text-title-md font-semibold">{roomTitle}</h3>
           <div className={cx("flex items-start justify-between gap-3 border-b", s.rule, "pb-4")}>
             <div className="min-w-0">
               <div className="text-label text-muted-2">{rateTitle}</div>
@@ -295,7 +295,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
           <div className="flex items-baseline justify-between py-4">
             <span className="text-body-lg font-semibold">{text.summaryLabel}</span>
-            <span className="font-serif text-title-3xl font-semibold">{formatMoney(extrasSum, cur)}</span>
+            <span className="font-serif text-title-lg font-semibold">{formatMoney(extrasSum, cur)}</span>
           </div>
 
           <button
@@ -468,8 +468,8 @@ function ConfigureModal({
         )}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="mb-1 flex items-start justify-between gap-3">
-            <h2 className="font-serif text-title-xl font-semibold">{extra.name}</h2>
-            <button type="button" onClick={onClose} aria-label="Close" className="text-title-xl leading-none text-muted-2 hover:text-ink">×</button>
+            <h2 className="font-serif text-title-md font-semibold">{extra.name}</h2>
+            <button type="button" onClick={onClose} aria-label="Close" className="text-title-md leading-none text-muted-2 hover:text-ink">×</button>
           </div>
           {extra.desc && <p className="mb-5 text-body leading-[1.5] text-muted">{extra.desc}</p>}
 
@@ -539,7 +539,7 @@ function ConfigureModal({
         <div className={cx("flex-none border-t", s.rule, "p-5")}>
           {!canAdd && <p className="mb-2.5 text-label text-[#b08968]">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
-            <span className="font-serif text-title-xl font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
+            <span className="font-serif text-title-md font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
             <div className="flex items-center gap-3">
               {already && (
                 <button type="button" onClick={onRemove} className="text-caption font-semibold text-[#c0392b] hover:underline">

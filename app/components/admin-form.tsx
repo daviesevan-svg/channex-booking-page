@@ -13,7 +13,7 @@ export const FIELD_INPUT =
 export function FeatureUnavailable({ title, body }: { title: string; body: string }) {
   return (
     <div className="max-w-[560px]">
-      <h1 className="mb-2 font-serif text-display-xs font-semibold">{title}</h1>
+      <h1 className="mb-2 font-serif text-display-sm font-semibold">{title}</h1>
       <p className="rounded-card border border-line bg-surface px-5 py-4 text-body leading-relaxed text-muted">{body}</p>
     </div>
   );

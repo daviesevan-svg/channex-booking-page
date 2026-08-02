@@ -167,7 +167,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
             </div>
           )}
 
-          <h1 className="mb-2 mt-7 font-serif text-display-2xl font-medium leading-[1.1] tracking-[-0.01em]">
+          <h1 className="mb-2 mt-7 font-serif text-display-lg font-medium leading-[1.1] tracking-[-0.01em]">
             {room.title}
           </h1>
           <div className="mb-5 text-body text-muted-2">

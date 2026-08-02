@@ -20,7 +20,7 @@ function Stepper({
   onChange: (v: number) => void;
 }) {
   const btn =
-    "flex h-9 w-9 items-center justify-center rounded-full border border-line-alt bg-surface-alt text-title-xs leading-none text-[#5a5145] transition-colors enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-30";
+    "flex h-9 w-9 items-center justify-center rounded-full border border-line-alt bg-surface-alt text-title-sm leading-none text-[#5a5145] transition-colors enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-30";
   return (
     <div className="flex items-center gap-3">
       <button
@@ -83,7 +83,7 @@ export function GuestSelector({
         className="w-full cursor-pointer rounded-card px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
       >
         <div className="field-label mb-1.5">{tr.t("guests")}</div>
-        <div className="text-lead-lg font-semibold">{summary}</div>
+        <div className="text-lead font-semibold">{summary}</div>
       </button>
 
       {open && (

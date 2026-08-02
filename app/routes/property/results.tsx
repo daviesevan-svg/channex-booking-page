@@ -291,7 +291,7 @@ function RoomCard({
       </Link>
       <div className="flex min-w-[240px] flex-1 flex-col p-6">
         <Link to={detailHref}>
-          <h3 className="mb-1.5 font-serif text-title-3xl font-semibold tracking-[-0.01em] hover:text-accent">
+          <h3 className="mb-1.5 font-serif text-title-lg font-semibold tracking-[-0.01em] hover:text-accent">
             {room.title}
           </h3>
         </Link>
@@ -400,7 +400,7 @@ function CartPanel({
       className={cx("sticky top-24 w-full min-w-[280px] flex-1 self-start", s.strip, "p-6")}
       style={{ boxShadow: "var(--shadow-sticky)" }}
     >
-      {cartTitle && <h3 className="mb-1 font-serif text-title-lg font-semibold">{cartTitle}</h3>}
+      {cartTitle && <h3 className="mb-1 font-serif text-title-md font-semibold">{cartTitle}</h3>}
       <div className="mb-4 text-caption text-muted-2">
         {lines.length === 0 ? tr.t("noRoomsSelected") : tr.p("roomsSelected", lines.length)}
       </div>
@@ -437,7 +437,7 @@ function CartPanel({
                   type="button"
                   onClick={() => onRemove(i)}
                   aria-label="Remove room"
-                  className="text-title-xs leading-none text-muted-2 hover:text-accent"
+                  className="text-title-sm leading-none text-muted-2 hover:text-accent"
                 >
                   ×
                 </button>
@@ -479,7 +479,7 @@ function CartPanel({
       )}
       <div className="mb-4 flex items-baseline justify-between">
         <span className="text-body-lg font-semibold">{tr.t("total")}</span>
-        <span className="font-serif text-display-xs font-semibold">
+        <span className="font-serif text-display-sm font-semibold">
           {formatMoney(coverage.total + extrasSum, currency)}
         </span>
       </div>
@@ -559,7 +559,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       )}
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>
-          <h1 className="mb-2 font-serif text-display-2xl font-medium tracking-[-0.02em]">
+          <h1 className="mb-2 font-serif text-display-lg font-medium tracking-[-0.02em]">
             {singleUnit ? text.cartTitle : text.heading}
           </h1>
           <div className="text-body-lg text-secondary">
@@ -586,7 +586,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
 
       {rooms.length > 0 && !fitsParty && (
         <div className="mb-6 rounded-card-lg border border-accent/40 bg-[#f9ede6] p-5">
-          <div className="mb-1 font-serif text-title-xs font-semibold text-[#8a4a2f]">
+          <div className="mb-1 font-serif text-title-sm font-semibold text-[#8a4a2f]">
             {tr.t("capacityTitle", { n: party })}
           </div>
           <p className="text-body text-secondary">

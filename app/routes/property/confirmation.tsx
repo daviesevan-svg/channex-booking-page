@@ -146,10 +146,10 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
   if (failed) {
     return (
       <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
-        <h1 className="mb-3 font-serif text-display-3xl font-medium tracking-[-0.02em]">
+        <h1 className="mb-3 font-serif text-display-lg font-medium tracking-[-0.02em]">
           {tr.t("confirmProblemHeading")}
         </h1>
-        <p className="mb-6 text-lead-lg leading-[1.6] text-secondary">
+        <p className="mb-6 text-lead leading-[1.6] text-secondary">
           {(refunded ? tr.t("confirmRefundedBody") : tr.t("confirmProblemBody")).replaceAll("{hotel}", hotelName)}
         </p>
         <div
@@ -201,8 +201,8 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
           }}
         />
       </div>
-      <h1 className="mb-3 font-serif text-display-4xl font-medium tracking-[-0.02em]">{text.heading}</h1>
-      <p className="mb-2 text-title-xs leading-[1.6] text-secondary">
+      <h1 className="mb-3 font-serif text-display-lg font-medium tracking-[-0.02em]">{text.heading}</h1>
+      <p className="mb-2 text-title-sm leading-[1.6] text-secondary">
         {text.subtitle.replaceAll("{hotel}", hotelName)}
       </p>
       <div
@@ -284,7 +284,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
           {total > 0 && (
             <div className={cx("flex items-baseline justify-between border-t", s.rule, "pt-3")}>
               <span className="text-secondary">{tr.t("total")}</span>
-              <span className="font-serif text-title-3xl font-semibold">
+              <span className="font-serif text-title-lg font-semibold">
                 {formatMoney(grandTotal, currency)}
               </span>
             </div>

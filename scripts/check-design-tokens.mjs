@@ -33,16 +33,82 @@ const EXTRA = ["app/lib/site-style.ts"];
 // `git ls-files` lists what's tracked, which still includes a file deleted but
 // not yet staged — reading it blind crashes the whole check with ENOENT, and
 // since this runs inside `npm run typecheck` that looks like a type error.
-const files = execSync("git ls-files 'app/**/*.tsx' 'app/*.tsx'", { encoding: "utf8" })
+const tracked = execSync("git ls-files 'app/**/*.tsx' 'app/*.tsx'", { encoding: "utf8" })
   .split("\n")
-  .filter(
-    (f) =>
-      f.endsWith(".tsx") &&
-      !f.startsWith("app/routes/admin/") &&
-      !f.startsWith("app/components/admin-"),
-  )
+  .filter((f) => f.endsWith(".tsx"))
   .concat(EXTRA)
   .filter((f) => existsSync(f));
+
+const isAdmin = (f) => f.startsWith("app/routes/admin/") || f.startsWith("app/components/admin-");
+
+// Guest-only: the admin UI is never templated, so a hardcoded size costs
+// nothing there.
+const files = tracked.filter((f) => !isAdmin(f));
+
+// ---- Second check: a token class that no longer exists -------------------
+//
+// Collapsing the scale from 25 steps to 13 retired nine class names. Tailwind
+// generates a rule only for names it finds in the theme, so `text-title-3xl`
+// left behind after a rename produces NO rule at all — the element silently
+// inherits its parent's size and the page still renders. That is a worse
+// failure than a hardcoded pixel value, because nothing anywhere reports it.
+//
+// Only the `title-`/`display-` families and the retired flat names are checked.
+// A bare `text-<word>` is ambiguous — `text-white`, `text-center` and
+// `text-secondary` are all legitimate and none of them are type tokens.
+const THEME = readFileSync("app/app.css", "utf8");
+const KNOWN_TYPE = new Set([...THEME.matchAll(/--text-([a-z0-9-]+):/g)].map((m) => m[1]));
+const KNOWN_RADIUS = new Set([...THEME.matchAll(/--radius-([a-z0-9-]+):/g)].map((m) => m[1]));
+
+// Retired in the 25 -> 13 collapse, with where each one went.
+const RETIRED = {
+  nano: "micro",
+  "lead-lg": "lead",
+  "title-xs": "title-sm",
+  "title-xl": "title-md",
+  "title-2xl": "title-lg",
+  "title-3xl": "title-lg",
+  "display-xs": "display-sm",
+  "display-2xl": "display-lg",
+  "display-3xl": "display-lg",
+  "display-4xl": "display-lg",
+  "display-5xl": "display-xl",
+  "display-6xl": "display-xl",
+};
+
+const FAMILY = /\b(text-(?:title|display)-[a-z0-9-]+|text-(?:nano|lead-lg)|rounded-(?:mark|chip|control|field|card|panel|well)(?:-[a-z0-9]+)?)\b/g;
+
+const unknown = [];
+function checkNames(file, line, lineNo) {
+  for (const m of line.match(FAMILY) ?? []) {
+    const isRadius = m.startsWith("rounded-");
+    const name = m.replace(/^(text|rounded)-/, "");
+    const known = isRadius ? KNOWN_RADIUS.has(name) : KNOWN_TYPE.has(name);
+    if (known) continue;
+    unknown.push({
+      file,
+      line: lineNo,
+      literal: m,
+      hint: RETIRED[name] ? `retired — use ${isRadius ? "rounded" : "text"}-${RETIRED[name]}` : "no such token",
+    });
+  }
+}
+
+// Unlike the hardcoded-size rule, this one runs over admin too: a retired name
+// renders just as silently wrong there, and admin was included in the rename.
+for (const file of tracked) {
+  readFileSync(file, "utf8")
+    .split("\n")
+    .forEach((line, i) => checkNames(file, line, i + 1));
+}
+
+if (unknown.length > 0) {
+  console.error(`\n✗ ${unknown.length} reference${unknown.length === 1 ? "" : "s"} to a token that does not exist.`);
+  console.error("  Tailwind emits no rule for these, so the element silently inherits its size.\n");
+  for (const u of unknown) console.error(`  ${u.file}:${u.line}  ${u.literal}  (${u.hint})`);
+  console.error();
+  process.exit(1);
+}
 
 const hits = [];
 for (const file of files) {
