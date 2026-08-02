@@ -117,7 +117,15 @@ const EMPTY_INVENTORY: InventoryData = { availability: {}, prices: {}, restricti
 /** Diff two inventory snapshots into per-value change entries. Compares at the
  *  "displayed value" granularity (what getInventory exposes), so it's identical
  *  for user grid edits and Channex pushes and free of per-occupancy noise. */
-function diffInventory(before: InventoryData, after: InventoryData): AriLogEntry[] {
+function diffInventory(
+  before: InventoryData,
+  after: InventoryData,
+  /** Dates the write actually touched. A change on any other date belongs to
+   *  someone else — a concurrent push, or a date that merely fell between two
+   *  this write happened to span — and must not be attributed to this actor.
+   *  Omit to diff everything the snapshots contain. */
+  onlyDates?: ReadonlySet<string>,
+): AriLogEntry[] {
   const entries: AriLogEntry[] = [];
 
   const availKeys = new Set([...Object.keys(before.availability), ...Object.keys(after.availability)]);
@@ -126,6 +134,7 @@ function diffInventory(before: InventoryData, after: InventoryData): AriLogEntry
     const n = after.availability[k];
     if (o === n) continue;
     const [roomTypeId, date] = k.split("|");
+    if (onlyDates && !onlyDates.has(date)) continue;
     entries.push({ kind: "availability", roomTypeId, ratePlanId: null, date, field: "avail", oldValue: o?.toString() ?? null, newValue: n?.toString() ?? null });
   }
 
@@ -135,6 +144,7 @@ function diffInventory(before: InventoryData, after: InventoryData): AriLogEntry
     const n = after.prices[k];
     if (o === n) continue;
     const [roomTypeId, ratePlanId, date] = k.split("|");
+    if (onlyDates && !onlyDates.has(date)) continue;
     entries.push({ kind: "price", roomTypeId, ratePlanId, date, field: "price", oldValue: o?.toString() ?? null, newValue: n?.toString() ?? null });
   }
 
@@ -179,8 +189,11 @@ async function insertAriLog(hotelCode: string, actor: AriActor, entries: AriLogE
 }
 
 /** Run a write that touches the given dates, capturing before/after snapshots
- *  and logging the diff as `actor`. The snapshot reads are scoped to the changed
- *  date window (and are skipped entirely when there's nothing to change). */
+ *  and logging the diff as `actor`. The snapshots cover exactly those dates —
+ *  not the span from the earliest to the latest — and the diff is filtered to
+ *  them as well, so an edit to 1 May and 1 September can no longer log every
+ *  cell of the summer in between. Skipped entirely when there's nothing to
+ *  change. */
 async function withAriLog<T>(
   hotelCode: string,
   actor: AriActor,
@@ -188,16 +201,11 @@ async function withAriLog<T>(
   write: () => Promise<T>,
 ): Promise<T> {
   if (dates.length === 0) return write();
-  let from = dates[0];
-  let to = dates[0];
-  for (const d of dates) {
-    if (d < from) from = d;
-    if (d > to) to = d;
-  }
-  const before = await getInventory(hotelCode, from, to);
+  const touched = new Set(dates);
+  const before = await getInventoryOn(hotelCode, touched);
   const result = await write();
-  const after = await getInventory(hotelCode, from, to);
-  await insertAriLog(hotelCode, actor, diffInventory(before, after), Date.now());
+  const after = await getInventoryOn(hotelCode, touched);
+  await insertAriLog(hotelCode, actor, diffInventory(before, after, touched), Date.now());
   return result;
 }
 
@@ -316,18 +324,18 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   const stmts: D1PreparedStatement[] = [];
   const counts = { availability: 0, rates: 0, restrictions: 0 };
   const hotels = new Set<string>();
-  // Per-hotel affected date window, so we can snapshot/diff for the audit log.
-  const ranges = new Map<string, { from: string; to: string }>();
-  const widen = (hotel: string, dates: string[]) => {
+  // Per-hotel affected DATES, so we can snapshot/diff for the audit log. A set
+  // rather than a {from,to} window: one notification body routinely carries
+  // scattered dates, and widening to cover them meant snapshotting — and then
+  // diffing — everything in between. With a 730-day horizon that turned a
+  // two-date push into a two-year comparison, which is both a large read and a
+  // way to attribute another writer's concurrent change to Channex.
+  const touched = new Map<string, Set<string>>();
+  const touch = (hotel: string, dates: string[]) => {
     if (!hotel || !dates.length) return;
-    const cur = ranges.get(hotel);
-    let from = cur?.from ?? dates[0];
-    let to = cur?.to ?? dates[0];
-    for (const d of dates) {
-      if (d < from) from = d;
-      if (d > to) to = d;
-    }
-    ranges.set(hotel, { from, to });
+    let set = touched.get(hotel);
+    if (!set) touched.set(hotel, (set = new Set<string>()));
+    for (const d of dates) set.add(d);
   };
   const D = db();
 
@@ -359,7 +367,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
       const room = String(a.room_type_id ?? "");
       const plan = String(a.rate_plan_id ?? "");
       const dates = eachDate(String(a.date_from), String(a.date_to));
-      widen(hotel, dates);
+      touch(hotel, dates);
 
       if (type === "availability_changes") {
         const avail = Number(a.availability) || 0;
@@ -392,7 +400,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // Snapshot the affected windows before applying, so we can log what actually
   // changed (Channex re-sends unchanged values; diffInventory drops those).
   const before = new Map<string, InventoryData>();
-  for (const [h, { from, to }] of ranges) before.set(h, await getInventory(h, from, to));
+  for (const [h, ds] of touched) before.set(h, await getInventoryOn(h, ds));
 
   // D1 batches are atomic; chunk to stay well within limits on big ranges.
   for (let i = 0; i < stmts.length; i += 100) {
@@ -401,9 +409,9 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
 
   // Audit log: diff each hotel's window after applying, attributed to Channex.
   const ts = Date.now();
-  for (const [h, { from, to }] of ranges) {
-    const after = await getInventory(h, from, to);
-    await insertAriLog(h, CHANNEX_ACTOR, diffInventory(before.get(h) ?? EMPTY_INVENTORY, after), ts);
+  for (const [h, ds] of touched) {
+    const after = await getInventoryOn(h, ds);
+    await insertAriLog(h, CHANNEX_ACTOR, diffInventory(before.get(h) ?? EMPTY_INVENTORY, after, ds), ts);
   }
 
   // Record "last received" per hotel once the writes land (best-effort — a KV
@@ -566,20 +574,48 @@ export interface InventoryData {
 
 /** Read the ARI for a [from, to] inclusive window, as lookup maps. */
 export async function getInventory(hotelCode: string, from: string, to: string): Promise<InventoryData> {
+  return readInventory(hotelCode, "date>=? AND date<=?", [from, to]);
+}
+
+/** Read the ARI for exactly these dates — the sparse counterpart to getInventory.
+ *
+ *  What it does NOT read is the point. A push carrying two dates two years apart
+ *  was snapshotted as the whole span between them, which meant every unrelated
+ *  cell in those two years was compared, and anything another writer changed in
+ *  the meantime was logged as this push's doing. Reading only the dates a write
+ *  actually touches removes both the cost and the misattribution.
+ *
+ *  Duplicates are collapsed and the order is irrelevant — callers pass raw
+ *  per-notification date lists. */
+export async function getInventoryOn(hotelCode: string, dates: Iterable<string>): Promise<InventoryData> {
+  const uniq = [...new Set(dates)].sort();
+  if (uniq.length === 0) return { availability: {}, prices: {}, restrictions: {} };
+  // SQLite caps bound variables per statement (~999) and hotel_code takes one of
+  // them. Past that a range read is cheaper than chunking, and it stays correct
+  // because the diff is filtered to the touched dates either way — extra rows
+  // read can no longer reach the log. In practice this is unreachable: the ARI
+  // horizon is 730 days and past dates are pruned.
+  if (uniq.length > 500) return getInventory(hotelCode, uniq[0], uniq[uniq.length - 1]);
+  return readInventory(hotelCode, `date IN (${uniq.map(() => "?").join(",")})`, uniq);
+}
+
+/** Shared body of the two readers above. `dateWhere` is built from fixed literals
+ *  and placeholders only — never from caller text — and every value is bound. */
+async function readInventory(hotelCode: string, dateWhere: string, dateBinds: string[]): Promise<InventoryData> {
   await ensureSchema();
   const D = db();
   const [av, rt, rs] = await Promise.all([
-    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND date>=? AND date<=?`)
-      .bind(hotelCode, from, to)
+    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND ${dateWhere}`)
+      .bind(hotelCode, ...dateBinds)
       .all<{ room_type_id: string; date: string; avail: number }>(),
-    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND date>=? AND date<=?`)
-      .bind(hotelCode, from, to)
+    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND ${dateWhere}`)
+      .bind(hotelCode, ...dateBinds)
       .all<{ room_type_id: string; rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number }>(),
     D.prepare(
       `SELECT room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
-       FROM restriction WHERE hotel_code=? AND date>=? AND date<=?`,
+       FROM restriction WHERE hotel_code=? AND ${dateWhere}`,
     )
-      .bind(hotelCode, from, to)
+      .bind(hotelCode, ...dateBinds)
       .all<{
         room_type_id: string;
         rate_plan_id: string;
@@ -705,10 +741,14 @@ export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: A
   const touchRestr = s.minStay !== undefined || s.stopSell !== undefined || s.cta !== undefined || s.ctd !== undefined;
   const touchPrice = s.price !== undefined && s.price > 0;
   if (touchPrice || touchRestr) {
-    // Read the current window once so we can preserve restriction fields the
-    // operator left blank.
+    // Read the current values once so we can preserve restriction fields the
+    // operator left blank. Only the chosen dates: a bulk edit is already
+    // filtered to days of the week, so "every Saturday next year" is 52 dates
+    // spread over 365 — reading the span would be seven times the rows for the
+    // same answer. Lookups are by exact `room|rate|date` key, so this changes
+    // nothing about the result.
     const existing = touchRestr
-      ? await getInventory(hotelCode, s.dates[0], s.dates[s.dates.length - 1])
+      ? await getInventoryOn(hotelCode, s.dates)
       : { availability: {}, prices: {}, restrictions: {} as Record<string, RestrictionCell> };
     for (const rate of s.rates) {
       for (const room of s.rooms) {
