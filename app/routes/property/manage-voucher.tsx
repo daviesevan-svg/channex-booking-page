@@ -290,7 +290,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
               <button
                 type="submit"
                 disabled={busy}
-                className="self-start rounded-field border border-line-alt px-5 py-2.5 text-body font-semibold text-secondary transition-colors hover:bg-chip disabled:opacity-60"
+                className="self-start rounded-control border border-line-alt px-5 py-2.5 text-body font-semibold text-secondary transition-colors hover:bg-chip disabled:opacity-60"
               >
                 {tr.t("voucherRemindButton")}
               </button>
@@ -332,7 +332,7 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
               <button
                 type="submit"
                 disabled={busy}
-                className="self-start rounded-field border border-[#e5c4bd] px-5 py-2.5 text-body font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
+                className="self-start rounded-control border border-[#e5c4bd] px-5 py-2.5 text-body font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
               >
                 {busy ? "…" : tr.t("voucherCancelButton")}
               </button>

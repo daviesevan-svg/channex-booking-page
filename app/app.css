@@ -94,19 +94,25 @@
      Same story, and the more expressive half of a template: sharp corners read
      as a completely different company from soft ones. `mark` is the decorative
      diamond, deliberately its own role so a template can restyle cards without
-     turning the diamonds into blobs. */
-  --radius-mark: 1px; /* ×7 — the diamond marker */
-  --radius-mark-lg: 2px; /* ×3 */
-  --radius-chip: 8px; /* ×2 */
-  --radius-chip-lg: 9px; /* ×1 */
+     turning the diamonds into blobs.
+
+     One radius per role — every `-lg` variant is gone. Each pair turned out to
+     be the same construct at two values rather than two roles: `chip-lg` was
+     the `h-9` icon button next to `chip`'s `h-8` one, `card-lg` was cards,
+     `panel-lg` was panels and popovers. `field` went to `control` because
+     despite the name it only ever sat on buttons (`px-5 py-2.5`), never on a
+     field. Six roles is also exactly what the guardrail already told people to
+     use.
+
+     All six merges round DOWN. Unlike the type scale nothing here can reflow —
+     border-radius does not affect layout — so the only question was which
+     value each role should keep, not whether anything would move. */
+  --radius-mark: 1px; /* ×10 — the diamond marker */
+  --radius-chip: 8px; /* ×4 — pills and small icon buttons */
   --radius-control: 10px; /* ×44 — buttons and inputs */
-  --radius-field: 11px; /* ×3 */
-  --radius-card: 12px; /* ×38 — cards */
-  --radius-card-lg: 14px; /* ×11 */
-  --radius-panel: 16px; /* ×23 */
-  --radius-panel-lg: 18px; /* ×17 */
-  --radius-well: 20px; /* ×2 */
-  --radius-well-lg: 22px; /* ×2 */
+  --radius-card: 12px; /* ×44 — cards */
+  --radius-panel: 16px; /* ×17 — panels, popovers, large media */
+  --radius-well: 20px; /* ×4 — modals and the largest surfaces */
 }
 
 @theme inline {

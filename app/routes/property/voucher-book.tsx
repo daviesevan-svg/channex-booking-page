@@ -188,7 +188,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                     key={r.id}
                     type="button"
                     onClick={() => setRoomId(r.id)}
-                    className={`overflow-hidden rounded-card-lg border-2 text-left transition-colors ${
+                    className={`overflow-hidden rounded-card border-2 text-left transition-colors ${
                       active ? "border-accent" : "border-line hover:border-accent/50"
                     }`}
                   >

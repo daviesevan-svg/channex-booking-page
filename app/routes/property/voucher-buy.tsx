@@ -362,7 +362,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
       {/* Hero gallery: one large image spanning two rows + two stacked. */}
       {gallery.length > 0 ? (
         <section
-          className={`mb-6 grid gap-3 overflow-hidden rounded-well-lg ${gallery.length >= 3 ? "grid-cols-[2fr_1fr] grid-rows-2" : gallery.length === 2 ? "grid-cols-[2fr_1fr]" : ""}`}
+          className={`mb-6 grid gap-3 overflow-hidden rounded-well ${gallery.length >= 3 ? "grid-cols-[2fr_1fr] grid-rows-2" : gallery.length === 2 ? "grid-cols-[2fr_1fr]" : ""}`}
           style={{ height: "clamp(300px, 42vw, 460px)" }}
         >
           {gallery.slice(0, 3).map((src, i) => {
@@ -385,7 +385,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           })}
         </section>
       ) : (
-        <div className="mb-6 h-[280px] rounded-well-lg" style={{ background: stripe }} />
+        <div className="mb-6 h-[280px] rounded-well" style={{ background: stripe }} />
       )}
 
       {/* Body: content + sticky purchase panel */}
@@ -599,7 +599,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           <a
             href="#buy"
             onClick={() => setFormOpen(true)}
-            className="flex-none rounded-field bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep"
+            className="flex-none rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep"
           >
             {tr.t("voucherBuy", { amount: money(p.price) })}
           </a>

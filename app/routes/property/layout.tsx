@@ -318,7 +318,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             ) : (
               <>
                 <span
-                  className="inline-block h-[13px] w-[13px] rounded-mark-lg bg-accent"
+                  className="inline-block h-[13px] w-[13px] rounded-mark bg-accent"
                   style={{ transform: "rotate(45deg)" }}
                 />
                 <span className="wordmark font-serif text-title-md font-semibold tracking-[-0.01em]">

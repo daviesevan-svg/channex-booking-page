@@ -60,7 +60,8 @@ const THEME = readFileSync("app/app.css", "utf8");
 const KNOWN_TYPE = new Set([...THEME.matchAll(/--text-([a-z0-9-]+):/g)].map((m) => m[1]));
 const KNOWN_RADIUS = new Set([...THEME.matchAll(/--radius-([a-z0-9-]+):/g)].map((m) => m[1]));
 
-// Retired in the 25 -> 13 collapse, with where each one went.
+// Retired when the type scale went 25 -> 13 and the radii 12 -> 6, with where
+// each one went. Type and radius names are disjoint, so one table serves both.
 const RETIRED = {
   nano: "micro",
   "lead-lg": "lead",
@@ -74,6 +75,13 @@ const RETIRED = {
   "display-4xl": "display-lg",
   "display-5xl": "display-xl",
   "display-6xl": "display-xl",
+
+  "mark-lg": "mark",
+  "chip-lg": "chip",
+  field: "control",
+  "card-lg": "card",
+  "panel-lg": "panel",
+  "well-lg": "well",
 };
 
 const FAMILY = /\b(text-(?:title|display)-[a-z0-9-]+|text-(?:nano|lead-lg)|rounded-(?:mark|chip|control|field|card|panel|well)(?:-[a-z0-9]+)?)\b/g;
@@ -104,7 +112,10 @@ for (const file of tracked) {
 
 if (unknown.length > 0) {
   console.error(`\n✗ ${unknown.length} reference${unknown.length === 1 ? "" : "s"} to a token that does not exist.`);
-  console.error("  Tailwind emits no rule for these, so the element silently inherits its size.\n");
+  console.error(
+    "  Tailwind emits no rule at all for these, and neither fails loudly:\n" +
+      "  a missing font size inherits the parent's, a missing radius squares the corner.\n",
+  );
   for (const u of unknown) console.error(`  ${u.file}:${u.line}  ${u.literal}  (${u.hint})`);
   console.error();
   process.exit(1);

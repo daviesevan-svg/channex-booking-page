@@ -103,7 +103,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc: () => void }) {
   const btn =
-    "flex h-9 w-9 flex-none items-center justify-center rounded-chip-lg border border-line-alt text-title-sm leading-none text-ink hover:border-accent hover:text-accent";
+    "flex h-9 w-9 flex-none items-center justify-center rounded-chip border border-line-alt text-title-sm leading-none text-ink hover:border-accent hover:text-accent";
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} className={btn}>−</button>

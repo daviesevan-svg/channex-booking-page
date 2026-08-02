@@ -129,7 +129,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_1fr]">
         {/* ---- photos + copy ---- */}
         <div>
-          <div className="aspect-[3/2] overflow-hidden rounded-panel-lg bg-surface-alt">
+          <div className="aspect-[3/2] overflow-hidden rounded-panel bg-surface-alt">
             {cover ? (
               <img
                 {...imageProps(cover, IMAGE_SIZES.full)}
@@ -223,7 +223,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
         {/* ---- always-on availability ---- */}
         <div>
           <div
-            className="rounded-panel-lg border border-line bg-surface p-[22px_22px_18px] lg:sticky lg:top-6"
+            className="rounded-panel border border-line bg-surface p-[22px_22px_18px] lg:sticky lg:top-6"
             style={{ boxShadow: "var(--shadow-card)" }}
           >
             <CalendarNav state={dates} title={tr.t("roomAvailability")} />

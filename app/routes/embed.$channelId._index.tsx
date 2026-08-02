@@ -90,7 +90,7 @@ export default function EmbedPicker({ loaderData }: Route.ComponentProps) {
   return (
     <div ref={rootRef} className="p-3">
       <div
-        className="flex flex-wrap items-stretch gap-1.5 rounded-panel-lg border border-line bg-surface p-2.5"
+        className="flex flex-wrap items-stretch gap-1.5 rounded-panel border border-line bg-surface p-2.5"
         style={{ boxShadow: "var(--shadow-card)" }}
       >
         <div className="relative flex min-w-[260px] flex-[2] flex-wrap items-stretch gap-1.5">
