@@ -101,7 +101,10 @@ export interface AriLogEntry {
   roomTypeId: string;
   ratePlanId: string | null;
   date: string;
-  field: string; // avail | price | stop_sell | min_stay | cta | ctd
+  // avail | price | min_stay | cta | ctd. `stop_sell` is no longer written (see
+  // diffInventory) but still appears in rows recorded before that, so anything
+  // RENDERING a field has to keep handling it until they age out.
+  field: string;
   oldValue: string | null;
   newValue: string | null;
 }
@@ -133,8 +136,15 @@ function diffInventory(before: InventoryData, after: InventoryData): AriLogEntry
   }
 
   const rKeys = new Set([...Object.keys(before.restrictions), ...Object.keys(after.restrictions)]);
+  // `stop_sell` is deliberately NOT logged. It was 33% of every row in the audit
+  // log — 193k rows across 27 days — because a restriction row that doesn't exist
+  // yet reads as `false` here (see `dflt` below), so simply CREATING a row logs a
+  // false→true transition. The counts show what that does to the signal:
+  // false→true 162,034 times against true→false only 31,395. A field that flips
+  // on five times for every time it flips off isn't recording reality, and the
+  // storage cost is real. The grid itself still shows the current value; only the
+  // change history drops it.
   const rFields: [string, keyof RestrictionCell][] = [
-    ["stop_sell", "stopSell"],
     ["min_stay", "minStay"],
     ["cta", "cta"],
     ["ctd", "ctd"],
@@ -438,10 +448,18 @@ export async function hasReceivedAri(hotelCode: string): Promise<boolean> {
  *  date-keyed, so it's left alone. The audit log is trimmed by when the change
  *  was recorded (`logDays` back), NOT by affected date — a dispute is about
  *  past dates, so that history must survive the availability/rate cleanup.
+ *
+ *  `logDays` is 30. It was 365, which sounds prudent until you price it: the log
+ *  took 584k rows in its first 27 days — nearly twice the size of ALL the live
+ *  ARI it describes — so a year of retention was on course for several GB against
+ *  a 10 GB database. Channex pushes are ~99.9% of that volume, and their value
+ *  decays fast: the question a change log answers is "what changed this week",
+ *  not "what changed last spring". Nothing migrates — the existing backlog is 27
+ *  days old, so it simply ages out over the next month.
  *  Runs on the cron; returns rows deleted. */
 export async function pruneAri(
   futureDays = 730,
-  logDays = 365,
+  logDays = 30,
 ): Promise<{ availability: number; rate: number; restriction: number; log: number }> {
   await ensureSchema();
   const D = db();
