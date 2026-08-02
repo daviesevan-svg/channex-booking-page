@@ -90,7 +90,7 @@ export function GuestSelector({
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
-            className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(360px,92vw)] rounded-panel-lg border border-line bg-surface p-5"
+            className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(360px,92vw)] rounded-panel border border-line bg-surface p-5"
             style={{ boxShadow: "var(--shadow-popover)" }}
           >
             <div className="flex items-center justify-between py-2">

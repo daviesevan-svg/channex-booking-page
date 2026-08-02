@@ -236,11 +236,11 @@ const CLASSIC: StyleSlots = {
   pageHead: "",
   headingAlign: "",
 
-  card: "rounded-card-lg border border-line bg-surface",
+  card: "rounded-card border border-line bg-surface",
   panel: "rounded-panel border border-line bg-surface",
-  strip: "rounded-panel-lg border border-line bg-surface",
-  media: "rounded-card-lg",
-  mediaLarge: "rounded-panel-lg",
+  strip: "rounded-panel border border-line bg-surface",
+  media: "rounded-card",
+  mediaLarge: "rounded-panel",
   ctaOutline: "rounded-card border border-accent",
   linkOutline: "rounded-control border border-accent",
 
@@ -298,15 +298,10 @@ const STYLE_DEFS: Record<
     // and status pills reads as broken rather than as a style.
     vars: {
       "--radius-chip": "0px",
-      "--radius-chip-lg": "0px",
       "--radius-control": "0px",
-      "--radius-field": "0px",
       "--radius-card": "0px",
-      "--radius-card-lg": "0px",
       "--radius-panel": "0px",
-      "--radius-panel-lg": "0px",
       "--radius-well": "0px",
-      "--radius-well-lg": "0px",
     },
     // Serif italic for the page title, small-caps sans below it — on every guest
     // page, not just the sections. The section slots below say the same thing for
@@ -410,14 +405,13 @@ const STYLE_DEFS: Record<
       // selected — their accent is untouched, and switching template restores it.
       "--page": "#ffffff",
       "--radius-control": "2px",
-      "--radius-field": "2px",
       "--radius-card": "2px",
-      "--radius-card-lg": "2px",
       "--radius-panel": "2px",
-      "--radius-panel-lg": "2px",
       "--radius-well": "2px",
-      "--radius-well-lg": "2px",
-      "--radius-chip-lg": "8px",
+      // Chips stay soft while everything else goes sharp — the pills read as
+      // labels, not as controls. Stated even though 8px is also the base value,
+      // so the design survives a change to the base.
+      "--radius-chip": "8px",
     },
     headings: {
       "--h1-weight": "700",
@@ -536,7 +530,7 @@ export interface EmailBrand {
 /** The email's own long-standing values. NOT read from the radius tokens: these
  *  were picked for email clients, and only happen to sit near the web ones. What
  *  the style contributes is the CHANGE, below. */
-const EMAIL_DEFAULTS = { radiusButton: 10, radiusPanel: 12, radiusShell: 14 };
+const EMAIL_DEFAULTS = { radiusButton: 10, radiusPanel: 12, radiusShell: 16 };
 
 /**
  * Fold a style into email-safe values.
@@ -558,7 +552,13 @@ export function emailBrandFor(accent: string, styleId: string | undefined): Emai
     accent,
     radiusButton: px("--radius-control", EMAIL_DEFAULTS.radiusButton),
     radiusPanel: px("--radius-card", EMAIL_DEFAULTS.radiusPanel),
-    radiusShell: px("--radius-card-lg", EMAIL_DEFAULTS.radiusShell),
+    // The shell reads `panel`, not `card`, now that `card-lg` is gone: the shell
+    // is the outermost surface, so it wants the large-surface role rather than
+    // the same token the inner panels use. Reading a token that no longer exists
+    // would have failed the quiet way — straight to the default, leaving a
+    // squared site sending rounded email, which is the exact drift this function
+    // exists to prevent.
+    radiusShell: px("--radius-panel", EMAIL_DEFAULTS.radiusShell),
     // Only the label case carries: the display face doesn't, because a web font
     // isn't there to load and the fallback stack would land somewhere arbitrary.
     labelCase: style.headings?.["--h2-case"] ?? "none",

@@ -615,7 +615,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         {/* map */}
         <div className="order-first min-w-0 self-stretch lg:order-none lg:flex-1 lg:basis-[360px]">
           <div
-            className="relative h-[340px] overflow-hidden rounded-panel-lg lg:sticky lg:top-[132px] lg:h-[calc(100vh-160px)]"
+            className="relative h-[340px] overflow-hidden rounded-panel lg:sticky lg:top-[132px] lg:h-[calc(100vh-160px)]"
             style={{ border: "1px solid #e3d9c9", boxShadow: "0 22px 50px -30px rgba(70,55,35,0.35)", minHeight: 320 }}
           >
             {mapKey ? (
