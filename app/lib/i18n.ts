@@ -1,13 +1,13 @@
 // Guest UI labels (not admin-editable). Editable copy lives in content.ts.
 //
 // Only ENGLISH is bundled for the browser. It has to be — it's the default and
-// the per-key fallback — but the other seven were shipping too, 46 kB gzipped of
+// the per-key fallback — but the other eight were shipping too, 46 kB gzipped of
 // languages a given visitor cannot read. They now live in ./locales/*, are
 // imported on the server only (i18n-locales.server.ts), and the active one
 // reaches the browser as root loader data, registered by root's Layout before
 // anything renders. See `registerDict`.
 
-import { de, el, enGB, es, fr, it, nl, pt, type Locale } from "date-fns/locale";
+import { de, el, enGB, es, fr, it, nl, pt, th, type Locale } from "date-fns/locale";
 
 import EN from "./locales/en";
 import type { Dict } from "./i18n-dict";
@@ -32,7 +32,7 @@ export function registerDict(lang: string, dict: Dict | null | undefined): void 
   DICTS.set(lang, dict);
 }
 
-const LOCALES: Record<string, Locale> = { en: enGB, fr, de, es, it, pt, nl, el };
+const LOCALES: Record<string, Locale> = { en: enGB, fr, de, es, it, pt, nl, el, th };
 
 function interpolate(s: string, vars?: Record<string, string | number>): string {
   return vars ? s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`)) : s;

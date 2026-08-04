@@ -1,7 +1,7 @@
 // Every guest language, on the server only.
 //
 // The `.server` suffix is doing real work here: this module statically imports
-// all eight dictionaries, and if the browser bundle could reach it we would be
+// all nine dictionaries, and if the browser bundle could reach it we would be
 // straight back to shipping 46 kB gzipped of languages nobody on the page reads.
 // Nothing outside a loader may import this.
 //
@@ -18,8 +18,9 @@ import fr from "./locales/fr";
 import it from "./locales/it";
 import nl from "./locales/nl";
 import pt from "./locales/pt";
+import th from "./locales/th";
 
-const ALL: Record<string, Dict> = { en, fr, de, es, it, pt, nl, el };
+const ALL: Record<string, Dict> = { en, fr, de, es, it, pt, nl, el, th };
 
 for (const [lang, dict] of Object.entries(ALL)) registerDict(lang, dict);
 
