@@ -1,13 +1,12 @@
 // The voucher as a printable/giftable PDF — same in-Worker pdf-lib approach as
-// booking-pdf.server.ts (no headless browser), same embedded Noto Sans subset
-// so names and messages in Latin/Greek/Cyrillic render properly.
+// booking-pdf.server.ts (no headless browser), same embedded Noto Sans subsets
+// so names and messages in Latin/Greek/Cyrillic/Thai render properly.
 import { PDFDocument, PDFFont, rgb, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 import { WEEKDAY_LABELS, type VoucherRecord } from "./vouchers";
 import { formatMoney } from "./money";
-import notoSansRegularB64 from "./fonts/noto-sans-regular";
-import notoSansBoldB64 from "./fonts/noto-sans-bold";
+import { embedPdfFonts, wrapText } from "./fonts/pdf-fonts";
 
 const PAGE_W = 595.28; // A4
 const PAGE_H = 841.89;
@@ -17,15 +16,6 @@ const INK = rgb(0.12, 0.12, 0.12);
 const MUTED = rgb(0.54, 0.54, 0.54);
 const LINE = rgb(0.9, 0.88, 0.85);
 
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-let fontBytes: { regular: Uint8Array; bold: Uint8Array } | null = null;
-const getFontBytes = () => (fontBytes ??= { regular: b64ToBytes(notoSansRegularB64), bold: b64ToBytes(notoSansBoldB64) });
-
 function hexToRgb(hex: string): RGB {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   if (!m) return rgb(0.75, 0.35, 0.24);
@@ -33,21 +23,6 @@ function hexToRgb(hex: string): RGB {
   return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
 }
 
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const candidate = line ? `${line} ${w}` : w;
-    if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !line) line = candidate;
-    else {
-      lines.push(line);
-      line = w;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
 
 export interface VoucherPdfInput {
   voucher: VoucherRecord;
@@ -63,9 +38,9 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
   const accent = hexToRgb(input.accent);
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  const bytes = getFontBytes();
-  const font = await doc.embedFont(bytes.regular, { subset: true });
-  const bold = await doc.embedFont(bytes.bold, { subset: true });
+  // The whole payload is the sample: it's what decides whether the Thai family
+  // is embedded at all, and every string drawn below comes out of it.
+  const { regular: font, bold, fontFor } = await embedPdfFonts(doc, JSON.stringify(input));
   doc.setTitle(`${hotelName} voucher ${v.code}`);
 
   const page = doc.addPage([PAGE_W, PAGE_H]);
@@ -73,7 +48,7 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
   let y = PAGE_H;
 
   const text = (s: string, opts: { size?: number; font?: PDFFont; color?: RGB; x?: number; center?: boolean } = {}) => {
-    const f = opts.font ?? font;
+    const f = fontFor(s, opts.font ?? font);
     const size = opts.size ?? 11;
     const x = opts.center ? (PAGE_W - f.widthOfTextAtSize(s, size)) / 2 : (opts.x ?? MARGIN);
     page.drawText(s, { x, y, size, font: f, color: opts.color ?? INK });
@@ -100,7 +75,10 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
     text(`For ${v.gift.recipientName}, from ${v.buyer.name}`, { size: 11.5, color: MUTED, center: true });
     if (v.gift.message) {
       y -= 18;
-      for (const line of wrap(`“${v.gift.message}”`, font, 11.5, PAGE_W - MARGIN * 2 - 60)) {
+      // Wrap with the same font the lines will be drawn in, or the measured
+      // widths won't match the glyphs.
+      const quoted = `“${v.gift.message}”`;
+      for (const line of wrapText(quoted, fontFor(quoted, font), 11.5, PAGE_W - MARGIN * 2 - 60)) {
         text(line, { size: 11.5, center: true });
         y -= 15;
       }
@@ -165,7 +143,7 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
   text(`Valid until ${v.expiresAt.slice(0, 10)}`, { size: 10.5, font: bold, center: true });
   if (v.product.terms) {
     y -= 20;
-    for (const line of wrap(v.product.terms, font, 9, PAGE_W - MARGIN * 2)) {
+    for (const line of wrapText(v.product.terms, fontFor(v.product.terms, font), 9, PAGE_W - MARGIN * 2)) {
       text(line, { size: 9, color: MUTED, center: true });
       y -= 12;
     }
@@ -173,7 +151,8 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
 
   // Footer.
   page.drawLine({ start: { x: MARGIN, y: MARGIN + 16 }, end: { x: PAGE_W - MARGIN, y: MARGIN + 16 }, thickness: 0.7, color: LINE });
-  page.drawText(hotelName, { x: MARGIN, y: MARGIN, size: 8.5, font, color: MUTED });
+  const footerFont = fontFor(hotelName, font);
+  page.drawText(hotelName, { x: MARGIN, y: MARGIN, size: 8.5, font: footerFont, color: MUTED });
   const ref = `Voucher ${v.code} · purchased ${v.purchasedAt.slice(0, 10)}`;
   page.drawText(ref, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(ref, 8.5), y: MARGIN, size: 8.5, font, color: MUTED });
 

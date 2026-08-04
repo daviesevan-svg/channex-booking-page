@@ -426,6 +426,7 @@ export const LANGUAGES = [
   { code: "pt", label: "Português", flag: "🇵🇹" },
   { code: "nl", label: "Nederlands", flag: "🇳🇱" },
   { code: "el", label: "Ελληνικά", flag: "🇬🇷" },
+  { code: "th", label: "ไทย", flag: "🇹🇭" },
 ] as const;
 
 export const DEFAULT_LANG = "en";
@@ -568,6 +569,18 @@ const SEARCH_TRANSLATIONS: Record<string, SearchDefaults> = {
       { title: "Geen boekingskosten", description: "De prijs die u ziet, is de prijs die u betaalt." },
     ],
   },
+  th: {
+    heading: "จองการเข้าพักของคุณ",
+    intro:
+      "จองตรงกับเราเพื่อรับราคาที่ดีที่สุด ยกเลิกฟรีสำหรับการจองแบบยืดหยุ่น และไม่มีค่าธรรมเนียมการจองทุกครั้ง",
+    promoText: "ใส่รหัสส่วนลดหรือรหัสองค์กร",
+    searchButton: "ค้นหาห้องพัก",
+    highlights: [
+      { title: "ยกเลิกฟรี", description: "สำหรับราคาแบบยืดหยุ่นทุกรายการ จนถึง 24 ชั่วโมงก่อนวันเข้าพัก" },
+      { title: "การันตีราคาดีที่สุด", description: "เจอราคาถูกกว่าที่อื่น? เราจะปรับให้เท่ากัน" },
+      { title: "ไม่มีค่าธรรมเนียมการจอง", description: "ราคาที่คุณเห็นคือราคาที่คุณจ่าย" },
+    ],
+  },
 };
 
 export function searchDefaults(lang: string): SearchDefaults {
@@ -582,6 +595,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { heading: "Scegli le tue camere", editSearch: "Modifica ricerca", cartTitle: "Il tuo soggiorno", continueButton: "Continua ai dettagli" },
     pt: { heading: "Escolha os seus quartos", editSearch: "Editar pesquisa", cartTitle: "A sua estadia", continueButton: "Continuar para os detalhes" },
     nl: { heading: "Kies uw kamers", editSearch: "Zoekopdracht wijzigen", cartTitle: "Uw verblijf", continueButton: "Doorgaan naar gegevens" },
+    th: { heading: "เลือกห้องพักของคุณ", editSearch: "แก้ไขการค้นหา", cartTitle: "การเข้าพักของคุณ", continueButton: "ไปกรอกข้อมูล" },
   },
   detail: {
     fr: { backLink: "Toutes les chambres", amenitiesTitle: "Dans cette chambre", rateTitle: "Choisissez votre tarif", addButton: "Ajouter à votre séjour" },
@@ -590,6 +604,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { backLink: "Tutte le camere", amenitiesTitle: "In questa camera", rateTitle: "Scegli la tua tariffa", addButton: "Aggiungi al soggiorno" },
     pt: { backLink: "Todos os quartos", amenitiesTitle: "Neste quarto", rateTitle: "Escolha a sua tarifa", addButton: "Adicionar à estadia" },
     nl: { backLink: "Alle kamers", amenitiesTitle: "In deze kamer", rateTitle: "Kies uw tarief", addButton: "Toevoegen aan verblijf" },
+    th: { backLink: "ห้องพักทั้งหมด", amenitiesTitle: "ในห้องนี้", rateTitle: "เลือกแพ็กเกจราคาของคุณ", addButton: "เพิ่มในการเข้าพักของคุณ" },
   },
   checkout: {
     fr: { heading: "Vos coordonnées", guestSection: "Informations du client", arrivalSection: "Arrivée et demandes", paymentSection: "Paiement", paymentNote: "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.", completeButton: "Finaliser la réservation" },
@@ -598,6 +613,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { heading: "I tuoi dati", guestSection: "Informazioni dell'ospite", arrivalSection: "Arrivo e richieste", paymentSection: "Pagamento", paymentNote: "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.", completeButton: "Completa la prenotazione" },
     pt: { heading: "Os seus dados", guestSection: "Informações do hóspede", arrivalSection: "Chegada e pedidos", paymentSection: "Pagamento", paymentNote: "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.", completeButton: "Concluir reserva" },
     nl: { heading: "Uw gegevens", guestSection: "Gastinformatie", arrivalSection: "Aankomst & verzoeken", paymentSection: "Betaling", paymentNote: "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.", completeButton: "Boeking voltooien" },
+    th: { heading: "ข้อมูลของคุณ", guestSection: "ข้อมูลผู้เข้าพัก", arrivalSection: "การเดินทางถึงและคำขอเพิ่มเติม", paymentSection: "การชำระเงิน", paymentNote: "ราคาแบบยืดหยุ่นของคุณชำระที่โรงแรม เราขอเพียงบัตรเพื่อรับประกันการจอง — วันนี้ยังไม่มีการเรียกเก็บเงิน", completeButton: "ยืนยันการจอง" },
   },
   extras: {
     fr: { heading: "Améliorez votre {room}", intro: "Des extras facultatifs pour rendre votre séjour spécial.", stayTitle: "Pour tout votre séjour", summaryLabel: "Extras", continueButton: "Continuer", skipButton: "Passer pour l’instant" },
@@ -606,6 +622,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { heading: "Arricchisci la tua {room}", intro: "Extra facoltativi per rendere speciale il tuo soggiorno.", stayTitle: "Per tutto il tuo soggiorno", summaryLabel: "Extra", continueButton: "Continua", skipButton: "Salta per ora" },
     pt: { heading: "Melhore o seu {room}", intro: "Extras opcionais para tornar a sua estadia especial.", stayTitle: "Para toda a sua estadia", summaryLabel: "Extras", continueButton: "Continuar", skipButton: "Ignorar por agora" },
     nl: { heading: "Maak je {room} compleet", intro: "Optionele extra’s om je verblijf bijzonder te maken.", stayTitle: "Voor je hele verblijf", summaryLabel: "Extra’s", continueButton: "Doorgaan", skipButton: "Nu overslaan" },
+    th: { heading: "เพิ่มความพิเศษให้ {room}", intro: "บริการเสริมที่เลือกได้ เพื่อให้การเข้าพักของคุณพิเศษยิ่งขึ้น", stayTitle: "สำหรับการเข้าพักทั้งหมด", summaryLabel: "บริการเสริม", continueButton: "ดำเนินการต่อ", skipButton: "ข้ามไปก่อน" },
   },
   confirmation: {
     fr: { heading: "Tout est confirmé", subtitle: "Votre séjour à {hotel} est confirmé. Un e-mail de confirmation est en route.", newBooking: "Faire une autre réservation" },
@@ -614,6 +631,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     it: { heading: "Tutto pronto", subtitle: "Il tuo soggiorno presso {hotel} è confermato. Un'e-mail di conferma è in arrivo.", newBooking: "Effettua un'altra prenotazione" },
     pt: { heading: "Está tudo pronto", subtitle: "A sua estadia no {hotel} está confirmada. Um e-mail de confirmação está a caminho.", newBooking: "Fazer outra reserva" },
     nl: { heading: "Helemaal geregeld", subtitle: "Uw verblijf in {hotel} is bevestigd. Een bevestigingsmail is onderweg.", newBooking: "Nog een boeking maken" },
+    th: { heading: "เรียบร้อยแล้ว", subtitle: "การเข้าพักของคุณที่ {hotel} ได้รับการยืนยันแล้ว อีเมลยืนยันกำลังส่งถึงคุณ", newBooking: "จองอีกครั้ง" },
   },
 };
 
