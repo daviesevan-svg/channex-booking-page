@@ -2,17 +2,17 @@
 // manually when the guest didn't receive the confirmation email. Generated
 // with pdf-lib (pure JS, no headless browser in a Worker) and mirrors the
 // email's details block: stay dates, rooms, extras, taxes & fees, totals,
-// cancellation line. Text uses an embedded Noto Sans subset (Latin + Greek +
-// Cyrillic), so guest names like "Νίκος" or "Дмитрий" render properly —
-// pdf-lib's standard fonts are WinAnsi-only.
+// cancellation line. Text uses embedded Noto Sans subsets (Latin + Greek +
+// Cyrillic, plus Noto Sans Thai for Thai), so guest names like "Νίκος",
+// "Дмитрий" or "สมชาย" render properly — pdf-lib's standard fonts are
+// WinAnsi-only. Font selection per string lives in fonts/pdf-fonts.ts.
 import { PDFDocument, PDFFont, PDFPage, rgb, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
 import { formatMoney } from "./money";
-import notoSansRegularB64 from "./fonts/noto-sans-regular";
-import notoSansBoldB64 from "./fonts/noto-sans-bold";
+import { embedPdfFonts, wrapText } from "./fonts/pdf-fonts";
 
 const PAGE_W = 595.28; // A4
 const PAGE_H = 841.89;
@@ -22,20 +22,6 @@ const CONTENT_W = PAGE_W - MARGIN * 2;
 const INK = rgb(0.12, 0.12, 0.12);
 const MUTED = rgb(0.54, 0.54, 0.54);
 const LINE = rgb(0.9, 0.88, 0.85);
-
-// The subsetted Noto Sans TTFs, base64-inlined (~119 KB each). Decoded once
-// per isolate and reused across renders.
-function b64ToBytes(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-let fontBytes: { regular: Uint8Array; bold: Uint8Array } | null = null;
-function getFontBytes() {
-  fontBytes ??= { regular: b64ToBytes(notoSansRegularB64), bold: b64ToBytes(notoSansBoldB64) };
-  return fontBytes;
-}
 
 function hexToRgb(hex: string): RGB {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
@@ -59,23 +45,6 @@ const fmtDateTime = (iso: string) => {
   }
 };
 
-/** Greedy word-wrap for a proportional font. */
-function wrap(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let line = "";
-  for (const w of words) {
-    const candidate = line ? `${line} ${w}` : w;
-    if (font.widthOfTextAtSize(candidate, size) <= maxWidth || !line) line = candidate;
-    else {
-      lines.push(line);
-      line = w;
-    }
-  }
-  if (line) lines.push(line);
-  return lines;
-}
-
 export interface BookingPdfInput {
   booking: BookingRecord;
   hotelName: string;
@@ -90,11 +59,9 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
   const accent = hexToRgb(input.accent);
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
-  // subset: true → only the glyphs actually used are embedded in the PDF, so
-  // the download stays small despite the full LGC coverage in the source font.
-  const bytes = getFontBytes();
-  const font = await doc.embedFont(bytes.regular, { subset: true });
-  const bold = await doc.embedFont(bytes.bold, { subset: true });
+  // The whole payload is the sample: it's what decides whether the Thai family
+  // is embedded at all, and every string drawn below comes out of it.
+  const { regular: font, bold, fontFor } = await embedPdfFonts(doc, JSON.stringify(input));
   doc.setTitle(`Booking confirmation ${b.reference}`);
 
   let page = doc.addPage([PAGE_W, PAGE_H]);
@@ -113,7 +80,7 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     s: string,
     opts: { x?: number; size?: number; font?: PDFFont; color?: RGB; rightAt?: number } = {},
   ) => {
-    const f = opts.font ?? font;
+    const f = fontFor(s, opts.font ?? font);
     const size = opts.size ?? 10.5;
     const x = opts.rightAt != null ? opts.rightAt - f.widthOfTextAtSize(s, size) : (opts.x ?? MARGIN);
     page.drawText(s, { x, y, size, font: f, color: opts.color ?? INK });
@@ -228,7 +195,9 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     y -= 6;
     text("Special requests", { size: 9.5, font: bold, color: MUTED });
     y -= 14;
-    for (const line of wrap(b.guest.requests, font, 9.5, CONTENT_W)) {
+    // Wrap with the same font the lines will be drawn in, or the measured
+    // widths won't match the glyphs.
+    for (const line of wrapText(b.guest.requests, fontFor(b.guest.requests, font), 9.5, CONTENT_W)) {
       ensure(13);
       text(line, { size: 9.5 });
       y -= 13;
@@ -243,7 +212,7 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     thickness: 0.7,
     color: LINE,
   });
-  page.drawText(footer, { x: MARGIN, y: MARGIN, size: 8.5, font, color: MUTED });
+  page.drawText(footer, { x: MARGIN, y: MARGIN, size: 8.5, font: fontFor(footer, font), color: MUTED });
 
   return doc.save();
 }
