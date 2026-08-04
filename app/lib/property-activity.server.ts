@@ -6,14 +6,12 @@
 // covers the whole page.
 import { ensureSchema, getLastAriReceivedAt } from "./ari.server";
 import { getDB } from "./config.server";
+import { chunkForBinds, placeholders } from "./d1-limits";
 import { openPercent, type PropertyActivity } from "./property-activity";
 
 /** How far ahead we measure. `pruneAri` keeps 730 days of future ARI, so a
  *  365-day window is always fully covered by stored data. */
 export const ACTIVITY_WINDOW_DAYS = 365;
-
-/** SQLite caps bound variables per statement (~999); stay well under it. */
-const CHUNK = 100;
 
 const iso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 
@@ -29,14 +27,14 @@ async function openDaysFor(ids: string[], from: string, to: string): Promise<Map
   const d = getDB();
   if (!d || ids.length === 0) return out;
 
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const batch = ids.slice(i, i + CHUNK);
-    const holes = batch.map(() => "?").join(",");
+  // `reserved: 2` for the two date bounds — a flat chunk of 100 ids plus those
+  // would be 102 parameters, two over what D1 accepts.
+  for (const batch of chunkForBinds(ids, 2)) {
     const rows = await d
       .prepare(
         `SELECT hotel_code, COUNT(DISTINCT date) AS open_days
            FROM availability
-          WHERE hotel_code IN (${holes}) AND date >= ? AND date <= ? AND avail > 0
+          WHERE hotel_code IN (${placeholders(batch.length)}) AND date >= ? AND date <= ? AND avail > 0
           GROUP BY hotel_code`,
       )
       .bind(...batch, from, to)
@@ -53,12 +51,11 @@ async function seenIds(ids: string[]): Promise<Set<string>> {
   const d = getDB();
   if (!d || ids.length === 0) return seen;
 
-  for (let i = 0; i < ids.length; i += CHUNK) {
-    const batch = ids.slice(i, i + CHUNK);
-    const holes = batch.map(() => "?").join(",");
+  // Nothing else is bound here, so the ids get the whole budget.
+  for (const batch of chunkForBinds(ids)) {
     for (const table of ["availability", "rate"] as const) {
       const rows = await d
-        .prepare(`SELECT DISTINCT hotel_code FROM ${table} WHERE hotel_code IN (${holes})`)
+        .prepare(`SELECT DISTINCT hotel_code FROM ${table} WHERE hotel_code IN (${placeholders(batch.length)})`)
         .bind(...batch)
         .all<{ hotel_code: string }>();
       for (const r of rows.results ?? []) seen.add(r.hotel_code);
