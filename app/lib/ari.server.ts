@@ -2,7 +2,7 @@
 // POST /api/changes; we upsert them into D1 and read slices on demand at search
 // time. See https://docs.channex.io/for-ota/open-channel-api.
 import { getConfig, getConfigKV, getDB } from "./config.server";
-import { chunkForBinds, placeholders } from "./d1-limits";
+import { chunkForBinds, chunkRows, placeholders, valuesTuples } from "./d1-limits";
 import { timingSafeEqual } from "./hmac.server";
 
 function db(): D1Database {
@@ -170,19 +170,67 @@ function diffInventory(
   return entries;
 }
 
+// ---- Multi-row writes ----------------------------------------------------
+//
+// Every ARI write is many rows of the same shape, which used to mean one bound
+// statement per row: a 730-day availability push issued 730 statements, batched
+// 100 at a time, so 8 sequential round trips just to store one number per day.
+//
+// The rows go in one statement each instead, as many as the 100-parameter cap
+// allows — 25 for availability at 4 parameters a row, 12 for rate, 10 for
+// restriction, 9 for the log. Same rows in the same order, so an upsert that
+// repeats a key still resolves last-wins exactly as the statement sequence did
+// (measured, see valuesTuples).
+
+interface RowWrite {
+  /** Parameters per row — sets how many rows fit one statement. */
+  cols: number;
+  /** Full SQL, given the `(?,?),(?,?)` fragment. */
+  sql: (values: string) => string;
+}
+
+const AVAIL_UPSERT: RowWrite = {
+  cols: 4,
+  sql: (v) => `INSERT INTO availability (hotel_code,room_type_id,date,avail) VALUES ${v}
+     ON CONFLICT(hotel_code,room_type_id,date) DO UPDATE SET avail=excluded.avail`,
+};
+
+const RATE_UPSERT: RowWrite = {
+  cols: 8,
+  sql: (v) => `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
+     VALUES ${v}
+     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date,occupancy)
+     DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency,fraction_size=excluded.fraction_size`,
+};
+
+const RESTR_UPSERT: RowWrite = {
+  cols: 10,
+  sql: (v) => `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,closed_to_arrival,closed_to_departure,min_stay_arrival,min_stay_through,max_stay)
+     VALUES ${v}
+     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
+     DO UPDATE SET stop_sell=excluded.stop_sell,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure,min_stay_arrival=excluded.min_stay_arrival,min_stay_through=excluded.min_stay_through,max_stay=excluded.max_stay`,
+};
+
+const LOG_INSERT: RowWrite = {
+  cols: 11,
+  sql: (v) => `INSERT INTO ari_log (hotel_code,ts,source,actor,kind,room_type_id,rate_plan_id,date,field,old_value,new_value) VALUES ${v}`,
+};
+
+/** Pack parameter tuples into as few statements as the cap allows. */
+function packUpserts(D: D1Database, w: RowWrite, rows: unknown[][]): D1PreparedStatement[] {
+  return chunkRows(rows, w.cols).map((chunk) => D.prepare(w.sql(valuesTuples(chunk.length, w.cols))).bind(...chunk.flat()));
+}
+
 /** Insert change entries into the audit log (best-effort — never fail a write
  *  because logging hiccuped). `now` is passed so a whole batch shares a ts. */
 async function insertAriLog(hotelCode: string, actor: AriActor, entries: AriLogEntry[], now: number): Promise<void> {
   if (!entries.length) return;
   try {
     const D = db();
-    const stmt = D.prepare(
-      `INSERT INTO ari_log (hotel_code,ts,source,actor,kind,room_type_id,rate_plan_id,date,field,old_value,new_value)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-    );
-    const stmts = entries.map((e) =>
-      stmt.bind(hotelCode, now, actor.source, actor.actor, e.kind, e.roomTypeId, e.ratePlanId, e.date, e.field, e.oldValue, e.newValue),
-    );
+    const rows = entries.map((e) => [
+      hotelCode, now, actor.source, actor.actor, e.kind, e.roomTypeId, e.ratePlanId, e.date, e.field, e.oldValue, e.newValue,
+    ]);
+    const stmts = packUpserts(D, LOG_INSERT, rows);
     for (let i = 0; i < stmts.length; i += 100) await D.batch(stmts.slice(i, i + 100));
   } catch (e) {
     console.log(`[ari-log] insert failed: ${e instanceof Error ? e.message : e}`);
@@ -350,7 +398,6 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   const notifications = (body as { data?: unknown })?.data;
   if (!Array.isArray(notifications)) throw new Error("Expected { data: [...] }");
 
-  const stmts: D1PreparedStatement[] = [];
   const counts = { availability: 0, rates: 0, restrictions: 0 };
   const hotels = new Set<string>();
   // Per-hotel affected DATES, so we can snapshot/diff for the audit log. A set
@@ -368,22 +415,14 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   };
   const D = db();
 
-  const availStmt = D.prepare(
-    `INSERT INTO availability (hotel_code,room_type_id,date,avail) VALUES (?,?,?,?)
-     ON CONFLICT(hotel_code,room_type_id,date) DO UPDATE SET avail=excluded.avail`,
-  );
-  const rateStmt = D.prepare(
-    `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
-     VALUES (?,?,?,?,?,?,?,?)
-     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date,occupancy)
-     DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency,fraction_size=excluded.fraction_size`,
-  );
-  const restrStmt = D.prepare(
-    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,closed_to_arrival,closed_to_departure,min_stay_arrival,min_stay_through,max_stay)
-     VALUES (?,?,?,?,?,?,?,?,?,?)
-     ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
-     DO UPDATE SET stop_sell=excluded.stop_sell,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure,min_stay_arrival=excluded.min_stay_arrival,min_stay_through=excluded.min_stay_through,max_stay=excluded.max_stay`,
-  );
+  // Rows are collected as parameter tuples and packed into multi-row INSERTs at
+  // the end, rather than bound one statement per cell. A 730-day availability
+  // push is 730 cells: as single-row statements that is 8 batched round trips,
+  // as 25-row statements (4 parameters each, so 25 fits the 100-parameter cap)
+  // it is 30 statements in one. Same rows, same order, same upsert.
+  const availRows: unknown[][] = [];
+  const rateRows: unknown[][] = [];
+  const restrRows: unknown[][] = [];
 
   for (const note of notifications) {
     const attrs = (note as { attributes?: ChangeAttrs }).attributes ?? {};
@@ -401,30 +440,32 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
       if (type === "availability_changes") {
         const avail = Number(a.availability) || 0;
         for (const d of dates) {
-          stmts.push(availStmt.bind(hotel, room, d, avail));
+          availRows.push([hotel, room, d, avail]);
           counts.availability++;
         }
       } else if (type === "restriction_changes") {
         const rates = (Array.isArray(a.rates) ? a.rates : []) as RateIn[];
         for (const d of dates) {
           for (const r of rates) {
-            stmts.push(
-              rateStmt.bind(hotel, room, plan, d, Number(r.occupancy) || 0, toMinor(r.rate, r.fraction_size ?? 2), r.currency, r.fraction_size ?? 2),
-            );
+            rateRows.push([hotel, room, plan, d, Number(r.occupancy) || 0, toMinor(r.rate, r.fraction_size ?? 2), r.currency, r.fraction_size ?? 2]);
             counts.rates++;
           }
-          stmts.push(
-            restrStmt.bind(
-              hotel, room, plan, d,
-              bit(a.stop_sell), bit(a.closed_to_arrival), bit(a.closed_to_departure),
-              Number(a.min_stay_arrival) || 0, Number(a.min_stay_through) || 0, Number(a.max_stay) || 0,
-            ),
-          );
+          restrRows.push([
+            hotel, room, plan, d,
+            bit(a.stop_sell), bit(a.closed_to_arrival), bit(a.closed_to_departure),
+            Number(a.min_stay_arrival) || 0, Number(a.min_stay_through) || 0, Number(a.max_stay) || 0,
+          ]);
           counts.restrictions++;
         }
       }
     }
   }
+
+  const stmts = [
+    ...packUpserts(D, AVAIL_UPSERT, availRows),
+    ...packUpserts(D, RATE_UPSERT, rateRows),
+    ...packUpserts(D, RESTR_UPSERT, restrRows),
+  ];
 
   // Snapshot the affected windows before applying, so we can log what actually
   // changed (Channex re-sends unchanged values; diffInventory drops those).
@@ -603,7 +644,7 @@ export interface InventoryData {
 
 /** Read the ARI for a [from, to] inclusive window, as lookup maps. */
 export async function getInventory(hotelCode: string, from: string, to: string): Promise<InventoryData> {
-  return readInventory(hotelCode, "date>=? AND date<=?", [from, to]);
+  return readInventory(hotelCode, [{ where: "date>=? AND date<=?", binds: [from, to] }]);
 }
 
 /** Read the ARI for exactly these dates — the sparse counterpart to getInventory.
@@ -628,56 +669,80 @@ export async function getInventoryOn(hotelCode: string, dates: Iterable<string>)
   // one notification is ordinary, so this was a live push failure, not a corner.
   //
   // Chunks are disjoint by date and every key in InventoryData contains the
-  // date, so merging them cannot collide, and the per-key occupancy preference
-  // in readInventory stays within one chunk where it belongs.
+  // date, so nothing can collide when their rows are folded together.
   //
-  // Sequential rather than parallel: a 730-day push is 8 chunks of 3 queries,
-  // and D1 answers "too many requests queued" to a wide enough fan-out. Eight
-  // round trips on a background push is the cheaper thing to spend.
-  const merged: InventoryData = { availability: {}, prices: {}, restrictions: {} };
-  for (const chunk of chunkForBinds(uniq, 1)) {
-    const part = await readInventory(hotelCode, `date IN (${placeholders(chunk.length)})`, chunk);
-    Object.assign(merged.availability, part.availability);
-    Object.assign(merged.prices, part.prices);
-    Object.assign(merged.restrictions, part.restrictions);
-  }
-  return merged;
+  // All the chunks go to D1 in ONE batch. The parameter cap is per STATEMENT,
+  // not per batch — the insert path has always sent 100 statements of 11
+  // parameters in a batch — so chunking costs statements, not round trips. The
+  // first version of this awaited each chunk in turn, which turned a 730-day
+  // push into 8 sequential round trips for the before snapshot and 8 more for
+  // the after, and that showed up as pushes being visibly slow to process.
+  return readInventory(
+    hotelCode,
+    chunkForBinds(uniq, 1).map((chunk) => ({ where: `date IN (${placeholders(chunk.length)})`, binds: chunk })),
+  );
 }
 
-/** Shared body of the two readers above. `dateWhere` is built from fixed literals
- *  and placeholders only — never from caller text — and every value is bound. */
-async function readInventory(hotelCode: string, dateWhere: string, dateBinds: string[]): Promise<InventoryData> {
+/** One date predicate and its bound values. Each `where` is built from fixed
+ *  literals and placeholders only — never from caller text. */
+interface DatePart {
+  where: string;
+  binds: string[];
+}
+
+type AvailRow = { room_type_id: string; date: string; avail: number };
+type RateRow = { room_type_id: string; rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number };
+type RestrRow = {
+  room_type_id: string;
+  rate_plan_id: string;
+  date: string;
+  stop_sell: number;
+  min_stay_arrival: number;
+  closed_to_arrival: number;
+  closed_to_departure: number;
+};
+
+/** Shared body of the two readers above. Every part's three table reads go in a
+ *  single `batch()`, so the cost is one round trip regardless of how many parts
+ *  the date list had to be split into. */
+async function readInventory(hotelCode: string, parts: DatePart[]): Promise<InventoryData> {
   await ensureSchema();
   const D = db();
-  const [av, rt, rs] = await Promise.all([
-    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND ${dateWhere}`)
-      .bind(hotelCode, ...dateBinds)
-      .all<{ room_type_id: string; date: string; avail: number }>(),
-    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND ${dateWhere}`)
-      .bind(hotelCode, ...dateBinds)
-      .all<{ room_type_id: string; rate_plan_id: string; date: string; occupancy: number; price_minor: number; fraction_size: number }>(),
+  if (parts.length === 0) return { availability: {}, prices: {}, restrictions: {} };
+
+  const stmts = parts.flatMap((p) => [
+    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND ${p.where}`).bind(hotelCode, ...p.binds),
+    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND ${p.where}`).bind(
+      hotelCode,
+      ...p.binds,
+    ),
     D.prepare(
       `SELECT room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
-       FROM restriction WHERE hotel_code=? AND ${dateWhere}`,
-    )
-      .bind(hotelCode, ...dateBinds)
-      .all<{
-        room_type_id: string;
-        rate_plan_id: string;
-        date: string;
-        stop_sell: number;
-        min_stay_arrival: number;
-        closed_to_arrival: number;
-        closed_to_departure: number;
-      }>(),
+       FROM restriction WHERE hotel_code=? AND ${p.where}`,
+    ).bind(hotelCode, ...p.binds),
   ]);
 
+  const res = await D.batch(stmts);
+
+  // Results come back in the order the statements went out: three per part.
+  const av: AvailRow[] = [];
+  const rt: RateRow[] = [];
+  const rs: RestrRow[] = [];
+  for (let i = 0; i < res.length; i += 3) {
+    av.push(...((res[i]?.results ?? []) as AvailRow[]));
+    rt.push(...((res[i + 1]?.results ?? []) as RateRow[]));
+    rs.push(...((res[i + 2]?.results ?? []) as RestrRow[]));
+  }
+
   const data: InventoryData = { availability: {}, prices: {}, restrictions: {} };
-  for (const r of av.results ?? []) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
+  for (const r of av) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
   // A rate may have several occupancy rows (per_person pushes from Channex);
-  // prefer the manual occupancy=0 price, else the highest occupancy (the full rate).
+  // prefer the manual occupancy=0 price, else the highest occupancy (the full
+  // rate). Folding every part through one map is the same answer as folding each
+  // separately, because the key carries the date and the parts are disjoint by
+  // date — two parts can never offer a price for the same key.
   const priceOcc: Record<string, number> = {};
-  for (const r of rt.results ?? []) {
+  for (const r of rt) {
     const key = `${r.room_type_id}|${r.rate_plan_id}|${r.date}`;
     const price = r.price_minor / 10 ** (r.fraction_size || 2);
     const prevOcc = priceOcc[key];
@@ -686,7 +751,7 @@ async function readInventory(hotelCode: string, dateWhere: string, dateBinds: st
       priceOcc[key] = r.occupancy;
     }
   }
-  for (const r of rs.results ?? [])
+  for (const r of rs)
     data.restrictions[`${r.room_type_id}|${r.rate_plan_id}|${r.date}`] = {
       stopSell: Boolean(r.stop_sell),
       minStay: r.min_stay_arrival || 0,
