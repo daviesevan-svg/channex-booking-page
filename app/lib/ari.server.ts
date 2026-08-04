@@ -2,6 +2,7 @@
 // POST /api/changes; we upsert them into D1 and read slices on demand at search
 // time. See https://docs.channex.io/for-ota/open-channel-api.
 import { getConfig, getConfigKV, getDB } from "./config.server";
+import { chunkForBinds, placeholders } from "./d1-limits";
 import { timingSafeEqual } from "./hmac.server";
 
 function db(): D1Database {
@@ -247,23 +248,51 @@ export async function queryAriLog(hotelCode: string, filter: AriLogFilter = {}):
     where.push("room_type_id = ?");
     binds.push(filter.roomTypeId);
   }
-  if (filter.ratePlanIds?.length) {
-    where.push(`rate_plan_id IN (${filter.ratePlanIds.map(() => "?").join(",")})`);
-    binds.push(...filter.ratePlanIds);
-  }
   const limit = Math.min(1000, Math.max(1, filter.limit ?? 200));
-  const res = await db()
-    .prepare(
-      `SELECT id, ts, source, actor, kind, room_type_id, rate_plan_id, date, field, old_value, new_value
-       FROM ari_log WHERE ${where.join(" AND ")} ORDER BY ts DESC, id DESC LIMIT ?`,
-    )
-    .bind(...binds, limit)
-    .all<{
-      id: number; ts: number; source: string; actor: string; kind: string;
-      room_type_id: string; rate_plan_id: string | null; date: string; field: string;
-      old_value: string | null; new_value: string | null;
-    }>();
-  return (res.results ?? []).map((r) => ({
+
+  type LogRecord = {
+    id: number; ts: number; source: string; actor: string; kind: string;
+    room_type_id: string; rate_plan_id: string | null; date: string; field: string;
+    old_value: string | null; new_value: string | null;
+  };
+
+  const run = async (idChunk: string[] | null): Promise<LogRecord[]> => {
+    const clauses = [...where];
+    const b = [...binds];
+    if (idChunk) {
+      clauses.push(`rate_plan_id IN (${placeholders(idChunk.length)})`);
+      b.push(...idChunk);
+    }
+    const res = await db()
+      .prepare(
+        `SELECT id, ts, source, actor, kind, room_type_id, rate_plan_id, date, field, old_value, new_value
+         FROM ari_log WHERE ${clauses.join(" AND ")} ORDER BY ts DESC, id DESC LIMIT ?`,
+      )
+      .bind(...b, limit)
+      .all<LogRecord>();
+    return res.results ?? [];
+  };
+
+  // One rate maps to a Channex id per room, so this list grows with the room
+  // count and can pass what D1 will bind (100 parameters, of which the WHERE
+  // above and the LIMIT have already taken some). Chunking is exact here rather
+  // than approximate: each chunk is asked for the same newest-`limit` rows, and
+  // any row in the true newest-`limit` of the whole set is necessarily in the
+  // newest-`limit` of its own chunk, so re-sorting the union and cutting to
+  // `limit` gives the same answer one big query would have.
+  let rows: LogRecord[];
+  if (!filter.ratePlanIds?.length) {
+    rows = await run(null);
+  } else {
+    const chunks = chunkForBinds(filter.ratePlanIds, binds.length + 1);
+    rows = (await Promise.all(chunks.map(run))).flat();
+    if (chunks.length > 1) {
+      rows.sort((a, z) => z.ts - a.ts || z.id - a.id);
+      rows = rows.slice(0, limit);
+    }
+  }
+
+  return rows.map((r) => ({
     id: r.id,
     ts: r.ts,
     source: r.source,
@@ -590,13 +619,29 @@ export async function getInventory(hotelCode: string, from: string, to: string):
 export async function getInventoryOn(hotelCode: string, dates: Iterable<string>): Promise<InventoryData> {
   const uniq = [...new Set(dates)].sort();
   if (uniq.length === 0) return { availability: {}, prices: {}, restrictions: {} };
-  // SQLite caps bound variables per statement (~999) and hotel_code takes one of
-  // them. Past that a range read is cheaper than chunking, and it stays correct
-  // because the diff is filtered to the touched dates either way — extra rows
-  // read can no longer reach the log. In practice this is unreachable: the ARI
-  // horizon is 730 days and past dates are pruned.
-  if (uniq.length > 500) return getInventory(hotelCode, uniq[0], uniq[uniq.length - 1]);
-  return readInventory(hotelCode, `date IN (${uniq.map(() => "?").join(",")})`, uniq);
+
+  // Chunked because D1 allows only 100 bound parameters per query, hotel_code
+  // taking one of them — NOT SQLite's ~999, which an earlier guard at 500 dates
+  // was written against. That guard never tripped, so a push touching 100 or
+  // more dates failed outright with "too many SQL variables at offset 281"
+  // (offset 281 being exactly the 100th date placeholder). A year of dates in
+  // one notification is ordinary, so this was a live push failure, not a corner.
+  //
+  // Chunks are disjoint by date and every key in InventoryData contains the
+  // date, so merging them cannot collide, and the per-key occupancy preference
+  // in readInventory stays within one chunk where it belongs.
+  //
+  // Sequential rather than parallel: a 730-day push is 8 chunks of 3 queries,
+  // and D1 answers "too many requests queued" to a wide enough fan-out. Eight
+  // round trips on a background push is the cheaper thing to spend.
+  const merged: InventoryData = { availability: {}, prices: {}, restrictions: {} };
+  for (const chunk of chunkForBinds(uniq, 1)) {
+    const part = await readInventory(hotelCode, `date IN (${placeholders(chunk.length)})`, chunk);
+    Object.assign(merged.availability, part.availability);
+    Object.assign(merged.prices, part.prices);
+    Object.assign(merged.restrictions, part.restrictions);
+  }
+  return merged;
 }
 
 /** Shared body of the two readers above. `dateWhere` is built from fixed literals
