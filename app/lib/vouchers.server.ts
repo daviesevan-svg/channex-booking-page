@@ -12,6 +12,7 @@
 import { getConfigKV, getDB } from "./config.server";
 import { clientKey, overLimit, rateLimit } from "./rate-limit.server";
 import { createRefund } from "./stripe.server";
+import { fromStripeMinor } from "./money";
 import {
   displayStatus,
   giftBalance,
@@ -344,7 +345,10 @@ export async function refundVoucherCharge(
   if (p.refund) return { ok: false, reason: "already_refunded" };
   try {
     const refund = await createRefund(p.accountId, p.paymentIntentId, undefined, `refund_v_${v.code}`);
-    const amount = (refund.amount ?? Math.round((p.amount ?? v.product.price) * 100)) / 100;
+    const refundCurrency = refund.currency?.toUpperCase() || p.currency || "";
+    // Stripe reports the refund in minor units; the fallback is already major.
+    const amount =
+      refund.amount != null ? fromStripeMinor(refund.amount, refundCurrency) : (p.amount ?? v.product.price);
     await casMutate(pid, v.code, (cur) =>
       cur.payment && !cur.payment.refund
         ? {

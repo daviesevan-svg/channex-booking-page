@@ -13,6 +13,7 @@ import {
 import { availabilityShortfall, decrementAvailability } from "./ari.server";
 import { pushOpenChannelBooking, pushOpenChannelRevision } from "./open-channel.server";
 import { getConfig } from "./config.server";
+import { fromStripeMinor, toStripeMinor } from "./money";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
@@ -34,7 +35,7 @@ export function paymentFromSession(account: string, sessionId: string, session: 
       mode: "payment",
       accountId: account,
       sessionId,
-      amount: (session.amount_total ?? 0) / 100,
+      amount: fromStripeMinor(session.amount_total ?? 0, session.currency ?? ""),
       currency: (session.currency ?? "").toUpperCase() || undefined,
       paymentIntentId: idOf(session.payment_intent),
     };
@@ -91,10 +92,13 @@ export async function finalizeBooking(
   // session mix-up let a wrong amount through — record what they actually paid
   // (below) but shout loudly so it's caught in logs/tests rather than silently.
   if (payment?.mode === "payment") {
-    const expectedMinor = Math.round((draft.consent?.dueNow ?? 0) * 100);
-    const gotMinor = Math.round((payment.amount ?? 0) * 100);
     const expCur = (draft.currency || "").toUpperCase();
     const gotCur = (payment.currency || "").toUpperCase();
+    // Compared (and logged) in Stripe's own minor units for the currency, so a
+    // zero-decimal booking reads as the ¥20000 Stripe saw, not ¥2000000.
+    const minorCur = expCur || gotCur;
+    const expectedMinor = toStripeMinor(draft.consent?.dueNow ?? 0, minorCur);
+    const gotMinor = toStripeMinor(payment.amount ?? 0, minorCur);
     if (expectedMinor !== gotMinor || (expCur && gotCur && expCur !== gotCur)) {
       console.error(
         `[finalize] CHARGE MISMATCH for ${draft.reference}: expected ${expectedMinor} ${expCur}, Stripe reported ${gotMinor} ${gotCur}`,

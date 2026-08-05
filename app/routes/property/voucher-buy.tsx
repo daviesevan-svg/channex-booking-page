@@ -12,7 +12,7 @@ import { pageMeta } from "~/lib/page-meta";
 import { Lightbox } from "~/components/lightbox";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
+import { formatMoney, toStripeMinor } from "~/lib/money";
 import { getConfig } from "~/lib/config.server";
 
 import { getOverrides, getSettings } from "~/lib/overrides.server";
@@ -167,7 +167,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const reference = generateReference();
   await stashPendingVoucher(reference, pending);
   const currency = settings.currency || "GBP";
-  const amountMinor = Math.round(product.price * 100);
+  const amountMinor = toStripeMinor(product.price, currency);
   const feeBps = config.stripePlatformFeeBps;
   const hotelName = (await getOverrides(pid)).hotelName || "Your hotel";
   let sessionUrl: string | undefined;

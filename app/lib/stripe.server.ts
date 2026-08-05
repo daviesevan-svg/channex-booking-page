@@ -204,7 +204,11 @@ export interface StripeRefund {
 }
 
 /** Refund a payment intent on a connected account. Omit `amountMinor` for a full
- *  refund. The idempotency key guards against a double-refund on retry. */
+ *  refund. The idempotency key guards against a double-refund on retry.
+ *
+ *  A partial `amountMinor` is in the currency's SMALLEST unit — derive it with
+ *  `toStripeMinor(amount, currency)`, never `amount * 100`: that would refund a
+ *  zero-decimal currency (JPY, KRW…) a hundred times over. */
 export function createRefund(
   account: string,
   paymentIntentId: string,

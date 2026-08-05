@@ -33,6 +33,7 @@ import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { rateLimit } from "~/lib/rate-limit.server";
 import { createCheckoutSession } from "~/lib/stripe.server";
+import { toStripeMinor } from "~/lib/money";
 
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
 export async function loader({ request }: Route.LoaderArgs) {
@@ -353,7 +354,7 @@ export async function action({ request }: Route.ActionArgs) {
                 quantity: 1,
                 price_data: {
                   currency: currency.toLowerCase(),
-                  unit_amount: Math.round(due * 100),
+                  unit_amount: toStripeMinor(due, currency),
                   product_data: { name: `Booking ${reference}`, description: `${checkin} – ${checkout} · ${nights} night${nights !== 1 ? "s" : ""}` },
                 },
               },
