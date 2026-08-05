@@ -3,6 +3,7 @@
 // bookings have no charge to refund.
 import { updateBooking, type BookingRecord } from "./bookings.server";
 import { createRefund } from "./stripe.server";
+import { fromStripeMinor } from "./money";
 
 export type RefundOutcome =
   | { ok: true; booking: BookingRecord; amount: number }
@@ -25,7 +26,9 @@ export async function refundBookingCharge(
 
   try {
     const refund = await createRefund(p.accountId, p.paymentIntentId, opts.amountMinor, `refund_${booking.reference}`);
-    const amount = (refund.amount ?? Math.round((p.amount ?? 0) * 100)) / 100;
+    const refundCurrency = refund.currency?.toUpperCase() || p.currency || "";
+    // Stripe reports the refund in minor units; the fallback is already major.
+    const amount = refund.amount != null ? fromStripeMinor(refund.amount, refundCurrency) : (p.amount ?? 0);
     const updated = await updateBooking(pid, booking.id, {
       payment: {
         ...p,

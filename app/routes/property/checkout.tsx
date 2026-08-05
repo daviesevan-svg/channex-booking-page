@@ -38,7 +38,7 @@ import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
-import { formatMoney } from "~/lib/money";
+import { formatMoney, toStripeMinor } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
@@ -531,7 +531,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
     let sessionParams: Record<string, unknown>;
     if (stripeMode === "payment") {
-      const amountMinor = Math.round(dueAfterVoucher * 100);
+      const amountMinor = toStripeMinor(dueAfterVoucher, stay.currency);
       const feeBps = config.stripePlatformFeeBps;
       const voucherNote = voucherHold
         ? " " + tr.t("stripeVoucherNote", { amount: money(voucherHold.amount), code: voucherHold.code })
