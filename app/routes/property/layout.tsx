@@ -246,8 +246,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // An extra website page is somewhere a guest looks around, like a room page —
   // so the browsing nav belongs there too.
   const onWebsitePage = pageSlugs.some((s) => here === `${base}/p/${s}`);
+  // The offers list AND one offer's page, hence the prefix rather than an equality
+  // check — an offer page is somewhere a guest looks around, like a room page, so
+  // hiding the nav there would be a dead end with only Back.
   const isBrowsing =
-    isHome || onWebsitePage || here === `${base}/offers` || here.startsWith(`${base}/room/`);
+    isHome || onWebsitePage || here.startsWith(`${base}/offers`) || here.startsWith(`${base}/room/`);
 
   // React Router doesn't scroll to a #fragment on navigation, so the "Rooms"
   // link would change the URL and sit still. Sections carry scroll-mt for the

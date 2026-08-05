@@ -511,8 +511,21 @@ const EL: Dict = {
   offerStaysFrom: "Διαμονές από {from}",
   offerStaysUntil: "Διαμονές έως {to}",
   offerBookCta: "Δείτε ημερομηνίες",
+  offersBackToAll: "Όλες οι προσφορές",
+  offerTermsHeading: "Λεπτομέρειες προσφοράς",
+  offerAppliesAllRooms: "Ισχύει για όλα τα δωμάτια και όλες τις τιμές",
+  offerCodeAutoApplied: "Δεν χρειάζεται να τον πληκτρολογήσετε — θα εφαρμόσουμε τον κωδικό {code} όταν συνεχίσετε.",
+  offerNeedsNights_one: "Η προσφορά απαιτεί διαμονή {n} νύχτας ή περισσότερο.",
+  offerNeedsNights_other: "Η προσφορά απαιτεί διαμονή {n} νυχτών ή περισσότερο.",
+  offerUpcomingHint:
+    "Δεν είναι διαθέσιμη για κράτηση ακόμη. Επιστρέψτε την ημερομηνία που αναφέρεται πιο πάνω ή αναζητήστε τις ημερομηνίες σας τώρα με τις κανονικές τιμές μας.",
+  offerSearchAnyway: "Αναζήτηση ημερομηνιών",
   metaOffers: "Ειδικές προσφορές · {hotel}",
   metaDescOffers: "Τρέχουσες προσφορές στο {hotel} — τι ισχύει, πότε, και απευθείας κράτηση.",
+  metaOffer: "{offer} · {hotel}",
+  metaDescOffer: "{offer} στο {hotel} — τι περιλαμβάνει η προσφορά, πότε ισχύει και η τρέχουσα διαθεσιμότητα.",
+  helperMaxArrival: "Αυτές οι ημερομηνίες επιτρέπουν άφιξη μόνο έως {date}.",
+  helperMaxDeparture: "Αυτές οι ημερομηνίες επιτρέπουν αναχώρηση μόνο έως {date}.",
 };
 
 export default EL;

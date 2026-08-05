@@ -30,8 +30,11 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
     r("rooms/:roomId", "routes/property/detail.tsx", "detail"),
     // Website room page (no dates needed) — distinct from the dated funnel step.
     r("room/:roomId", "routes/property/room.tsx", "room"),
-    // Website offers page: every current promotion and when it applies.
+    // Website offers pages: the list, and one offer with its own availability
+    // calendar (the room/rooms pair again — static before dynamic, so the list
+    // keeps the bare /offers URL).
     r("offers", "routes/property/offers.tsx", "offers"),
+    r("offers/:offerId", "routes/property/offer.tsx", "offer"),
     // Contact-form submission (POST only; GET redirects home).
     r("contact", "routes/property/contact.tsx", "contact"),
     r("extras", "routes/property/extras.tsx", "extras"),

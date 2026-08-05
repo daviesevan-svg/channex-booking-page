@@ -523,8 +523,21 @@ const NL: Dict = {
   offerStaysFrom: "Verblijven vanaf {from}",
   offerStaysUntil: "Verblijven tot {to}",
   offerBookCta: "Data bekijken",
+  offersBackToAll: "Alle aanbiedingen",
+  offerTermsHeading: "Details van de aanbieding",
+  offerAppliesAllRooms: "Geldt voor alle kamers en tarieven",
+  offerCodeAutoApplied: "U hoeft niets in te typen — we passen {code} toe als u verdergaat.",
+  offerNeedsNights_one: "Deze aanbieding vraagt een verblijf van {n} nacht of langer.",
+  offerNeedsNights_other: "Deze aanbieding vraagt een verblijf van {n} nachten of langer.",
+  offerUpcomingHint:
+    "Hij is nog niet boekbaar. Kom terug op de datum hierboven, of zoek nu uw data tegen onze gewone tarieven.",
+  offerSearchAnyway: "Data zoeken",
   metaOffers: "Speciale aanbiedingen · {hotel}",
   metaDescOffers: "Actuele aanbiedingen bij {hotel} — wat er is, wanneer het geldt, en direct boeken.",
+  metaOffer: "{offer} · {hotel}",
+  metaDescOffer: "{offer} bij {hotel} — wat de aanbieding inhoudt, wanneer die geldt, en de actuele beschikbaarheid.",
+  helperMaxArrival: "Deze data staan aankomst alleen toe tot {date}.",
+  helperMaxDeparture: "Deze data staan vertrek alleen toe tot {date}.",
 };
 
 export default NL;

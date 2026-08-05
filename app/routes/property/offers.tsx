@@ -28,7 +28,6 @@ import { useT } from "~/lib/i18n";
 import { getSettings } from "~/lib/overrides.server";
 import { pageMeta } from "~/lib/page-meta";
 import { getPublicOffers } from "~/lib/promotions.server";
-import type { OfferView } from "~/lib/promotions";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -58,20 +57,6 @@ export default function OffersPage({ loaderData }: Route.ComponentProps) {
   const base = useBase();
   const tr = useT();
   const s = useSlots();
-
-  /**
-   * Where "book this offer" goes: the search card, with the offer's earliest
-   * qualifying check-in already in the field and — for a code offer — the code
-   * filled in and its box open (the home page reads both out of the query).
-   *
-   * The check-in only. The guest chooses how long they're staying, and a
-   * check-out we invented could quietly break a minimum-nights rule.
-   */
-  const bookHref = (offer: OfferView) => {
-    const qs = new URLSearchParams({ checkin: offer.earliestCheckin });
-    if (offer.code) qs.set("promo", offer.code);
-    return `${base}?${qs.toString()}#book`;
-  };
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
@@ -105,14 +90,11 @@ export default function OffersPage({ loaderData }: Route.ComponentProps) {
               tr={tr}
               currency={currency}
               today={today}
-              // Nothing to click on an offer that isn't open yet: the guest can't
-              // book it today, and a search that silently drops the discount is
-              // worse than no button.
-              cta={
-                offer.status === "live"
-                  ? { label: tr.t("offerBookCta"), to: bookHref(offer) }
-                  : undefined
-              }
+              // Every offer gets a page, including one that isn't open yet — the
+              // page is where the dates and the calendar are, and for an upcoming
+              // offer it explains why there's nothing to book instead of dropping
+              // the guest into a search that would miss the discount.
+              cta={{ label: tr.t("offerBookCta"), to: `${base}/offers/${offer.id}` }}
             />
           ))}
         </div>

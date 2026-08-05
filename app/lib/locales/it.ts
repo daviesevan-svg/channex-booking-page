@@ -523,8 +523,21 @@ const IT: Dict = {
   offerStaysFrom: "Soggiorni dal {from}",
   offerStaysUntil: "Soggiorni fino al {to}",
   offerBookCta: "Verifica le date",
+  offersBackToAll: "Tutte le offerte",
+  offerTermsHeading: "Dettagli dell’offerta",
+  offerAppliesAllRooms: "Valida per tutte le camere e tutte le tariffe",
+  offerCodeAutoApplied: "Non serve digitarlo: applicheremo {code} quando proseguirai.",
+  offerNeedsNights_one: "Questa offerta richiede un soggiorno di almeno {n} notte.",
+  offerNeedsNights_other: "Questa offerta richiede un soggiorno di almeno {n} notti.",
+  offerUpcomingHint:
+    "Non è ancora prenotabile. Torna alla data indicata sopra, oppure cerca le tue date ora alle nostre tariffe consuete.",
+  offerSearchAnyway: "Cerca le date",
   metaOffers: "Offerte speciali · {hotel}",
   metaDescOffers: "Offerte attive a {hotel}: quali sono, quando valgono e prenotazione diretta.",
+  metaOffer: "{offer} · {hotel}",
+  metaDescOffer: "{offer} a {hotel}: cosa comprende l’offerta, quando vale e la disponibilità aggiornata.",
+  helperMaxArrival: "Queste date consentono l’arrivo solo fino al {date}.",
+  helperMaxDeparture: "Queste date consentono la partenza solo fino al {date}.",
 };
 
 export default IT;

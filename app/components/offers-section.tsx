@@ -27,7 +27,7 @@ import { cx } from "~/lib/site-style";
 
 /** Dates read as "4 Oct 2026" — the year is not optional here. Half of these are
  *  months out, and "4 Oct" on a December stay window is ambiguous by one year. */
-function offerDate(iso: string, tr: Translator): string {
+export function offerDate(iso: string, tr: Translator): string {
   return fmtDate(iso, "d MMM yyyy", tr.locale);
 }
 
@@ -73,7 +73,7 @@ export function offerRules(offer: OfferView, tr: Translator): string[] {
  * status and nothing else, and printing "earliest stay: today" under it would be
  * noise dressed as detail.
  */
-function OfferAvailability({
+export function OfferTerms({
   offer,
   tr,
   today,
@@ -158,7 +158,7 @@ export function OfferCard({
         ))}
       </ul>
 
-      <OfferAvailability offer={offer} tr={tr} today={today} />
+      <OfferTerms offer={offer} tr={tr} today={today} />
 
       {cta && (
         <Link
@@ -213,10 +213,10 @@ export function OffersSection({
             tr={tr}
             currency={currency}
             today={today}
-            // The card's own booking CTA lives on the offers page, not here: the
-            // home page IS the search form, so a "check dates" link that scrolled
-            // 400px up would look broken. This goes to the offer's full entry.
-            cta={{ label: tr.t("secOffersCta"), to: `${base}/offers#offer-${offer.id}` }}
+            // Straight to the offer's own page, exactly as a room card goes to the
+            // room page. It used to point at the offers list, which meant clicking
+            // an offer showed you a list of offers.
+            cta={{ label: tr.t("secOffersCta"), to: `${base}/offers/${offer.id}` }}
           />
         ))}
       </div>
