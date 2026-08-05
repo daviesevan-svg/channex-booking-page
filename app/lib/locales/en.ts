@@ -524,8 +524,21 @@ const EN: Dict = {
   offerStaysFrom: "Stays from {from}",
   offerStaysUntil: "Stays until {to}",
   offerBookCta: "Check dates",
+  offersBackToAll: "All offers",
+  offerTermsHeading: "Offer details",
+  offerAppliesAllRooms: "Applies to every room and rate",
+  offerCodeAutoApplied: "No need to type it — we’ll apply {code} when you continue.",
+  offerNeedsNights_one: "This offer needs a stay of {n} night or more.",
+  offerNeedsNights_other: "This offer needs a stay of {n} nights or more.",
+  offerUpcomingHint:
+    "It isn’t open for booking yet. Come back on the date above, or search your dates now at our normal rates.",
+  offerSearchAnyway: "Search dates",
   metaOffers: "Special offers · {hotel}",
   metaDescOffers: "Current offers at {hotel} — see what’s on, when it applies, and book direct.",
+  metaOffer: "{offer} · {hotel}",
+  metaDescOffer: "{offer} at {hotel} — what the offer includes, when it applies, and live availability.",
+  helperMaxArrival: "These dates only allow arrivals up to {date}.",
+  helperMaxDeparture: "These dates only allow check-out up to {date}.",
 };
 
 export default EN;

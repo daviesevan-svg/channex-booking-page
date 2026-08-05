@@ -154,6 +154,15 @@ export interface OfferView {
   conditions?: PromoConditions;
   /** Earliest check-in that qualifies for a booking made today. */
   earliestCheckin: string;
+  /**
+   * Latest check-in that qualifies for a booking made today. Absent = no ceiling.
+   *
+   * Two things can cap it and the tighter one wins: the stay window's close (less
+   * the minimum stay), and a last-minute rule, which says a check-in more than N
+   * days out doesn't qualify *yet*. The offer page's calendar greys out arrivals
+   * past this, so the guest can't pick dates the discount wouldn't apply to.
+   */
+  latestCheckin?: string;
   /** Last day a guest can book and still qualify. Absent = no deadline. */
   bookBy?: string;
   /** First day a guest can book — a last-minute rule on a future stay window
@@ -195,7 +204,10 @@ function laterISO(a: string, b: string | undefined): string {
 function offerWindow(
   c: PromoConditions | undefined,
   today: string,
-): Pick<OfferView, "earliestCheckin" | "bookBy" | "bookFrom" | "status"> | null {
+): Pick<
+  OfferView,
+  "earliestCheckin" | "latestCheckin" | "bookBy" | "bookFrom" | "status"
+> | null {
   const minAhead = c?.minDaysAhead ?? 0;
   const maxAhead = c?.maxDaysAhead;
   // At least one night, whatever the rules say — a stay is nights, not days.
@@ -228,7 +240,14 @@ function offerWindow(
     };
   }
 
-  return { earliestCheckin, bookBy, status: "live" };
+  // The tighter of the two ceilings, and undefined when neither rule caps it —
+  // an early bird with no window has no last check-in at all.
+  const latestCheckin =
+    windowTo && latestBookableToday
+      ? (windowTo < latestBookableToday ? windowTo : latestBookableToday)
+      : (windowTo ?? latestBookableToday);
+
+  return { earliestCheckin, latestCheckin, bookBy, status: "live" };
 }
 
 /**

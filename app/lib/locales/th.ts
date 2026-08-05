@@ -524,8 +524,21 @@ const TH: Dict = {
   offerStaysFrom: "เข้าพักตั้งแต่ {from}",
   offerStaysUntil: "เข้าพักถึง {to}",
   offerBookCta: "ตรวจสอบวันที่",
+  offersBackToAll: "โปรโมชันทั้งหมด",
+  offerTermsHeading: "รายละเอียดโปรโมชัน",
+  offerAppliesAllRooms: "ใช้ได้กับทุกห้องพักและทุกอัตราค่าห้อง",
+  offerCodeAutoApplied: "ไม่ต้องพิมพ์รหัส — เราจะใส่ {code} ให้เมื่อคุณดำเนินการต่อ",
+  offerNeedsNights_one: "โปรโมชันนี้ต้องเข้าพักตั้งแต่ {n} คืนขึ้นไป",
+  offerNeedsNights_other: "โปรโมชันนี้ต้องเข้าพักตั้งแต่ {n} คืนขึ้นไป",
+  offerUpcomingHint:
+    "ยังไม่เปิดให้จอง กลับมาอีกครั้งในวันที่ระบุด้านบน หรือค้นหาวันที่ของคุณตอนนี้ในอัตราปกติ",
+  offerSearchAnyway: "ค้นหาวันที่",
   metaOffers: "โปรโมชันพิเศษ · {hotel}",
   metaDescOffers: "โปรโมชันที่ใช้ได้ของ {hotel} — มีอะไร ใช้ได้ช่วงไหน และจองตรงกับเรา",
+  metaOffer: "{offer} · {hotel}",
+  metaDescOffer: "{offer} ที่ {hotel} — โปรโมชันครอบคลุมอะไร ใช้ได้ช่วงไหน และห้องว่างล่าสุด",
+  helperMaxArrival: "ช่วงวันที่นี้เข้าพักได้ไม่เกินวันที่ {date}",
+  helperMaxDeparture: "ช่วงวันที่นี้เช็คเอาท์ได้ไม่เกินวันที่ {date}",
 };
 
 export default TH;

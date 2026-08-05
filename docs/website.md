@@ -383,14 +383,51 @@ code's `name` is an internal note — publishing "OTA winback, don't honour twic
 as a headline is the failure this default avoids. Ticking the box for a code
 requires a name written for guests.
 
-**Availability, not a calendar.** Whether an offer applies depends on the
+**Availability, not a rules grid.** Whether an offer applies depends on the
 check-in date, the check-out date, the booking date and the number of nights at
-once, so a grid of qualifying days would have to fix three of those and be wrong
-about the rest. `publicOffers` instead derives the two dates that are actually
-actionable — the earliest stay a booking made today can have, and the last day
-the offer can be booked — from the same conditions `offerMatches` evaluates when
-the discount is really given. One set of rules, so the page can't promise a
-discount checkout won't honour.
+once, so a calendar colouring "qualifying days" would have to fix three of those
+and be wrong about the rest. `publicOffers` instead derives the dates that are
+actually actionable — the earliest stay a booking made today can have, the last
+check-in that still qualifies, and the last day the offer can be booked — from the
+same conditions `offerMatches` evaluates when the discount is really given. One
+set of rules, so the page can't promise a discount checkout won't honour.
+
+### One offer's page
+
+`/:channelId/offers/:offerId` — the room page's shape for a deal: terms on the
+left, a real availability calendar on the right, and a hand-off to
+`/rooms?checkin=…` once dates are picked. Both the home section's cards and the
+list's cards link here.
+
+It exists because they used to link to the home page's search card with the dates
+pre-filled, and Evan's report was that clicking an offer "just takes you back to
+main page" — which is what it looked like, because nothing on the destination
+named the offer or showed the discount. Prefilling a form is not a destination.
+
+The calendar shows **inventory** availability (`getCalendarAvailability`,
+property-wide — an offer applies to every room), bounded by the offer's own rules
+so that every range a guest can select is one the discount applies to:
+
+- `maxCheckin` = `OfferView.latestCheckin` — the tighter of the stay window's last
+  usable arrival and a last-minute rule's horizon.
+- `maxCheckout` = the window's `stayTo`. **Deliberately a separate bound**: a
+  3-night stay starting on the last eligible arrival departs three days later, so
+  one shared ceiling would make the last arrivals of every window unusable.
+- `minNights` — the offer's minimum, applied alongside the hotel's own per-date
+  min-stay; the longer wins.
+
+Out-of-range dates render **greyed, not struck through** — "this stay can't use
+that date" is not "nobody can have that night" — and clicking one explains the
+ceiling instead of silently refusing. `useDateRange` also now opens on the first
+month with something to pick, which is what makes a 60-day early bird land on
+October rather than on a wall of greyed August dates.
+
+An **upcoming** offer gets the page but no calendar and no CTA: every range a
+guest could pick today would miss the discount, so it says when it opens and
+offers a plain search instead. A code offer's page carries the code into the
+funnel (`?promo=`), which results forwards wholesale to checkout, where
+`resolveAppliedPromo` pre-applies it — verified end to end down to the
+"Discount (SUMMER10)" line on the checkout total.
 
 The same derivation is what drops dead offers rather than showing them expired: a
 60-day early bird on a stay window that closes in six weeks can no longer be

@@ -2,6 +2,7 @@ import {
   addDays,
   addMonths,
   differenceInCalendarDays,
+  differenceInCalendarMonths,
   format,
   getDay,
   getDaysInMonth,
@@ -23,7 +24,11 @@ export interface DayCell {
   date?: Date;
   disabled: boolean;
   sold: boolean;
-  /** Past dates render greyed; sold (non-past) dates render struck-through. */
+  /**
+   * Out of range: before the arrival floor, or past a ceiling the caller set.
+   * Renders greyed, where a sold (in-range) date renders struck-through — "this
+   * stay can't use that date" is not "nobody can have that night".
+   */
   past: boolean;
   /** A sold night whose previous night is available — i.e. reachable as a
    *  check-out. Styled black+struck; deeper sold nights stay plain grey. */
@@ -44,11 +49,35 @@ export interface CalMonth {
 const iso = (d: Date) => format(d, "yyyy-MM-dd");
 const MAX_OFFSET = 11;
 
+/** How many months forward the calendar should open on for a target date, within
+ *  the range it can page to. 0 for no date, a past one, or today's month. */
+function monthsAhead(target: string | undefined): number {
+  if (!target) return 0;
+  const d = parseISO(target);
+  if (Number.isNaN(d.getTime())) return 0;
+  const months = differenceInCalendarMonths(startOfMonth(d), startOfMonth(startOfToday()));
+  return Math.min(MAX_OFFSET, Math.max(0, months));
+}
+
 export interface UseDateRangeArgs {
   closedDates: ClosedDates | null;
   /** Earliest selectable check-in (YYYY-MM-DD); dates before it are greyed out.
    *  Used for the booking lead-time cutoff. Defaults to today. */
   minCheckin?: string;
+  /**
+   * Latest selectable check-in, and latest selectable check-out.
+   *
+   * For a stay that has to fall inside a window — an offer's stay dates — where
+   * the two ceilings are genuinely different: a 3-night stay starting on the last
+   * eligible arrival departs three days after it, so capping both at the same date
+   * would make the last few arrivals unusable. Absent means no ceiling, which is
+   * every caller that isn't the offer page.
+   */
+  maxCheckin?: string;
+  maxCheckout?: string;
+  /** A minimum stay the CALLER imposes, on top of whatever the inventory's
+   *  per-date min-stay says. The longer of the two applies. */
+  minNights?: number;
   initialCheckin?: string;
   initialCheckout?: string;
   tr: Translator;
@@ -57,6 +86,9 @@ export interface UseDateRangeArgs {
 export function useDateRange({
   closedDates,
   minCheckin,
+  maxCheckin,
+  maxCheckout,
+  minNights: minNightsFloor,
   initialCheckin,
   initialCheckout,
   tr,
@@ -68,7 +100,14 @@ export function useDateRange({
   const [checkout, setCheckout] = useState<Date | null>(
     initialCheckout ? parseISO(initialCheckout) : null,
   );
-  const [monthOffset, setMonthOffset] = useState(0);
+  // Open on the first month that has something to pick, rather than always on
+  // this one: an offer whose earliest stay is two months out otherwise greets the
+  // guest with a calendar of greyed dates and no hint to page forward. For every
+  // other caller `minCheckin` is a lead-time of hours or days, so this is the
+  // current month exactly as before.
+  const [monthOffset, setMonthOffset] = useState(() =>
+    monthsAhead(initialCheckin || minCheckin),
+  );
   const [helper, setHelper] = useState("");
 
   const soldSet = useMemo(
@@ -82,9 +121,18 @@ export function useDateRange({
   const ctaSet = useMemo(() => new Set(closedDates?.closedToArrival ?? []), [closedDates]);
   const ctdSet = useMemo(() => new Set(closedDates?.closedToDeparture ?? []), [closedDates]);
 
-  const minStayFor = (d: Date) => minStayMap[iso(d)] ?? 1;
+  // The caller's floor and the inventory's per-date rule are both minimums, so
+  // the longer one wins — an offer needing 3 nights can't be satisfied by the
+  // hotel's 2-night minimum, and vice versa.
+  const minStayFor = (d: Date) => Math.max(minStayMap[iso(d)] ?? 1, minNightsFloor ?? 1);
   const isSold = (d: Date) => soldSet.has(iso(d));
   const today = startOfToday();
+  // Arrival and departure ceilings. Compared as dates rather than strings because
+  // everything else in this hook is a Date.
+  const lastArrival = maxCheckin ? parseISO(maxCheckin) : null;
+  const lastDeparture = maxCheckout ? parseISO(maxCheckout) : null;
+  const afterLastArrival = (d: Date) => !!lastArrival && isBefore(lastArrival, d);
+  const afterLastDeparture = (d: Date) => !!lastDeparture && isBefore(lastDeparture, d);
   // Arrival floor = the later of today and the lead-time cutoff. Dates before it
   // can't be selected as a check-in (greyed like past dates).
   const minArrival = minCheckin ? parseISO(minCheckin) : today;
@@ -105,11 +153,16 @@ export function useDateRange({
   // depart. If none exists, the date can't start a booking.
   const arrivalAllowed = (date: Date) => {
     if (isSold(date) || ctaSet.has(iso(date))) return false;
+    if (afterLastArrival(date)) return false;
     const need = minStayFor(date);
     let nights = 0;
     while (!isSold(addDays(date, nights))) {
       nights++;
-      if (nights >= need && !ctdSet.has(iso(addDays(date, nights)))) return true;
+      const out = addDays(date, nights);
+      // A stay that would have to depart past the ceiling is no use here either:
+      // the last eligible arrivals of a window are exactly where this bites.
+      if (afterLastDeparture(out)) return false;
+      if (nights >= need && !ctdSet.has(iso(out))) return true;
       if (nights >= MAX_LOOKAHEAD_NIGHTS) break;
     }
     return false;
@@ -120,7 +173,7 @@ export function useDateRange({
   // isn't closed-to-departure, and every night in between is available.
   const checkoutAllowed = (date: Date) => {
     if (!checkin || checkout || !isBefore(checkin, date)) return false;
-    if (ctdSet.has(iso(date))) return false;
+    if (ctdSet.has(iso(date)) || afterLastDeparture(date)) return false;
     if (differenceInCalendarDays(date, checkin) < minStayFor(checkin)) return false;
     for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) if (isSold(d)) return false;
     return true;
@@ -130,6 +183,12 @@ export function useDateRange({
     if (!checkin || checkout || !isBefore(checkin, date)) {
       if (ctaSet.has(iso(date))) {
         setHelper(tr.t("helperClosedToArrival", { date: fmt(date, "EEE d MMM") }));
+        return;
+      }
+      // Explain the ceiling rather than just refusing: a greyed date with no
+      // reason reads as broken, and this one isn't about availability.
+      if (afterLastArrival(date)) {
+        setHelper(tr.t("helperMaxArrival", { date: fmt(lastArrival!, "EEE d MMM") }));
         return;
       }
       const minS = minStayFor(date);
@@ -144,6 +203,10 @@ export function useDateRange({
     }
     if (ctdSet.has(iso(date))) {
       setHelper(tr.t("helperClosedToDeparture", { date: fmt(date, "EEE d MMM") }));
+      return;
+    }
+    if (afterLastDeparture(date)) {
+      setHelper(tr.t("helperMaxDeparture", { date: fmt(lastDeparture!, "EEE d MMM") }));
       return;
     }
     const nights = differenceInCalendarDays(date, checkin);
@@ -210,11 +273,19 @@ export function useDateRange({
         // handleDay can explain why it doesn't work.
         const asArrival = !checkin || !!checkout || !isBefore(checkin, date);
         const arrivalBlocked = asArrival && !sold && !arrivalAllowed(date);
-        const disabled = tooEarly ? true : asCheckout ? false : sold || arrivalBlocked;
+        // Past the departure ceiling nothing can be picked at all. Past the
+        // ARRIVAL ceiling a date can still be a check-out, so it's only blocked
+        // when it would be an arrival — which `arrivalAllowed` already refuses.
+        const tooLate = afterLastDeparture(date);
+        // Greyed as out-of-range, not struck through as sold: it's a date this
+        // stay can't use, which is a different thing from a night nobody can have.
+        const outOfRange = tooEarly || tooLate || (asArrival && afterLastArrival(date) && !sold);
+        const disabled = tooEarly || tooLate ? true : asCheckout ? false : sold || arrivalBlocked;
         let title: string | undefined;
-        if (!tooEarly) {
+        if (!tooEarly && !tooLate) {
           if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
+          else if (afterLastArrival(date)) title = tr.t("helperMaxArrival", { date: fmt(lastArrival!, "EEE d MMM") });
           else if (arrivalBlocked) title = tr.t("minStayUnreachable", { n: minStayFor(date) });
         }
         const isCheckin = !!checkin && differenceInCalendarDays(date, checkin) === 0;
@@ -233,7 +304,7 @@ export function useDateRange({
           date,
           disabled,
           sold,
-          past: tooEarly,
+          past: outOfRange,
           checkoutBoundary,
           title,
           isCheckin,
@@ -245,7 +316,19 @@ export function useDateRange({
       return { title, cells };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checkin, checkout, monthOffset, soldSet, minStayMap, ctaSet, ctdSet, minCheckin]);
+  }, [
+    checkin,
+    checkout,
+    monthOffset,
+    soldSet,
+    minStayMap,
+    ctaSet,
+    ctdSet,
+    minCheckin,
+    maxCheckin,
+    maxCheckout,
+    minNightsFloor,
+  ]);
 
   let rangeSummary: string;
   if (checkin && checkout) {
