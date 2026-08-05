@@ -493,6 +493,39 @@ const EN: Dict = {
   stripeSubmitDeposit: "Paying {due} now to secure your stay at {hotel}; {balance} is due at the hotel.",
   stripeSubmitFull: "Paying {due} for your stay at {hotel}.",
   stripeSubmitGuarantee: "Saving your card to guarantee your stay at {hotel} ({room}, {dates}). You won’t be charged now — payment is taken at the hotel.",
+
+  // The website's offers section and /offers page. The rule sentences are the
+  // hotel's stored conditions; the availability ones are those rules worked out
+  // against today, which is why they're labelled apart.
+  offersNav: "Offers",
+  offersTitle: "Special offers",
+  offersIntro: "Every offer running right now, and the dates each one applies to.",
+  offersEmpty: "There are no offers running just now — please check back soon.",
+  offersAllCta: "See all {n} offers",
+  secOffersHeadingDefault: "Special offers",
+  secOffersCta: "See details",
+  offerAvailability: "Availability",
+  offerStatusLive: "Bookable now",
+  offerStatusUpcoming: "Bookable from {date}",
+  offerEarliestStay: "Earliest stay {date}",
+  offerBookBy: "Book by {date}",
+  offerAutomatic: "Applied automatically",
+  offerUseCode: "Use code {code}",
+  offerPercentOff: "{value}% off",
+  offerAmountOff: "{amount} off",
+  offerAnyStay: "Applies to any stay",
+  offerBookAhead_one: "Book at least {n} day before arrival",
+  offerBookAhead_other: "Book at least {n} days before arrival",
+  offerBookWithin_one: "Book within {n} day of arrival",
+  offerBookWithin_other: "Book within {n} days of arrival",
+  offerMinNights_one: "Stays of {n} night or more",
+  offerMinNights_other: "Stays of {n} nights or more",
+  offerStaysBetween: "Stays between {from} and {to}",
+  offerStaysFrom: "Stays from {from}",
+  offerStaysUntil: "Stays until {to}",
+  offerBookCta: "Check dates",
+  metaOffers: "Special offers · {hotel}",
+  metaDescOffers: "Current offers at {hotel} — see what’s on, when it applies, and book direct.",
 };
 
 export default EN;

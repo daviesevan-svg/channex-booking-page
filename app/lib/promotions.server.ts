@@ -1,5 +1,13 @@
 import { getConfigKV } from "./config.server";
-import { computeDiscount, normalizeCode, type AppliedPromo, type Promotion } from "./promotions";
+import { todayISODate } from "./dates";
+import {
+  computeDiscount,
+  normalizeCode,
+  publicOffers,
+  type AppliedPromo,
+  type OfferView,
+  type Promotion,
+} from "./promotions";
 
 const promotionsKey = (pid: string) => `promotions:${pid}`;
 
@@ -43,6 +51,20 @@ export async function resolveAppliedPromo(
   const discount = computeDiscount(promo, total);
   if (discount <= 0) return null;
   return { code: promo.code, type: promo.type, value: promo.value, discount };
+}
+
+/**
+ * The offers the website may show, already filtered and ranked.
+ *
+ * Fails open with an empty list, like every other section loader: a KV hiccup
+ * should cost the offers section, not the page it sits on.
+ */
+export async function getPublicOffers(pid: string): Promise<OfferView[]> {
+  try {
+    return publicOffers(await getPromotions(pid), todayISODate());
+  } catch {
+    return [];
+  }
 }
 
 async function writePromotions(pid: string, list: Promotion[]): Promise<void> {

@@ -12,8 +12,10 @@ import { formatAddress } from "./address";
 import { getRooms } from "./catalog.server";
 import { getConfig } from "./config.server";
 import { normalizeFacilities } from "./content";
+import { todayISODate } from "./dates";
 import { getGalleryFor } from "./gallery.server";
 import { getFacilitiesExtra, getOverrides, getSearchContent, getSettings } from "./overrides.server";
+import { getPublicOffers } from "./promotions.server";
 import { getPublicReviews } from "./reviews.server";
 import { getActiveVoucherProducts } from "./vouchers.server";
 import type { SectionData } from "./section-data";
@@ -43,9 +45,11 @@ export async function loadSectionData(
   // country are structured on settings. Both sections need the whole thing.
   const wantsAddress = wantsMap || wantsContact;
 
-  const [rooms, gallery, facilitiesExtra, reviews, hasVouchers, overrides, heroPhoto] =
+  const [rooms, offers, gallery, facilitiesExtra, reviews, hasVouchers, overrides, heroPhoto] =
     await Promise.all([
       has("rooms") ? getRooms(pid).catch(() => []) : Promise.resolve([]),
+      // Already fails open to an empty list, so no .catch() here.
+      has("offers") ? getPublicOffers(pid) : Promise.resolve([]),
       has("gallery") ? getGalleryFor(pid, lang).catch(() => []) : Promise.resolve([]),
       // Fail open throughout: a data hiccup in one section must not take the
       // whole page down with it.
@@ -84,6 +88,7 @@ export async function loadSectionData(
       photo: r.images[0],
       maxGuests: r.maxGuests,
     })),
+    offers,
     gallery,
     // Normalized here so an unknown key can never reach the page and render as
     // a raw slug; free-text lines are shown as typed.
@@ -103,5 +108,6 @@ export async function loadSectionData(
       canReceive: Boolean(settings.hostNotifyEmail || settings.emailReplyTo || overrides?.email),
     },
     fallbackPhoto: fallbackPhoto ?? heroPhoto ?? undefined,
+    today: todayISODate(),
   };
 }

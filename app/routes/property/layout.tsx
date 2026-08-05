@@ -17,6 +17,7 @@ import { formatAddress } from "~/lib/address";
 import { FontStylesheet } from "~/components/font-stylesheet";
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { getPublicOffers } from "~/lib/promotions.server";
 import { getActiveVoucherProducts } from "~/lib/vouchers.server";
 import { getSiteChrome } from "~/lib/site.server";
 import { SiteFooterBlock } from "~/components/site-footer";
@@ -73,6 +74,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // comes from our own tables — but a hotel's shared link should never render as
   // a design they didn't choose. The session is only read when a param is
   // present, so ordinary traffic pays nothing.
+  // Auto-discovery for two header links, one KV read each and neither waiting on
+  // the other: "Gift vouchers" whenever the property has something on sale, and
+  // "Offers" whenever it has a published promotion. Both fail open to hidden — a
+  // KV hiccup should cost a nav link, not the page.
+  const [hasVouchers, hasOffers] = await Promise.all([
+    getActiveVoucherProducts(pid)
+      .then((v) => v.length > 0)
+      .catch(() => false),
+    // Website-only, because the offers page itself 404s with the website off —
+    // otherwise this would be a link to a 404.
+    settings.websiteEnabled
+      ? getPublicOffers(pid).then((o) => o.length > 0)
+      : Promise.resolve(false),
+  ]);
+
   const url = new URL(request.url);
   const wantStyle = url.searchParams.get("style");
   const wantFont = url.searchParams.get("font");
@@ -91,11 +107,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     hotelName: overrides.hotelName || "Your hotel",
     logoImage: settings.logoImage || null,
     logoHideName: settings.logoHideName ?? false,
-    // Auto-discovery: the "Gift vouchers" header link appears whenever the
-    // property has something on sale (fail-open: a KV hiccup hides it).
-    hasVouchers: await getActiveVoucherProducts(pid)
-      .then((v) => v.length > 0)
-      .catch(() => false),
+    hasVouchers,
+    hasOffers,
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
@@ -198,7 +211,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -233,7 +246,8 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // An extra website page is somewhere a guest looks around, like a room page —
   // so the browsing nav belongs there too.
   const onWebsitePage = pageSlugs.some((s) => here === `${base}/p/${s}`);
-  const isBrowsing = isHome || onWebsitePage || here.startsWith(`${base}/room/`);
+  const isBrowsing =
+    isHome || onWebsitePage || here === `${base}/offers` || here.startsWith(`${base}/room/`);
 
   // React Router doesn't scroll to a #fragment on navigation, so the "Rooms"
   // link would change the URL and sit still. Sections carry scroll-mt for the
@@ -340,6 +354,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 {tr.t("roomsNav")}
               </Link>
             )}
+            {isBrowsing && hasOffers && (
+              <Link to={`${base}/offers`} className="hover:text-accent">
+                {tr.t("offersNav")}
+              </Link>
+            )}
             {isBrowsing &&
               navPages.map((p) => (
                 <Link key={p.slug} to={`${base}/p/${p.slug}`} className="hover:text-accent">
@@ -380,6 +399,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           hotelName={hotelName}
           links={[
             ...(websiteRooms ? [{ label: tr.t("roomsNav"), to: `${base}#rooms` }] : []),
+            ...(hasOffers ? [{ label: tr.t("offersNav"), to: `${base}/offers` }] : []),
             ...navPages.map((p) => ({ label: p.label, to: `${base}/p/${p.slug}` })),
             ...(hasVouchers ? [{ label: tr.t("vouchersTitle"), to: `${base}/vouchers` }] : []),
             { label: tr.t("manageBooking"), to: `${base}/manage` },

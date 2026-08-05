@@ -157,7 +157,7 @@ the base language, so a half-translated site renders complete rather than blank.
 | `facilities` | **new** facilities | heading, columns |
 | `richText` | — | heading, body, **its own pictures** + which side, align (text-only) |
 | `reviews` | `reviews.server` | heading, min rating, count |
-| `offers` | promotions | heading |
+| `offers` | promotions | heading, intro, how many. Cards link to the offers page |
 | `extras` | extras catalog | heading |
 | `vouchers` | voucher catalog | heading |
 | `map` | lat/lng, address | heading, zoom, directions copy. Click-to-load (see below) |
@@ -215,8 +215,8 @@ them. If that's ever wanted it should go through `savePageSections` /
 every existing `richText` section rather than deleting hotel-written pages.
 
 > Original plan, kept because the section stacks are still a good starting point
-> for a "suggested layout" feature, and because three of the types they need
-> (`booking`, `offers`/`extras`, `faq`/`cta`) don't exist yet:
+> for a "suggested layout" feature, and because several of the types they need
+> (`booking`, `extras`, `faq`/`cta`) don't exist yet:
 >
 > | Template | Sections |
 > |---|---|
@@ -367,6 +367,44 @@ the same function the search calendar uses.
 
 The room page 404s when the website layer is off — there's no website for it to
 belong to.
+
+### Offers
+
+`/:channelId/offers` is the room page's counterpart for promotions: every
+promotion a guest can currently have, what its rules are, and when it can be
+booked. The `offers` section on the home page shows the first few of the same
+cards and links each one into this page — one component, so the terms can't be
+worded two ways.
+
+A promotion is shown when `isPublishedOffer` says so: enabled, and `publish` set.
+Unset means yes for an automatic offer and no for a code, because an auto offer
+already has a guest-facing name and already shows up in room prices, while a
+code's `name` is an internal note — publishing "OTA winback, don't honour twice"
+as a headline is the failure this default avoids. Ticking the box for a code
+requires a name written for guests.
+
+**Availability, not a calendar.** Whether an offer applies depends on the
+check-in date, the check-out date, the booking date and the number of nights at
+once, so a grid of qualifying days would have to fix three of those and be wrong
+about the rest. `publicOffers` instead derives the two dates that are actually
+actionable — the earliest stay a booking made today can have, and the last day
+the offer can be booked — from the same conditions `offerMatches` evaluates when
+the discount is really given. One set of rules, so the page can't promise a
+discount checkout won't honour.
+
+The same derivation is what drops dead offers rather than showing them expired: a
+60-day early bird on a stay window that closes in six weeks can no longer be
+satisfied by anyone, and a hotel that forgot to delete last summer's sale
+shouldn't have it in front of guests. An offer whose *last-minute* rule its stay
+window hasn't reached yet is "bookable from" that date instead, with no CTA —
+a search that quietly drops the discount is worse than no button.
+
+`today` is decided on the server and passed down (`SectionData.today`, and the
+loader's own value on the page), so a visitor's clock or timezone can't have the
+markup say something different on hydration than it served.
+
+The page 404s with the website off, like the room page, and the header/footer
+"Offers" link appears only when there's a published offer to land on.
 
 ### Phase 1 — shared domain, no routing change
 

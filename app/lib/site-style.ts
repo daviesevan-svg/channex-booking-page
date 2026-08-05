@@ -127,6 +127,8 @@ export interface StyleSlots {
   roomsGrid: string;
   /** Aspect ratio of a room card's photo. */
   roomPhoto: string;
+  /** Offer cards — the home page's section and the /offers page both use it. */
+  offersGrid: string;
 }
 
 /**
@@ -263,6 +265,7 @@ const CLASSIC: StyleSlots = {
   galleryTile: "aspect-[4/3]",
   roomsGrid: "grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3",
   roomPhoto: "aspect-[3/2]",
+  offersGrid: "grid-cols-1 gap-[18px] sm:grid-cols-2 lg:grid-cols-3",
 };
 
 /** A style is a delta over classic, so adding one means writing only what differs. */
@@ -370,6 +373,9 @@ const STYLE_DEFS: Record<
       // Two tall plates. Fewer, larger rooms per row is most of the difference.
       roomsGrid: "grid-cols-1 gap-10 sm:grid-cols-2",
       roomPhoto: "aspect-[4/5]",
+      // Offers carry no photograph, so they stay three across even here — the
+      // hairline over each one is what makes them read as a set.
+      offersGrid: "grid-cols-1 gap-8 sm:grid-cols-3",
     },
   },
 
@@ -482,6 +488,7 @@ const STYLE_DEFS: Record<
       galleryTile: "aspect-[4/3]",
       roomsGrid: "grid-cols-1 gap-x-10 gap-y-14 sm:grid-cols-2",
       roomPhoto: "aspect-[4/3]",
+      offersGrid: "grid-cols-1 gap-x-12 gap-y-12 sm:grid-cols-3",
     },
   },
 };

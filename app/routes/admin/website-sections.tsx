@@ -625,6 +625,19 @@ function Editor({
                 </div>
               )}
 
+              {/* The offers themselves aren't authored here — the section holds a
+                  heading and a count, and reads the property's promotions. Worth
+                  saying outright, because an operator who adds this section and
+                  sees no offer on the page needs to know where they live. */}
+              {section.type === "offers" && (
+                <p className="mt-3 text-[12px] text-muted">
+                  {t("secOffersSource")}{" "}
+                  <Link to="/admin/promotions" className="font-semibold text-accent hover:underline">
+                    {t("navPromotions")}
+                  </Link>
+                </p>
+              )}
+
               {def.images && (
                 <SectionImages
                   section={section}
