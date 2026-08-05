@@ -5,6 +5,7 @@
 // The loader that fills it in lives in `section-data.server.ts`.
 
 import type { ResolvedGalleryImage } from "./gallery";
+import type { OfferView } from "./promotions";
 
 /** One review as the reviews section shows it — a projection, not the stored
  *  record: a loader returning the full row would serialize private fields into
@@ -47,6 +48,9 @@ export interface SectionContact {
 
 export interface SectionData {
   rooms: SectionRoom[];
+  /** Live and upcoming promotions, best first. Empty when the section isn't on
+   *  the page — or when the hotel has nothing running, which renders nothing. */
+  offers: OfferView[];
   gallery: ResolvedGalleryImage[];
   facilities: string[];
   facilitiesExtra: string[];
@@ -57,4 +61,13 @@ export interface SectionData {
   contact: SectionContact;
   /** Shown by the gallery section when the property has no gallery images. */
   fallbackPhoto?: string;
+  /**
+   * Today's date (YYYY-MM-DD) as the server saw it.
+   *
+   * The offers section says whether an offer is bookable now and how soon the
+   * earliest stay is, which is a comparison against today — and a visitor's
+   * clock (or timezone) disagreeing with the server's would have it re-render
+   * different words on hydration than it served.
+   */
+  today: string;
 }

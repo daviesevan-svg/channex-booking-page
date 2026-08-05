@@ -29,6 +29,7 @@ export const RESERVED_PAGE_SLUGS = new Set([
   "p", // pages themselves live under /p/ — a page slugged "p" gives /p/p
   "rooms",
   "room",
+  "offers",
   "contact",
   "extras",
   "vouchers",
@@ -38,6 +39,7 @@ export const RESERVED_PAGE_SLUGS = new Set([
   "manage",
   "review",
   // held back
+  "offer", // singular, so it can't shadow a future /offer/:id
   "book",
   "booking",
   "search",

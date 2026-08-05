@@ -9,8 +9,11 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
+import { todayISODate } from "~/lib/dates";
 import {
+  isPublishedOffer,
   normalizeCode,
+  publicOffers,
   type DiscountType,
   type PromoConditions,
   type PromoTrigger,
@@ -38,6 +41,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     currency: settings.currency || "GBP",
     editing: promotions.find((p) => p.id === editId) ?? null,
     creating: url.searchParams.get("new") != null,
+    // Which published promotions the website is actually showing. Ticking the box
+    // isn't the whole story: an offer whose stay window has passed can no longer
+    // apply to anyone, so the guest page drops it. Saying "on the website" about
+    // one of those sends the operator looking for a bug.
+    shownOnSite: publicOffers(promotions, todayISODate()).map((o) => o.id),
   };
 }
 
@@ -72,6 +80,7 @@ export async function action({ request }: Route.ActionArgs) {
   const name = String(form.get("name") ?? "").trim();
   const value = Number(form.get("value"));
   const enabled = form.get("enabled") != null;
+  const publish = form.get("publish") != null;
   // Automatic offers are percent-only (so the % can be shown per-room while browsing).
   const type = (trigger === "auto"
     ? "percent"
@@ -84,6 +93,7 @@ export async function action({ request }: Route.ActionArgs) {
     code,
     name,
     type,
+    publish: publish ? "1" : "",
     value: form.get("value") as string,
     minDaysAhead: String(form.get("minDaysAhead") ?? ""),
     maxDaysAhead: String(form.get("maxDaysAhead") ?? ""),
@@ -102,6 +112,12 @@ export async function action({ request }: Route.ActionArgs) {
     if (!code) return { error: "Enter a promo code.", values };
     const clash = existing.find((p) => p.trigger === "code" && p.code === code && p.id !== id);
     if (clash) return { error: `The code “${code}” is already used by another promotion.`, values };
+    // A code's name is normally an internal note. Publishing one puts it on the
+    // website as a headline, so it has to be a name written for guests — the
+    // fallback would be the bare code, which is a poor thing to head a card with.
+    if (publish && !name) {
+      return { error: "Give the offer a name guests will see before publishing it.", values };
+    }
   } else {
     if (!name) return { error: "Give the offer a name guests will see (e.g. “Early Bird”).", values };
     const minDaysAhead = posInt(form.get("minDaysAhead"));
@@ -132,6 +148,7 @@ export async function action({ request }: Route.ActionArgs) {
     type,
     value: type === "percent" ? Math.round(value) : Math.round(value * 100) / 100,
     enabled,
+    publish,
     createdAt: prev?.createdAt ?? new Date().toISOString(),
   };
   await savePromotion(propertyId, promo);
@@ -177,7 +194,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
     );
   }
 
-  const { promotions, currency, editing, creating } = loaderData;
+  const { promotions, currency, editing, creating, shownOnSite } = loaderData;
   const v = actionData && "values" in actionData ? actionData.values : undefined;
   const cur = (k: keyof NonNullable<typeof v>, fallback = "") => (v?.[k] as string | undefined) ?? fallback;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -189,6 +206,14 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
     (v?.trigger as PromoTrigger) ?? editing?.trigger ?? "code",
   );
   const [type, setType] = useState<DiscountType>((v?.type as DiscountType) ?? editing?.type ?? "percent");
+  // Same default the renderer applies to stored promotions (see isPublishedOffer):
+  // an automatic offer already has a guest-facing name and already shows up in
+  // room prices, a code's name is an internal note.
+  const [publish, setPublish] = useState<boolean>(() => {
+    if (v) return v.publish === "1";
+    if (editing) return editing.publish ?? editing.trigger === "auto";
+    return trigger === "auto";
+  });
   const isAuto = trigger === "auto";
 
   return (
@@ -269,7 +294,7 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           <label className="block text-[13px] font-semibold text-secondary">
             {t("pmName")}{" "}
             <span className="font-normal text-faint">
-              {isAuto ? t("pmNameShownToGuests") : t("pmNameInternal")}
+              {isAuto || publish ? t("pmNameShownToGuests") : t("pmNameInternal")}
             </span>
             <input
               name="name"
@@ -390,6 +415,21 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           {t("pmActive")}
         </label>
 
+        <div>
+          <label className="flex items-center gap-2.5 text-[14px] font-semibold">
+            {/* Controlled, because the Name field's hint above changes with it. */}
+            <input
+              type="checkbox"
+              name="publish"
+              checked={publish}
+              onChange={(e) => setPublish(e.target.checked)}
+              className={checkbox}
+            />
+            {t("pmPublish")}
+          </label>
+          <p className="mt-1 text-[12px] text-faint">{t("pmPublishHint")}</p>
+        </div>
+
         {actionData && "error" in actionData && actionData.error && (
           <p className="text-[13px] text-red-600">{actionData.error}</p>
         )}
@@ -429,6 +469,17 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   {p.trigger === "auto" && (
                     <span className="rounded-full bg-[#ece6f0] px-2 py-0.5 text-[11px] font-semibold text-[#6b4f8a]">
                       {t("pmAutomaticBadge")}
+                    </span>
+                  )}
+                  {/* What the WEBSITE is doing, not just what the box says: a
+                      published offer whose dates have passed is dropped by the
+                      guest page, and the badge says so rather than claiming it's
+                      out there. Nothing at all when it isn't published, and
+                      nothing when it's disabled — "on the website" beside
+                      "disabled" would describe a card no guest can see. */}
+                  {isPublishedOffer(p) && (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-secondary">
+                      {shownOnSite.includes(p.id) ? t("pmPublishedBadge") : t("pmPublishExpired")}
                     </span>
                   )}
                   {p.enabled ? (

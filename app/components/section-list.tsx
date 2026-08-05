@@ -13,6 +13,7 @@ import { useNavigate } from "react-router";
 
 import { ContactSection } from "~/components/contact-section";
 import { MapSection } from "~/components/map-section";
+import { OffersSection } from "~/components/offers-section";
 import {
   FacilitiesSection,
   GallerySection,
@@ -67,6 +68,16 @@ export function SectionList({
                 section={section}
                 tr={tr}
                 rooms={data.rooms}
+              />
+            );
+          case "offers":
+            return (
+              <OffersSection
+                key={section.id}
+                section={section}
+                tr={tr}
+                offers={data.offers}
+                today={data.today}
               />
             );
           case "gallery":

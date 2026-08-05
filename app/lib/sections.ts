@@ -14,6 +14,7 @@ export const SECTION_TYPES = [
   "hero",
   "highlights",
   "rooms",
+  "offers",
   "gallery",
   "facilities",
   "map",
@@ -165,6 +166,19 @@ export const SECTION_DEFS: Record<SectionType, SectionDef> = {
       { key: "limit", kind: "number", min: 1, max: 24, default: 6 },
     ],
   },
+  offers: {
+    type: "offers",
+    labelKey: "secOffers",
+    headingKey: "secOffersHeadingDefault",
+    // Nothing about the offers themselves is stored here — they're promotions,
+    // edited on their own screen. Same rule as rooms: a section says which and
+    // how many, never what, so a discount can't go stale on the home page.
+    fields: [
+      HEADING,
+      { key: "intro", kind: "textarea", localized: true, rich: true },
+      { key: "limit", kind: "number", min: 1, max: 12, default: 3 },
+    ],
+  },
   gallery: {
     type: "gallery",
     labelKey: "secGallery",
@@ -256,6 +270,9 @@ export const DEFAULT_WEBSITE_SECTIONS: SiteSection[] = [
   { id: "hero", type: "hero" },
   { id: "highlights", type: "highlights" },
   { id: "rooms", type: "rooms" },
+  // Straight after the rooms, and it renders nothing at all until the property
+  // has an offer to show — so it costs a hotel with no promotions no space.
+  { id: "offers", type: "offers" },
   { id: "gallery", type: "gallery" },
   { id: "facilities", type: "facilities" },
   { id: "map", type: "map" },
