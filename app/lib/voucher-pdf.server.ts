@@ -39,8 +39,14 @@ export async function renderVoucherPdf(input: VoucherPdfInput): Promise<Uint8Arr
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
   // The whole payload is the sample: it's what decides whether the Thai family
-  // is embedded at all, and every string drawn below comes out of it.
-  const { regular: font, bold, fontFor } = await embedPdfFonts(doc, JSON.stringify(input));
+  // is embedded at all, and every string drawn below comes out of it — except
+  // the formatted amounts, hence the sample amount. THB's ฿ sits in the Thai
+  // block and Intl emits it for some locales, so a THB voucher needs the Thai
+  // family even when every word on it is English.
+  const { regular: font, bold, fontFor } = await embedPdfFonts(
+    doc,
+    JSON.stringify(input) + formatMoney(0, currency),
+  );
   doc.setTitle(`${hotelName} voucher ${v.code}`);
 
   const page = doc.addPage([PAGE_W, PAGE_H]);
