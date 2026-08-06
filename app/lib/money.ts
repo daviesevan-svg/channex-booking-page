@@ -1,3 +1,20 @@
+// Currencies to render with their NARROW symbol. Intl's default `symbol`
+// display has no symbol for these and falls back to the bare ISO code —
+// "THB 1,234.50" where the guest expects "฿1,234.50".
+//
+// Deliberately a list rather than a blanket `currencyDisplay: "narrowSymbol"`:
+// the narrow form also drops the prefix that tells the dollars apart, collapsing
+// AUD (A$), CAD (CA$), NZD (NZ$) and SGD to a bare "$". Adding a currency to the
+// list in admin General? Print it both ways first — take the narrow form only
+// when the default gives back the code and the narrow one is unambiguous.
+const NARROW_SYMBOL = new Set(["THB"]);
+
+/** How `currency` should name itself. Exported for the one other place that
+ *  builds its own Intl formatter (the voucher email's big gift value). */
+export function currencyDisplay(currency: string): "symbol" | "narrowSymbol" {
+  return NARROW_SYMBOL.has(currency.trim().toUpperCase()) ? "narrowSymbol" : "symbol";
+}
+
 // Format a Channex price string (e.g. "198.00") in the given currency.
 export function formatMoney(amount: string | number, currency = "USD", locale?: string): string {
   const value = typeof amount === "string" ? Number(amount) : amount;
@@ -6,6 +23,7 @@ export function formatMoney(amount: string | number, currency = "USD", locale?: 
     return new Intl.NumberFormat(locale, {
       style: "currency",
       currency,
+      currencyDisplay: currencyDisplay(currency),
       maximumFractionDigits: 2,
     }).format(value);
   } catch {
