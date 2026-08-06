@@ -342,7 +342,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         <div className="border-t border-divider pt-5">
           <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPaymentTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            {t("rtPaymentIntro")}
+            {t(canTakeCard ? "rtPaymentIntroCharge" : "rtPaymentIntroNoGateway")}
           </p>
 
           {/* A penalty you can't charge is a term you can't enforce. Warn where

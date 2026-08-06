@@ -270,8 +270,6 @@ const EN: Record<string, string> = {
     "With this off, your address shows the booking search page exactly as it does today. With it on, it shows a website home page and the search box becomes part of it. The booking flow itself never changes.",
   webEnableLabel: "Enable website",
   webEnableLabelDesc: "You can turn this off again at any time — nothing you have entered is deleted.",
-  webNotBuiltYet:
-    "Page building isn't here yet, so turning this on doesn't change what guests see. It records the choice and unlocks the settings below. Your photos and facilities already appear on your booking page.",
   webAddressTitle: "Address",
   webAddressHint: "Where your booking page and website live today.",
   webViewSite: "View ↗",
@@ -1356,7 +1354,10 @@ const EN: Record<string, string> = {
   rtNoCardWarnBody:
     "It charges for a late cancellation or a no-show, but card payments aren't set up, so no card is taken and there's nothing to charge. Guests will still agree to the terms.",
   rtNoCardWarnLink: "Set up payments",
-  rtPaymentIntro: "How and when the guest pays. This drives the checkout breakdown and policy text — it doesn’t charge cards (no payment gateway is connected yet).",
+  rtPaymentIntroCharge:
+    "How and when the guest pays. This drives the checkout breakdown, the policy text, and what Stripe charges at checkout.",
+  rtPaymentIntroNoGateway:
+    "How and when the guest pays. This drives the checkout breakdown and policy text — no card is charged until you connect payments.",
   rtPayTiming: "Payment timing",
   rtOptTiming_pay_at_hotel: "Pay at hotel",
   rtOptTiming_deposit: "Deposit",
@@ -2068,8 +2069,6 @@ const DE: Record<string, string> = {
   webEnableLabel: "Website aktivieren",
   webEnableLabelDesc:
     "Sie können dies jederzeit wieder ausschalten — nichts, was Sie eingegeben haben, wird gelöscht.",
-  webNotBuiltYet:
-    "Der Seiteneditor ist noch nicht verfügbar; das Einschalten ändert also noch nichts für Gäste. Es merkt sich Ihre Entscheidung und schaltet die Einstellungen unten frei. Ihre Fotos und Ausstattung erscheinen bereits auf Ihrer Buchungsseite.",
   webAddressTitle: "Adresse",
   webAddressHint: "Wo Ihre Buchungsseite und Website heute erreichbar sind.",
   webViewSite: "Ansehen ↗",
@@ -3159,7 +3158,10 @@ const DE: Record<string, string> = {
   rtNoCardWarnBody:
     "Sie berechnet eine späte Stornierung oder ein Nichterscheinen, aber Kartenzahlungen sind nicht eingerichtet – es wird keine Karte erfasst und es gibt nichts zu belasten. Gäste stimmen den Bedingungen dennoch zu.",
   rtNoCardWarnLink: "Zahlungen einrichten",
-  rtPaymentIntro: "Wie und wann der Gast zahlt. Dies steuert die Aufschlüsselung im Checkout und den Bedingungstext — es werden keine Karten belastet (noch kein Zahlungsanbieter angebunden).",
+  rtPaymentIntroCharge:
+    "Wie und wann der Gast zahlt. Dies steuert die Aufschlüsselung im Checkout, den Bedingungstext und was Stripe beim Checkout abbucht.",
+  rtPaymentIntroNoGateway:
+    "Wie und wann der Gast zahlt. Dies steuert die Aufschlüsselung im Checkout und den Bedingungstext — es wird keine Karte belastet, bis Sie Zahlungen anbinden.",
   rtPayTiming: "Zahlungszeitpunkt",
   rtOptTiming_pay_at_hotel: "Zahlung im Hotel",
   rtOptTiming_deposit: "Anzahlung",
@@ -3872,8 +3874,6 @@ const PT: Record<string, string> = {
   webEnableLabel: "Ativar site",
   webEnableLabelDesc:
     "Pode voltar a desligar a qualquer momento — nada do que introduziu é eliminado.",
-  webNotBuiltYet:
-    "O editor de páginas ainda não existe, por isso ativar não altera o que os hóspedes veem. Regista a sua escolha e desbloqueia as definições abaixo. As suas fotos e instalações já aparecem na página de reservas.",
   webAddressTitle: "Endereço",
   webAddressHint: "Onde a sua página de reservas e o seu site estão hoje.",
   webViewSite: "Ver ↗",
@@ -4960,7 +4960,10 @@ const PT: Record<string, string> = {
   rtNoCardWarnBody:
     "Cobra por cancelamento tardio ou não comparência, mas os pagamentos com cartão não estão configurados, pelo que nenhum cartão é recolhido e não há nada a cobrar. Os hóspedes continuarão a aceitar as condições.",
   rtNoCardWarnLink: "Configurar pagamentos",
-  rtPaymentIntro: "Como e quando o hóspede paga. Isto determina o detalhe da finalização e o texto da política — não cobra cartões (ainda não há gateway de pagamento ligado).",
+  rtPaymentIntroCharge:
+    "Como e quando o hóspede paga. Isto determina o detalhe da finalização, o texto da política e o que o Stripe cobra na finalização.",
+  rtPaymentIntroNoGateway:
+    "Como e quando o hóspede paga. Isto determina o detalhe da finalização e o texto da política — nenhum cartão é cobrado até ligar os pagamentos.",
   rtPayTiming: "Momento do pagamento",
   rtOptTiming_pay_at_hotel: "Pagamento no hotel",
   rtOptTiming_deposit: "Depósito",
@@ -5668,8 +5671,6 @@ const TH: Record<string, string> = {
     "หากปิดไว้ ที่อยู่เว็บของคุณจะแสดงหน้าค้นหาการจองเหมือนที่เป็นอยู่ทุกวันนี้ หากเปิด จะแสดงหน้าแรกของเว็บไซต์ และช่องค้นหาจะกลายเป็นส่วนหนึ่งของหน้านั้น ขั้นตอนการจองไม่เปลี่ยนแปลง",
   webEnableLabel: "เปิดใช้งานเว็บไซต์",
   webEnableLabelDesc: "คุณปิดกลับได้ทุกเมื่อ — ข้อมูลที่คุณกรอกไว้จะไม่ถูกลบ",
-  webNotBuiltYet:
-    "ระบบสร้างหน้ายังไม่พร้อมใช้งาน การเปิดตัวเลือกนี้จึงยังไม่เปลี่ยนสิ่งที่ผู้เข้าพักเห็น แต่จะบันทึกการตั้งค่าไว้และปลดล็อกการตั้งค่าด้านล่าง รูปภาพและสิ่งอำนวยความสะดวกของคุณแสดงบนหน้าจองอยู่แล้ว",
   webAddressTitle: "ที่อยู่เว็บ",
   webAddressHint: "ตำแหน่งที่หน้าจองและเว็บไซต์ของคุณอยู่ในปัจจุบัน",
   webViewSite: "ดู ↗",
@@ -6753,7 +6754,10 @@ const TH: Record<string, string> = {
   rtNoCardWarnBody:
     "แพ็กเกจนี้เรียกเก็บเงินเมื่อยกเลิกช้าหรือไม่เข้าพัก แต่ยังไม่ได้ตั้งค่าการรับชำระด้วยบัตร จึงไม่มีการเก็บข้อมูลบัตรและไม่มีอะไรให้เรียกเก็บ ผู้เข้าพักจะยังคงยอมรับเงื่อนไขนี้",
   rtNoCardWarnLink: "ตั้งค่าการชำระเงิน",
-  rtPaymentIntro: "ผู้เข้าพักชำระเงินอย่างไรและเมื่อใด ค่านี้กำหนดการแยกยอดในหน้าชำระเงินและข้อความนโยบาย — แต่ไม่ได้เรียกเก็บเงินจากบัตร (ยังไม่ได้เชื่อมต่อเกตเวย์การชำระเงิน)",
+  rtPaymentIntroCharge:
+    "ผู้เข้าพักชำระเงินอย่างไรและเมื่อใด ค่านี้กำหนดการแยกยอดในหน้าชำระเงิน ข้อความนโยบาย และยอดที่ Stripe เรียกเก็บเมื่อชำระเงิน",
+  rtPaymentIntroNoGateway:
+    "ผู้เข้าพักชำระเงินอย่างไรและเมื่อใด ค่านี้กำหนดการแยกยอดในหน้าชำระเงินและข้อความนโยบาย — จะไม่มีการเรียกเก็บเงินจากบัตรจนกว่าคุณจะเชื่อมต่อการชำระเงิน",
   rtPayTiming: "จังหวะการชำระเงิน",
   rtOptTiming_pay_at_hotel: "ชำระที่โรงแรม",
   rtOptTiming_deposit: "เงินมัดจำ",
@@ -7450,8 +7454,6 @@ const TR: Record<string, string> = {
   webEnableLabel: "Web sitesini etkinleştir",
   webEnableLabelDesc:
     "Dilediğiniz zaman yeniden kapatabilirsiniz — girdiğiniz hiçbir şey silinmez.",
-  webNotBuiltYet:
-    "Sayfa oluşturma henüz hazır değil; bu nedenle bunu açmak misafirlerin gördüğünü değiştirmez. Yalnızca tercihinizi kaydeder ve aşağıdaki ayarları açar. Fotoğraflarınız ve olanaklarınız rezervasyon sayfanızda zaten görünüyor.",
   webAddressTitle: "Adres",
   webAddressHint: "Rezervasyon sayfanızın ve web sitenizin bugünkü adresi.",
   webViewSite: "Görüntüle ↗",
@@ -8600,8 +8602,10 @@ const TR: Record<string, string> = {
   rtNoCardWarnBody:
     "Geç iptal veya gelmeme durumunda ücret alıyor, ancak kart ödemeleri tanımlı olmadığından kart alınmıyor ve tahsil edilecek bir şey yok. Misafirler yine de koşulları kabul edecek.",
   rtNoCardWarnLink: "Ödemeleri kur",
-  rtPaymentIntro:
-    "Misafirin nasıl ve ne zaman ödeyeceği. Bu, ödeme adımındaki döküm ve koşul metnini belirler — kart tahsilatı yapmaz (henüz bağlı bir ödeme altyapısı yok).",
+  rtPaymentIntroCharge:
+    "Misafirin nasıl ve ne zaman ödeyeceği. Bu, ödeme adımındaki dökümü, koşul metnini ve Stripe'ın ödeme adımında tahsil edeceği tutarı belirler.",
+  rtPaymentIntroNoGateway:
+    "Misafirin nasıl ve ne zaman ödeyeceği. Bu, ödeme adımındaki döküm ve koşul metnini belirler — ödemeleri bağlayana kadar karttan tahsilat yapılmaz.",
   rtPayTiming: "Ödeme zamanı",
   rtOptTiming_pay_at_hotel: "Otelde ödeme",
   rtOptTiming_deposit: "Depozito",
