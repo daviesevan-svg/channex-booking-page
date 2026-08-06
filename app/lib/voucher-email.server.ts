@@ -9,7 +9,7 @@
 // through the accent, which replaces the design's terracotta everywhere.
 import { format, parseISO } from "date-fns";
 
-import { currencyDisplay, formatMoney } from "./money";
+import { currencyDisplay, formatMoney, isZeroDecimal } from "./money";
 import type { VoucherRecord } from "./vouchers";
 
 // Fixed palette from the design handoff (email-safe warm neutrals).
@@ -152,7 +152,7 @@ export function composeVoucherEmail(ctx: Ctx): { subject: string; html: string }
         currency,
         currencyDisplay: currencyDisplay(currency),
         minimumFractionDigits: 0,
-        maximumFractionDigits: Number.isInteger(giftValue) ? 0 : 2,
+        maximumFractionDigits: Number.isInteger(giftValue) || isZeroDecimal(currency) ? 0 : 2,
       }).format(giftValue);
     } catch {
       return money(giftValue);
