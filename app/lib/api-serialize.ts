@@ -167,6 +167,9 @@ function serializeRatePlan(rp: RatePlan, room: RoomWithRates, ctx?: StayContext)
     nights: ctx?.nights ?? null,
     available: rp.availability ?? null,
     occupancy: rp.occupancy,
+    /** True when this rate prices per adult — total_price already reflects the
+     *  requested party, so callers need no arithmetic; this is informational. */
+    per_person: rp.perPerson ?? false,
     refundable: rp.refundable ?? null,
     free_cancel_until: rp.freeCancelUntilISO ?? null,
     /** Plain sentences, the same ones the guest is shown at checkout. */
@@ -236,7 +239,8 @@ export function serializeRate(r: CatalogRate) {
     id: r.id,
     title: r.title,
     meal_plan: r.mealPlan ?? null,
-    prices: r.prices, // base nightly price by room id, property currency
+    prices: r.prices, // base nightly price by room id (per adult when per_person), property currency
+    per_person: r.perPerson ?? false,
     refundable: r.refundable,
     cancel_deadline_value: r.cancelDeadlineValue ?? null,
     cancel_deadline_unit: r.cancelDeadlineUnit ?? null,

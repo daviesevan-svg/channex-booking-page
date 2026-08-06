@@ -31,10 +31,46 @@ export function occupancyNightlyDelta(
   let d = 0;
   if (adults > def) d += (adults - def) * (op.extraAdultPrice ?? 0);
   else if (adults < def) d -= (def - adults) * (op.lessGuestDiscount ?? 0);
+  return d + childrenNightlyDelta(op, childrenAge);
+}
+
+/** The children part of the occupancy delta alone — per child per night, by age
+ *  band. This is the only part of `occupancyPricing` a PER-PERSON rate uses:
+ *  adult pricing comes from the per-occupancy prices themselves. */
+export function childrenNightlyDelta(op: OccupancyPricing | undefined, childrenAge: number[]): number {
+  if (!op) return 0;
+  let d = 0;
   for (const age of childrenAge) {
     if (age <= 3) d += op.child0to3 ?? 0;
     else if (age <= 12) d += op.child4to12 ?? 0;
     else d += op.child13plus ?? 0;
   }
   return d;
+}
+
+/** Pick the price for `adults` from a per-occupancy price map (keys = adults,
+ *  key 0 = an occupancy-less price — a manual edit, or a leftover from when the
+ *  plan was pushed per-room — read as a price PER ADULT).
+ *
+ *  Selection: a pushed per-occupancy price wins — the exact occupancy, else the
+ *  nearest defined below (Channex pushes a contiguous 1..max, so this is just
+ *  clamping), else the smallest above. Occupancy-0 is only the fallback:
+ *  Channex per-ROOM pushes also land at occupancy 0, so letting it win would
+ *  let stale rows shadow a per-person push forever after a rate switches mode.
+ *  Undefined when the map has no usable entry. */
+export function perPersonPrice(
+  byOcc: Record<number, number> | undefined,
+  adults: number,
+): number | undefined {
+  if (!byOcc) return undefined;
+  if (byOcc[adults] !== undefined && adults > 0) return byOcc[adults];
+  const occs = Object.keys(byOcc)
+    .map(Number)
+    .filter((o) => o > 0)
+    .sort((a, b) => a - b);
+  if (occs.length === 0) {
+    return byOcc[0] !== undefined ? byOcc[0] * Math.max(1, adults) : undefined;
+  }
+  const below = occs.filter((o) => o < adults);
+  return byOcc[below.length ? below[below.length - 1] : occs[0]];
 }

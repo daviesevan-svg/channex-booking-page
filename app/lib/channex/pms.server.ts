@@ -40,6 +40,9 @@ export interface ChannexRatePlan {
   mealPlan?: string;
   currency?: string;
   occupancy?: number;
+  /** Channex sell mode — "per_person" plans price each occupancy separately
+   *  (their ARI pushes carry a price per number of adults). */
+  sellMode?: string;
   /** True when this rate plan is distributed to a real OTA channel (Booking.com,
    *  Expedia, Airbnb…). We default these OFF at import — a commission-free direct
    *  engine usually sells the property's own direct rates, not its OTA rates. */
@@ -243,6 +246,7 @@ export async function getChannexRatePlans(
       mealPlan: mealRaw ? (MEAL_LABELS[mealRaw] ?? mealRaw) : undefined,
       currency: str(a.currency),
       occupancy: num(a.occupancy),
+      sellMode: str(a.sellMode),
       ota: otaChannels.length > 0,
       otaChannels,
     };

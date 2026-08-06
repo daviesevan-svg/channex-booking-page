@@ -18,7 +18,7 @@ import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
 import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
-import { occupancyNightlyDelta } from "~/lib/rate-pricing";
+import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice } from "~/lib/rate-pricing";
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
@@ -268,8 +268,17 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const priceFor = (plan: DetailRate) => {
     const op = plan.occupancyPricing;
     const grossSearched = plan.offer ? Number(plan.offer.originalTotalPrice) : Number(plan.totalPrice);
-    const baseGross = grossSearched - occupancyNightlyDelta(op, searched.adults, searched.childrenAge) * nights;
-    const gross = Math.max(0, baseGross + occupancyNightlyDelta(op, adults, childrenAges) * nights);
+    // Per-person rates carry a room-only stay total per adults count (their
+    // prices vary by date, so the flat-delta reversal below can't apply);
+    // children still add via the age bands, same as the server.
+    const perPersonGross = perPersonPrice(plan.perPersonTotals, adults);
+    const baseGross =
+      perPersonGross !== undefined
+        ? perPersonGross + childrenNightlyDelta(op, childrenAges) * nights
+        : grossSearched -
+          occupancyNightlyDelta(op, searched.adults, searched.childrenAge) * nights +
+          occupancyNightlyDelta(op, adults, childrenAges) * nights;
+    const gross = Math.max(0, baseGross);
     const offerPct = plan.offer?.percent ?? 0;
     return {
       gross: allInOf(gross),

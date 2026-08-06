@@ -142,6 +142,14 @@ export interface RatePlan {
   /** Per-person pricing rules (set by getCatalogRooms from the rate), so the
    *  detail page can re-price live for a chosen room occupancy. */
   occupancyPricing?: OccupancyPricing;
+  /** True for a per-person rate: the price is per number of ADULTS (from
+   *  Channex per-occupancy pushes, or a per-adult base price). Children still
+   *  price via `occupancyPricing`'s age bands. */
+  perPerson?: boolean;
+  /** Per-person rates only: room-only stay total for each adults count
+   *  (1..maxAdults), pre-offer — the detail page re-prices from these because a
+   *  per-person rate's prices vary by date, so a flat nightly delta can't. */
+  perPersonTotals?: Record<number, number>;
   /** Tax-/fee-inclusive stay total (set by the results loader via computePricing)
    *  — the all-in price shown to guests and emitted in Google structured data so
    *  it matches the checkout total. `allInOriginal` is the pre-discount equivalent. */
