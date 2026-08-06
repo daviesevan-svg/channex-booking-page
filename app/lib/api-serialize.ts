@@ -233,14 +233,16 @@ export function policyMap(
   return new Map(rates.map((r) => [r.id, describePolicy(ratePolicyOf(r), anchor)]));
 }
 
-/** Rate plan definitions + policy (GET /v1/rates). */
-export function serializeRate(r: CatalogRate) {
+/** Rate plan definitions + policy (GET /v1/rates). `perPerson` is the
+ *  property-wide pricing mode (settings.pricingMode) — it can't vary per rate,
+ *  but stays a per-rate field in the payload for API back-compat. */
+export function serializeRate(r: CatalogRate, perPerson: boolean) {
   return {
     id: r.id,
     title: r.title,
     meal_plan: r.mealPlan ?? null,
     prices: r.prices, // base nightly price by room id (per adult when per_person), property currency
-    per_person: r.perPerson ?? false,
+    per_person: perPerson,
     refundable: r.refundable,
     cancel_deadline_value: r.cancelDeadlineValue ?? null,
     cancel_deadline_unit: r.cancelDeadlineUnit ?? null,
