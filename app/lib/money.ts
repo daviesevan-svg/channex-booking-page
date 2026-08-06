@@ -16,6 +16,12 @@ export function currencyDisplay(currency: string): "symbol" | "narrowSymbol" {
 }
 
 // Format a Channex price string (e.g. "198.00") in the given currency.
+//
+// The fraction digits are Intl's, per currency — NOT a hardcoded 2. Two is
+// right for most, but the zero-decimal currencies have no minor unit at all
+// (see STRIPE_ZERO_DECIMAL below), and forcing a maximum of 2 on those left the
+// half of a yen that the arithmetic produced on screen: "¥1,234.5" where the
+// hotel means ¥1,235. It reads like a typo, and there is no such coin.
 export function formatMoney(amount: string | number, currency = "USD", locale?: string): string {
   const value = typeof amount === "string" ? Number(amount) : amount;
   if (Number.isNaN(value)) return String(amount);
@@ -24,7 +30,6 @@ export function formatMoney(amount: string | number, currency = "USD", locale?: 
       style: "currency",
       currency,
       currencyDisplay: currencyDisplay(currency),
-      maximumFractionDigits: 2,
     }).format(value);
   } catch {
     return `${value.toFixed(2)} ${currency}`;
@@ -45,10 +50,20 @@ const STRIPE_ZERO_DECIMAL = new Set([
 // Deliberately NOT handled: Stripe's three-decimal currencies (BHD, JOD, KWD,
 // OMR, TND), which take amounts ×1000 rounded to the nearest 10. None of them
 // are on the currency list in admin General — add them here before one is.
+// Note that formatMoney already PRINTS those with three decimals (Intl knows
+// the minor unit), so adding one without coming here would show a price the
+// charge doesn't match.
+
+/** True when the currency has no minor unit at all — ¥, ₩, ₫. Sourced from
+ *  Stripe's list, but it's a property of the currency, so display code can ask
+ *  too: a fraction of one of these is not a real amount. */
+export function isZeroDecimal(currency: string): boolean {
+  return STRIPE_ZERO_DECIMAL.has(currency.trim().toUpperCase());
+}
 
 /** Minor units per major unit for `currency` at Stripe: 1 or 100. */
 export function stripeMinorFactor(currency: string): number {
-  return STRIPE_ZERO_DECIMAL.has(currency.trim().toUpperCase()) ? 1 : 100;
+  return isZeroDecimal(currency) ? 1 : 100;
 }
 
 /** A major-unit amount (12.34, or 20000 for ¥) as the minor units Stripe charges. */
