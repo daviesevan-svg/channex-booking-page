@@ -1,4 +1,5 @@
 import { getConfigKV } from "./config.server";
+import { parseHHMM } from "./dates";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
   bookingCutoffOf,
@@ -510,6 +511,21 @@ const posInt = (v: FormDataEntryValue | null): number | undefined => {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
+/** Like posInt but 0 survives — for a field where zero means something. An empty
+ *  box is still undefined, so "no deadline" and "0 hours" stay distinguishable. */
+const nonNegInt = (v: FormDataEntryValue | null): number | undefined => {
+  const raw = String(v ?? "").trim();
+  if (!raw) return undefined;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : undefined;
+};
+
+/** A "HH:MM" wall-clock time, or undefined when blank/malformed. */
+const hhmm = (v: FormDataEntryValue | null): string | undefined => {
+  const raw = String(v ?? "").trim();
+  return parseHHMM(raw) == null ? undefined : raw;
+};
+
 // ===== taxes & fees =====
 const num = (v: unknown, min = 0): number => {
   const n = Number(v);
@@ -606,8 +622,12 @@ export async function savePortalSettings(pid: string, form: FormData): Promise<S
     allowCancel: form.get("allowCancel") === "on",
     allowModify: form.get("allowModify") === "on",
     autoRefund: form.get("autoRefund") === "on",
-    cancelDeadlineValue: posInt(form.get("cancelDeadlineValue")),
+    // 0 is a REAL value here, not "unset": with the 18:00 anchor it means free
+    // cancellation until 6pm on the day of arrival. posInt would silently turn it
+    // into "no deadline at all", which is a refund promise nobody made.
+    cancelDeadlineValue: nonNegInt(form.get("cancelDeadlineValue")),
     cancelDeadlineUnit: unit("cancelDeadlineUnit"),
+    cancelAnchorTime: hhmm(form.get("cancelAnchorTime")),
     modifyDeadlineValue: posInt(form.get("modifyDeadlineValue")),
     modifyDeadlineUnit: unit("modifyDeadlineUnit"),
     afterDeadlineMessage: String(form.get("afterDeadlineMessage") ?? "").trim() || undefined,

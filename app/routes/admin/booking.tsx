@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/booking";
 import { adminMeta } from "~/lib/admin-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
-import { cancellationMessage } from "~/lib/cancellation";
+import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
 import { useAdminLang, useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
@@ -196,7 +196,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const gt = makeTranslator(useAdminLang());
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
-    ? gt.t(msg.key, "iso" in msg ? { date: fmtDate(msg.iso, "EEE d MMM yyyy", dl) } : undefined)
+    ? gt.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", dl) } : undefined)
     : "";
 
   return (

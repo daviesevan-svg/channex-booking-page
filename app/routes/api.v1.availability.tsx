@@ -51,7 +51,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     children: childrenAge.length,
     checkin,
     taxConfig: taxConfigFrom(settings),
-    policyByRateId: policyMap(rates),
+    policyByRateId: policyMap(rates, settings.cancelAnchorTime),
   };
 
   return Response.json({

@@ -327,6 +327,15 @@ export interface SiteSettings {
   /** Default windows used when a rate plan doesn't set its own. */
   cancelDeadlineValue?: number;
   cancelDeadlineUnit?: DeadlineUnit;
+  /**
+   * "HH:MM" local time on the ARRIVAL DATE that cancellation deadlines count
+   * back from. Default 18:00 (see DEFAULT_CANCEL_ANCHOR).
+   *
+   * This is what makes "24 hours before arrival" mean 6pm the night before rather
+   * than midnight, and what lets a deadline of 0 mean "6pm on the day you
+   * arrive" — the flexible-city-hotel policy. Evaluated in `timezone`.
+   */
+  cancelAnchorTime?: string;
   modifyDeadlineValue?: number;
   modifyDeadlineUnit?: DeadlineUnit;
   /** Shown to guests once the cancel/modify deadline has passed. */

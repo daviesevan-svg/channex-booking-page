@@ -220,9 +220,14 @@ export function serializeGateReason(g: GateReason) {
   };
 }
 
-/** Policy sentences per rate id, built once for a whole availability response. */
-export function policyMap(rates: CatalogRate[]): Map<string, ReturnType<typeof describePolicy>> {
-  return new Map(rates.map((r) => [r.id, describePolicy(ratePolicyOf(r))]));
+/** Policy sentences per rate id, built once for a whole availability response.
+ *  `anchor` is the property's cancellation cut-off time — without it the
+ *  sentences would name 18:00 while the property's deadlines use its own. */
+export function policyMap(
+  rates: CatalogRate[],
+  anchor?: string,
+): Map<string, ReturnType<typeof describePolicy>> {
+  return new Map(rates.map((r) => [r.id, describePolicy(ratePolicyOf(r), anchor)]));
 }
 
 /** Rate plan definitions + policy (GET /v1/rates). */

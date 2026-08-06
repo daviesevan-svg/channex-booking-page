@@ -5,6 +5,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
+import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings, savePortalSettings } from "~/lib/overrides.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -120,6 +121,21 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
           value={s.cancelDeadlineValue}
           unit={s.cancelDeadlineUnit}
         />
+        {/* The wall-clock the deadline counts back from. Its own field because a
+            deadline in hours is meaningless without it: 24 hours before arrival is
+            6pm the previous evening here, not midnight. */}
+        <label className="block text-[14px] font-semibold">
+          {t("poCancelAnchor")}
+          <input
+            name="cancelAnchorTime"
+            type="time"
+            defaultValue={s.cancelAnchorTime || DEFAULT_CANCEL_ANCHOR}
+            className="mt-1.5 block w-40 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
+          />
+          <span className="mt-1 block text-[12px] font-normal text-muted">
+            {t("poCancelAnchorHint")}
+          </span>
+        </label>
         <label className="flex items-start gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
           <span>

@@ -14,7 +14,7 @@ import { serializeBooking } from "~/lib/api-serialize";
 import { getSettings } from "~/lib/overrides.server";
 
 import { getGuestEmail } from "~/lib/guest-auth.server";
-import { cancellationMessage } from "~/lib/cancellation";
+import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -144,7 +144,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
 
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
-    ? tr.t(msg.key, "iso" in msg ? { date: fmt(msg.iso, "EEE d MMM yyyy") } : undefined)
+    ? tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", tr.locale) } : undefined)
     : "";
 
   return (

@@ -368,6 +368,41 @@ the same function the search calendar uses.
 The room page 404s when the website layer is off — there's no website for it to
 belong to.
 
+### Cancellation deadlines are anchored to a wall clock
+
+Not part of the website layer, but it lands in the same guest copy. A cancellation
+tier stores an offset ("free until N hours before arrival"), and that offset now
+counts back from **`cancelAnchorTime` on the arrival date** (default 18:00, read in
+the property's `timezone`) rather than from midnight UTC. Evan's framing, from a
+hotel wanting "up to 6pm on the day of check-in":
+
+| Stored | Means |
+|---|---|
+| `0` hours | 18:00 on the day of arrival — the flexible-city-hotel policy |
+| `6` hours | 12:00 on the day of arrival |
+| `24` hours | 18:00 the evening before |
+| `48` hours | 18:00 two evenings before |
+
+Three things this fixed at once: 6pm-day-of was previously **inexpressible** (the
+offset had to be positive and midnight was the anchor, so 6pm on the arrival day
+was 18 hours the wrong side of it); `0` was silently coerced to "no deadline at
+all", i.e. a refund promise with no limit; and every existing "24 hours" was
+anchored to midnight **UTC**, so a UK hotel's deadline drifted an hour through
+summer time.
+
+`cancelDeadline()` in `dates.ts` is the one implementation, returning both the
+instant (which gates the cancel button and the auto-refund) and a **naive local
+string** — "2026-08-09T18:00" — for display. The naive form is load-bearing: it
+carries no offset, so the server and a guest's browser in another timezone render
+the same words, and those words are the time the hotel actually means rather than
+its UTC equivalent. Bookings snapshotted before this keep rendering from the
+instant.
+
+`formatCancelDeadline()` is the single renderer for all six places the deadline
+appears (rate card, checkout, manage booking, admin, email, PDF). They previously
+used four different patterns and only two showed a time at all — fine for a
+midnight-ish deadline, actively misleading for 6pm.
+
 ### Offers
 
 `/:channelId/offers` is the room page's counterpart for promotions: every
