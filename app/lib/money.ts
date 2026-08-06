@@ -20,14 +20,15 @@ export const MONEY_LOCALE = "en-US";
 
 // Currencies to render with their NARROW symbol. Intl's default `symbol`
 // display has no symbol for these and falls back to the bare ISO code —
-// "THB 1,234.50" where the guest expects "฿1,234.50".
+// "THB 1,234.50" where the guest expects "฿1,234.50", "TRY" where they
+// expect "₺".
 //
 // Deliberately a list rather than a blanket `currencyDisplay: "narrowSymbol"`:
 // the narrow form also drops the prefix that tells the dollars apart, collapsing
 // AUD (A$), CAD (CA$), NZD (NZ$) and SGD to a bare "$". Adding a currency to the
 // list in admin General? Print it both ways first — take the narrow form only
 // when the default gives back the code and the narrow one is unambiguous.
-const NARROW_SYMBOL = new Set(["THB"]);
+const NARROW_SYMBOL = new Set(["THB", "TRY"]);
 
 /** How `currency` should name itself. Exported for the one other place that
  *  builds its own Intl formatter (the voucher email's big gift value). */
