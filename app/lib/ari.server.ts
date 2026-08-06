@@ -802,7 +802,16 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
 export interface InventoryEdits {
   currency: string;
   availability: { roomId: string; date: string; avail: number }[];
-  prices: { rateId: string; roomId: string; date: string; price: number }[];
+  /** `occupancy` omitted (or 0) is the occupancy-less price — one price for the
+   *  date, which per-person pricing reads as a price PER ADULT. A value >= 1
+   *  prices that exact number of adults, the same shape Channex pushes for a
+   *  per-person plan. */
+  prices: { rateId: string; roomId: string; date: string; price: number; occupancy?: number }[];
+  /** Per-occupancy prices to REMOVE, so the date inherits again (a nearby
+   *  occupancy, else the occupancy-less price × adults). Clearing the cell is
+   *  the only way to undo an override, so blank has to mean delete rather than
+   *  "leave alone" the way it does for the other fields. */
+  priceDeletes: { rateId: string; roomId: string; date: string; occupancy: number }[];
   restrictions: {
     rateId: string;
     roomId: string;
@@ -825,9 +834,12 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
   );
   const rateStmt = D.prepare(
     `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
-     VALUES (?,?,?,?,0,?,?,2)
+     VALUES (?,?,?,?,?,?,?,2)
      ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date,occupancy)
      DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency`,
+  );
+  const rateDelStmt = D.prepare(
+    `DELETE FROM rate WHERE hotel_code=? AND room_type_id=? AND rate_plan_id=? AND date=? AND occupancy=?`,
   );
   const restrStmt = D.prepare(
     `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival,closed_to_arrival,closed_to_departure)
@@ -839,7 +851,11 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
   const stmts: D1PreparedStatement[] = [];
   for (const a of edits.availability) stmts.push(availStmt.bind(hotelCode, a.roomId, a.date, a.avail));
   for (const p of edits.prices)
-    stmts.push(rateStmt.bind(hotelCode, p.roomId, p.rateId, p.date, Math.round(p.price * 100), edits.currency));
+    stmts.push(
+      rateStmt.bind(hotelCode, p.roomId, p.rateId, p.date, p.occupancy ?? 0, Math.round(p.price * 100), edits.currency),
+    );
+  for (const p of edits.priceDeletes)
+    stmts.push(rateDelStmt.bind(hotelCode, p.roomId, p.rateId, p.date, p.occupancy));
   for (const r of edits.restrictions)
     stmts.push(
       restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay, r.cta ? 1 : 0, r.ctd ? 1 : 0),
@@ -852,6 +868,7 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
   const dates = [
     ...edits.availability.map((a) => a.date),
     ...edits.prices.map((p) => p.date),
+    ...edits.priceDeletes.map((p) => p.date),
     ...edits.restrictions.map((r) => r.date),
   ];
   await withAriLog(hotelCode, actor, dates, write);
@@ -882,7 +899,9 @@ export interface BulkScope {
  *  doesn't clear existing min-stay/CTA/CTD on the same cells. */
 export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: AriActor): Promise<{ cells: number }> {
   if (!s.dates.length) return { cells: 0 };
-  const edits: InventoryEdits = { currency: s.currency, availability: [], prices: [], restrictions: [] };
+  // Bulk sets the occupancy-less price only: the panel has one price box, and in
+  // per-person mode that reads as a price per adult across the whole range.
+  const edits: InventoryEdits = { currency: s.currency, availability: [], prices: [], priceDeletes: [], restrictions: [] };
 
   if (s.avail !== undefined) {
     const avail = Math.max(0, Math.round(s.avail));
