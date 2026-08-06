@@ -239,12 +239,17 @@ export async function getCatalogRooms(
   // explanation. The guest UI ignores this; the API uses it to tell a caller
   // WHY something isn't bookable instead of having it silently vanish.
   const note = (r: GateReason) => opts.reasons?.push(r);
-  const [rooms, rates, promotions] = await Promise.all([
+  const [rooms, rates, promotions, settings] = await Promise.all([
     getRooms(pid),
     getRates(pid),
     getPromotions(pid),
+    // For the cancellation anchor: a rate card's free-until date has to be the
+    // same moment the booking will snapshot, and that needs the hotel's cut-off
+    // time and timezone.
+    getSettings(pid),
   ]);
   const { checkinDate, checkoutDate, currency: cur } = query;
+  const cancelAnchor = { time: settings.cancelAnchorTime, timezone: settings.timezone };
   // Searched party — drives per-person (occupancy) rate pricing below.
   const childrenAge = query.childrenAge ?? [];
   const nights =
@@ -295,6 +300,9 @@ export async function getCatalogRooms(
             .map((r): RatePlan | null => {
               const base = r.prices[room.id];
               const pol = ratePolicyOf(r);
+              // The same computation the booking will snapshot, so the free-until
+              // date on the rate card can't disagree with the confirmation email.
+              const freeCancel = policyToCancellation(pol, checkinDate, cancelAnchor);
               // ARI is keyed by the room's real Channex rate id, which for a
               // consolidated imported rate differs from our single `r.id`.
               const k = (d: string) => `${room.id}|${rateChannexId(r, room.id)}|${d}`;
@@ -348,7 +356,8 @@ export async function getCatalogRooms(
                 inclusions: r.inclusions.length ? r.inclusions : undefined,
                 cancellationNote: pol.overrideNote || undefined,
                 refundable: pol.cancellation.refundable,
-                freeCancelUntilISO: policyToCancellation(pol, checkinDate).cancelByISO,
+                freeCancelUntilISO: freeCancel.cancelByISO,
+                freeCancelUntilLocal: freeCancel.cancelByLocal,
                 offer: offer
                   ? {
                       name: offer.name || "Offer",

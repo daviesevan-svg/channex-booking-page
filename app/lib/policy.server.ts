@@ -1,5 +1,6 @@
 import { getRates } from "./catalog.server";
 import type { DeadlineUnit } from "./content";
+import { cancelDeadline } from "./dates";
 import { getSettings } from "./overrides.server";
 import { DEFAULT_RATE_POLICY, ratePolicyOf, type PenaltyType, type RatePolicy } from "./rate-policy";
 
@@ -7,12 +8,20 @@ export interface CancellationSnapshot {
   refundable: boolean;
   /** Latest moment a guest may self-cancel (ISO). null = no time limit. */
   cancelByISO: string | null;
+  /** The same moment as the hotel's wall clock, for display. See
+   *  CancellationLike.cancelByLocal. */
+  cancelByLocal?: string;
 }
 
-function deadlineMs(value?: number, unit?: DeadlineUnit): number | null {
-  if (!value || value <= 0) return null;
-  const hours = unit === "days" ? value * 24 : value; // default unit: hours
-  return hours * 3600 * 1000;
+/** The window in hours, or null when the rate sets no deadline at all.
+ *
+ *  0 is a real answer, not "unset": with the 18:00 anchor it means free
+ *  cancellation until 6pm on the day of arrival. Treating it as null would
+ *  promise free cancellation with no deadline whatsoever — and with auto-refunds
+ *  on, that promise is money. */
+function deadlineHours(value?: number, unit?: DeadlineUnit): number | null {
+  if (value == null || !Number.isFinite(value) || value < 0) return null;
+  return unit === "days" ? value * 24 : value; // default unit: hours
 }
 
 /** Resolve a booking's cancellation policy from its rates' overrides, falling
@@ -26,10 +35,9 @@ export async function resolveBookingCancellation(
 ): Promise<CancellationSnapshot> {
   const [rates, settings] = await Promise.all([getRates(pid), getSettings(pid)]);
   const byId = new Map(rates.map((r) => [r.id, r]));
-  const checkinMs = Date.parse(checkinISO);
 
   let refundable = true;
-  let earliestCancelBy: number | null = null;
+  let earliest: { utcMs: number; local: string } | null = null;
 
   for (const id of rateIds) {
     const rate = byId.get(id);
@@ -42,16 +50,17 @@ export async function resolveBookingCancellation(
       value = settings.cancelDeadlineValue;
       unit = settings.cancelDeadlineUnit;
     }
-    const ms = deadlineMs(value, unit);
-    if (ms == null) continue; // this rate has no time limit
-    const cancelBy = checkinMs - ms;
-    earliestCancelBy = earliestCancelBy == null ? cancelBy : Math.min(earliestCancelBy, cancelBy);
+    const hours = deadlineHours(value, unit);
+    if (hours == null) continue; // this rate has no time limit
+    // Counted back from the hotel's cut-off time on the arrival date, in its own
+    // timezone — so "24 hours" is 6pm the night before, and 0 is 6pm on the day.
+    const d = cancelDeadline(checkinISO, hours, settings.cancelAnchorTime, settings.timezone);
+    if (!d) continue;
+    if (earliest == null || d.utcMs < earliest.utcMs) earliest = d;
   }
 
-  const cancelByISO =
-    earliestCancelBy == null || Number.isNaN(earliestCancelBy)
-      ? null
-      : new Date(earliestCancelBy).toISOString();
+  const cancelByISO = earliest == null ? null : new Date(earliest.utcMs).toISOString();
+  const earliestCancelBy = earliest?.utcMs ?? null;
   // A free-cancellation window that already closed before the booking was made
   // is, for THIS booking, non-refundable — the guest can never use it. Snapshot
   // it that way, or the confirmation email would promise "free cancellation
@@ -60,7 +69,7 @@ export async function resolveBookingCancellation(
   if (refundable && earliestCancelBy != null && earliestCancelBy <= Date.now()) {
     return { refundable: false, cancelByISO: null };
   }
-  return { refundable, cancelByISO };
+  return { refundable, cancelByISO, cancelByLocal: earliest?.local };
 }
 
 /** True when the cart mixes refundable and non-refundable rates. A single

@@ -3,21 +3,47 @@
 // short policy lines for the rate card / checkout. The cancellation free-until
 // line reuses the existing cancellation engine (translated keys).
 import type { CancellationLike } from "./cancellation";
-import type { PenaltyType, RatePolicy } from "./rate-policy";
+import { cancelDeadline } from "./dates";
+import type { CancelTier, PenaltyType, RatePolicy } from "./rate-policy";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** How the hotel's clock is set, for turning a tier into a real moment. Passed in
+ *  rather than read here so this file stays pure and client-safe. */
+export interface CancelAnchor {
+  /** "HH:MM" on the arrival date that the deadline counts back from. */
+  time?: string;
+  /** IANA timezone the wall-clock is read in. */
+  timezone?: string;
+}
+
+/** A tier's window in hours. `deadlineValue` may legitimately be 0 — that's the
+ *  anchor time itself (6pm on the day of arrival). */
+export function tierHours(tier: CancelTier): number {
+  return tier.deadlineUnit === "days" ? tier.deadlineValue * 24 : tier.deadlineValue;
+}
 
 /** Represent the policy's first cancellation tier as a CancellationLike, so the
  *  existing cancellationMessage()/cancellationView() can render the free-until
  *  line with its already-translated keys. */
-export function policyToCancellation(p: RatePolicy, checkinISO?: string): CancellationLike {
+export function policyToCancellation(
+  p: RatePolicy,
+  checkinISO?: string,
+  anchor?: CancelAnchor,
+): CancellationLike {
   if (!p.cancellation.refundable) return { refundable: false, cancelByISO: null };
   const tier = p.cancellation.tiers[0];
   if (!tier || !checkinISO) return { refundable: true, cancelByISO: null };
-  const hours = tier.deadlineUnit === "days" ? tier.deadlineValue * 24 : tier.deadlineValue;
-  const checkinMs = Date.parse(checkinISO);
-  if (Number.isNaN(checkinMs)) return { refundable: true, cancelByISO: null };
-  return { refundable: true, cancelByISO: new Date(checkinMs - hours * 3600 * 1000).toISOString() };
+  // Anchored to the hotel's wall clock on the arrival date, not to midnight UTC —
+  // see cancelDeadline(). The naive local string rides along so what the guest
+  // reads is the hotel's own 6pm rather than its UTC equivalent.
+  const d = cancelDeadline(checkinISO, tierHours(tier), anchor?.time, anchor?.timezone);
+  if (!d) return { refundable: true, cancelByISO: null };
+  return {
+    refundable: true,
+    cancelByISO: new Date(d.utcMs).toISOString(),
+    cancelByLocal: d.local,
+  };
 }
 
 /** Amount due at booking time (0 = nothing today / pay at hotel). Clamped to the

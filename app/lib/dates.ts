@@ -60,13 +60,15 @@ function addDaysISO(dateISO: string, n: number): string {
   return new Date(Date.parse(`${dateISO}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
-/** UTC epoch ms for `hour`:00 local wall-time on `dateISO` (YYYY-MM-DD) in `tz`.
- *  One-shot offset correction (accurate except across a DST transition at that
- *  exact hour, which doesn't matter for a 17:00 "evening" send). Falls back to
- *  treating the wall-time as UTC when tz is missing or invalid. */
-export function localTimeToUtcMs(dateISO: string, hour: number, tz?: string): number {
+/** UTC epoch ms for `hour`:`minute` local wall-time on `dateISO` (YYYY-MM-DD) in
+ *  `tz`. One-shot offset correction (accurate except across a DST transition at
+ *  that exact hour, which doesn't matter for a 17:00 "evening" send, nor for a
+ *  cancellation deadline — an hour either way on the one night a year a clock
+ *  changes). Falls back to treating the wall-time as UTC when tz is missing or
+ *  invalid. */
+export function localTimeToUtcMs(dateISO: string, hour: number, tz?: string, minute = 0): number {
   const [y, m, d] = dateISO.split("-").map(Number);
-  const guess = Date.UTC(y, (m || 1) - 1, d || 1, hour, 0, 0);
+  const guess = Date.UTC(y, (m || 1) - 1, d || 1, hour, minute, 0);
   if (!tz) return guess;
   try {
     const parts = Object.fromEntries(
@@ -94,7 +96,7 @@ export function localTimeToUtcMs(dateISO: string, hour: number, tz?: string): nu
 }
 
 /** Parse "HH:MM" to minutes-since-midnight, or null if malformed. */
-function parseHHMM(t?: string): number | null {
+export function parseHHMM(t?: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec((t ?? "").trim());
   if (!m) return null;
   const h = Number(m[1]);
@@ -113,6 +115,67 @@ export function earliestCheckinDate(cutoff: BookingCutoff, now: Date = new Date(
     return cut != null && minutes >= cut ? addDaysISO(today, 1) : today;
   }
   return addDaysISO(today, cutoff.days); // require N days of lead time
+}
+
+/** The hotel's cancellation cut-off hour when it hasn't set one. 6pm is the near
+ *  universal city-hotel convention, and it matches the booking cutoff's default. */
+export const DEFAULT_CANCEL_ANCHOR = "18:00";
+
+export interface CancelDeadline {
+  /** The instant the free-cancellation window closes. Gates the cancel button. */
+  utcMs: number;
+  /** The same moment as the hotel's own wall clock, e.g. "2026-08-09T18:00".
+   *  Naive on purpose: it carries no offset, so the server and a guest's browser
+   *  in another timezone render the identical string, and what a guest reads is
+   *  the time the hotel actually means. */
+  local: string;
+  /** Whole days before arrival the deadline falls, for undated copy: 0 = the day
+   *  of arrival, 1 = the day before. */
+  daysBefore: number;
+  /** "18:00" — the wall-clock part on its own. */
+  time: string;
+}
+
+/**
+ * When a "free until N hours before arrival" window closes.
+ *
+ * Anchored to a wall-clock time on the ARRIVAL DATE, not to midnight: a hotel
+ * saying "24 hours" means 6pm the night before, not 00:00, and the difference is
+ * 18 hours of a guest's flexibility. It also makes `0` a real, useful setting —
+ * free cancellation until 6pm on the day you arrive, which is what a flexible
+ * city hotel sells — where a midnight anchor could only ever express "the moment
+ * the arrival day began".
+ *
+ * All of it is one subtraction from the anchor, so the arithmetic a hotel expects
+ * holds: with an 18:00 anchor, 0h → 18:00 on arrival, 6h → 12:00 on arrival,
+ * 24h → 18:00 the day before, 30h → 12:00 the day before.
+ */
+export function cancelDeadline(
+  checkinISO: string,
+  hoursBefore: number,
+  anchorTime?: string,
+  tz?: string,
+): CancelDeadline | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkinISO) || !Number.isFinite(hoursBefore) || hoursBefore < 0) {
+    return null;
+  }
+  const anchorMin = parseHHMM(anchorTime) ?? parseHHMM(DEFAULT_CANCEL_ANCHOR)!;
+  const totalMin = anchorMin - Math.round(hoursBefore * 60);
+  // Floor, so a negative total walks back whole days: -360 is 18:00 yesterday,
+  // not "day 0 at minus six hours".
+  const dayShift = Math.floor(totalMin / 1440);
+  const minOfDay = ((totalMin % 1440) + 1440) % 1440;
+  const dateISO = addDaysISO(checkinISO, dayShift);
+  const hh = Math.floor(minOfDay / 60);
+  const mm = minOfDay % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const time = `${pad(hh)}:${pad(mm)}`;
+  return {
+    utcMs: localTimeToUtcMs(dateISO, hh, tz, mm),
+    local: `${dateISO}T${time}`,
+    daysBefore: -dayShift,
+    time,
+  };
 }
 
 /** Whether a check-in is too last-minute to accept right now, per the cutoff. */

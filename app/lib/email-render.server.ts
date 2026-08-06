@@ -4,6 +4,7 @@
 import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
+import { formatCancelDeadline } from "./cancellation";
 import type { EmailDef, SiteSettings } from "./content";
 import { THEMES, type ThemeId } from "./content";
 import { formatMoney } from "./money";
@@ -62,6 +63,10 @@ const fmtDateTime = (iso: string) => {
     return iso;
   }
 };
+/** A cancellation deadline: the hotel's own wall clock when the booking has it,
+ *  else the instant as before (bookings made before deadlines were anchored). */
+const fmtDeadline = (c: { cancelByISO: string | null; cancelByLocal?: string }) =>
+  formatCancelDeadline({ iso: c.cancelByISO ?? "", local: c.cancelByLocal }, "d MMM yyyy");
 
 /** Plain (unescaped) token values for subject + prose substitution. */
 export function bookingVars(
@@ -162,7 +167,10 @@ function detailsHtml(
     ? ""
     : cancel.refundable
       ? cancel.cancelByISO
-        ? `Free cancellation until ${fmtDateTime(cancel.cancelByISO)}`
+        ? // The hotel's wall clock when the booking carries it — a confirmation
+          // email that turns "6pm" into the server's UTC "17:00" is the hotel's
+          // policy quietly restated an hour early.
+          `Free cancellation until ${fmtDeadline(cancel)}`
         : "Free cancellation"
       : "Non-refundable";
 
@@ -357,7 +365,13 @@ export function sampleBooking(currency = "GBP"): BookingRecord {
     checkout: "2025-08-17",
     nights: 3,
     total: 540,
-    cancellation: { refundable: true, cancelByISO: "2025-08-12T15:00:00.000Z" },
+    // Carries the wall-clock form too, so the editor preview shows what a real
+    // booking now shows rather than the pre-anchor fallback.
+    cancellation: {
+      refundable: true,
+      cancelByISO: "2025-08-13T17:00:00.000Z",
+      cancelByLocal: "2025-08-13T18:00",
+    },
     guest: {
       firstName: "Jamie",
       lastName: "Rivera",

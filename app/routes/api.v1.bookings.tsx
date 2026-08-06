@@ -255,10 +255,13 @@ export async function action({ request }: Route.ActionArgs) {
 
   const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
   const due = dueNow(policy, grandTotal, nights);
-  const cancelInfo = policyToCancellation(policy, checkin);
+  const cancelInfo = policyToCancellation(policy, checkin, {
+    time: settings.cancelAnchorTime,
+    timezone: settings.timezone,
+  });
   const freeWindowClosed = cancelInfo.refundable && cancelInfo.cancelByISO != null && Date.now() > Date.parse(cancelInfo.cancelByISO);
   const needAck = !policy.cancellation.refundable || freeWindowClosed || due > 0;
-  const desc = describePolicy(policy);
+  const desc = describePolicy(policy, settings.cancelAnchorTime);
 
   // test-mode keys never push to Channex; live keys honour the property's setting.
   const live = mode === "live" && (settings.liveBooking ?? config.allowLiveBooking) && settings.connectedSystem === "channex";

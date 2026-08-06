@@ -1168,7 +1168,11 @@ const EN: Record<string, string> = {
   poBeforeArrival: "before arrival",
   poAllowCancel: "Allow guests to cancel their booking",
   poCancelUpTo: "Free cancellation up to",
-  poCancelHint: "Guests can cancel until this long before arrival. Leave blank for no time limit.",
+  poCancelHint:
+    "Guests can cancel until this long before arrival. 0 means the cut-off time below on the day of arrival. Leave blank for no time limit.",
+  poCancelAnchor: "Cancellation cut-off time",
+  poCancelAnchorHint:
+    "The time on the arrival date that deadlines count back from, in your timezone. At 18:00: “0 hours” means 6pm on the day of arrival, “24 hours” means 6pm the day before.",
   poAutoRefund: "Automatically refund on cancellation",
   poAutoRefundHint: "When a guest cancels within the free-cancellation window, refund their Stripe payment in full automatically. Leave off to issue refunds yourself. Guarantee-card bookings have no charge, so nothing is refunded.",
   poAllowModify: "Allow guests to modify their booking",
@@ -1390,6 +1394,8 @@ const EN: Record<string, string> = {
   rtCancelTitle: "Cancellation policy",
   rtRefundable: "Refundable (free cancellation)",
   rtFreeCancelUpTo: "Free cancellation up to",
+  rtCancelAnchorHint:
+    "Counted back from {time} on the arrival date. So 0 = {time} on the day of arrival, 24 hours = {time} the day before. Blank = no time limit.",
   rtHours: "hours",
   rtDays: "days",
   rtBeforeArrival: "before arrival",
@@ -2965,7 +2971,11 @@ const DE: Record<string, string> = {
   poBeforeArrival: "vor Anreise",
   poAllowCancel: "Gästen erlauben, ihre Buchung zu stornieren",
   poCancelUpTo: "Kostenlose Stornierung bis",
-  poCancelHint: "Gäste können bis zu diesem Zeitpunkt vor Anreise stornieren. Leer lassen für keine zeitliche Begrenzung.",
+  poCancelHint:
+    "Gäste können bis zu diesem Zeitpunkt vor Anreise stornieren. 0 bedeutet die unten festgelegte Uhrzeit am Anreisetag. Leer lassen für keine zeitliche Begrenzung.",
+  poCancelAnchor: "Stornierungs-Uhrzeit",
+  poCancelAnchorHint:
+    "Die Uhrzeit am Anreisetag, von der aus die Fristen zurückgerechnet werden — in Ihrer Zeitzone. Bei 18:00 bedeutet „0 Stunden“ 18:00 am Anreisetag und „24 Stunden“ 18:00 am Vortag.",
   poAutoRefund: "Bei Stornierung automatisch erstatten",
   poAutoRefundHint: "Wenn ein Gast innerhalb der kostenlosen Stornierungsfrist storniert, wird seine Stripe-Zahlung automatisch vollständig erstattet. Deaktivieren Sie dies, um Erstattungen selbst vorzunehmen. Bei Buchungen mit Kartengarantie erfolgt keine Abbuchung, daher wird nichts erstattet.",
   poAllowModify: "Gästen erlauben, ihre Buchung zu ändern",
@@ -3187,6 +3197,8 @@ const DE: Record<string, string> = {
   rtCancelTitle: "Stornierungsbedingungen",
   rtRefundable: "Erstattbar (kostenlose Stornierung)",
   rtFreeCancelUpTo: "Kostenlose Stornierung bis",
+  rtCancelAnchorHint:
+    "Zurückgerechnet ab {time} am Anreisetag. 0 = {time} am Anreisetag, 24 Stunden = {time} am Vortag. Leer = keine zeitliche Begrenzung.",
   rtHours: "Stunden",
   rtDays: "Tage",
   rtBeforeArrival: "vor Anreise",
@@ -4760,7 +4772,11 @@ const PT: Record<string, string> = {
   poBeforeArrival: "antes da chegada",
   poAllowCancel: "Permitir que os hóspedes cancelem a reserva",
   poCancelUpTo: "Cancelamento gratuito até",
-  poCancelHint: "Os hóspedes podem cancelar até este prazo antes da chegada. Deixe em branco para não impor limite de tempo.",
+  poCancelHint:
+    "Os hóspedes podem cancelar até este prazo antes da chegada. 0 significa a hora-limite indicada abaixo no dia da chegada. Deixe em branco para não impor limite de tempo.",
+  poCancelAnchor: "Hora-limite de cancelamento",
+  poCancelAnchorHint:
+    "A hora, no dia da chegada, a partir da qual os prazos são contados para trás — no seu fuso horário. Com 18:00, “0 horas” significa 18:00 no dia da chegada e “24 horas” significa 18:00 no dia anterior.",
   poAutoRefund: "Reembolsar automaticamente ao cancelar",
   poAutoRefundHint: "Quando um hóspede cancela dentro do prazo de cancelamento gratuito, reembolsar integralmente o pagamento Stripe de forma automática. Deixe desativado para emitir os reembolsos você mesmo. As reservas com cartão de garantia não têm cobrança, pelo que nada é reembolsado.",
   poAllowModify: "Permitir que os hóspedes alterem a reserva",
@@ -4982,6 +4998,8 @@ const PT: Record<string, string> = {
   rtCancelTitle: "Política de cancelamento",
   rtRefundable: "Reembolsável (cancelamento gratuito)",
   rtFreeCancelUpTo: "Cancelamento gratuito até",
+  rtCancelAnchorHint:
+    "Contado a partir das {time} do dia da chegada. Ou seja: 0 = {time} do dia da chegada, 24 horas = {time} do dia anterior. Em branco = sem limite de tempo.",
   rtHours: "horas",
   rtDays: "dias",
   rtBeforeArrival: "antes da chegada",
@@ -6547,7 +6565,11 @@ const TH: Record<string, string> = {
   poBeforeArrival: "ก่อนวันเข้าพัก",
   poAllowCancel: "อนุญาตให้ผู้เข้าพักยกเลิกการจองเอง",
   poCancelUpTo: "ยกเลิกฟรีได้ถึง",
-  poCancelHint: "ผู้เข้าพักยกเลิกได้จนถึงช่วงเวลานี้ก่อนวันเข้าพัก เว้นว่างไว้เพื่อไม่จำกัดเวลา",
+  poCancelHint:
+    "ผู้เข้าพักยกเลิกได้จนถึงช่วงเวลานี้ก่อนวันเข้าพัก ค่า 0 หมายถึงเวลาตัดรอบด้านล่างของวันเข้าพัก เว้นว่างไว้เพื่อไม่จำกัดเวลา",
+  poCancelAnchor: "เวลาตัดรอบการยกเลิก",
+  poCancelAnchorHint:
+    "เวลาในวันเข้าพักที่ใช้นับย้อนหลังเพื่อคำนวณกำหนดเวลา ตามเขตเวลาของคุณ หากตั้งไว้ 18:00 “0 ชั่วโมง” หมายถึง 18:00 ของวันเข้าพัก และ “24 ชั่วโมง” หมายถึง 18:00 ของวันก่อนหน้า",
   poAutoRefund: "คืนเงินอัตโนมัติเมื่อมีการยกเลิก",
   poAutoRefundHint: "เมื่อผู้เข้าพักยกเลิกภายในช่วงยกเลิกฟรี ระบบจะคืนเงินที่ชำระผ่าน Stripe ให้เต็มจำนวนโดยอัตโนมัติ ปิดไว้หากคุณต้องการคืนเงินด้วยตัวเอง การจองแบบใช้บัตรรับประกันไม่มีการเรียกเก็บเงิน จึงไม่มีการคืนเงิน",
   poAllowModify: "อนุญาตให้ผู้เข้าพักแก้ไขการจองเอง",
@@ -6769,6 +6791,8 @@ const TH: Record<string, string> = {
   rtCancelTitle: "นโยบายการยกเลิก",
   rtRefundable: "คืนเงินได้ (ยกเลิกฟรี)",
   rtFreeCancelUpTo: "ยกเลิกฟรีได้ถึง",
+  rtCancelAnchorHint:
+    "นับย้อนจากเวลา {time} ของวันเข้าพัก ดังนั้น 0 = {time} ของวันเข้าพัก, 24 ชั่วโมง = {time} ของวันก่อนหน้า เว้นว่าง = ไม่จำกัดเวลา",
   rtHours: "ชั่วโมง",
   rtDays: "วัน",
   rtBeforeArrival: "ก่อนวันเข้าพัก",

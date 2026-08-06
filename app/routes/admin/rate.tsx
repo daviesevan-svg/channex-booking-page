@@ -21,6 +21,7 @@ import {
 } from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { getConfig } from "~/lib/config.server";
+import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings } from "~/lib/overrides.server";
 
 /** Build the structured policy from form field getters — shared by the save
@@ -34,16 +35,24 @@ function buildPolicy(get: (name: string) => string): RatePolicy {
     const n = Math.round(Number(v));
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
+  const nonNegInt = (v: string) => {
+    const n = Math.round(Number(v));
+    return Number.isFinite(n) && n >= 0 ? n : undefined;
+  };
   const pick = <T extends string>(v: string, allowed: readonly T[], fb: T): T =>
     (allowed as readonly string[]).includes(v) ? (v as T) : fb;
 
   const refundable = get("refundable") !== "";
-  const cdv = int(get("cancelDeadlineValue"));
+  // 0 is a real deadline — with the property's 18:00 anchor it means "free until
+  // 6pm on the day of arrival", the flexible-city-hotel policy. An EMPTY box still
+  // means no deadline, so the two stay distinguishable.
+  const cdvRaw = get("cancelDeadlineValue").trim();
+  const cdv = cdvRaw === "" ? undefined : nonNegInt(cdvRaw);
   const rawUnit = get("cancelDeadlineUnit");
   const cdu = isDeadlineUnit(rawUnit) ? rawUnit : "hours";
   const latePenalty = pick(get("latePenalty"), PENALTY_TYPES, "full_stay");
   const tiers: CancelTier[] =
-    refundable && cdv
+    refundable && cdv != null
       ? [
           {
             deadlineValue: cdv,
@@ -86,7 +95,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // enforceable if there's something on file to charge.
   const settings = await getSettings(propertyId);
   const canTakeCard = Boolean(settings.stripeAccountId && getConfig().stripeSecretKey);
-  return { isNew, rate, canTakeCard, rooms: rooms.map((r) => ({ id: r.id, title: r.title })) };
+  return {
+    isNew,
+    rate,
+    canTakeCard,
+    // The deadline counts back from this wall-clock time on the arrival date, so
+    // the field can say what a given number actually resolves to.
+    cancelAnchor: settings.cancelAnchorTime || DEFAULT_CANCEL_ANCHOR,
+    rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
+  };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -192,7 +209,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
-  const { isNew, rate, rooms, canTakeCard } = loaderData;
+  const { isNew, rate, rooms, canTakeCard, cancelAnchor } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -211,10 +228,10 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
 
   // Live preview of the guest-facing policy text, recomputed from the form on any change.
   const formRef = useRef<HTMLFormElement>(null);
-  const [preview, setPreview] = useState(() => describePolicy(pol));
+  const [preview, setPreview] = useState(() => describePolicy(pol, cancelAnchor));
   const refreshPreview = () => {
     const el = formRef.current;
-    if (el) setPreview(describePolicy(buildPolicy((n) => String(new FormData(el).get(n) ?? ""))));
+    if (el) setPreview(describePolicy(buildPolicy((n) => String(new FormData(el).get(n) ?? "")), cancelAnchor));
   };
 
   // Per-room occupancy pricing: a table of editable rows, one per room, gated by
@@ -528,6 +545,12 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                 </select>
                 <span className="text-[13px] text-muted-2">{t("rtBeforeArrival")}</span>
               </div>
+              {/* Without this the field is genuinely ambiguous: "24 hours before
+                  arrival" could mean midnight, and "0" looks like it means nothing
+                  at all rather than the most useful setting on the page. */}
+              <p className="mt-1.5 text-[12px] text-faint">
+                {t("rtCancelAnchorHint", { time: cancelAnchor })}
+              </p>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block text-[13px] font-semibold text-secondary">
                   {t("rtLateCharge")} <span className="font-normal text-faint">{t("rtLateChargeHint")}</span>

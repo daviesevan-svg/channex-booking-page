@@ -10,6 +10,8 @@ import { PDFDocument, PDFFont, PDFPage, rgb, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { format, parseISO } from "date-fns";
 
+import { formatCancelDeadline } from "./cancellation";
+
 import type { BookingRecord } from "./bookings.server";
 import { formatMoney } from "./money";
 import { embedPdfFonts, wrapText } from "./fonts/pdf-fonts";
@@ -185,7 +187,8 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     ? ""
     : cancel.refundable
       ? cancel.cancelByISO
-        ? `Free cancellation until ${fmtDateTime(cancel.cancelByISO)}`
+        ? // The hotel's wall clock, not the server's UTC — same reason as the email.
+          `Free cancellation until ${formatCancelDeadline({ iso: cancel.cancelByISO, local: cancel.cancelByLocal }, "d MMM yyyy")}`
         : "Free cancellation"
       : "Non-refundable";
   if (cancelLine) {

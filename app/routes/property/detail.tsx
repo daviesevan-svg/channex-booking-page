@@ -19,7 +19,7 @@ import { formatMoney } from "~/lib/money";
 import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { occupancyNightlyDelta } from "~/lib/rate-pricing";
-import { cancellationMessage } from "~/lib/cancellation";
+import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
@@ -186,10 +186,21 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
   } else {
     // Derive the cancellation line (incl. the free-cancel deadline) from the policy.
     const msg = cancellationMessage(
-      { refundable: plan.refundable ?? true, cancelByISO: plan.freeCancelUntilISO ?? null },
+      {
+        refundable: plan.refundable ?? true,
+        cancelByISO: plan.freeCancelUntilISO ?? null,
+        cancelByLocal: plan.freeCancelUntilLocal ?? undefined,
+      },
       Date.now(),
     );
-    if (msg) parts.push(tr.t(msg.key, "iso" in msg ? { date: format(parseISO(msg.iso), "d MMM", { locale: tr.locale }) } : undefined));
+    // The year is dropped here (the rate card is always about a searched stay) but
+    // the TIME is not: "free until 9 Aug" and "free until 9 Aug, 18:00" are
+    // different promises, and this rate card is where the guest chooses.
+    if (msg) {
+      parts.push(
+        tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "d MMM", tr.locale) } : undefined),
+      );
+    }
     else if (plan.cancellationPolicy?.title) parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
   }
   return parts.join(" · ") || tr.t("standardRate");

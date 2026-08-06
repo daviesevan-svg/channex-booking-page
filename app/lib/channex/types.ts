@@ -133,6 +133,9 @@ export interface RatePlan {
    *  from the rate policy so the rate card can show it. */
   refundable?: boolean;
   freeCancelUntilISO?: string | null;
+  /** The deadline as the hotel's wall clock ("2026-08-09T18:00"), for display —
+   *  see CancellationLike.cancelByLocal. */
+  freeCancelUntilLocal?: string | null;
   /** Automatic offer baked into totalPrice (set by getCatalogRooms). The
    *  original (pre-discount) price is kept so the UI can show the saving. */
   offer?: { name: string; percent: number; originalTotalPrice: string };

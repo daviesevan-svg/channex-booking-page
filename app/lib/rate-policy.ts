@@ -138,9 +138,34 @@ export function describePenalty(penalty: PenaltyType, value?: number): string {
   }
 }
 
+/**
+ * A cancellation deadline in words, as the time it actually falls.
+ *
+ * The stored form is an offset in hours/days, but a guest experiences a wall
+ * clock: with an 18:00 cut-off, 0 is "6pm on the day of arrival", 24 hours is
+ * "6pm the day before", 30 hours is "12pm the day before". Rendering the offset
+ * raw is how "24 hours before arrival" gets read as midnight.
+ */
+export function describeDeadline(tier: CancelTier, anchorTime = "18:00"): string {
+  const hours = tier.deadlineUnit === "days" ? tier.deadlineValue * 24 : tier.deadlineValue;
+  const [ah, am] = anchorTime.split(":").map(Number);
+  const totalMin = (ah || 0) * 60 + (am || 0) - Math.round(hours * 60);
+  const daysBefore = -Math.floor(totalMin / 1440);
+  const minOfDay = ((totalMin % 1440) + 1440) % 1440;
+  const time = `${String(Math.floor(minOfDay / 60)).padStart(2, "0")}:${String(minOfDay % 60).padStart(2, "0")}`;
+  if (daysBefore === 0) return `${time} on the day of arrival`;
+  if (daysBefore === 1) return `${time} the day before arrival`;
+  return `${time}, ${daysBefore} days before arrival`;
+}
+
 /** Plain-English summary lines for the admin preview — mirrors what the guest
  *  sees at checkout (without live £ amounts). Override note wins for cancellation. */
-export function describePolicy(p: RatePolicy): { payment: string; cancellation: string; noShow: string } {
+export function describePolicy(
+  p: RatePolicy,
+  /** The property's cancellation cut-off time ("HH:MM"), which deadlines count
+   *  back from. Defaults to 18:00, same as the resolver. */
+  anchor?: string,
+): { payment: string; cancellation: string; noShow: string } {
   let payment: string;
   if (p.payment.timing === "full_prepay") {
     payment = "Full payment due now.";
@@ -164,7 +189,10 @@ export function describePolicy(p: RatePolicy): { payment: string; cancellation: 
     if (!t) {
       cancellation = "Free cancellation any time before arrival.";
     } else {
-      cancellation = `Free cancellation until ${t.deadlineValue} ${t.deadlineUnit} before arrival`;
+      // Named as the wall-clock it resolves to, not as a bare offset: "0 hours
+      // before arrival" is unreadable, and "24 hours before arrival" invites the
+      // reader to assume midnight. `anchor` is the property's cut-off time.
+      cancellation = `Free cancellation until ${describeDeadline(t, anchor)}`;
       cancellation += t.penalty === "none" ? "." : `, then ${describePenalty(t.penalty, t.penaltyValue)} is charged.`;
     }
   }
@@ -179,7 +207,11 @@ export function ratePolicyOf(rate: LegacyPolicyFields): RatePolicy {
   if (rate.policy) return withDefaults(rate.policy);
 
   const refundable = rate.refundable !== false;
-  const hasDeadline = !!rate.cancelDeadlineValue && rate.cancelDeadlineValue > 0;
+  // >= 0, not > 0: a stored 0 is "free until the cut-off time on the arrival day".
+  // Legacy data can't contain 0 (it was stripped on save before deadlines were
+  // anchored), but the API can now set one, and this fallback disagreeing with
+  // resolveBookingCancellation would put two different policies on one rate.
+  const hasDeadline = rate.cancelDeadlineValue != null && rate.cancelDeadlineValue >= 0;
   // Legacy: free until the deadline, then a full charge; non-refundable = no free window.
   const tiers: CancelTier[] =
     refundable && hasDeadline

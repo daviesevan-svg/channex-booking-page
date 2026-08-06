@@ -24,7 +24,7 @@ import { generateReference } from "~/lib/bookings.server";
 import { cancellationVaries, resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow, policyToCancellation } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
-import { cancellationMessage } from "~/lib/cancellation";
+import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
@@ -230,6 +230,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     policy,
     cancellation,
     mixedCancellation,
+    // The cut-off time (and timezone) deadlines count back from. The component
+    // re-derives the free-until moment client-side, and doing that with the
+    // default anchor while the server used the property's would put two different
+    // dates in front of the same guest.
+    cancelAnchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
     collectsCard,
@@ -388,7 +393,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   const dueAfterVoucher = Math.round((due - (voucherHold?.amount ?? 0)) * 100) / 100;
   // A refundable rate whose free-cancellation window has already closed is, for
   // this booking, non-refundable — so it needs the same acknowledgment.
-  const cancelAtBooking = policyToCancellation(policy, stay.checkin);
+  const anchor = { time: settings.cancelAnchorTime, timezone: settings.timezone };
+  const cancelAtBooking = policyToCancellation(policy, stay.checkin, anchor);
   const freeWindowClosed =
     cancelAtBooking.refundable && cancelAtBooking.cancelByISO != null && Date.now() > parseISO(cancelAtBooking.cancelByISO).getTime();
   // Mirrors the UI: the charged-today acknowledgment is only required when a
@@ -400,7 +406,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!agreed || (needAck && !nonRefundableAck)) {
     return { consentError: true };
   }
-  const desc = describePolicy(policy);
+  const desc = describePolicy(policy, settings.cancelAnchorTime);
   const consent = {
     acceptedAt: new Date().toISOString(),
     ip:
@@ -688,7 +694,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -757,7 +763,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   };
   // Cancellation: the override note wins; else the translated free-until / non-refundable line.
   // atBooking → a free window that's already closed reads as non-refundable, not a past date.
-  const cancelInfo = policyToCancellation(policy, stay.checkin);
+  const cancelInfo = policyToCancellation(policy, stay.checkin, cancelAnchor);
   // A refundable rate whose free-cancellation window has already closed is, for
   // this booking, non-refundable (the guest can't go back and cancel for free).
   const freeWindowClosed =
@@ -765,7 +771,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const cancelMsg = cancellationMessage(cancelInfo, Date.now(), { atBooking: true });
   const cancellationText =
     policy.overrideNote ||
-    (cancelMsg ? tr.t(cancelMsg.key, "iso" in cancelMsg ? { date: fmt(parseISO(cancelMsg.iso), "EEE d MMM yyyy") } : undefined) : "");
+    (cancelMsg
+      ? tr.t(
+          cancelMsg.key,
+          "iso" in cancelMsg ? { date: formatCancelDeadline(cancelMsg, "EEE d MMM yyyy", tr.locale) } : undefined,
+        )
+      : "");
   const tier0 = policy.cancellation.tiers[0];
   // The "after the deadline …" line only makes sense while the deadline is still
   // ahead — once it's passed the lead line already reads "non-refundable".
