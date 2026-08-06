@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useNavigate, useNavigation } from "react-router";
 
@@ -11,6 +11,9 @@ import { getRates, getRooms, pricingModeOf, rateChannexId } from "~/lib/catalog.
 import { applyBulkUpdate, getInventory, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
+// Client-safe (rate-pricing.ts has no server imports) — this runs in the grid to
+// show what a blank per-occupancy cell would inherit.
+import { perPersonPrice } from "~/lib/rate-pricing";
 
 // Generous server window; the client renders only as many columns as fit the
 // screen and pages by that visible count.
@@ -67,7 +70,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   return {
     configured: true as const,
-    rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
+    // maxAdults bounds the per-occupancy rows: a per-person rate is priced for
+    // 1..maxAdults adults, the same range the Channex mapping advertises.
+    rooms: rooms.map((r) => ({ id: r.id, title: r.title, maxAdults: Math.max(1, r.maxAdults || 1) })),
     // channexRateIds: Channex pushes ARI keyed by each room's real Channex rate
     // id (what the mapping advertises), so per-occupancy lookups need it.
     rates: rates.map((r) => ({ id: r.id, title: r.title, prices: r.prices, channexRateIds: r.channexRateIds })),
@@ -169,6 +174,7 @@ export async function action({ request }: Route.ActionArgs) {
     currency: settings.currency || "GBP",
     availability: [],
     prices: [],
+    priceDeletes: [],
     restrictions: [],
   };
 
@@ -186,6 +192,20 @@ export async function action({ request }: Route.ActionArgs) {
       if (!date || v === "") continue;
       const price = Math.round(Number(v) * 100) / 100;
       if (price > 0) edits.prices.push({ roomId, rateId, date, price });
+    } else if (parts[0] === "po") {
+      // per-occupancy price: po:roomId:rateId:date:adults — the rows the
+      // "Occupancy prices" toggle reveals. Unlike every other field here, BLANK
+      // means delete: an override can only be undone by clearing it, and
+      // leaving the stored row in place would make the save look ignored.
+      const [, roomId, rateId, date, adults] = parts;
+      const occupancy = Math.round(Number(adults));
+      if (!date || !Number.isFinite(occupancy) || occupancy < 1) continue;
+      if (v === "") {
+        edits.priceDeletes.push({ roomId, rateId, date, occupancy });
+        continue;
+      }
+      const price = Math.round(Number(v) * 100) / 100;
+      if (price > 0) edits.prices.push({ roomId, rateId, date, price, occupancy });
     }
   }
   // Restrictions cover every (room, its rates) × date in the window so toggles
@@ -571,70 +591,106 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                       ))}
                     </tr>
                     {/* Rate rows: price + restrictions */}
-                    {roomRates.map((rate) => (
-                      <tr key={rate.id} className="border-t border-divider/60">
-                        <td className={labelCell}>
-                          <div className="font-medium">{rate.title}</div>
-                          <div className="text-[11px] text-muted-2">{t("invCellLegend")}</div>
-                        </td>
-                        {shown.map((d) => {
-                          // All ARI — Channex pushes and our own edits — is
-                          // stored under the room's real Channex rate id, which
-                          // for a consolidated imported rate differs from our
-                          // single rate.id on all but one room. Display and the
-                          // submitted field names both use it so edits land on
-                          // the rows guest pricing actually reads.
-                          const rid = rate.channexRateIds?.[room.id] ?? rate.id;
-                          const key = `${room.id}|${rid}|${d}`;
-                          const suffix = `${room.id}:${rid}:${d}`;
-                          const restr = inventory.restrictions[key];
-                          const byOcc = showOcc ? inventory.pricesByOcc[key] : undefined;
-                          const occs = byOcc
-                            ? Object.keys(byOcc).map(Number).filter((o) => o > 0).sort((a, b) => a - b)
-                            : [];
-                          return (
-                            <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
-                              <input
-                                name={`p:${suffix}`}
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                defaultValue={inventory.prices[key] ?? ""}
-                                placeholder={rate.prices[room.id].toFixed(0)}
-                                className={cellInput}
-                              />
+                    {roomRates.map((rate) => {
+                      // All ARI — Channex pushes and our own edits — is stored
+                      // under the room's real Channex rate id, which for a
+                      // consolidated imported rate differs from our single
+                      // rate.id on all but one room. Display and the submitted
+                      // field names both use it so edits land on the rows guest
+                      // pricing actually reads.
+                      const rid = rate.channexRateIds?.[room.id] ?? rate.id;
+                      const base = rate.prices[room.id];
+                      // One editable row per adult count, as Channex shows them.
+                      const occRows = showOcc ? Array.from({ length: room.maxAdults }, (_, i) => i + 1) : [];
+                      return (
+                        <Fragment key={rate.id}>
+                          <tr className="border-t border-divider/60">
+                            <td className={labelCell}>
+                              <div className="font-medium">{rate.title}</div>
+                              <div className="text-[11px] text-muted-2">{t("invCellLegend")}</div>
                               {showOcc && (
-                                <div className="mt-1 space-y-px text-center text-[10px] leading-[1.5] text-muted-2" title={t("invOccPricesTitle")}>
-                                  {occs.length > 0 ? (
-                                    occs.map((o) => (
-                                      <div key={o} className="tabular-nums">
-                                        {o}× {Number.isInteger(byOcc![o]) ? byOcc![o] : byOcc![o].toFixed(2)}
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <div>—</div>
-                                  )}
-                                </div>
+                                <div className="text-[11px] font-medium text-muted-2">{t("invOccDefaultRow")}</div>
                               )}
-                              <div className="mt-1 flex items-center justify-center gap-1">
-                                <input
-                                  name={`m:${suffix}`}
-                                  type="number"
-                                  min={0}
-                                  defaultValue={restr?.minStay || ""}
-                                  title={t("invMinimumStay")}
-                                  placeholder="0"
-                                  className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
-                                />
-                                <Toggle name={`s:${suffix}`} label="✕" title={t("invClosedStopSell")} checked={restr?.stopSell} danger />
-                                <Toggle name={`ca:${suffix}`} label="A" title={t("invClosedToArrival")} checked={restr?.cta} />
-                                <Toggle name={`cd:${suffix}`} label="D" title={t("invClosedToDeparture")} checked={restr?.ctd} />
-                              </div>
                             </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                            {shown.map((d) => {
+                              const key = `${room.id}|${rid}|${d}`;
+                              const suffix = `${room.id}:${rid}:${d}`;
+                              const restr = inventory.restrictions[key];
+                              return (
+                                <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
+                                  <input
+                                    name={`p:${suffix}`}
+                                    type="number"
+                                    min={0}
+                                    step="0.01"
+                                    defaultValue={inventory.prices[key] ?? ""}
+                                    placeholder={base.toFixed(0)}
+                                    className={cellInput}
+                                  />
+                                  <div className="mt-1 flex items-center justify-center gap-1">
+                                    <input
+                                      name={`m:${suffix}`}
+                                      type="number"
+                                      min={0}
+                                      defaultValue={restr?.minStay || ""}
+                                      title={t("invMinimumStay")}
+                                      placeholder="0"
+                                      className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
+                                    />
+                                    <Toggle name={`s:${suffix}`} label="✕" title={t("invClosedStopSell")} checked={restr?.stopSell} danger />
+                                    <Toggle name={`ca:${suffix}`} label="A" title={t("invClosedToArrival")} checked={restr?.cta} />
+                                    <Toggle name={`cd:${suffix}`} label="D" title={t("invClosedToDeparture")} checked={restr?.ctd} />
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                          {/* Per-occupancy prices: the real selling prices of a
+                              per-person rate, edited exactly like the row above.
+                              Restrictions stay on that row — stop-sell and
+                              min-stay are per date, not per adult count. */}
+                          {occRows.map((occ) => (
+                            <tr key={`${rate.id}:${occ}`} className="border-t border-divider/40 bg-surface-alt/30">
+                              <td className={`${labelCell} bg-surface-alt/30`}>
+                                <div className="flex items-center gap-1.5 pl-3 text-[12px] font-medium text-secondary">
+                                  <span aria-hidden="true">👤</span>
+                                  {t(occ === 1 ? "invAdults_one" : "invAdults_other", { n: occ })}
+                                </div>
+                              </td>
+                              {shown.map((d) => {
+                                const key = `${room.id}|${rid}|${d}`;
+                                const byOcc = inventory.pricesByOcc[key];
+                                // Placeholder = what this cell would charge if
+                                // left blank, so an inherited price is visible
+                                // rather than looking unset. Computed WITHOUT
+                                // this occupancy, which is what deleting it
+                                // leaves behind.
+                                const { [occ]: _own, ...rest } = byOcc ?? {};
+                                const inherited = perPersonPrice(rest, occ) ?? base * occ;
+                                return (
+                                  <td key={d} className={`px-1.5 py-1.5 ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
+                                    <input
+                                      name={`po:${room.id}:${rid}:${d}:${occ}`}
+                                      type="number"
+                                      min={0}
+                                      step="0.01"
+                                      defaultValue={byOcc?.[occ] ?? ""}
+                                      placeholder={inherited.toFixed(0)}
+                                      title={t("invOccPricesTitle")}
+                                      // Muted placeholder: on these rows the
+                                      // difference between a price that IS set
+                                      // and one merely inherited is the point,
+                                      // so the two must not look alike.
+                                      className={`${cellInput} placeholder:text-faint`}
+                                    />
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      );
+                    })}
                     {roomRates.length === 0 && (
                       <tr className="border-t border-divider/60">
                         <td className={labelCell} colSpan={shown.length + 1}>
