@@ -26,7 +26,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
-  const currency = url.searchParams.get("currency") || "GBP";
   const occ = readOccupancy(url.searchParams);
   const simulated = url.searchParams.get("sim") === "1";
   // Set by checkout/complete when finalize failed — the guest paid but the
@@ -37,6 +36,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // :channelId may be a slug — resolve to the real id for data lookups; links
   // keep params.channelId so the slug stays in the URL.
   const pid = await resolveRequestProperty(params.channelId, request);
+
+  // Currency is the property's, not the URL param — same rule as results and
+  // checkout. Entry points that skip ?currency= (the embed widget, go.booking,
+  // any shared link) otherwise landed the guest on a GBP-labelled confirmation.
+  const settings = await getSettings(pid);
+  const currency = settings.currency || "GBP";
 
   let rooms: { title: string; rate: string }[] = [];
   let total = 0;
@@ -89,7 +94,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     total > 0 ? await resolveAppliedPromo(pid, url.searchParams.get("promo") || "", total) : null;
 
   const discount = applied?.discount ?? 0;
-  const settings = await getSettings(pid);
   const pricing = computePricing(
     {
       base: Math.round((total - discount) * 100) / 100,
