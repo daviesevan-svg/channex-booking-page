@@ -282,9 +282,6 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
               <span className="block text-[12px] text-muted">{t("webEnableLabelDesc")}</span>
             </span>
           </label>
-          <p className="mt-3 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
-            {t("webNotBuiltYet")}
-          </p>
         </div>
 
         {/* --- where it lives --- */}
