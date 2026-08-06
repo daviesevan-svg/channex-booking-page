@@ -310,6 +310,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                     defaultChecked={checked}
                     disabled={isDefault}
                   />
+                  <span aria-hidden="true">{l.flag}</span>
                   {l.label}
                   {isDefault && <span className="text-[11px] text-faint">{t("genDefault")}</span>}
                 </label>

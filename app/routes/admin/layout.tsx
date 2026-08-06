@@ -347,7 +347,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               >
                 {ADMIN_LANGS.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.label}
+                    {l.flag} {l.label}
                   </option>
                 ))}
               </select>
