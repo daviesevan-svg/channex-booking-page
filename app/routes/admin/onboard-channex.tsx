@@ -94,6 +94,9 @@ async function importFromChannex(
       title: g.first.title,
       mealPlan: g.first.mealPlan,
       prices: g.prices,
+      // A Channex per-person plan pushes a price for every occupancy — carry
+      // the mode over so those prices are used per number of adults.
+      perPerson: g.first.sellMode === "per_person" || undefined,
       channexRateIds: g.channexRateIds,
       refundable: true,
       inclusions: [],

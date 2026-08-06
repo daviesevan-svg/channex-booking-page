@@ -10,7 +10,7 @@ import { getConfigKV } from "./config.server";
 import type { DeadlineUnit } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
-import { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
+import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, type OccupancyPricing } from "./rate-pricing";
 import { ratePolicyOf, type RatePolicy } from "./rate-policy";
 import { policyToCancellation } from "./policy-copy";
 import { lineOccupancy, type CartLine, type ResolvedLine } from "./cart";
@@ -49,6 +49,14 @@ export interface CatalogRate {
    *  offered on a room only when it has a price here, so one rate plan can apply
    *  to every room at its own price. Occupancy is taken from each room. */
   prices: Record<string, number>;
+  /** Per-person rate: prices vary by the number of ADULTS instead of being one
+   *  price per room. Channex pushes such plans with a price for every occupancy
+   *  (stored per-occupancy in D1) and each is used as-is; where no per-occupancy
+   *  price exists (manual properties, grid/bulk edits, the base prices below)
+   *  the price is read as a price PER ADULT and multiplied by the party's
+   *  adults. Children stay priced by the age bands in `occupancyPricing`; its
+   *  adult fields are ignored in this mode. */
+  perPerson?: boolean;
   /** Optional per-person pricing rules (absent = flat price for any party).
    *  This is the rate-wide default, applied to every room unless overridden. */
   occupancyPricing?: OccupancyPricing;
@@ -199,8 +207,10 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
           // ARI it pushes back line up per room, even though we present one rate.
           id: rateChannexId(r, room.id),
           title: r.title,
-          sell_mode: "per_room",
-          max_persons: room.maxGuests,
+          // Advertising per_person makes Channex map its per-person plans here
+          // and push a price for every occupancy 1..max_persons (adults).
+          sell_mode: r.perPerson ? "per_person" : "per_room",
+          max_persons: r.perPerson ? Math.max(1, room.maxAdults) : room.maxGuests,
           currency,
           read_only: false,
         })),
@@ -273,7 +283,7 @@ export async function getCatalogRooms(
   // Query through the checkout date too, so the CTD check below sees it.
   const inv = nightDates.length
     ? await getInventory(pid, nightDates[0], checkoutDate ?? nightDates[nightDates.length - 1])
-    : { availability: {}, prices: {}, restrictions: {} };
+    : { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
 
   return rooms
     .map((room): RoomWithRates => {
@@ -326,20 +336,47 @@ export async function getCatalogRooms(
                   return null; // closed to departure
                 }
               }
-              // Per-person pricing: adjust each night for the searched party. With
+              // Occupancy pricing: adjust each night for the searched party. With
               // no adults given, price at the rate's default occupancy (no delta).
               // A per-room override wins over the rate-wide default when present.
               const op = r.occupancyPricingByRoom?.[room.id] ?? r.occupancyPricing;
               const adults = query.adults && query.adults > 0 ? query.adults : (op?.defaultOccupancy ?? 1);
-              const delta = occupancyNightlyDelta(op, adults, childrenAge);
+              // A PER-PERSON rate prices adults from the per-occupancy ARI rows
+              // (per-adult × adults where only a manual/base price exists) and
+              // children from the age bands alone; everything else keeps the
+              // flat price + occupancy delta model.
+              const nightlyFor = (nAdults: number, d?: string): number => {
+                if (r.perPerson) {
+                  const byOcc = d ? inv.pricesByOcc[k(d)] : undefined;
+                  return perPersonPrice(byOcc, nAdults) ?? base * Math.max(1, nAdults);
+                }
+                const invPrice = d ? inv.prices[k(d)] : undefined;
+                return (invPrice ?? base) + occupancyNightlyDelta(op, nAdults, []);
+              };
+              const childDelta = childrenNightlyDelta(op, childrenAge);
               // Effective nightly price for the stay: the ARI price when set, else
               // the rate's base. A night priced at 0 means no rate is loaded (or
               // it's free) — we don't sell free rooms, so any unpriced night makes
               // the rate unbookable (and a room with no priced rate drops out).
               const nightly = nightDates.length
-                ? nightDates.map((d) => (inv.prices[k(d)] ?? base) + delta)
-                : [base + delta];
+                ? nightDates.map((d) => nightlyFor(adults, d) + childDelta)
+                : [nightlyFor(adults) + childDelta];
               if (nightly.some((n) => n <= 0)) return null;
+              // Room-only stay totals for every party size, so the detail page
+              // can re-price live as the guest changes adults — a per-person
+              // rate's prices vary by date, so a flat per-night delta can't
+              // express them the way `occupancyPricing` does for flat rates.
+              const perPersonTotals: Record<number, number> | undefined = r.perPerson
+                ? Object.fromEntries(
+                    Array.from({ length: Math.max(1, room.maxAdults) }, (_, i) => {
+                      const n = i + 1;
+                      const tot = nightDates.length
+                        ? nightDates.reduce((s, d) => s + nightlyFor(n, d), 0)
+                        : nightlyFor(n) * nights;
+                      return [n, Math.round(tot * 100) / 100];
+                    }),
+                  )
+                : undefined;
               const raw = nightDates.length ? nightly.reduce((s, n) => s + n, 0) : nightly[0] * nights;
               const gross = Math.round(raw * 100) / 100;
               const sale = offer ? Math.round(gross * (1 - offer.value / 100) * 100) / 100 : gross;
@@ -366,6 +403,8 @@ export async function getCatalogRooms(
                     }
                   : undefined,
                 occupancyPricing: op,
+                perPerson: r.perPerson || undefined,
+                perPersonTotals,
               };
             })
             .filter((rp): rp is RatePlan => rp !== null);

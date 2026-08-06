@@ -1349,6 +1349,10 @@ const EN: Record<string, string> = {
   rtMealPlanPlaceholder: "Breakfast included",
   rtPricesTitle: "Nightly price per room",
   rtPricesIntro: "This rate applies to every room you price below — leave a room blank to not offer it there. Occupancy is taken from each room’s settings. Prices in your property currency.",
+  rtPricesIntroPerPerson: "This rate applies to every room you price below — leave a room blank to not offer it there. Prices are PER ADULT per night, in your property currency.",
+  rtPerPerson: "Per-person pricing",
+  rtPerPersonHint: "The price depends on how many adults stay. When Channex sends this rate as per person, its price for each number of adults is used exactly; prices entered here or in the inventory grid are charged per adult.",
+  rtOccIntroPerPerson: "Adult pricing comes from the per-person prices themselves, so there is nothing to set for adults. Children can still be priced per night by age band below.",
   rtPaymentTitle: "Payment",
   rtNoCardWarnTitle: "This rate's penalties can't be enforced.",
   rtNoCardWarnBody:
@@ -3153,6 +3157,10 @@ const DE: Record<string, string> = {
   rtMealPlanPlaceholder: "Frühstück inklusive",
   rtPricesTitle: "Übernachtungspreis pro Zimmer",
   rtPricesIntro: "Diese Rate gilt für jedes Zimmer, das Sie unten bepreisen — lassen Sie ein Zimmer leer, um sie dort nicht anzubieten. Die Belegung ergibt sich aus den Einstellungen des jeweiligen Zimmers. Preise in Ihrer Unterkunftswährung.",
+  rtPricesIntroPerPerson: "Diese Rate gilt für jedes Zimmer, das Sie unten bepreisen — lassen Sie ein Zimmer leer, um sie dort nicht anzubieten. Die Preise gelten PRO ERWACHSENEM pro Nacht, in Ihrer Unterkunftswährung.",
+  rtPerPerson: "Preis pro Person",
+  rtPerPersonHint: "Der Preis richtet sich nach der Anzahl der Erwachsenen. Sendet Channex diese Rate als Pro-Person-Rate, wird der Preis für jede Erwachsenenzahl exakt übernommen; hier oder im Belegungskalender eingegebene Preise gelten pro Erwachsenem.",
+  rtOccIntroPerPerson: "Die Erwachsenenpreise ergeben sich aus den Pro-Person-Preisen selbst — für Erwachsene ist nichts einzustellen. Kinder können weiterhin pro Nacht nach Altersgruppe bepreist werden.",
   rtPaymentTitle: "Zahlung",
   rtNoCardWarnTitle: "Die Gebühren dieser Rate sind nicht durchsetzbar.",
   rtNoCardWarnBody:
@@ -4955,6 +4963,10 @@ const PT: Record<string, string> = {
   rtMealPlanPlaceholder: "Pequeno-almoço incluído",
   rtPricesTitle: "Preço por noite por quarto",
   rtPricesIntro: "Esta tarifa aplica-se a todos os quartos a que der preço abaixo — deixe um quarto em branco para não a oferecer nele. A ocupação é retirada das definições de cada quarto. Preços na moeda da sua propriedade.",
+  rtPricesIntroPerPerson: "Esta tarifa aplica-se a todos os quartos a que der preço abaixo — deixe um quarto em branco para não a oferecer nele. Os preços são POR ADULTO por noite, na moeda da sua propriedade.",
+  rtPerPerson: "Preço por pessoa",
+  rtPerPersonHint: "O preço depende do número de adultos. Quando o Channex envia esta tarifa como por pessoa, o preço para cada número de adultos é usado exatamente; preços introduzidos aqui ou na grelha de inventário são cobrados por adulto.",
+  rtOccIntroPerPerson: "O preço dos adultos vem dos próprios preços por pessoa — não há nada a definir para adultos. As crianças podem continuar a ser cobradas por noite por faixa etária abaixo.",
   rtPaymentTitle: "Pagamento",
   rtNoCardWarnTitle: "As penalizações desta tarifa não podem ser aplicadas.",
   rtNoCardWarnBody:
@@ -6749,6 +6761,10 @@ const TH: Record<string, string> = {
   rtMealPlanPlaceholder: "รวมอาหารเช้า",
   rtPricesTitle: "ราคาต่อคืนของแต่ละห้อง",
   rtPricesIntro: "แพ็กเกจราคานี้จะใช้กับทุกห้องที่คุณตั้งราคาไว้ด้านล่าง — เว้นห้องใดว่างไว้เพื่อไม่เสนอแพ็กเกจนี้กับห้องนั้น จำนวนผู้เข้าพักที่รับได้มาจากการตั้งค่าของแต่ละห้อง ราคาเป็นสกุลเงินของที่พักคุณ",
+  rtPricesIntroPerPerson: "แพ็กเกจราคานี้จะใช้กับทุกห้องที่คุณตั้งราคาไว้ด้านล่าง — เว้นห้องใดว่างไว้เพื่อไม่เสนอแพ็กเกจนี้กับห้องนั้น ราคาคิดต่อผู้ใหญ่หนึ่งคนต่อคืน เป็นสกุลเงินของที่พักคุณ",
+  rtPerPerson: "คิดราคาต่อคน",
+  rtPerPersonHint: "ราคาขึ้นอยู่กับจำนวนผู้ใหญ่ที่เข้าพัก เมื่อ Channex ส่งแพ็กเกจนี้แบบต่อคน ระบบจะใช้ราคาของผู้ใหญ่แต่ละจำนวนตามที่ส่งมาโดยตรง ส่วนราคาที่กรอกที่นี่หรือในตารางห้องพักจะคิดต่อผู้ใหญ่หนึ่งคน",
+  rtOccIntroPerPerson: "ราคาสำหรับผู้ใหญ่มาจากราคาต่อคนโดยตรง จึงไม่ต้องตั้งค่าสำหรับผู้ใหญ่ ส่วนเด็กยังตั้งราคาต่อคืนตามช่วงอายุได้ด้านล่าง",
   rtPaymentTitle: "การชำระเงิน",
   rtNoCardWarnTitle: "ค่าปรับของแพ็กเกจราคานี้บังคับใช้ไม่ได้",
   rtNoCardWarnBody:
@@ -8597,6 +8613,11 @@ const TR: Record<string, string> = {
   rtPricesTitle: "Oda başına gecelik fiyat",
   rtPricesIntro:
     "Bu plan, aşağıda fiyat verdiğiniz her oda için geçerlidir — o odada sunmamak için boş bırakın. Kapasite her odanın kendi ayarlarından alınır. Fiyatlar tesis para biriminizdedir.",
+  rtPricesIntroPerPerson:
+    "Bu plan, aşağıda fiyat verdiğiniz her oda için geçerlidir — o odada sunmamak için boş bırakın. Fiyatlar YETİŞKİN BAŞINA gecelik olup tesis para biriminizdedir.",
+  rtPerPerson: "Kişi başı fiyatlandırma",
+  rtPerPersonHint: "Fiyat, konaklayan yetişkin sayısına göre belirlenir. Channex bu planı kişi başı olarak gönderdiğinde her yetişkin sayısı için gelen fiyat aynen kullanılır; burada veya envanter tablosunda girilen fiyatlar yetişkin başına uygulanır.",
+  rtOccIntroPerPerson: "Yetişkin fiyatları kişi başı fiyatların kendisinden gelir; yetişkinler için ayarlanacak bir şey yoktur. Çocuklar aşağıda yaş grubuna göre gecelik fiyatlandırılabilir.",
   rtPaymentTitle: "Ödeme",
   rtNoCardWarnTitle: "Bu planın cezaları uygulanamaz.",
   rtNoCardWarnBody:

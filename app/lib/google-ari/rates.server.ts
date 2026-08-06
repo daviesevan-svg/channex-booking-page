@@ -13,7 +13,7 @@ import { getRates, getRooms, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
 import { cityTaxNightlyAmount } from "../pricing";
-import { occupancyNightlyDelta } from "../rate-pricing";
+import { occupancyNightlyDelta, perPersonPrice } from "../rate-pricing";
 import type { AvailEntry, InvEntry, RateEntry, TaxLine } from "./xml";
 
 export interface AriWindow {
@@ -114,10 +114,18 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       const rid = rateChannexId(rate, room.id);
 
       // Per-occupancy nightly amounts (net + VAT-inclusive) for a given date.
+      // A per-person rate prices each guest count from its own per-occupancy ARI
+      // row (per-adult × guests where only a manual/base price exists), exactly
+      // as getCatalogRooms does; flat rates keep base + occupancy delta.
       const amountsAt = (date: string): { guests: number; net: number; gross: number }[] => {
-        const base = inv.prices[`${room.id}|${rid}|${date}`] ?? catalogBase;
+        const key = `${room.id}|${rid}|${date}`;
+        const base = inv.prices[key] ?? catalogBase;
         return Array.from({ length: maxAdults }, (_, i) => {
           const guests = i + 1;
+          if (rate.perPerson) {
+            const priced = perPersonPrice(inv.pricesByOcc[key], guests) ?? catalogBase * guests;
+            return { guests, ...netGross(priced, 0, vat, inclusive) };
+          }
           return { guests, ...netGross(base, occupancyNightlyDelta(op, guests, []), vat, inclusive) };
         });
       };

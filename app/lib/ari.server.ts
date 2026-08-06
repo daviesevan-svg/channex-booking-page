@@ -113,7 +113,7 @@ export interface AriLogEntry {
   newValue: string | null;
 }
 
-const EMPTY_INVENTORY: InventoryData = { availability: {}, prices: {}, restrictions: {} };
+const EMPTY_INVENTORY: InventoryData = { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
 
 /** Diff two inventory snapshots into per-value change entries. Compares at the
  *  "displayed value" granularity (what getInventory exposes), so it's identical
@@ -638,6 +638,11 @@ export interface InventoryData {
   availability: Record<string, number>;
   /** key `${roomId}|${rateId}|${date}` → price in major currency units */
   prices: Record<string, number>;
+  /** key `${roomId}|${rateId}|${date}` → every stored price by occupancy.
+   *  Occupancy ≥ 1 rows are Channex per-person pushes (price for that many
+   *  adults); occupancy 0 is a manual edit. Only per-person rates read this —
+   *  everything else uses the collapsed `prices` above. */
+  pricesByOcc: Record<string, Record<number, number>>;
   /** key `${roomId}|${rateId}|${date}` → restriction flags */
   restrictions: Record<string, RestrictionCell>;
 }
@@ -659,7 +664,7 @@ export async function getInventory(hotelCode: string, from: string, to: string):
  *  per-notification date lists. */
 export async function getInventoryOn(hotelCode: string, dates: Iterable<string>): Promise<InventoryData> {
   const uniq = [...new Set(dates)].sort();
-  if (uniq.length === 0) return { availability: {}, prices: {}, restrictions: {} };
+  if (uniq.length === 0) return { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
 
   // Chunked because D1 allows only 100 bound parameters per query, hotel_code
   // taking one of them — NOT SQLite's ~999, which an earlier guard at 500 dates
@@ -708,7 +713,7 @@ type RestrRow = {
 async function readInventory(hotelCode: string, parts: DatePart[]): Promise<InventoryData> {
   await ensureSchema();
   const D = db();
-  if (parts.length === 0) return { availability: {}, prices: {}, restrictions: {} };
+  if (parts.length === 0) return { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
 
   const stmts = parts.flatMap((p) => [
     D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND ${p.where}`).bind(hotelCode, ...p.binds),
@@ -734,7 +739,7 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
     rs.push(...((res[i + 2]?.results ?? []) as RestrRow[]));
   }
 
-  const data: InventoryData = { availability: {}, prices: {}, restrictions: {} };
+  const data: InventoryData = { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
   for (const r of av) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
   // A rate may have several occupancy rows (per_person pushes from Channex);
   // prefer the manual occupancy=0 price, else the highest occupancy (the full
@@ -745,6 +750,9 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
   for (const r of rt) {
     const key = `${r.room_type_id}|${r.rate_plan_id}|${r.date}`;
     const price = r.price_minor / 10 ** (r.fraction_size || 2);
+    // Every row also lands in the per-occupancy map (per-person rates price each
+    // party size from its own row rather than the collapsed value below).
+    (data.pricesByOcc[key] ??= {})[r.occupancy] = price;
     const prevOcc = priceOcc[key];
     if (prevOcc === undefined || r.occupancy === 0 || (prevOcc !== 0 && r.occupancy > prevOcc)) {
       data.prices[key] = price;
@@ -859,7 +867,7 @@ export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: A
     // nothing about the result.
     const existing = touchRestr
       ? await getInventoryOn(hotelCode, s.dates)
-      : { availability: {}, prices: {}, restrictions: {} as Record<string, RestrictionCell> };
+      : { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} as Record<string, RestrictionCell> };
     for (const rate of s.rates) {
       for (const room of s.rooms) {
         if (rate.prices[room.id] === undefined) continue; // rate not offered on this room

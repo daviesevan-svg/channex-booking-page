@@ -150,7 +150,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   const policy = buildPolicy((n) => String(form.get(n) ?? ""));
   const tier0 = policy.cancellation.tiers[0];
 
-  // Per-person pricing is opt-in: only stored when a default occupancy is set.
+  // Per-person rates: the price is per adult (Channex pushes one price per
+  // occupancy; manual prices multiply by the party's adults).
+  const perPerson = form.get("perPerson") === "on";
+
+  // Occupancy pricing is opt-in: only stored when a default occupancy is set.
   const readOccupancy = (prefix: string): OccupancyPricing | undefined => {
     const defaultOccupancy = posInt(form.get(`${prefix}defaultOccupancy`));
     if (!defaultOccupancy) return undefined;
@@ -164,7 +168,19 @@ export async function action({ params, request }: Route.ActionArgs) {
     };
   };
   // Rate-wide default (also the fallback for rooms without a per-room override).
-  const occupancyPricing = readOccupancy("");
+  let occupancyPricing = readOccupancy("");
+  // A per-person rate needs no default occupancy — adults price themselves —
+  // but the child age bands still ride on occupancyPricing, so store them with
+  // a nominal default occupancy when any band is set. (The adult fields are
+  // ignored by per-person pricing either way.)
+  if (perPerson && !occupancyPricing) {
+    const kids = {
+      child0to3: money(form.get("child0to3")),
+      child4to12: money(form.get("child4to12")),
+      child13plus: money(form.get("child13plus")),
+    };
+    if (kids.child0to3 || kids.child4to12 || kids.child13plus) occupancyPricing = { defaultOccupancy: 1, ...kids };
+  }
   // Optional per-room overrides — only when the "per room" toggle is on. Each
   // room needs its own default occupancy to be included, mirroring the rate-wide
   // opt-in rule; rooms left blank fall back to the rate-wide pricing above.
@@ -183,6 +199,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     title,
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
     prices,
+    perPerson: perPerson || undefined,
     occupancyPricing,
     occupancyPricingByRoom,
     policy,
@@ -250,6 +267,9 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [perRoomOcc, setPerRoomOcc] = useState<boolean>(
     !!rate?.occupancyPricingByRoom && Object.keys(rate.occupancyPricingByRoom).length > 0,
   );
+  // Per-person pricing: prices are per adult, so the adult occupancy fields
+  // (default occupancy / extra adult / fewer adults) don't apply and are hidden.
+  const [perPerson, setPerPerson] = useState<boolean>(!!rate?.perPerson);
   const [occRows, setOccRows] = useState<Record<string, OpRow>>(() => {
     const out: Record<string, OpRow> = {};
     for (const r of rooms) out[r.id] = opToRow(rate?.occupancyPricingByRoom?.[r.id] ?? rate?.occupancyPricing);
@@ -314,8 +334,21 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         <div className="border-t border-divider pt-5">
           <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPricesTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            {t("rtPricesIntro")}
+            {perPerson ? t("rtPricesIntroPerPerson") : t("rtPricesIntro")}
           </p>
+          <label className="mb-3 flex items-start gap-2.5 text-[14px] font-semibold">
+            <input
+              type="checkbox"
+              name="perPerson"
+              checked={perPerson}
+              onChange={(e) => setPerPerson(e.target.checked)}
+              className={`${checkbox} mt-0.5`}
+            />
+            <span>
+              {t("rtPerPerson")}{" "}
+              <span className="block font-normal text-faint">{t("rtPerPersonHint")}</span>
+            </span>
+          </label>
           <div className="overflow-hidden rounded-[12px] border border-line">
             {rooms.map((r, i) => (
               <label
@@ -389,8 +422,9 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         <div className="border-t border-divider pt-5">
           <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtOccTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            {t("rtOccIntro")}
+            {perPerson ? t("rtOccIntroPerPerson") : t("rtOccIntro")}
           </p>
+          {!perPerson && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <label className="block text-[13px] font-semibold text-secondary">
               {t("rtDefaultOcc")} <span className="font-normal text-faint">{t("rtDefaultOccHint")}</span>
@@ -428,6 +462,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               />
             </label>
           </div>
+          )}
           <div className="mt-3 text-[13px] font-semibold text-secondary">
             {t("rtChildTitle")} <span className="font-normal text-faint">{t("rtChildHint")}</span>
           </div>
@@ -446,6 +481,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
           </div>
 
+          {!perPerson && (
           <label className="mt-5 flex items-center gap-2.5 text-[14px] font-semibold">
             <input
               type="checkbox"
@@ -456,8 +492,9 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             {t("rtPerRoomToggle")}
             <span className="font-normal text-faint">{t("rtPerRoomToggleHint")}</span>
           </label>
+          )}
 
-          {perRoomOcc && (
+          {!perPerson && perRoomOcc && (
             <div className="mt-3">
               {/* Marks per-room mode as on for the action; the row inputs below carry the values. */}
               <input type="hidden" name="perRoomOccupancy" value="on" />
