@@ -9,7 +9,7 @@
 // through the accent, which replaces the design's terracotta everywhere.
 import { format, parseISO } from "date-fns";
 
-import { currencyDisplay, formatMoney, isZeroDecimal } from "./money";
+import { currencyDisplay, formatMoney, isZeroDecimal, MONEY_LOCALE } from "./money";
 import type { VoucherRecord } from "./vouchers";
 
 // Fixed palette from the design handoff (email-safe warm neutrals).
@@ -147,7 +147,7 @@ export function composeVoucherEmail(ctx: Ctx): { subject: string; html: string }
   const giftValue = v.product.value ?? v.product.price;
   const displayValue = (() => {
     try {
-      return new Intl.NumberFormat(undefined, {
+      return new Intl.NumberFormat(MONEY_LOCALE, {
         style: "currency",
         currency,
         currencyDisplay: currencyDisplay(currency),

@@ -1,3 +1,23 @@
+// Money is formatted in ONE locale, deliberately. An undefined locale means the
+// RUNTIME default, which is not the same thing on both sides of a render: en-US
+// in the Worker, whatever the guest's browser is set to in the client. Where
+// those disagree the server sends one string and hydration replaces it with
+// another — "¥369" becoming "JP¥369" on a JPY property in an en-GB browser, or
+// every price on every currency for a de-DE one — which React reports as a
+// failed hydration and the guest sees as the price changing after the page
+// loads. GBP and EUR happen to format identically in en-US and en-GB, which is
+// the only reason this went unnoticed.
+//
+// en-US because it is what the Worker was already rendering, so nothing moves,
+// and it has the cleanest symbols of the English locales (en-GB writes USD as
+// "US$" and JPY as "JP¥").
+//
+// This is a DISPLAY locale, not the guest's language: a German guest sees
+// "€369.00", not "369,00 €". Threading the guest's `lang` through instead would
+// be more correct — but only if EVERY call site passes it, since a half-migrated
+// version reintroduces exactly the mismatch this constant exists to prevent.
+export const MONEY_LOCALE = "en-US";
+
 // Currencies to render with their NARROW symbol. Intl's default `symbol`
 // display has no symbol for these and falls back to the bare ISO code —
 // "THB 1,234.50" where the guest expects "฿1,234.50".
@@ -22,7 +42,11 @@ export function currencyDisplay(currency: string): "symbol" | "narrowSymbol" {
 // (see STRIPE_ZERO_DECIMAL below), and forcing a maximum of 2 on those left the
 // half of a yen that the arithmetic produced on screen: "¥1,234.5" where the
 // hotel means ¥1,235. It reads like a typo, and there is no such coin.
-export function formatMoney(amount: string | number, currency = "USD", locale?: string): string {
+export function formatMoney(
+  amount: string | number,
+  currency = "USD",
+  locale: string = MONEY_LOCALE,
+): string {
   const value = typeof amount === "string" ? Number(amount) : amount;
   if (Number.isNaN(value)) return String(amount);
   try {
