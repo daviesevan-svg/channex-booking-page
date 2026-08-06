@@ -7,7 +7,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getRates, getRooms, pricingModeOf } from "~/lib/catalog.server";
+import { getRates, getRooms, pricingModeOf, rateChannexId } from "~/lib/catalog.server";
 import { applyBulkUpdate, getInventory, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
@@ -144,7 +144,7 @@ export async function action({ request }: Route.ActionArgs) {
       currency: settings.currency || "GBP",
       dates,
       rooms: scopedRooms.map((r) => ({ id: r.id })),
-      rates: scopedRates.map((r) => ({ id: r.id, prices: r.prices })),
+      rates: scopedRates.map((r) => ({ id: r.id, prices: r.prices, channexRateIds: r.channexRateIds })),
       avail: avail !== undefined ? Math.max(0, Math.round(avail)) : undefined,
       price: price !== undefined && price > 0 ? Math.round(price * 100) / 100 : undefined,
       minStay: minStay !== undefined ? Math.max(0, Math.round(minStay)) : undefined,
@@ -180,7 +180,8 @@ export async function action({ request }: Route.ActionArgs) {
       const [, roomId, date] = parts;
       if (date && v !== "") edits.availability.push({ roomId, date, avail: Math.max(0, Math.round(Number(v)) || 0) });
     } else if (parts[0] === "p") {
-      // price: p:roomId:rateId:date
+      // price: p:roomId:rateId:date — rateId is the room's Channex rate id for
+      // consolidated imported rates (the grid renders it), i.e. the storage id.
       const [, roomId, rateId, date] = parts;
       if (!date || v === "") continue;
       const price = Math.round(Number(v) * 100) / 100;
@@ -189,12 +190,15 @@ export async function action({ request }: Route.ActionArgs) {
   }
   // Restrictions cover every (room, its rates) × date in the window so toggles
   // clear too. A rate is offered on a room only when it has a price for it.
+  // Keyed by the per-room Channex rate id (= rate.id for native rates), matching
+  // both the field names the grid rendered and the rows guest pricing reads.
   for (const rate of rates) {
     for (const roomId of Object.keys(rate.prices)) {
+      const rid = rateChannexId(rate, roomId);
       for (const date of dates) {
-        const suffix = `${roomId}:${rate.id}:${date}`;
+        const suffix = `${roomId}:${rid}:${date}`;
         edits.restrictions.push({
-          rateId: rate.id,
+          rateId: rid,
           roomId,
           date,
           stopSell: form.get(`s:${suffix}`) != null,
@@ -574,14 +578,17 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                           <div className="text-[11px] text-muted-2">{t("invCellLegend")}</div>
                         </td>
                         {shown.map((d) => {
-                          const key = `${room.id}|${rate.id}|${d}`;
-                          const suffix = `${room.id}:${rate.id}:${d}`;
+                          // All ARI — Channex pushes and our own edits — is
+                          // stored under the room's real Channex rate id, which
+                          // for a consolidated imported rate differs from our
+                          // single rate.id on all but one room. Display and the
+                          // submitted field names both use it so edits land on
+                          // the rows guest pricing actually reads.
+                          const rid = rate.channexRateIds?.[room.id] ?? rate.id;
+                          const key = `${room.id}|${rid}|${d}`;
+                          const suffix = `${room.id}:${rid}:${d}`;
                           const restr = inventory.restrictions[key];
-                          // Channex per-occupancy pushes key by the room's real
-                          // Channex rate id, not our consolidated rate id.
-                          const byOcc = showOcc
-                            ? inventory.pricesByOcc[`${room.id}|${rate.channexRateIds?.[room.id] ?? rate.id}|${d}`]
-                            : undefined;
+                          const byOcc = showOcc ? inventory.pricesByOcc[key] : undefined;
                           const occs = byOcc
                             ? Object.keys(byOcc).map(Number).filter((o) => o > 0).sort((a, b) => a - b)
                             : [];
