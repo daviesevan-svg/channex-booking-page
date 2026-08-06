@@ -15,13 +15,17 @@ import type { Locale } from "date-fns";
 import { useRouteLoaderData } from "react-router";
 
 export type AdminLang = "en" | "de" | "pt" | "el" | "th" | "tr";
-export const ADMIN_LANGS: { id: AdminLang; label: string }[] = [
-  { id: "en", label: "English" },
-  { id: "de", label: "Deutsch" },
-  { id: "pt", label: "Português" },
-  { id: "el", label: "Ελληνικά" },
-  { id: "th", label: "ไทย" },
-  { id: "tr", label: "Türkçe" },
+/** Flags are spelled out here rather than read from `LANGUAGES` in content.ts:
+ *  the admin's languages are deliberately independent of the guest ones (a
+ *  guest language can be dropped without touching the admin panel), and the
+ *  emoji must not silently become undefined when that happens. */
+export const ADMIN_LANGS: { id: AdminLang; label: string; flag: string }[] = [
+  { id: "en", label: "English", flag: "🇬🇧" },
+  { id: "de", label: "Deutsch", flag: "🇩🇪" },
+  { id: "pt", label: "Português", flag: "🇵🇹" },
+  { id: "el", label: "Ελληνικά", flag: "🇬🇷" },
+  { id: "th", label: "ไทย", flag: "🇹🇭" },
+  { id: "tr", label: "Türkçe", flag: "🇹🇷" },
 ];
 export const ADMIN_LANG_COOKIE = "admin_lang";
 export const DEFAULT_ADMIN_LANG: AdminLang = "en";
