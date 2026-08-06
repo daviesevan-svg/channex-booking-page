@@ -9,7 +9,7 @@
 import { addDays, format, parseISO } from "date-fns";
 
 import { getInventory } from "../ari.server";
-import { getRates, getRooms, rateChannexId } from "../catalog.server";
+import { getRates, getRooms, pricingModeOf, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
 import { cityTaxNightlyAmount } from "../pricing";
@@ -87,6 +87,8 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
   const inclusive = settings.taxesInclusive === true;
   const dates = eachDate(window.from, window.to);
   const activeRates = allRates.filter((r) => r.active);
+  // Property-wide pricing mode — every rate prices per room or per person.
+  const perPersonMode = pricingModeOf(settings, allRates) === "per_person";
 
   const rates: RateEntry[] = [];
   const avail: AvailEntry[] = [];
@@ -122,7 +124,7 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
         const base = inv.prices[key] ?? catalogBase;
         return Array.from({ length: maxAdults }, (_, i) => {
           const guests = i + 1;
-          if (rate.perPerson) {
+          if (perPersonMode) {
             const priced = perPersonPrice(inv.pricesByOcc[key], guests) ?? catalogBase * guests;
             return { guests, ...netGross(priced, 0, vat, inclusive) };
           }

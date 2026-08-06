@@ -7,7 +7,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { isDeadlineUnit } from "~/lib/content";
-import { deleteRate, getRate, getRooms, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
+import { deleteRate, getPricingMode, getRate, getRates, getRooms, pricingModeOf, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import {
   CARD_HANDLINGS,
@@ -99,6 +99,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     isNew,
     rate,
     canTakeCard,
+    // Property-wide (set on General): every rate prices per room or per person.
+    perPerson: pricingModeOf(settings, await getRates(propertyId)) === "per_person",
     // The deadline counts back from this wall-clock time on the arrival date, so
     // the field can say what a given number actually resolves to.
     cancelAnchor: settings.cancelAnchorTime || DEFAULT_CANCEL_ANCHOR,
@@ -150,9 +152,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   const policy = buildPolicy((n) => String(form.get(n) ?? ""));
   const tier0 = policy.cancellation.tiers[0];
 
-  // Per-person rates: the price is per adult (Channex pushes one price per
-  // occupancy; manual prices multiply by the party's adults).
-  const perPerson = form.get("perPerson") === "on";
+  // Per-person pricing is property-wide (settings.pricingMode, set on General):
+  // in that mode the price is per adult (Channex pushes one price per occupancy;
+  // manual prices multiply by the party's adults).
+  const perPerson = (await getPricingMode(propertyId)) === "per_person";
 
   // Occupancy pricing is opt-in: only stored when a default occupancy is set.
   const readOccupancy = (prefix: string): OccupancyPricing | undefined => {
@@ -199,7 +202,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     title,
     mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
     prices,
-    perPerson: perPerson || undefined,
+    // Legacy flag, no longer edited here — preserved so a property that never
+    // saved General still derives its mode from it (see pricingModeOf).
+    perPerson: existing?.perPerson,
     occupancyPricing,
     occupancyPricingByRoom,
     policy,
@@ -226,7 +231,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
-  const { isNew, rate, rooms, canTakeCard, cancelAnchor } = loaderData;
+  const { isNew, rate, rooms, canTakeCard, cancelAnchor, perPerson } = loaderData;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -267,9 +272,9 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [perRoomOcc, setPerRoomOcc] = useState<boolean>(
     !!rate?.occupancyPricingByRoom && Object.keys(rate.occupancyPricingByRoom).length > 0,
   );
-  // Per-person pricing: prices are per adult, so the adult occupancy fields
-  // (default occupancy / extra adult / fewer adults) don't apply and are hidden.
-  const [perPerson, setPerPerson] = useState<boolean>(!!rate?.perPerson);
+  // Per-person pricing (property-wide, from General): prices are per adult, so
+  // the adult occupancy fields (default occupancy / extra adult / fewer adults)
+  // don't apply and are hidden.
   const [occRows, setOccRows] = useState<Record<string, OpRow>>(() => {
     const out: Record<string, OpRow> = {};
     for (const r of rooms) out[r.id] = opToRow(rate?.occupancyPricingByRoom?.[r.id] ?? rate?.occupancyPricing);
@@ -334,21 +339,13 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
         <div className="border-t border-divider pt-5">
           <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPricesTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
-            {perPerson ? t("rtPricesIntroPerPerson") : t("rtPricesIntro")}
+            {perPerson ? t("rtPricesIntroPerPerson") : t("rtPricesIntro")}{" "}
+            {t("rtPricingModeNote")}{" "}
+            <Link to="/admin/general" className="font-semibold text-accent hover:underline">
+              {t("navGeneral")}
+            </Link>
+            .
           </p>
-          <label className="mb-3 flex items-start gap-2.5 text-[14px] font-semibold">
-            <input
-              type="checkbox"
-              name="perPerson"
-              checked={perPerson}
-              onChange={(e) => setPerPerson(e.target.checked)}
-              className={`${checkbox} mt-0.5`}
-            />
-            <span>
-              {t("rtPerPerson")}{" "}
-              <span className="block font-normal text-faint">{t("rtPerPersonHint")}</span>
-            </span>
-          </label>
           <div className="overflow-hidden rounded-[12px] border border-line">
             {rooms.map((r, i) => (
               <label

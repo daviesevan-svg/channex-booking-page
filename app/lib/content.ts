@@ -267,6 +267,9 @@ export function normalizeFacilities(input: string[]): PropertyFacility[] {
 /** The i18n key for a facility label, in both the guest and admin dictionaries. */
 export const facilityLabelKey = (key: string) => `fac_${key}`;
 
+/** Property-wide pricing mode — see SiteSettings.pricingMode. */
+export type PricingMode = "per_room" | "per_person";
+
 export interface SiteSettings {
   theme?: ThemeId | "custom";
   customColor?: string;
@@ -301,6 +304,11 @@ export interface SiteSettings {
   privacyUrl?: string;
   /** ISO currency code for all prices (e.g. GBP). Defaults to GBP when unset. */
   currency?: string;
+  /** How every rate prices: flat per room (default) or per person (per adult).
+   *  Property-wide, not per rate — Channex applies sell mode to the whole
+   *  channel connection, so a per-rate mix would advertise a mapping it can't
+   *  fulfil. Unset = derived from legacy per-rate flags (see pricingModeOf). */
+  pricingMode?: PricingMode;
   languages?: string[]; // enabled languages (always includes the default)
   /** When true, checkout pushes real bookings to Channex; when false it simulates.
    *  Unset (never saved) falls back to the ALLOW_LIVE_BOOKING env var. */

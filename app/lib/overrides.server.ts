@@ -329,6 +329,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
   const next: SiteSettings = {
     ...existing,
     currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
+    pricingMode: form.get("pricingMode") === "per_person" ? "per_person" : "per_room",
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),
     languages: form.getAll("languages").map(String),

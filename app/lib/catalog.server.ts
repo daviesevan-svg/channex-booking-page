@@ -7,7 +7,7 @@ import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 import { getInventory, type MappingRoomType } from "./ari.server";
 import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
-import type { DeadlineUnit } from "./content";
+import type { DeadlineUnit, PricingMode, SiteSettings } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
 import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, type OccupancyPricing } from "./rate-pricing";
@@ -49,13 +49,10 @@ export interface CatalogRate {
    *  offered on a room only when it has a price here, so one rate plan can apply
    *  to every room at its own price. Occupancy is taken from each room. */
   prices: Record<string, number>;
-  /** Per-person rate: prices vary by the number of ADULTS instead of being one
-   *  price per room. Channex pushes such plans with a price for every occupancy
-   *  (stored per-occupancy in D1) and each is used as-is; where no per-occupancy
-   *  price exists (manual properties, grid/bulk edits, the base prices below)
-   *  the price is read as a price PER ADULT and multiplied by the party's
-   *  adults. Children stay priced by the age bands in `occupancyPricing`; its
-   *  adult fields are ignored in this mode. */
+  /** LEGACY — the pricing mode is property-wide now (settings.pricingMode);
+   *  Channex applies sell mode to the whole channel connection, so it can't
+   *  vary per rate. Kept only so pre-setting data still derives the right mode
+   *  (see pricingModeOf); the rate editor preserves it but the UI is gone. */
   perPerson?: boolean;
   /** Optional per-person pricing rules (absent = flat price for any party).
    *  This is the rate-wide default, applied to every room unless overridden. */
@@ -180,6 +177,19 @@ export async function deleteRate(pid: string, id: string): Promise<void> {
   await writeArr(ratesKey(pid), list);
 }
 
+// ---- pricing mode ----
+/** The property's effective pricing mode. Explicit setting first; data saved
+ *  before the setting existed falls back to the per-rate flags (any flagged
+ *  rate = the property was priced per person — modes were never legally mixed,
+ *  Channex applies one per channel). */
+export function pricingModeOf(settings: SiteSettings, rates: CatalogRate[]): PricingMode {
+  return settings.pricingMode ?? (rates.some((r) => r.perPerson) ? "per_person" : "per_room");
+}
+export async function getPricingMode(pid: string): Promise<PricingMode> {
+  const [settings, rates] = await Promise.all([getSettings(pid), getRates(pid)]);
+  return pricingModeOf(settings, rates);
+}
+
 /** Replace the whole rooms / rates list in one write. Used by the Channex
  *  import so a re-import rebuilds the catalog cleanly instead of piling new
  *  records on top of a previous import's. */
@@ -196,6 +206,9 @@ export async function replaceRates(pid: string, rates: CatalogRate[]): Promise<v
 export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]> {
   const [rooms, rates, settings] = await Promise.all([getRooms(pid), getRates(pid), getSettings(pid)]);
   const currency = settings.currency || "GBP";
+  // One sell mode for the whole property: Channex applies it per channel
+  // connection, so advertising a per-rate mix would be a mapping it can't fulfil.
+  const perPerson = pricingModeOf(settings, rates) === "per_person";
   return rooms
     .map((room) => ({
       id: room.id,
@@ -209,8 +222,8 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
           title: r.title,
           // Advertising per_person makes Channex map its per-person plans here
           // and push a price for every occupancy 1..max_persons (adults).
-          sell_mode: r.perPerson ? "per_person" : "per_room",
-          max_persons: r.perPerson ? Math.max(1, room.maxAdults) : room.maxGuests,
+          sell_mode: perPerson ? "per_person" : "per_room",
+          max_persons: perPerson ? Math.max(1, room.maxAdults) : room.maxGuests,
           currency,
           read_only: false,
         })),
@@ -260,6 +273,8 @@ export async function getCatalogRooms(
   ]);
   const { checkinDate, checkoutDate, currency: cur } = query;
   const cancelAnchor = { time: settings.cancelAnchorTime, timezone: settings.timezone };
+  // Property-wide pricing mode — every rate prices per room or per person.
+  const perPersonMode = pricingModeOf(settings, rates) === "per_person";
   // Searched party — drives per-person (occupancy) rate pricing below.
   const childrenAge = query.childrenAge ?? [];
   const nights =
@@ -346,7 +361,7 @@ export async function getCatalogRooms(
               // children from the age bands alone; everything else keeps the
               // flat price + occupancy delta model.
               const nightlyFor = (nAdults: number, d?: string): number => {
-                if (r.perPerson) {
+                if (perPersonMode) {
                   const byOcc = d ? inv.pricesByOcc[k(d)] : undefined;
                   return perPersonPrice(byOcc, nAdults) ?? base * Math.max(1, nAdults);
                 }
@@ -366,7 +381,7 @@ export async function getCatalogRooms(
               // can re-price live as the guest changes adults — a per-person
               // rate's prices vary by date, so a flat per-night delta can't
               // express them the way `occupancyPricing` does for flat rates.
-              const perPersonTotals: Record<number, number> | undefined = r.perPerson
+              const perPersonTotals: Record<number, number> | undefined = perPersonMode
                 ? Object.fromEntries(
                     Array.from({ length: Math.max(1, room.maxAdults) }, (_, i) => {
                       const n = i + 1;
@@ -403,7 +418,7 @@ export async function getCatalogRooms(
                     }
                   : undefined,
                 occupancyPricing: op,
-                perPerson: r.perPerson || undefined,
+                perPerson: perPersonMode || undefined,
                 perPersonTotals,
               };
             })

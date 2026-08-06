@@ -8,6 +8,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
+import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
@@ -46,9 +47,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
   const ref = await getProperty(propertyId);
+  // Effective, not stored: data saved before the setting existed derives its
+  // mode from the legacy per-rate flags, and the select should show that.
+  const pricingMode = pricingModeOf(settings, await getRates(propertyId));
   return {
     configured: true as const,
     settings,
+    pricingMode,
     slug: ref?.slug ?? "",
     propertyId,
     host: new URL(request.url).host,
@@ -92,7 +97,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, slug, host, envLive, timezones } = loaderData;
+  const { settings, slug, host, envLive, timezones, pricingMode } = loaderData;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
   // "1".."7" = require that many days before arrival.
@@ -180,6 +185,31 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
+        </section>
+
+        {/* Pricing mode — property-wide, because a channel manager applies sell
+            mode to the whole connection; rates can't mix per-room and per-person. */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("genPricingMode")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("genPricingModeHint")}</p>
+          <div className="grid grid-cols-1 gap-2.5 sm:max-w-md">
+            {(["per_room", "per_person"] as const).map((mode) => (
+              <label
+                key={mode}
+                className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3"
+              >
+                <input type="radio" name="pricingMode" value={mode} defaultChecked={pricingMode === mode} className="mt-1" />
+                <span>
+                  <span className="block text-[14px] font-semibold text-ink">
+                    {mode === "per_room" ? t("genPricingPerRoom") : t("genPricingPerPerson")}
+                  </span>
+                  <span className="block text-[12px] text-muted">
+                    {mode === "per_room" ? t("genPricingPerRoomDesc") : t("genPricingPerPersonDesc")}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
         </section>
 
         {/* Booking lead time */}

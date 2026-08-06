@@ -34,6 +34,10 @@ async function importFromChannex(
   rates: ChannexRatePlan[],
 ) {
   const pid = property.id;
+  const importedRoomIds = new Set(rooms.map((r) => r.id));
+  // One pricing mode for the whole property — Channex applies sell mode to the
+  // whole channel connection, so a mixed selection is refused in the action.
+  const perPerson = rates.some((rp) => importedRoomIds.has(rp.roomTypeId) && rp.sellMode === "per_person");
   await addProperty(pid, property.title, owner);
   await saveOverrides(pid, DEFAULT_LANG, {
     hotelName: property.title,
@@ -51,6 +55,7 @@ async function importFromChannex(
     latitude: property.latitude,
     longitude: property.longitude,
     connectedSystem: "channex",
+    pricingMode: perPerson ? "per_person" : "per_room",
   });
 
   const now = new Date().toISOString();
@@ -69,7 +74,6 @@ async function importFromChannex(
     })),
   );
 
-  const importedRoomIds = new Set(rooms.map((r) => r.id));
   // Channex stores one rate-plan record per room type, but our model is one rate
   // plan spanning many rooms. Consolidate by title into a single rate applied to
   // every imported room it covers. `channexRateIds` keeps each room's real
@@ -94,9 +98,6 @@ async function importFromChannex(
       title: g.first.title,
       mealPlan: g.first.mealPlan,
       prices: g.prices,
-      // A Channex per-person plan pushes a price for every occupancy — carry
-      // the mode over so those prices are used per number of adults.
-      perPerson: g.first.sellMode === "per_person" || undefined,
       channexRateIds: g.channexRateIds,
       refundable: true,
       inclusions: [],
@@ -152,6 +153,24 @@ export async function action({ request }: Route.ActionArgs) {
           rooms: roomTypes,
           rates: ratePlans,
           error: "Pick at least one room type to import.",
+        };
+      }
+      // A property prices per room OR per person — Channex applies sell mode to
+      // the whole channel connection, so a mixed selection can't be mapped.
+      // Refuse it here, where the owner can still change what they picked.
+      const selected = ratePlans.filter((rp) => rateTitles.has(rp.title) && roomIds.has(rp.roomTypeId));
+      const modes = new Set(selected.map((rp) => (rp.sellMode === "per_person" ? "per_person" : "per_room")));
+      if (modes.size > 1) {
+        return {
+          step: "review" as const,
+          apiKey,
+          properties,
+          propertyId,
+          property,
+          rooms: roomTypes,
+          rates: ratePlans,
+          error:
+            "The selected rate plans mix per-room and per-person pricing. A channel connection can only use one sell mode, so pick plans that all price the same way.",
         };
       }
       await importFromChannex(
