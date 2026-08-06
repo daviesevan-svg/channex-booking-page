@@ -203,12 +203,27 @@ const RATE_UPSERT: RowWrite = {
      DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency,fraction_size=excluded.fraction_size`,
 };
 
+// Channex splits one logical update into several restriction_changes: rates
+// arrive in one change and min_stay/stop_sell in another, often for the same
+// cell. Each change therefore carries only SOME fields, and a field that is
+// absent means "unchanged" — not zero. Absent fields are bound as -1 and the
+// upsert's CASE keeps the stored value. (NULL can't be the sentinel: SQLite
+// enforces NOT NULL on the proposed row BEFORE upsert conflict resolution.)
+// RESTR_ENSURE must run first so the insert arm — which would store the -1s —
+// is never taken.
+const RESTR_ENSURE: RowWrite = {
+  cols: 4,
+  sql: (v) => `INSERT OR IGNORE INTO restriction (hotel_code,room_type_id,rate_plan_id,date) VALUES ${v}`,
+};
+
+const keepAbsent = (col: string) => `${col}=CASE WHEN excluded.${col}<0 THEN ${col} ELSE excluded.${col} END`;
+
 const RESTR_UPSERT: RowWrite = {
   cols: 10,
   sql: (v) => `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,closed_to_arrival,closed_to_departure,min_stay_arrival,min_stay_through,max_stay)
      VALUES ${v}
      ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
-     DO UPDATE SET stop_sell=excluded.stop_sell,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure,min_stay_arrival=excluded.min_stay_arrival,min_stay_through=excluded.min_stay_through,max_stay=excluded.max_stay`,
+     DO UPDATE SET ${["stop_sell", "closed_to_arrival", "closed_to_departure", "min_stay_arrival", "min_stay_through", "max_stay"].map(keepAbsent).join(",")}`,
 };
 
 const LOG_INSERT: RowWrite = {
@@ -366,7 +381,12 @@ function eachDate(from: string, to: string): string[] {
 }
 
 const toMinor = (rate: string, fraction = 2) => Math.round(Number(rate) * 10 ** fraction);
-const bit = (v: unknown) => (v ? 1 : 0);
+// Bindings for partial restriction changes: absent (or null) means "field not
+// in this change", carried as the -1 sentinel so the upsert keeps the stored
+// value (see RESTR_UPSERT).
+const ABSENT = -1;
+const nbit = (v: unknown) => (v == null ? ABSENT : v ? 1 : 0);
+const nnum = (v: unknown) => (v == null ? ABSENT : Number(v) || 0);
 
 interface RateIn {
   rate: string;
@@ -422,6 +442,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // it is 30 statements in one. Same rows, same order, same upsert.
   const availRows: unknown[][] = [];
   const rateRows: unknown[][] = [];
+  const restrEnsureRows: unknown[][] = [];
   const restrRows: unknown[][] = [];
 
   for (const note of notifications) {
@@ -445,17 +466,23 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
         }
       } else if (type === "restriction_changes") {
         const rates = (Array.isArray(a.rates) ? a.rates : []) as RateIn[];
+        // Fields absent from this change bind the ABSENT sentinel → preserved
+        // by the upsert. A rate-only change writes no restriction row at all.
+        const restr = [
+          nbit(a.stop_sell), nbit(a.closed_to_arrival), nbit(a.closed_to_departure),
+          nnum(a.min_stay_arrival), nnum(a.min_stay_through), nnum(a.max_stay),
+        ];
+        const hasRestr = restr.some((f) => f !== ABSENT);
         for (const d of dates) {
           for (const r of rates) {
             rateRows.push([hotel, room, plan, d, Number(r.occupancy) || 0, toMinor(r.rate, r.fraction_size ?? 2), r.currency, r.fraction_size ?? 2]);
             counts.rates++;
           }
-          restrRows.push([
-            hotel, room, plan, d,
-            bit(a.stop_sell), bit(a.closed_to_arrival), bit(a.closed_to_departure),
-            Number(a.min_stay_arrival) || 0, Number(a.min_stay_through) || 0, Number(a.max_stay) || 0,
-          ]);
-          counts.restrictions++;
+          if (hasRestr) {
+            restrEnsureRows.push([hotel, room, plan, d]);
+            restrRows.push([hotel, room, plan, d, ...restr]);
+            counts.restrictions++;
+          }
         }
       }
     }
@@ -464,6 +491,9 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   const stmts = [
     ...packUpserts(D, AVAIL_UPSERT, availRows),
     ...packUpserts(D, RATE_UPSERT, rateRows),
+    // Ensure-then-upsert order matters: rows must exist before the NULL-keep
+    // upsert runs (see RESTR_ENSURE).
+    ...packUpserts(D, RESTR_ENSURE, restrEnsureRows),
     ...packUpserts(D, RESTR_UPSERT, restrRows),
   ];
 
