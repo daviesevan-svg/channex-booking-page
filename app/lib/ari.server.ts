@@ -863,8 +863,11 @@ export interface BulkScope {
   dates: string[];
   /** rooms in scope — availability is set per room */
   rooms: { id: string }[];
-  /** rates in scope — price + restrictions are set per (room, rate) it's priced on */
-  rates: { id: string; prices: Record<string, number> }[];
+  /** rates in scope — price + restrictions are set per (room, rate) it's priced
+   *  on. `channexRateIds` maps roomId → the room's real Channex rate id for
+   *  consolidated imported rates; ARI rows are stored under that id (see
+   *  rateChannexId in catalog.server.ts — not imported here, it would cycle). */
+  rates: { id: string; prices: Record<string, number>; channexRateIds?: Record<string, string> }[];
   /** each field is applied only when defined; undefined = leave untouched */
   avail?: number;
   price?: number;
@@ -901,13 +904,16 @@ export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: A
     for (const rate of s.rates) {
       for (const room of s.rooms) {
         if (rate.prices[room.id] === undefined) continue; // rate not offered on this room
+        // Store under the room's real Channex rate id so guest pricing (which
+        // reads by that id) sees the edit; equals rate.id for native rates.
+        const rid = rate.channexRateIds?.[room.id] ?? rate.id;
         for (const date of s.dates) {
-          if (touchPrice) edits.prices.push({ roomId: room.id, rateId: rate.id, date, price: s.price! });
+          if (touchPrice) edits.prices.push({ roomId: room.id, rateId: rid, date, price: s.price! });
           if (touchRestr) {
-            const cur = existing.restrictions[`${room.id}|${rate.id}|${date}`];
+            const cur = existing.restrictions[`${room.id}|${rid}|${date}`];
             edits.restrictions.push({
               roomId: room.id,
-              rateId: rate.id,
+              rateId: rid,
               date,
               stopSell: s.stopSell ?? cur?.stopSell ?? false,
               minStay: s.minStay ?? cur?.minStay ?? 0,
