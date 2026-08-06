@@ -7,7 +7,7 @@
 // reaches the browser as root loader data, registered by root's Layout before
 // anything renders. See `registerDict`.
 
-import { de, el, enGB, es, fr, it, nl, pt, th, type Locale } from "date-fns/locale";
+import { de, el, enGB, es, fr, it, nl, pt, th, tr, type Locale } from "date-fns/locale";
 
 import EN from "./locales/en";
 import type { Dict } from "./i18n-dict";
@@ -32,7 +32,7 @@ export function registerDict(lang: string, dict: Dict | null | undefined): void 
   DICTS.set(lang, dict);
 }
 
-const LOCALES: Record<string, Locale> = { en: enGB, fr, de, es, it, pt, nl, el, th };
+const LOCALES: Record<string, Locale> = { en: enGB, fr, de, es, it, pt, nl, el, th, tr };
 
 function interpolate(s: string, vars?: Record<string, string | number>): string {
   return vars ? s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`)) : s;
