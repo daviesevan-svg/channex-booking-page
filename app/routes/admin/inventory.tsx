@@ -7,7 +7,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { getRates, getRooms } from "~/lib/catalog.server";
+import { getRates, getRooms, pricingModeOf } from "~/lib/catalog.server";
 import { applyBulkUpdate, getInventory, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
@@ -68,8 +68,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     configured: true as const,
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
-    rates: rates.map((r) => ({ id: r.id, title: r.title, prices: r.prices })),
+    // channexRateIds: Channex pushes ARI keyed by each room's real Channex rate
+    // id (what the mapping advertises), so per-occupancy lookups need it.
+    rates: rates.map((r) => ({ id: r.id, title: r.title, prices: r.prices, channexRateIds: r.channexRateIds })),
     currency: settings.currency || "GBP",
+    // Per-person property: offer to unfold each cell's per-occupancy prices.
+    perPerson: pricingModeOf(settings, rates) === "per_person",
     dates,
     start,
     inventory,
@@ -257,6 +261,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   // hidden cards stay in the DOM so Save still submits their values.
   const [roomFilter, setRoomFilter] = useState<string>("all");
   const [bulkOpen, setBulkOpen] = useState(false);
+  // Per-person properties: unfold each cell's per-occupancy prices (read-only —
+  // they come from Channex pushes; the editable price is the occupancy-0 row).
+  const [showOcc, setShowOcc] = useState(false);
   const datesLen = loaderData.configured ? loaderData.dates.length : 0;
   useEffect(() => {
     const el = gridRef.current;
@@ -285,7 +292,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
     );
   }
 
-  const { rooms, rates, currency, dates, start, inventory } = loaderData;
+  const { rooms, rates, currency, dates, start, inventory, perPerson } = loaderData;
   const shown = dates.slice(0, visible);
   const go = (s: string) => navigate(`/admin/inventory?start=${s}`);
   const today = format(new Date(), "yyyy-MM-dd");
@@ -478,6 +485,17 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           )}
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
           <div className="ml-auto flex items-center gap-2 text-[13px] font-semibold">
+            {perPerson && (
+              <label className="mr-2 flex cursor-pointer items-center gap-1.5 text-muted-2">
+                <input
+                  type="checkbox"
+                  checked={showOcc}
+                  onChange={(e) => setShowOcc(e.target.checked)}
+                  className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent"
+                />
+                {t("invShowOccPrices")}
+              </label>
+            )}
             <label htmlFor="roomFilter" className="text-muted-2">{t("invShow")}</label>
             <select
               id="roomFilter"
@@ -559,6 +577,14 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                           const key = `${room.id}|${rate.id}|${d}`;
                           const suffix = `${room.id}:${rate.id}:${d}`;
                           const restr = inventory.restrictions[key];
+                          // Channex per-occupancy pushes key by the room's real
+                          // Channex rate id, not our consolidated rate id.
+                          const byOcc = showOcc
+                            ? inventory.pricesByOcc[`${room.id}|${rate.channexRateIds?.[room.id] ?? rate.id}|${d}`]
+                            : undefined;
+                          const occs = byOcc
+                            ? Object.keys(byOcc).map(Number).filter((o) => o > 0).sort((a, b) => a - b)
+                            : [];
                           return (
                             <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
                               <input
@@ -570,6 +596,19 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                 placeholder={rate.prices[room.id].toFixed(0)}
                                 className={cellInput}
                               />
+                              {showOcc && (
+                                <div className="mt-1 space-y-px text-center text-[10px] leading-[1.5] text-muted-2" title={t("invOccPricesTitle")}>
+                                  {occs.length > 0 ? (
+                                    occs.map((o) => (
+                                      <div key={o} className="tabular-nums">
+                                        {o}× {Number.isInteger(byOcc![o]) ? byOcc![o] : byOcc![o].toFixed(2)}
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <div>—</div>
+                                  )}
+                                </div>
+                              )}
                               <div className="mt-1 flex items-center justify-center gap-1">
                                 <input
                                   name={`m:${suffix}`}
