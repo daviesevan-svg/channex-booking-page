@@ -12,7 +12,9 @@ import {
   getProperty,
   isOwnerOrSuper,
   removePropertyMember,
+  setMemberHiddenAreas,
 } from "~/lib/properties.server";
+import { isMemberArea, MEMBER_AREAS, type MemberArea } from "~/lib/member-areas";
 import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -26,6 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     name: property?.name ?? "",
     owner: property?.owner ?? null,
     members: property?.members ?? [],
+    memberHiddenAreas: property?.memberHiddenAreas ?? {},
   };
 }
 
@@ -55,6 +58,12 @@ export async function action({ request }: Route.ActionArgs) {
     await sendTeamInviteEmail(propertyId, email, inviter, signInUrl, partnerId);
   } else if (intent === "remove" && email) {
     await removePropertyMember(propertyId, email);
+  } else if (intent === "access" && email) {
+    // Checkboxes carry what the member CAN see; we store the complement so
+    // absent-entry = full access stays the default for existing teams.
+    const allowed = form.getAll("areas").map(String).filter(isMemberArea);
+    const hidden: MemberArea[] = MEMBER_AREAS.filter((a) => !allowed.includes(a));
+    await setMemberHiddenAreas(propertyId, email, hidden);
   }
   return redirect("/admin/team");
 }
@@ -64,10 +73,17 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function AdminTeam({ loaderData }: Route.ComponentProps) {
-  const { name, owner, members } = loaderData;
+  const { name, owner, members, memberHiddenAreas } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
+  const areaLabel: Record<MemberArea, string> = {
+    operations: t("tmAreaOperations"),
+    pricing: t("tmAreaPricing"),
+    website: t("tmAreaWebsite"),
+    emails: t("tmAreaEmails"),
+    payments: t("tmAreaPayments"),
+  };
 
   return (
     <div>
@@ -89,26 +105,52 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
         </div>
 
         {/* teammates */}
-        {members.map((m) => (
-          <div
-            key={m}
-            className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-5 py-4"
-          >
-            <span className="font-semibold">{m}</span>
-            <Form
-              method="post"
-              onSubmit={(e) => {
-                if (!confirm(t("tmRemoveConfirm", { email: m }))) e.preventDefault();
-              }}
-            >
-              <input type="hidden" name="intent" value="remove" />
-              <input type="hidden" name="email" value={m} />
-              <button type="submit" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
-                {t("tmRemove")}
-              </button>
-            </Form>
-          </div>
-        ))}
+        {members.map((m) => {
+          const hidden = memberHiddenAreas[m] ?? [];
+          return (
+            <div key={m} className="border-t border-divider px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="font-semibold">{m}</span>
+                <Form
+                  method="post"
+                  onSubmit={(e) => {
+                    if (!confirm(t("tmRemoveConfirm", { email: m }))) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="intent" value="remove" />
+                  <input type="hidden" name="email" value={m} />
+                  <button type="submit" className="text-[13px] font-semibold text-[#c0392b] hover:underline">
+                    {t("tmRemove")}
+                  </button>
+                </Form>
+              </div>
+              {/* Per-member page access: ticked = can see that area. */}
+              <Form method="post" className="mt-3">
+                <input type="hidden" name="intent" value="access" />
+                <input type="hidden" name="email" value={m} />
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">
+                    {t("tmAccessTitle")}
+                  </span>
+                  {MEMBER_AREAS.map((a) => (
+                    <label key={a} className="flex items-center gap-1.5 text-[13px] text-secondary">
+                      <input type="checkbox" name="areas" value={a} defaultChecked={!hidden.includes(a)} />
+                      {areaLabel[a]}
+                    </label>
+                  ))}
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {t("tmAccessSave")}
+                  </button>
+                </div>
+                <p className="mt-1 text-[12px] text-faint">{t("tmAccessHint")}</p>
+              </Form>
+            </div>
+          );
+        })}
 
         {members.length === 0 && (
           <div className="border-t border-divider px-5 py-4 text-[13px] text-muted">
