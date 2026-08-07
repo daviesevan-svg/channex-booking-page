@@ -23,7 +23,7 @@ const ES: Dict = {
   staysAvailable_other: "{n} alojamientos disponibles",
   staysInView_one: "{n} alojamiento a la vista",
   staysInView_other: "{n} alojamientos a la vista",
-  footerRight: "Reserva segura · Desarrollado por Channex",
+  footerRight: "Reserva segura · Desarrollado por Roompanda",
   allRightsReserved: "Todos los derechos reservados",
   admin: "Admin",
   step_room: "Elegir habitación",

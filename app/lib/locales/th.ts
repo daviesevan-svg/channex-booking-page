@@ -72,7 +72,7 @@ const TH: Dict = {
   penaltyPercent: "{n}% ของค่าเข้าพัก",
   afterDeadlineCharge: "หลังจากนั้น หากยกเลิกจะถูกเรียกเก็บ {penalty}",
   noShowCharge: "ไม่เข้าพัก: เรียกเก็บ {penalty}",
-  footerRight: "จองอย่างปลอดภัย · ให้บริการโดย Channex",
+  footerRight: "จองอย่างปลอดภัย · ให้บริการโดย Roompanda",
   allRightsReserved: "สงวนลิขสิทธิ์",
   admin: "ผู้ดูแลระบบ",
   step_room: "เลือกห้องพัก",

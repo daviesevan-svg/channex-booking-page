@@ -28,7 +28,7 @@ export async function pushOpenChannelBooking(booking: unknown): Promise<OpenChan
       body && typeof body === "object"
         ? JSON.stringify((body as { errors?: unknown }).errors ?? body)
         : String(body);
-    throw new Error(`Channex booking push failed (${res.status}): ${detail}`.slice(0, 400));
+    throw new Error(`Channel manager booking push failed (${res.status}): ${detail}`.slice(0, 400));
   }
   // Channex replies { success: true, bookings: [{ id, unique_id }] }. Older/other
   // shapes (a bare object or { data }) are tolerated as a fallback.

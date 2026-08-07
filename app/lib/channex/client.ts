@@ -13,7 +13,7 @@ export class ChannexApiError extends Error {
   status: number;
   errors: unknown;
   constructor(status: number, errors: unknown) {
-    super(`Channex API error (${status})`);
+    super(`Channel manager API error (${status})`);
     this.name = "ChannexApiError";
     this.status = status;
     this.errors = errors;

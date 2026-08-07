@@ -15,7 +15,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 const SYSTEMS = [
   {
     id: "channex",
-    name: "Channex",
+    name: "Channel manager",
     taglineKey: "cnTaglineChannex",
     blurbKey: "cnBlurbChannex",
     available: true,

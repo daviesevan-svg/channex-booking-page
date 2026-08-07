@@ -70,7 +70,7 @@ const EN: Dict = {
   penaltyPercent: "{n}% of the stay",
   afterDeadlineCharge: "After that, {penalty} is charged if you cancel.",
   noShowCharge: "No-show: {penalty} charged.",
-  footerRight: "Secure booking · Powered by Channex",
+  footerRight: "Secure booking · Powered by Roompanda",
   allRightsReserved: "All rights reserved",
   admin: "Admin",
   step_room: "Choose a room",
