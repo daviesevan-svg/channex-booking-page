@@ -3,31 +3,41 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
 import { adminMeta } from "~/lib/admin-meta";
 import {
-  canSignIn,
+  adminHostPartnerId,
+  canSignInOnHost,
   createMagicToken,
   getAdminEmail,
   sendMagicLink,
 } from "~/lib/auth.server";
 import { adminLangFromRequest, adminT } from "~/lib/admin-i18n";
-import { requireCanonicalHost } from "~/lib/domains.server";
+import { getPartner } from "~/lib/partners.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  // Never on a hotel's custom domain — the login form is exactly what a tenant would want to phish with.
-  requireCanonicalHost(request);
+  // Our hosts and registered partner admin hosts only — anything else 404s. A
+  // hotel's custom domain must never render this form (a phishing surface),
+  // and adminHostPartnerId is what enforces that now.
+  const hostPartnerId = await adminHostPartnerId(request);
   if (await getAdminEmail(request)) throw redirect("/admin");
   // A team invite links here with ?email= so the invitee's address is pre-filled.
   const email = new URL(request.url).searchParams.get("email") ?? "";
-  return { email, adminLang: adminLangFromRequest(request) };
+  return {
+    email,
+    adminLang: adminLangFromRequest(request),
+    // Pre-login branding: on a partner's admin host the form carries THEIR
+    // name — the first thing an invited hotel ever sees.
+    brandName: hostPartnerId ? ((await getPartner(hostPartnerId))?.brandName ?? null) : null,
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
-  // Never on a hotel's custom domain — the login form is exactly what a tenant would want to phish with.
-  requireCanonicalHost(request);
+  const hostPartnerId = await adminHostPartnerId(request);
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   if (!email) return { error: "Enter your email address." };
-  if (!(await canSignIn(email))) {
-    return { error: "That email isn't on the admin allowlist." };
+  // Host-scoped in both directions: partner hosts are invite-only for that
+  // partner's users; a partner's users don't get OUR door once theirs exists.
+  if (!(await canSignInOnHost(email, hostPartnerId))) {
+    return { error: "That email can't sign in here." };
   }
   const token = await createMagicToken(email);
   // Build the link from this request's own origin so it works on any host.
@@ -53,7 +63,7 @@ export default function Login({ actionData, loaderData }: Route.ComponentProps) 
           className="inline-block h-3.5 w-3.5 rounded-[2px] bg-accent"
           style={{ transform: "rotate(45deg)" }}
         />
-        <span className="font-serif text-[22px] font-semibold">Booking Admin</span>
+        <span className="font-serif text-[22px] font-semibold">{loaderData.brandName ?? "Booking Admin"}</span>
       </div>
 
       {actionData?.ok ? (

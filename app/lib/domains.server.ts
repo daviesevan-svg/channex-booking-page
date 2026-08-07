@@ -158,6 +158,13 @@ export async function claimDomainSetup(pid: string, domain: string): Promise<Cla
   // A hostname someone else is live on is taken regardless of reservations.
   const live = kv ? await kv.get(domainKey(host)) : null;
   if (live && live !== pid) return { ok: false, reason: "taken", propertyId: live };
+  // A white-label partner's admin host (partners.server.ts) is not claimable as
+  // a website domain either — a hotel serving guest pages on a partner's admin
+  // hostname would shadow their login. Key literal duplicated here because
+  // partners.server imports this module; keep the prefixes in sync.
+  if (kv && (await kv.get(`partner-admin-host:${host}`))) {
+    return { ok: false, reason: "own_host" };
+  }
   return claimKey(setupKey(host), pid, SETUP_TTL_SECONDS);
 }
 
