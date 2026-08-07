@@ -9,6 +9,7 @@ import {
   claimPartnerAdminHost,
   claimPartnerGuestHost,
   DEFAULT_HIDDEN_PAGES,
+  deletePartner,
   getPartner,
   getPartners,
   isValidPartnerId,
@@ -20,7 +21,7 @@ import {
 import { normalizeDomain } from "~/lib/domains";
 import { ensureCustomHostname } from "~/lib/custom-hostnames.server";
 import { getConfig } from "~/lib/config.server";
-import { getProperties, setPropertyPartner } from "~/lib/properties.server";
+import { getProperties, setPropertyPartner, slugify } from "~/lib/properties.server";
 import { getUsers, setUserPartner } from "~/lib/users.server";
 
 // White-label partners (docs/whitelabel.md): superadmin-only management of the
@@ -52,13 +53,20 @@ export async function action({ request }: Route.ActionArgs) {
   const str = (k: string) => String(form.get(k) ?? "").trim();
 
   if (intent === "create") {
-    if (!isValidPartnerId(partnerId)) return { error: "Partner id: 3–40 lowercase letters, digits or hyphens." };
-    if (await getPartner(partnerId)) return { error: `Partner "${partnerId}" already exists.` };
     const brandName = str("brandName");
     if (!brandName) return { error: "Enter the brand name their users will see." };
+    const name = str("name") || brandName;
+    // The id is internal (a KV key and a foreign key on properties/users) and
+    // never shown to their users, so it's derived rather than asked for: the
+    // slugified name, uniquified with a numeric suffix. Non-Latin names can
+    // slugify to nothing — fall back to a generic stem rather than erroring.
+    let base = slugify(name);
+    if (!isValidPartnerId(base)) base = "partner";
+    let id = base;
+    for (let n = 2; await getPartner(id); n++) id = `${base}-${n}`;
     const partner: Partner = {
-      id: partnerId,
-      name: str("name") || brandName,
+      id,
+      name,
       brandName,
       supportEmail: str("supportEmail") || undefined,
       hiddenPages: [...DEFAULT_HIDDEN_PAGES],
@@ -122,6 +130,15 @@ export async function action({ request }: Route.ActionArgs) {
     const email = str("email").toLowerCase();
     // Back to a plain direct member; their property team memberships survive.
     if (email) await setUserPartner(email, undefined, "member");
+  } else if (intent === "delete") {
+    // Only an EMPTY partner can go — a dangling partnerId on a property or
+    // user would strand it invisible to everyone but superadmins. Unassign
+    // properties and remove admins first; that friction is the safety.
+    const [properties, users] = await Promise.all([getProperties(), getUsers()]);
+    if (properties.some((p) => p.partnerId === partnerId) || users.some((u) => u.partnerId === partnerId)) {
+      return { error: "Unassign this partner's properties and remove its admins first." };
+    }
+    await deletePartner(partner);
   }
   return redirect("/admin/partners");
 }
@@ -159,9 +176,25 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
               <span className="font-serif text-[17px] font-semibold">{p.brandName}</span>
               <code className="rounded bg-chip px-1.5 py-0.5 text-[11px] text-muted">{p.id}</code>
             </div>
-            <span className="text-[12px] text-muted-2">
-              {t(p.properties.length === 1 ? "wlpPropsCount_one" : "wlpPropsCount_other", { n: p.properties.length })}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-muted-2">
+                {t(p.properties.length === 1 ? "wlpPropsCount_one" : "wlpPropsCount_other", { n: p.properties.length })}
+              </span>
+              {p.properties.length === 0 && p.admins.length === 0 && (
+                <Form
+                  method="post"
+                  onSubmit={(e) => {
+                    if (!confirm(t("wlpDeleteConfirm", { name: p.brandName }))) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="intent" value="delete" />
+                  <input type="hidden" name="partnerId" value={p.id} />
+                  <button type="submit" disabled={busy} className="text-[12px] font-semibold text-[#c0392b] hover:underline">
+                    {t("wlpDelete")}
+                  </button>
+                </Form>
+              )}
+            </div>
           </div>
 
           <div className="grid gap-6 px-5 py-4 lg:grid-cols-2">
@@ -295,16 +328,12 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
       {/* create */}
       <div className="rounded-[14px] border border-line bg-surface p-5">
         <h2 className="mb-3 font-serif text-[18px] font-semibold">{t("wlpCreateTitle")}</h2>
-        <Form method="post" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Form method="post" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <input type="hidden" name="intent" value="create" />
-          <div>
-            <span className={label}>{t("wlpId")}</span>
-            <input name="partnerId" required placeholder="hotelsoft" autoCapitalize="off" spellCheck={false} className={FIELD_INPUT} />
-            <span className="mt-1 block text-[12px] text-faint">{t("wlpIdHint")}</span>
-          </div>
           <div>
             <span className={label}>{t("wlpBrandName")}</span>
             <input name="brandName" required placeholder="HotelSoft Bookings" className={FIELD_INPUT} />
+            <span className="mt-1 block text-[12px] text-faint">{t("wlpBrandNameHint")}</span>
           </div>
           <div>
             <span className={label}>{t("wlpInternalName")}</span>
