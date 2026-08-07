@@ -203,7 +203,7 @@ export default function AriLog({ loaderData }: Route.ComponentProps) {
                         : "bg-[#e8f0e6] text-[#3f7a52]"
                     }`}
                   >
-                    {r.source === "channex" ? "Channex" : r.source === "revman" ? t("alSourceRevman") : t("alSourceUser")}
+                    {r.source === "channex" ? "Channel manager" : r.source === "revman" ? t("alSourceRevman") : t("alSourceUser")}
                   </span>
                   {r.source === "channex" ? "" : r.actor}
                 </td>

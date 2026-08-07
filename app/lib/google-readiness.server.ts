@@ -54,8 +54,8 @@ export function requiredMissing(
   need(settings.addressCountry, "addressCountry", "Country (Location)");
   need(settings.latitude && settings.longitude, "geo", "Map coordinates — latitude & longitude (Location)");
   // Google must not advertise a property that can't take a booking: an active
-  // Stripe connection, or a live Channex connection receiving rates.
-  need(canBook, "payment", "A way to take bookings — connect Stripe (Payments), or a live Channex connection receiving rates (Connectivity)");
+  // Stripe connection, or a live channel manager connection receiving rates.
+  need(canBook, "payment", "A way to take bookings — connect Stripe (Payments), or a live channel manager connection receiving rates (Connectivity)");
   return out;
 }
 

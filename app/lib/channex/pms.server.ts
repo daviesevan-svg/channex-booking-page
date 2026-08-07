@@ -68,12 +68,12 @@ async function pmsFetch(path: string, apiKey: string): Promise<PmsPage> {
       headers: { "user-api-key": apiKey, Accept: "application/json" },
     });
   } catch {
-    throw new Error("Couldn't reach Channex. Check your connection and try again.");
+    throw new Error("Couldn't reach your channel manager. Check your connection and try again.");
   }
   if (res.status === 401 || res.status === 403) {
-    throw new Error("Channex rejected that API key. Double-check it and try again.");
+    throw new Error("Your channel manager rejected that API key. Double-check it and try again.");
   }
-  if (!res.ok) throw new Error(`Channex returned an error (${res.status}). Try again shortly.`);
+  if (!res.ok) throw new Error(`Your channel manager returned an error (${res.status}). Try again shortly.`);
   const json = (await res.json().catch(() => ({}))) as { data?: unknown; meta?: Record<string, unknown> };
   const raw = Array.isArray(json.data) ? json.data : json.data ? [json.data] : [];
   return { data: convertToCamelCase(raw) as JsonApiRecord[], meta: json.meta };

@@ -44,15 +44,15 @@ export async function spliceListingsFeed(
   try {
     res = await fetch(channexFeedUrl, { headers: { Accept: "application/xml" } });
   } catch {
-    throw new Error("Could not reach the Channex feed.");
+    throw new Error("Could not reach the partner feed.");
   }
-  if (!res.ok) throw new Error(`Channex feed returned ${res.status}.`);
+  if (!res.ok) throw new Error(`Partner feed returned ${res.status}.`);
   const channex = normalizeRelations(await res.text());
 
   // Guard: only splice into a document that really is the listings feed.
   const close = channex.lastIndexOf(CLOSE_TAG);
   if (close === -1 || !channex.includes("<listings")) {
-    throw new Error("Unexpected Channex feed shape.");
+    throw new Error("Unexpected partner feed shape.");
   }
 
   const ours = await ourListingElements();

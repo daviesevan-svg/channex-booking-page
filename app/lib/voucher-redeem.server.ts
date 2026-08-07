@@ -203,7 +203,7 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
       status = "confirmed";
     } catch (e) {
       status = "failed";
-      error = e instanceof Error ? e.message : "Channex rejected the booking.";
+      error = e instanceof Error ? e.message : "The channel manager rejected the booking.";
     }
   }
   const patch: Partial<BookingRecord> = {

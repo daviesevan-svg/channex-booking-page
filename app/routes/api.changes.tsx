@@ -26,7 +26,7 @@ export async function action({ request }: Route.ActionArgs) {
   for (const code of hotelCodes) {
     if (!(await isChannexConnected(code))) {
       return Response.json(
-        { success: false, error: `Property ${code} is not connected to Channex.` },
+        { success: false, error: `Property ${code} is not connected to a channel manager.` },
         { status: 403 },
       );
     }

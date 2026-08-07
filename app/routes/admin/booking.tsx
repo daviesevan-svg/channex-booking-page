@@ -49,15 +49,15 @@ export async function action({ params, request }: Route.ActionArgs) {
         r.reason === "not_failed"
           ? "Only a failed booking can be retried."
           : r.reason === "no_payload"
-            ? "No stored Channex payload to retry (legacy failed booking)."
-            : `Channex rejected it again: ${r.error}`,
+            ? "No stored channel manager payload to retry (legacy failed booking)."
+            : `The channel manager rejected it again: ${r.error}`,
     };
   }
 
   if (intent === "resendEmail") {
     // Re-send the guest confirmation (e.g. after fixing content or a mail
     // hiccup). Confirmation only makes sense for a booking that stands.
-    if (booking.status === "failed") return { error: "This booking isn't confirmed — retry the Channex push first." };
+    if (booking.status === "failed") return { error: "This booking isn't confirmed — retry the channel manager push first." };
     if ((booking.lifecycle ?? "active") !== "active") return { error: "This booking is cancelled — there's no confirmation to resend." };
     const sent = await sendGuestBookingEmail(propertyId, booking, new URL(request.url).origin);
     return sent
@@ -105,7 +105,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     const push = await pushGuestModification(propertyId, updated);
     const pushWarning =
       booking.channexId && !push.pushed
-        ? `Saved here, but the update couldn't be sent to Channex — the PMS copy keeps the old details. (${push.error ?? "push failed"})`
+        ? `Saved here, but the update couldn't be sent to your channel manager — the PMS copy keeps the old details. (${push.error ?? "push failed"})`
         : undefined;
 
     let emailResent = false;

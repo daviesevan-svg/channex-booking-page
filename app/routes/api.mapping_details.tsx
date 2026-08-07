@@ -10,7 +10,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const hotelCode = new URL(request.url).searchParams.get("hotel_code") ?? "";
   if (!(await isChannexConnected(hotelCode))) {
     return Response.json(
-      { success: false, error: "This property is not connected to Channex." },
+      { success: false, error: "This property is not connected to a channel manager." },
       { status: 403 },
     );
   }

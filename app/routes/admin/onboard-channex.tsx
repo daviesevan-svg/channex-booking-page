@@ -116,7 +116,7 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = String(form.get("intent"));
   const apiKey = String(form.get("apiKey") || "").trim();
-  if (!apiKey) return { error: "Enter your Channex API key." };
+  if (!apiKey) return { error: "Enter your channel manager API key." };
 
   try {
     if (intent === "connect") {
@@ -188,7 +188,7 @@ export async function action({ request }: Route.ActionArgs) {
       });
     }
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Something went wrong talking to Channex." };
+    return { error: e instanceof Error ? e.message : "Something went wrong talking to your channel manager." };
   }
   return { error: "Unknown action." };
 }

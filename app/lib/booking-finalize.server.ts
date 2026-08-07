@@ -129,7 +129,7 @@ export async function finalizeBooking(
         status = "confirmed";
       } catch (e) {
         status = "failed";
-        error = e instanceof Error ? e.message : "Channex rejected the booking.";
+        error = e instanceof Error ? e.message : "The channel manager rejected the booking.";
       }
     }
   }
@@ -199,7 +199,7 @@ export async function retryChannexPush(
     await dispatchWebhook(pid, "booking.created", serializeBooking(finalBooking), Date.now());
     return { ok: true, booking: finalBooking };
   } catch (e) {
-    const error = e instanceof Error ? e.message : "Channex rejected the booking.";
+    const error = e instanceof Error ? e.message : "The channel manager rejected the booking.";
     await updateBooking(pid, booking.id, { error });
     return { ok: false, reason: "push_failed", error };
   }
