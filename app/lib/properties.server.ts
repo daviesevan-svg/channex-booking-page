@@ -6,7 +6,7 @@
 import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
 import { getOverrides, getSettings } from "./overrides.server";
-import { isSuperadmin } from "./users.server";
+import { getUser, isSuperadmin } from "./users.server";
 import { releaseDomain } from "./domains.server";
 import { deleteCustomHostname } from "./custom-hostnames.server";
 
@@ -32,6 +32,10 @@ export interface PropertyRef {
    *  page is exposed there, and never a contact address, so the directory can't
    *  be harvested as a lead list. */
   directoryListed?: boolean;
+  /** White-label partner (PMS) this property belongs to (docs/whitelabel.md).
+   *  Unset = a direct Roompanda property. Partner properties are scoped to the
+   *  partner's admins and kept off our public surfaces. */
+  partnerId?: string;
 }
 
 const KEY = "properties";
@@ -76,14 +80,26 @@ export async function addProperty(
   id: string,
   name: string,
   owner?: string,
+  partnerId?: string,
 ): Promise<PropertyRef> {
   const list = await getProperties();
-  const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner };
+  const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner, ...(partnerId ? { partnerId } : {}) };
   if (!list.some((p) => p.id === id)) {
     list.push(ref);
     await write(list);
   }
   return ref;
+}
+
+/** Assigns (or clears) a property's partner. Superadmin-only at the route. */
+export async function setPropertyPartner(id: string, partnerId: string | undefined): Promise<void> {
+  const list = await getProperties();
+  const p = list.find((x) => x.id === id);
+  if (p) {
+    if (partnerId) p.partnerId = partnerId;
+    else delete p.partnerId;
+    await write(list);
+  }
 }
 
 /** Assigns (or clears) the owner of a property. Superadmin-only at the route. */
@@ -96,15 +112,21 @@ export async function setPropertyOwner(id: string, owner: string | undefined): P
   }
 }
 
-/** Properties the signed-in user may see/edit: superadmins see all; everyone
- *  else sees the ones they own OR are a teammate on. This is the isolation
- *  chokepoint — every admin route resolves its active property through
- *  currentPropertyId(), which is scoped to this list. */
+/** Properties the signed-in user may see/edit: superadmins see all; a
+ *  partner_admin sees every property of their partner; everyone else sees the
+ *  ones they own OR are a teammate on. This is the isolation chokepoint —
+ *  every admin route resolves its active property through currentPropertyId(),
+ *  which is scoped to this list. */
 export async function getVisibleProperties(request: Request): Promise<PropertyRef[]> {
   const email = await getAdminEmail(request);
   if (!email) return [];
   const list = await getProperties();
   if (await isSuperadmin(email)) return list;
+  const user = await getUser(email);
+  if (user?.role === "partner_admin" && user.partnerId) {
+    const pid = user.partnerId;
+    return list.filter((p) => p.partnerId === pid || p.owner === email || p.members?.includes(email));
+  }
   return list.filter((p) => p.owner === email || p.members?.includes(email));
 }
 

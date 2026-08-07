@@ -225,6 +225,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/properties", label: t("navProperties") },
         { to: "/admin/collections", label: t("navCollections") },
         ...(isSuperadmin ? [{ to: "/admin/users", label: t("navUsers") }] : []),
+        ...(isSuperadmin ? [{ to: "/admin/partners", label: t("navPartners") }] : []),
       ],
     },
     {
