@@ -3,6 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/webhooks";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { addWebhook, isSafeWebhookUrl, listWebhooks, removeWebhook } from "~/lib/webhooks.server";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "~/lib/webhook-events";
@@ -10,6 +11,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "webhooks");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
@@ -18,6 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "webhooks");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   if (!(await isOwnerOrSuper(request, propertyId))) return { error: "Only an owner or manager can manage webhooks." };

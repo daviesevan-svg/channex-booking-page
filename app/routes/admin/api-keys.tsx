@@ -3,12 +3,14 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/api-keys";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { issueApiKey, listApiKeys, revokeApiKey, type ApiKeyMode } from "~/lib/api-auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "api-keys");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
@@ -17,6 +19,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "api-keys");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   if (!(await isOwnerOrSuper(request, propertyId))) {

@@ -3,6 +3,7 @@ import { Link, redirect, useSearchParams } from "react-router";
 import type { Route } from "./+types/collection-analytics";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { getVisibleCollections } from "~/lib/collections.server";
 import { getCollectionAnalytics } from "~/lib/collection-analytics.server";
 import { getProperties } from "~/lib/properties.server";
@@ -18,6 +19,7 @@ const WINDOWS = [
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "collections");
   const collection = (await getVisibleCollections(request)).find((c) => c.slug === params.slug);
   if (!collection) throw redirect("/admin/collections");
 

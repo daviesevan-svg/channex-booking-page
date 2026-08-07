@@ -71,9 +71,12 @@ export async function getProperties(): Promise<PropertyRef[]> {
   return seeded;
 }
 
-/** Properties shown on the public root picker (opt-in via the `public` flag). */
+/** Properties shown on the public root picker (opt-in via the `public` flag).
+ *  Partner properties never appear — a PMS's hotels must not be listed on OUR
+ *  public front door (docs/whitelabel.md §10); their own picker comes with the
+ *  partner guest host in the domains phase. */
 export async function getPublicProperties(): Promise<PropertyRef[]> {
-  return (await getProperties()).filter((p) => p.public);
+  return (await getProperties()).filter((p) => p.public && !p.partnerId);
 }
 
 export async function addProperty(

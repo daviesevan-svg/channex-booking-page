@@ -4,6 +4,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/connectivity";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
 import { getLastAriReceivedAt } from "~/lib/ari.server";
@@ -27,6 +28,7 @@ const AVAILABLE = new Set<string>(SYSTEMS.filter((s) => s.available).map((s) => 
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "connectivity");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
@@ -37,6 +39,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "connectivity");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
