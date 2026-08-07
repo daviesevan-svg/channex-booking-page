@@ -26,6 +26,7 @@ import { emailDef, type SiteSettings } from "./content";
 import { getConfig, type AppConfig } from "./config.server";
 import { accentHex, composeEmail, composeReviewEmail, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
+import { brandOf, getPartner } from "./partners.server";
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -203,25 +204,32 @@ export async function sendTeamInviteEmail(
   toEmail: string,
   invitedBy: string,
   signInUrl: string,
+  /** The property's white-label partner, resolved by the caller (email.server
+   *  can't import properties.server — that cycles back through auth.server). */
+  partnerId?: string,
 ): Promise<{ sent: boolean }> {
   try {
-    const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid)]);
+    const [settings, ov, product] = await Promise.all([
+      getSettings(pid),
+      getOverrides(pid),
+      getPartner(partnerId).then(brandOf),
+    ]);
     const hotelName = ov.hotelName || "the property";
     const html = renderSimpleEmail({
       hotelName,
       brand: await emailBrand(pid, accentHex(settings)),
       heading: `You've been added to ${hotelName}`,
       body:
-        `${invitedBy} has given you access to manage ${hotelName} on Roompanda.\n\n` +
+        `${invitedBy} has given you access to manage ${hotelName} on ${product.name}.\n\n` +
         `To get started, sign in with your email address (${toEmail}) — no password needed. ` +
         `We'll email you a one-time link each time you sign in.`,
       cta: { label: "Sign in", url: signInUrl },
     });
     return await sendEmail({
       to: toEmail,
-      subject: `You've been added to ${hotelName} on Roompanda`,
+      subject: `You've been added to ${hotelName} on ${product.name}`,
       from: senderFrom(settings, getConfig()),
-      replyTo: settings.emailReplyTo,
+      replyTo: product.supportEmail || settings.emailReplyTo,
       html,
     });
   } catch (e) {

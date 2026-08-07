@@ -52,7 +52,7 @@ export async function action({ request }: Route.ActionArgs) {
     // their email pre-filled; they request a fresh magic link there.
     const origin = new URL(request.url).origin;
     const signInUrl = `${origin}/admin/login?email=${encodeURIComponent(email)}`;
-    await sendTeamInviteEmail(propertyId, email, inviter, signInUrl);
+    await sendTeamInviteEmail(propertyId, email, inviter, signInUrl, partnerId);
   } else if (intent === "remove" && email) {
     await removePropertyMember(propertyId, email);
   }

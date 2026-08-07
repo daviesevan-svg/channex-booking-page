@@ -5,6 +5,7 @@ import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getVisibleProperties, isOwnerOrSuper } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
+import { brandForUser } from "~/lib/partners.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 import { getConfig } from "~/lib/config.server";
@@ -28,8 +29,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // payment. Surfaced as a persistent banner so it's never a surprise. Only
   // meaningful once a property is selected.
   const testMode = Boolean(propertyId) && !(settings.liveBooking ?? getConfig().allowLiveBooking);
+  // White-label: a user under a partner sees the partner's brand in the chrome,
+  // never ours. Direct users keep the stock header (brand stays null).
+  const brand = await brandForUser(email);
+  const partnerBrand = brand.partnerId ? brand.name : null;
   return {
     email,
+    partnerBrand,
     propertyId,
     properties,
     isSuperadmin: superadmin,
@@ -169,7 +175,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
+  const { email, partnerBrand, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -303,7 +309,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                 className="inline-block h-3 w-3 rounded-[2px] bg-accent"
                 style={{ transform: "rotate(45deg)" }}
               />
-              <span className="font-serif text-[19px] font-semibold">Booking Admin</span>
+              <span className="font-serif text-[19px] font-semibold">{partnerBrand ?? "Booking Admin"}</span>
             </Link>
           </div>
           <div className="flex items-center gap-5 text-[13px] text-muted">

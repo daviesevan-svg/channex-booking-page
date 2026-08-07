@@ -3,6 +3,7 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
 import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
+import { brandForUser } from "./partners.server";
 import { requireCanonicalHost } from "./domains.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
@@ -170,10 +171,15 @@ export async function logout(request: Request) {
  *  the send actually failed so ops can recover a lockout via logs. A production
  *  build with working email never logs the link. */
 export async function sendMagicLink(email: string, link: string): Promise<{ sent: boolean }> {
+  // Sign-in is pre-property, so the brand comes from the USER: a hotel under a
+  // white-label partner gets the partner's name, never ours; unknown emails
+  // (open self-signup) get the default.
+  const brand = await brandForUser(email);
   const { sent } = await sendEmail({
     to: email,
-    subject: "Your admin sign-in link",
-    html: `<p>Click to sign in to the booking admin:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
+    subject: brand.partnerId ? `Sign in to ${brand.name}` : "Your admin sign-in link",
+    html: `<p>Click to sign in to ${brand.partnerId ? brand.name : "the booking admin"}:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
+    replyTo: brand.supportEmail,
   });
   if (!sent || import.meta.env.DEV) {
     console.log(`[admin] magic link for ${email}: ${link}`);
