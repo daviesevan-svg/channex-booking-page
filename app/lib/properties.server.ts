@@ -7,6 +7,7 @@ import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getUser, isSuperadmin } from "./users.server";
+import { areaForPathname, type MemberArea } from "./member-areas";
 import { releaseDomain } from "./domains.server";
 import { deleteCustomHostname } from "./custom-hostnames.server";
 
@@ -27,6 +28,10 @@ export interface PropertyRef {
   /** Teammate emails the owner has invited to co-manage this property. They get
    *  full edit access to it, but can't manage the team, delete, or transfer it. */
   members?: string[];
+  /** Page areas (member-areas.ts) HIDDEN from a teammate, keyed by email —
+   *  absent/empty = full access, mirroring the partner hiddenPages semantics.
+   *  Set from the Team page; enforced by assertMemberAreaAllowed below. */
+  memberHiddenAreas?: Record<string, MemberArea[]>;
   /** Discoverable in the directory collection operators browse. Opt-OUT — unset
    *  means listed. Only content already public on the property's own booking
    *  page is exposed there, and never a contact address, so the directory can't
@@ -280,6 +285,11 @@ export async function removePropertyMember(id: string, email: string): Promise<v
   const p = list.find((x) => x.id === id);
   if (!p?.members) return;
   p.members = p.members.filter((m) => m !== e);
+  // Their access entry goes with them — a later re-invite starts clean.
+  if (p.memberHiddenAreas && e in p.memberHiddenAreas) {
+    delete p.memberHiddenAreas[e];
+    if (!Object.keys(p.memberHiddenAreas).length) delete p.memberHiddenAreas;
+  }
   await write(list);
 }
 
@@ -338,6 +348,65 @@ export async function removeProperty(id: string): Promise<void> {
 export async function currentPropertyId(request: Request): Promise<string | undefined> {
   const list = await getVisibleProperties(request);
   const selected = await getSessionProperty(request);
-  if (selected && list.some((p) => p.id === selected)) return selected;
-  return list[0]?.id;
+  const id = selected && list.some((p) => p.id === selected) ? selected : list[0]?.id;
+  const property = id ? list.find((p) => p.id === id) : undefined;
+  if (property) await assertMemberAreaAllowed(request, property);
+  return id;
+}
+
+/** Whether per-member area restrictions bind this user on this property.
+ *  Never the owner (the Team UI doesn't offer it, and a stale entry must not
+ *  lock an owner out), superadmins, or the property's own partner admins. */
+async function memberRestrictionApplies(p: PropertyRef, email: string): Promise<boolean> {
+  if (p.owner === email) return false;
+  if (await isSuperadmin(email)) return false;
+  const user = await getUser(email);
+  if (user?.role === "partner_admin" && user.partnerId && user.partnerId === p.partnerId) return false;
+  return true;
+}
+
+/** 404s when a teammate opens a page in an area the owner hid from them (the
+ *  Team page checkboxes). Enforced HERE, on the property resolver every
+ *  property-scoped loader and action already flows through, so a new admin
+ *  route is covered without anyone remembering a guard — nav-hiding alone
+ *  would repeat the wildcard-route mistake. Cheap checks (URL, in-memory map)
+ *  run before any extra KV reads; 404 rather than redirect because to this
+ *  member the page does not exist. */
+async function assertMemberAreaAllowed(request: Request, p: PropertyRef): Promise<void> {
+  const area = areaForPathname(new URL(request.url).pathname);
+  if (!area) return;
+  const email = await getAdminEmail(request);
+  if (!email) return;
+  if (!p.memberHiddenAreas?.[email]?.includes(area)) return;
+  if (!(await memberRestrictionApplies(p, email))) return;
+  throw new Response("Not found", { status: 404 });
+}
+
+/** The areas hidden from this user on this property — nav-side companion of
+ *  assertMemberAreaAllowed (same exemptions), used by the layout to drop nav
+ *  items. Empty for everyone the restriction doesn't bind. */
+export async function hiddenMemberAreasFor(request: Request, propertyId: string | undefined): Promise<MemberArea[]> {
+  if (!propertyId) return [];
+  const email = await getAdminEmail(request);
+  if (!email) return [];
+  const p = await getProperty(propertyId);
+  const hidden = p?.memberHiddenAreas?.[email];
+  if (!p || !hidden?.length) return [];
+  return (await memberRestrictionApplies(p, email)) ? hidden : [];
+}
+
+/** Replaces a teammate's hidden-area list (empty = full access, entry removed).
+ *  Owner-or-superadmin gating happens at the route; unknown emails are ignored
+ *  so a removed member can't be re-added through this side door. */
+export async function setMemberHiddenAreas(id: string, email: string, hidden: MemberArea[]): Promise<void> {
+  const e = email.trim().toLowerCase();
+  const list = await read();
+  const p = list.find((x) => x.id === id);
+  if (!p || !p.members?.includes(e)) return;
+  const map = { ...(p.memberHiddenAreas ?? {}) };
+  if (hidden.length) map[e] = hidden;
+  else delete map[e];
+  if (Object.keys(map).length) p.memberHiddenAreas = map;
+  else delete p.memberHiddenAreas;
+  await write(list);
 }

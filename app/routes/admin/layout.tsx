@@ -3,7 +3,8 @@ import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getVisibleProperties, isOwnerOrSuper } from "~/lib/properties.server";
+import { currentPropertyId, getVisibleProperties, hiddenMemberAreasFor, isOwnerOrSuper } from "~/lib/properties.server";
+import type { MemberArea } from "~/lib/member-areas";
 import { isSuperadmin } from "~/lib/users.server";
 import { brandForUser } from "~/lib/partners.server";
 import { hiddenPagesFor } from "~/lib/page-access.server";
@@ -38,11 +39,15 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Pages this user's partner hides. Nav-side only — the routes themselves
   // enforce it in their loaders via requirePageAllowed.
   const hiddenPages = await hiddenPagesFor(email);
+  // Areas the property owner hides from this teammate (Team page). Nav-side
+  // only — assertMemberAreaAllowed enforces the same rule on every request.
+  const hiddenAreas = await hiddenMemberAreasFor(request, propertyId);
   return {
     email,
     partnerBrand,
     partnerLogo,
     hiddenPages,
+    hiddenAreas,
     propertyId,
     properties,
     isSuperadmin: superadmin,
@@ -182,7 +187,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, partnerBrand, partnerLogo, hiddenPages, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
+  const { email, partnerBrand, partnerLogo, hiddenPages, hiddenAreas, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -198,8 +203,12 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
     /** Page id from page-access.server — the item is dropped when the user's
      *  partner hides that page (the route's loader enforces the same id). */
     page?: string;
+    /** Area id from member-areas.ts — dropped when the property owner hides
+     *  that area from this teammate (enforced by assertMemberAreaAllowed). */
+    area?: MemberArea;
   }
-  const shown = (items: NavItem[]) => items.filter((i) => !i.page || !hiddenPages.includes(i.page));
+  const shown = (items: NavItem[]) =>
+    items.filter((i) => (!i.page || !hiddenPages.includes(i.page)) && (!i.area || !hiddenAreas.includes(i.area)));
   // Sections are keyed by a stable id (NOT the translated title) so the
   // open/closed state survives an admin-language switch.
   const sections: { id: string; title: string; items: NavItem[] }[] = [
@@ -207,11 +216,11 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       id: "operations",
       title: t("navOperations"),
       items: [
-        { to: "/admin/inventory", label: t("navInventory") },
-        { to: "/admin/analytics", label: t("navAnalytics") },
-        { to: "/admin/ari-log", label: t("navChangeLog") },
-        { to: "/admin/bookings", label: t("navBookings") },
-        { to: "/admin/reviews", label: t("navReviews") },
+        { to: "/admin/inventory", label: t("navInventory"), area: "operations" },
+        { to: "/admin/analytics", label: t("navAnalytics"), area: "operations" },
+        { to: "/admin/ari-log", label: t("navChangeLog"), area: "operations" },
+        { to: "/admin/bookings", label: t("navBookings"), area: "operations" },
+        { to: "/admin/reviews", label: t("navReviews"), area: "operations" },
       ],
     },
     {
@@ -223,18 +232,18 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/general", label: t("navGeneral") },
         { to: "/admin/portal", label: t("navPortal") },
         // Catalogue & pricing
-        { to: "/admin/rooms", label: t("navRooms") },
-        { to: "/admin/rates", label: t("navRates") },
-        { to: "/admin/taxes", label: t("navTaxes") },
-        { to: "/admin/promotions", label: t("navPromotions") },
-        { to: "/admin/extras", label: t("navExtras") },
-        { to: "/admin/vouchers", label: t("navVouchers") },
+        { to: "/admin/rooms", label: t("navRooms"), area: "pricing" },
+        { to: "/admin/rates", label: t("navRates"), area: "pricing" },
+        { to: "/admin/taxes", label: t("navTaxes"), area: "pricing" },
+        { to: "/admin/promotions", label: t("navPromotions"), area: "pricing" },
+        { to: "/admin/extras", label: t("navExtras"), area: "pricing" },
+        { to: "/admin/vouchers", label: t("navVouchers"), area: "pricing" },
         // Integrations
         { to: "/admin/connectivity", label: t("navConnectivity"), page: "connectivity" },
         { to: "/admin/google-hotels", label: t("navGoogle"), page: "google-hotels" },
         { to: "/admin/website-widget", label: t("navWidget") },
         { to: "/admin/brand-kit", label: t("navBrandKit"), page: "brand-kit" },
-        { to: "/admin/payments", label: t("navPayments") },
+        { to: "/admin/payments", label: t("navPayments"), area: "payments" },
         ...(canManageCurrent ? [{ to: "/admin/api-keys", label: t("navApiKeys"), page: "api-keys" }] : []),
         ...(canManageCurrent ? [{ to: "/admin/webhooks", label: t("navWebhooks"), page: "webhooks" }] : []),
         // Access & management
@@ -249,31 +258,31 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       id: "website",
       title: t("navWebsite"),
       items: [
-        { to: "/admin/website", label: t("navWebsiteGeneral"), end: true },
-        { to: "/admin/website/sections", label: t("navSections") },
-        { to: "/admin/website/pages", label: t("navPages") },
-        { to: "/admin/website/footer", label: t("navFooter") },
-        { to: "/admin/gallery", label: t("navGallery") },
-        { to: "/admin/facilities", label: t("navFacilities") },
-        { to: "/admin/home", label: t("navHome") },
-        { to: "/admin/pages/results", label: t("navResults") },
-        { to: "/admin/pages/detail", label: t("navRoomDetail") },
-        { to: "/admin/pages/extras", label: t("navExtras") },
-        { to: "/admin/pages/checkout", label: t("navCheckout") },
-        { to: "/admin/pages/confirmation", label: t("navConfirmation") },
+        { to: "/admin/website", label: t("navWebsiteGeneral"), end: true, area: "website" },
+        { to: "/admin/website/sections", label: t("navSections"), area: "website" },
+        { to: "/admin/website/pages", label: t("navPages"), area: "website" },
+        { to: "/admin/website/footer", label: t("navFooter"), area: "website" },
+        { to: "/admin/gallery", label: t("navGallery"), area: "website" },
+        { to: "/admin/facilities", label: t("navFacilities"), area: "website" },
+        { to: "/admin/home", label: t("navHome"), area: "website" },
+        { to: "/admin/pages/results", label: t("navResults"), area: "website" },
+        { to: "/admin/pages/detail", label: t("navRoomDetail"), area: "website" },
+        { to: "/admin/pages/extras", label: t("navExtras"), area: "website" },
+        { to: "/admin/pages/checkout", label: t("navCheckout"), area: "website" },
+        { to: "/admin/pages/confirmation", label: t("navConfirmation"), area: "website" },
       ],
     },
     {
       id: "emails",
       title: t("navEmails"),
       items: [
-        { to: "/admin/emails", label: t("navEmailSettings"), end: true },
-        { to: "/admin/emails/booking_confirmation", label: t("navEmailBookingConfirmation") },
-        { to: "/admin/emails/host_notification", label: t("navEmailHostNotification") },
-        { to: "/admin/emails/booking_cancellation", label: t("navEmailBookingCancellation") },
-        { to: "/admin/emails/cancellation_notification", label: t("navEmailCancellationNotification") },
-        { to: "/admin/emails/booking_failed", label: t("navEmailBookingFailed") },
-        { to: "/admin/emails/review_request", label: t("navEmailReviewRequest") },
+        { to: "/admin/emails", label: t("navEmailSettings"), end: true, area: "emails" },
+        { to: "/admin/emails/booking_confirmation", label: t("navEmailBookingConfirmation"), area: "emails" },
+        { to: "/admin/emails/host_notification", label: t("navEmailHostNotification"), area: "emails" },
+        { to: "/admin/emails/booking_cancellation", label: t("navEmailBookingCancellation"), area: "emails" },
+        { to: "/admin/emails/cancellation_notification", label: t("navEmailCancellationNotification"), area: "emails" },
+        { to: "/admin/emails/booking_failed", label: t("navEmailBookingFailed"), area: "emails" },
+        { to: "/admin/emails/review_request", label: t("navEmailReviewRequest"), area: "emails" },
       ],
     },
   ];
@@ -403,6 +412,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       <div className={`flex ${shell} gap-8 px-6 py-8`}>
         <nav className={`${navOpen ? "block" : "hidden"} w-44 flex-none space-y-1`}>
           {sections.map((section) => {
+            const items = shown(section.items);
+            // A teammate with a whole area hidden loses the section header too.
+            if (items.length === 0) return null;
             const isOpen = openSections[section.id] ?? false;
             return (
               <div key={section.id}>
@@ -424,7 +436,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                 </button>
                 {isOpen && (
                   <div className="space-y-1">
-                    {shown(section.items).map((item) => (
+                    {items.map((item) => (
                       <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
                         {item.label}
                       </NavLink>
