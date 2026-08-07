@@ -9,26 +9,42 @@ import { sendTeamInviteEmail } from "~/lib/email.server";
 import {
   addPropertyMember,
   currentPropertyId,
+  getProperties,
   getProperty,
   isOwnerOrSuper,
   removePropertyMember,
   setMemberHiddenAreas,
 } from "~/lib/properties.server";
 import { isMemberArea, MEMBER_AREAS, type MemberArea } from "~/lib/member-areas";
-import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
+import { getUser, isSuperadmin, setUserPartner, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   // Only the owner (or a superadmin) manages a property's team.
   if (!propertyId || !(await isOwnerOrSuper(request, propertyId))) throw redirect("/admin");
-  const property = await getProperty(propertyId);
+  const [properties, su] = await Promise.all([getProperties(), isSuperadmin(email)]);
+  const property = properties.find((p) => p.id === propertyId);
+  // Every property this user could invite to — their own (or all, for a
+  // superadmin). Membership is per property; the invite form offers these
+  // as checkboxes so one invite can cover several.
+  const manageable = properties.filter((p) => su || p.owner === email);
+  const members = property?.members ?? [];
   return {
     propertyId,
     name: property?.name ?? "",
     owner: property?.owner ?? null,
-    members: property?.members ?? [],
+    members,
     memberHiddenAreas: property?.memberHiddenAreas ?? {},
+    invitableProperties: manageable.map((p) => ({ id: p.id, name: p.name })),
+    // The OTHER manageable properties each teammate is also on — display only,
+    // so cross-property access is visible from any one Team page.
+    alsoOn: Object.fromEntries(
+      members.map((m) => [
+        m,
+        manageable.filter((p) => p.id !== propertyId && p.members?.includes(m)).map((p) => p.name),
+      ]),
+    ) as Record<string, string[]>,
   };
 }
 
@@ -41,7 +57,16 @@ export async function action({ request }: Route.ActionArgs) {
   const email = String(form.get("email") || "").trim().toLowerCase();
 
   if (intent === "invite" && email) {
-    await addPropertyMember(propertyId, email);
+    // Add to every ticked property the inviter can manage. No boxes rendered
+    // (single-property owner) or none ticked = just the current property; ids
+    // are re-checked against ownership so a forged POST can't reach further.
+    const [all, su] = await Promise.all([getProperties(), isSuperadmin(inviter)]);
+    const requested = form.getAll("propertyIds").map(String);
+    const targets = all
+      .filter((p) => (su || p.owner === inviter) && requested.includes(p.id))
+      .map((p) => p.id);
+    if (!targets.length) targets.push(propertyId);
+    for (const id of targets) await addPropertyMember(id, email);
     // Pre-create the user so they can sign in (even once sign-up is locked down)
     // and show up in the superadmin Users list. Under a white-label partner the
     // invite carries the property's partner, so the new user is scoped (and
@@ -73,7 +98,7 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function AdminTeam({ loaderData }: Route.ComponentProps) {
-  const { name, owner, members, memberHiddenAreas } = loaderData;
+  const { propertyId, name, owner, members, memberHiddenAreas, invitableProperties, alsoOn } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
@@ -124,6 +149,11 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
                   </button>
                 </Form>
               </div>
+              {(alsoOn[m] ?? []).length > 0 && (
+                <p className="mt-1 text-[12px] text-faint">
+                  {t("tmAlsoOn")} {alsoOn[m].join(", ")}
+                </p>
+              )}
               {/* Per-member page access: ticked = can see that area. */}
               <Form method="post" className="mt-3">
                 <input type="hidden" name="intent" value="access" />
@@ -176,6 +206,20 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
             {t("tmInviteHint")}
           </span>
         </label>
+        {invitableProperties.length > 1 && (
+          <div>
+            <span className="block text-[13px] font-semibold text-secondary">{t("tmInviteProps")}</span>
+            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+              {invitableProperties.map((p) => (
+                <label key={p.id} className="flex items-center gap-1.5 text-[13px] text-secondary">
+                  <input type="checkbox" name="propertyIds" value={p.id} defaultChecked={p.id === propertyId} />
+                  {p.name}
+                </label>
+              ))}
+            </div>
+            <span className="mt-1 block text-[11px] text-faint">{t("tmInvitePropsHint")}</span>
+          </div>
+        )}
         <div>
           <button
             type="submit"
