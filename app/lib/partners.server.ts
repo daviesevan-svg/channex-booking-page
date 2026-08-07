@@ -7,6 +7,7 @@
 // consistent and concurrent writes to one key overwrite each other, so a shared
 // list would drop a partner when two saves race. Per-key writes can't collide.
 import { getConfigKV } from "./config.server";
+import { getUser } from "./users.server";
 
 export interface Partner {
   /** Stable slug id ([a-z0-9-]), chosen at creation, used in KV keys and on
@@ -94,10 +95,18 @@ export interface Brand {
   partnerId?: string;
 }
 
-export const DEFAULT_BRAND: Brand = { name: "Booking Admin" };
+export const DEFAULT_BRAND: Brand = { name: "Roompanda" };
 
 export function brandOf(partner: Partner | undefined): Brand {
   return partner
     ? { name: partner.brandName, supportEmail: partner.supportEmail, partnerId: partner.id }
     : DEFAULT_BRAND;
+}
+
+/** The brand a given USER lives under — for surfaces we show before any
+ *  property is in play (admin chrome, the sign-in email). Unknown emails get
+ *  the default, which is exactly right for open self-signup. */
+export async function brandForUser(email: string): Promise<Brand> {
+  const user = await getUser(email);
+  return brandOf(await getPartner(user?.partnerId));
 }
