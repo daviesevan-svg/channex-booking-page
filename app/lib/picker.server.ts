@@ -29,6 +29,7 @@ export interface PickerData {
   /** Heading brand: a white-label partner's name on THEIR guest host; unset =
    *  ours (the component's default). */
   brandName?: string;
+  brandLogo?: string;
 }
 
 /** First cover photo among a collection's member properties (checks a few, then
@@ -63,6 +64,7 @@ function subtitle(n: number, kind: "collection" | "property"): string {
 export async function loadPartnerPicker(partner: {
   id: string;
   brandName: string;
+  logoImage?: string;
 }): Promise<PickerData> {
   const properties = (await getProperties()).filter((p) => p.public && p.partnerId === partner.id);
   const items: PickerCard[] = await Promise.all(
@@ -80,7 +82,12 @@ export async function loadPartnerPicker(partner: {
       };
     }),
   );
-  return { items, subtitle: subtitle(properties.length, "property"), brandName: partner.brandName };
+  return {
+    items,
+    subtitle: subtitle(properties.length, "property"),
+    brandName: partner.brandName,
+    brandLogo: partner.logoImage || undefined,
+  };
 }
 
 export async function loadPicker(): Promise<PickerData> {

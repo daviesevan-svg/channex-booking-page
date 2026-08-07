@@ -21,6 +21,12 @@ export interface Partner {
   brandName: string;
   /** Reply-to for operator emails; shown as the support contact. */
   supportEmail?: string;
+  /** Brand mark (/images/… path) shown in the admin chrome, on their login
+   *  page, and on their guest-host picker — wherever the diamond would be. */
+  logoImage?: string;
+  /** Favicon (/images/… path) served on the partner's admin and guest hosts
+   *  (root.tsx). Unset = the platform favicon.ico. */
+  faviconImage?: string;
   /** Route ids their hotel users can't open (enforced in loaders; see
    *  requirePageAllowed). partner_admins bypass this — they chose the list. */
   hiddenPages?: string[];
@@ -115,6 +121,8 @@ export async function deletePartner(partner: Partner): Promise<void> {
 export interface Brand {
   name: string;
   supportEmail?: string;
+  /** Brand mark path — shown where the diamond would be. */
+  logo?: string;
   /** Set when this is a partner brand (surfaces may behave differently). */
   partnerId?: string;
 }
@@ -123,7 +131,12 @@ export const DEFAULT_BRAND: Brand = { name: "Roompanda" };
 
 export function brandOf(partner: Partner | undefined): Brand {
   return partner
-    ? { name: partner.brandName, supportEmail: partner.supportEmail, partnerId: partner.id }
+    ? {
+        name: partner.brandName,
+        supportEmail: partner.supportEmail,
+        logo: partner.logoImage || undefined,
+        partnerId: partner.id,
+      }
     : DEFAULT_BRAND;
 }
 

@@ -20,12 +20,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (await getAdminEmail(request)) throw redirect("/admin");
   // A team invite links here with ?email= so the invitee's address is pre-filled.
   const email = new URL(request.url).searchParams.get("email") ?? "";
+  // Pre-login branding: on a partner's admin host the form carries THEIR name
+  // and logo — the first thing an invited hotel ever sees.
+  const partner = hostPartnerId ? await getPartner(hostPartnerId) : undefined;
   return {
     email,
     adminLang: adminLangFromRequest(request),
-    // Pre-login branding: on a partner's admin host the form carries THEIR
-    // name — the first thing an invited hotel ever sees.
-    brandName: hostPartnerId ? ((await getPartner(hostPartnerId))?.brandName ?? null) : null,
+    brandName: partner?.brandName ?? null,
+    brandLogo: partner?.logoImage ?? null,
   };
 }
 
@@ -59,10 +61,14 @@ export default function Login({ actionData, loaderData }: Route.ComponentProps) 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
       <div className="mb-6 flex items-center gap-3">
-        <span
-          className="inline-block h-3.5 w-3.5 rounded-[2px] bg-accent"
-          style={{ transform: "rotate(45deg)" }}
-        />
+        {loaderData.brandLogo ? (
+          <img src={loaderData.brandLogo} alt="" className="h-8 max-w-[180px] object-contain" />
+        ) : (
+          <span
+            className="inline-block h-3.5 w-3.5 rounded-[2px] bg-accent"
+            style={{ transform: "rotate(45deg)" }}
+          />
+        )}
         <span className="font-serif text-[22px] font-semibold">{loaderData.brandName ?? "Booking Admin"}</span>
       </div>
 

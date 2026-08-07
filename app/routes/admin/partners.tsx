@@ -2,7 +2,8 @@ import { Form, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/partners";
 import { adminMeta } from "~/lib/admin-meta";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { uploadPartnerFavicon, uploadPartnerLogo } from "~/lib/images.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import {
@@ -106,6 +107,23 @@ export async function action({ request }: Route.ActionArgs) {
       }
       await releasePartnerGuestHost(partnerId, partner.guestHost);
     }
+    // Brand assets. Replaced/removed files are left in R2 — the image GC is
+    // property-scoped and partner uploads are superadmin-rare; orphaned bytes
+    // are cheaper than teaching the sweeper a second ownership model.
+    let logoImage = partner.logoImage;
+    let faviconImage = partner.faviconImage;
+    try {
+      const logoUpload = form.get("logoUpload");
+      if (logoUpload instanceof File && logoUpload.size > 0) {
+        logoImage = await uploadPartnerLogo(partnerId, logoUpload);
+      } else if (form.get("removeLogo") === "1") logoImage = undefined;
+      const faviconUpload = form.get("faviconUpload");
+      if (faviconUpload instanceof File && faviconUpload.size > 0) {
+        faviconImage = await uploadPartnerFavicon(partnerId, faviconUpload);
+      } else if (form.get("removeFavicon") === "1") faviconImage = undefined;
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "Upload failed." };
+    }
     await savePartner({
       ...partner,
       name: str("name") || brandName,
@@ -113,6 +131,8 @@ export async function action({ request }: Route.ActionArgs) {
       supportEmail: str("supportEmail") || undefined,
       adminHost,
       guestHost,
+      logoImage,
+      faviconImage,
     });
     if (provisioning) return { ok: true as const, provisioning };
   } else if (intent === "assignProperty") {
@@ -199,7 +219,7 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
 
           <div className="grid gap-6 px-5 py-4 lg:grid-cols-2">
             {/* branding / contact */}
-            <Form method="post" className="space-y-3">
+            <Form method="post" encType="multipart/form-data" className="space-y-3">
               <input type="hidden" name="intent" value="update" />
               <input type="hidden" name="partnerId" value={p.id} />
               <div>
@@ -247,6 +267,38 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
                   className={FIELD_INPUT}
                 />
                 <span className="mt-1 block text-[12px] text-faint">{t("wlpGuestHostHint")}</span>
+              </div>
+              <div>
+                <span className={label}>{t("wlpLogo")}</span>
+                <div className="flex items-center gap-3">
+                  {p.logoImage && (
+                    <img src={p.logoImage} alt="" className="h-8 max-w-[140px] rounded-[6px] bg-chip object-contain px-1.5" />
+                  )}
+                  <FilePicker name="logoUpload" accept="image/*" />
+                </div>
+                <span className="mt-1 block text-[12px] text-faint">{t("wlpLogoHint")}</span>
+                {p.logoImage && (
+                  <label className="mt-1 flex items-center gap-2 text-[12px] text-secondary">
+                    <input type="checkbox" name="removeLogo" value="1" />
+                    {t("wlpRemove")}
+                  </label>
+                )}
+              </div>
+              <div>
+                <span className={label}>{t("wlpFavicon")}</span>
+                <div className="flex items-center gap-3">
+                  {p.faviconImage && (
+                    <img src={p.faviconImage} alt="" className="h-6 w-6 rounded-[4px] bg-chip object-contain" />
+                  )}
+                  <FilePicker name="faviconUpload" accept="image/png,image/x-icon,image/svg+xml,image/vnd.microsoft.icon" />
+                </div>
+                <span className="mt-1 block text-[12px] text-faint">{t("wlpFaviconHint")}</span>
+                {p.faviconImage && (
+                  <label className="mt-1 flex items-center gap-2 text-[12px] text-secondary">
+                    <input type="checkbox" name="removeFavicon" value="1" />
+                    {t("wlpRemove")}
+                  </label>
+                )}
               </div>
               <button type="submit" disabled={busy} className="rounded-[10px] bg-accent px-4 py-2 text-[13px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60">
                 {t("saveChanges")}

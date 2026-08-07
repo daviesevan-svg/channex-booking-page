@@ -21,16 +21,20 @@ function Diamond({ size = 13 }: { size?: number }) {
   );
 }
 
-export function PropertyPicker({ items, subtitle, brandName }: { items: PickerCard[]; subtitle: string; brandName?: string }) {
+export function PropertyPicker({ items, subtitle, brandName, brandLogo }: { items: PickerCard[]; subtitle: string; brandName?: string; brandLogo?: string }) {
   // A white-label partner's guest host fronts their brand, never ours.
   const brand = brandName ?? "Roompanda";
   if (items.length === 0) {
     return (
       <main className="mx-auto max-w-2xl px-7 py-24 text-center">
-        <span
-          className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark bg-accent"
-          style={{ transform: "rotate(45deg)" }}
-        />
+        {brandLogo ? (
+          <img src={brandLogo} alt="" className="mx-auto mb-6 h-10 max-w-[220px] object-contain" />
+        ) : (
+          <span
+            className="mx-auto mb-6 inline-block h-3.5 w-3.5 rounded-mark bg-accent"
+            style={{ transform: "rotate(45deg)" }}
+          />
+        )}
         <h1 className="font-serif text-display-lg font-medium tracking-[-0.02em]">{brand}</h1>
         <p className="mt-4 text-secondary">
           Open <code className="rounded bg-chip px-1.5 py-0.5">/your-property-id</code> to book, or
@@ -46,7 +50,11 @@ export function PropertyPicker({ items, subtitle, brandName }: { items: PickerCa
         {/* hero */}
         <div className="mb-[clamp(28px,5vw,52px)] max-w-[640px]">
           <div className="mb-5 flex items-center gap-3">
-            <Diamond />
+            {brandLogo ? (
+              <img src={brandLogo} alt="" className="h-8 max-w-[180px] object-contain" />
+            ) : (
+              <Diamond />
+            )}
             <span className="font-serif text-title-sm font-semibold tracking-[-0.01em]">
               {brand}
             </span>

@@ -12,6 +12,8 @@ import type { Route } from "./+types/root";
 import { DEFAULT_FONTS_HREF, langFromRequest } from "./lib/content";
 import { FontStylesheet } from "./components/font-stylesheet";
 import { adminLangFromRequest } from "./lib/admin-i18n";
+import { isOwnHost } from "./lib/domains.server";
+import { getPartner, partnerIdForAdminHost, partnerIdForGuestHost } from "./lib/partners.server";
 import { registerDict } from "./lib/i18n";
 import { guestDictFor } from "./lib/i18n-locales.server";
 import "./app.css";
@@ -23,17 +25,28 @@ import "./app.css";
  * the language actually being served, instead of as JS for all of them. English
  * pages send nothing extra at all.
  */
-export function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request }: Route.LoaderArgs) {
+  // A white-label partner's hosts (admin door and guest booking domain) carry
+  // the partner's favicon on every page. Only looked up off our own hosts, so
+  // the shared domain pays nothing; a hotel's custom domain pays two KV reads
+  // that miss — the same order of cost as its own host lookup.
+  const url = new URL(request.url);
+  let favicon: string | null = null;
+  if (!isOwnHost(url.hostname)) {
+    const partnerId =
+      (await partnerIdForAdminHost(url.hostname)) ?? (await partnerIdForGuestHost(url.hostname));
+    if (partnerId) favicon = (await getPartner(partnerId))?.faviconImage || null;
+  }
   // The admin is its own language, chosen by the signed-in user rather than by
   // the guest cookie, so `lang` on an admin page has to come from there — and
   // it is not cosmetic. `text-transform: uppercase` is language-aware: a Turkish
   // admin labelled lang="en" gets "BILGI" where Turkish wants "BİLGİ", because
   // only tr maps i → İ. The admin needs no guest dictionary; it has its own.
-  if (new URL(request.url).pathname.startsWith("/admin")) {
-    return { lang: adminLangFromRequest(request), dict: null };
+  if (url.pathname.startsWith("/admin")) {
+    return { lang: adminLangFromRequest(request), dict: null, favicon };
   }
   const lang = langFromRequest(request);
-  return { lang, dict: guestDictFor(lang) };
+  return { lang, dict: guestDictFor(lang), favicon };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -65,6 +78,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {data?.favicon && <link rel="icon" href={data.favicon} />}
         <FontStylesheet href={DEFAULT_FONTS_HREF} />
       </head>
       <body>
