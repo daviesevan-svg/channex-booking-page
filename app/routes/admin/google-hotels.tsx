@@ -5,6 +5,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { getConfig } from "~/lib/config.server";
@@ -17,6 +18,7 @@ import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
+  await requirePageAllowed(request, "google-hotels");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const [canManage, superadmin] = await Promise.all([isOwnerOrSuper(request, propertyId), isSuperadmin(email)]);
@@ -62,6 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const email = await requireAdmin(request);
+  await requirePageAllowed(request, "google-hotels");
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
 
@@ -72,7 +75,7 @@ export async function action({ request }: Route.ActionArgs) {
     const res = intent === "refreshVrFeed" ? await refreshMergedVrFeed(true) : await refreshMergedGoogleFeed(true);
     return res.ok
       ? { feedRefreshed: true as const }
-      : { error: "Feed rebuild failed — the previous snapshot is unchanged (Channex feed unreachable?)." };
+      : { error: "Feed rebuild failed — the previous snapshot is unchanged (partner feed unreachable?)." };
   }
 
   const propertyId = await currentPropertyId(request);

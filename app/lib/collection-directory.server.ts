@@ -46,9 +46,11 @@ export interface DirectoryQuery {
 const DEFAULT_LIMIT = 24;
 
 /** Listed properties only. Unset means listed (opt-out), so a property that has
- *  never touched the setting is discoverable. */
+ *  never touched the setting is discoverable — EXCEPT under a white-label
+ *  partner: a PMS's hotels are not part of our operator directory at all
+ *  (docs/whitelabel.md §10), whatever their own flag says. */
 export function isListed(p: PropertyRef): boolean {
-  return p.directoryListed !== false;
+  return p.directoryListed !== false && !p.partnerId;
 }
 
 const locationOf = (s: { addressCity?: string; addressRegion?: string; addressCountry?: string }): string =>

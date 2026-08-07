@@ -4,6 +4,7 @@ import type { Route } from "./+types/collection";
 import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import {
   deleteCollection,
   getVisibleCollections,
@@ -28,6 +29,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "collections");
   const collection = (await getVisibleCollections(request)).find((c) => c.slug === params.slug);
   if (!collection) throw redirect("/admin/collections");
 
@@ -144,6 +146,7 @@ async function externalActiveIds(request: Request, slug: string): Promise<string
 
 export async function action({ params, request }: Route.ActionArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "collections");
   // Ownership: must be one of the user's visible collections.
   const owned = (await getVisibleCollections(request)).some((c) => c.slug === params.slug);
   if (!owned) throw redirect("/admin/collections");

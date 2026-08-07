@@ -6,6 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getVisibleProperties, isOwnerOrSuper } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { brandForUser } from "~/lib/partners.server";
+import { hiddenPagesFor } from "~/lib/page-access.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
 import { getConfig } from "~/lib/config.server";
@@ -33,9 +34,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // never ours. Direct users keep the stock header (brand stays null).
   const brand = await brandForUser(email);
   const partnerBrand = brand.partnerId ? brand.name : null;
+  // Pages this user's partner hides. Nav-side only — the routes themselves
+  // enforce it in their loaders via requirePageAllowed.
+  const hiddenPages = await hiddenPagesFor(email);
   return {
     email,
     partnerBrand,
+    hiddenPages,
     propertyId,
     properties,
     isSuperadmin: superadmin,
@@ -175,7 +180,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, partnerBrand, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
+  const { email, partnerBrand, hiddenPages, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -188,7 +193,11 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
     to: string;
     label: string;
     end?: boolean;
+    /** Page id from page-access.server — the item is dropped when the user's
+     *  partner hides that page (the route's loader enforces the same id). */
+    page?: string;
   }
+  const shown = (items: NavItem[]) => items.filter((i) => !i.page || !hiddenPages.includes(i.page));
   // Sections are keyed by a stable id (NOT the translated title) so the
   // open/closed state survives an admin-language switch.
   const sections: { id: string; title: string; items: NavItem[] }[] = [
@@ -219,17 +228,17 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/extras", label: t("navExtras") },
         { to: "/admin/vouchers", label: t("navVouchers") },
         // Integrations
-        { to: "/admin/connectivity", label: t("navConnectivity") },
-        { to: "/admin/google-hotels", label: t("navGoogle") },
+        { to: "/admin/connectivity", label: t("navConnectivity"), page: "connectivity" },
+        { to: "/admin/google-hotels", label: t("navGoogle"), page: "google-hotels" },
         { to: "/admin/website-widget", label: t("navWidget") },
-        { to: "/admin/brand-kit", label: t("navBrandKit") },
+        { to: "/admin/brand-kit", label: t("navBrandKit"), page: "brand-kit" },
         { to: "/admin/payments", label: t("navPayments") },
-        ...(canManageCurrent ? [{ to: "/admin/api-keys", label: t("navApiKeys") }] : []),
-        ...(canManageCurrent ? [{ to: "/admin/webhooks", label: t("navWebhooks") }] : []),
+        ...(canManageCurrent ? [{ to: "/admin/api-keys", label: t("navApiKeys"), page: "api-keys" }] : []),
+        ...(canManageCurrent ? [{ to: "/admin/webhooks", label: t("navWebhooks"), page: "webhooks" }] : []),
         // Access & management
         ...(canManageCurrent ? [{ to: "/admin/team", label: t("navTeam") }] : []),
         { to: "/admin/properties", label: t("navProperties") },
-        { to: "/admin/collections", label: t("navCollections") },
+        { to: "/admin/collections", label: t("navCollections"), page: "collections" },
         ...(isSuperadmin ? [{ to: "/admin/users", label: t("navUsers") }] : []),
         ...(isSuperadmin ? [{ to: "/admin/partners", label: t("navPartners") }] : []),
       ],
@@ -409,7 +418,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                 </button>
                 {isOpen && (
                   <div className="space-y-1">
-                    {section.items.map((item) => (
+                    {shown(section.items).map((item) => (
                       <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
                         {item.label}
                       </NavLink>

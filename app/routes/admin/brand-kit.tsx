@@ -3,12 +3,14 @@ import { useState } from "react";
 import type { Route } from "./+types/brand-kit";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { buildBrandKit } from "~/lib/brand-kit.server";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "brand-kit");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const kit = await buildBrandKit(propertyId);

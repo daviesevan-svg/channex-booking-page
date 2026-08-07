@@ -4,6 +4,7 @@ import type { Route } from "./+types/collections";
 import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { requireAdmin } from "~/lib/auth.server";
+import { requirePageAllowed } from "~/lib/page-access.server";
 import {
   canAccessCollection,
   createCollection,
@@ -25,6 +26,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
+  await requirePageAllowed(request, "collections");
   const collections = await getVisibleCollections(request);
 
   // The other side of the relationship: collections that list one of YOUR
@@ -62,6 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export async function action({ request }: Route.ActionArgs) {
   const email = await requireAdmin(request);
+  await requirePageAllowed(request, "collections");
   const form = await request.formData();
   const intent = String(form.get("intent"));
 
