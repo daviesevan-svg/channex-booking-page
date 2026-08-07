@@ -98,6 +98,17 @@ export async function savePartner(partner: Partner): Promise<void> {
   if (kv) await kv.put(key(partner.id), JSON.stringify(partner));
 }
 
+/** Removes a partner record and releases its host claims. The ROUTE is
+ *  responsible for refusing while properties or users still reference the id —
+ *  a dangling partnerId would strand them invisible to everyone but
+ *  superadmins. */
+export async function deletePartner(partner: Partner): Promise<void> {
+  await releasePartnerAdminHost(partner.id, partner.adminHost);
+  await releasePartnerGuestHost(partner.id, partner.guestHost);
+  const kv = getConfigKV();
+  if (kv) await kv.delete(key(partner.id));
+}
+
 /** The brand context every operator-facing surface resolves through: partner
  *  brand when there is one, our defaults when there isn't. Keep the default in
  *  ONE place so a rebrand of ours is one edit. */
