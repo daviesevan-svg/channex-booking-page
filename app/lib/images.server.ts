@@ -70,6 +70,15 @@ export function uploadSectionImage(propertyId: string, file: File): Promise<stri
   return uploadImage(`sections/${propertyId}`, file);
 }
 
+/** White-label partner brand assets (admin chrome, login, favicon). Keyed by
+ *  partner id, not property — they belong to the PMS, not any hotel. */
+export function uploadPartnerLogo(partnerId: string, file: File): Promise<string> {
+  return uploadImage(`partners/${partnerId}/logo`, file);
+}
+export function uploadPartnerFavicon(partnerId: string, file: File): Promise<string> {
+  return uploadImage(`partners/${partnerId}/favicon`, file);
+}
+
 export function uploadPropertyLogo(propertyId: string, file: File): Promise<string> {
   return uploadImage(`logo/${propertyId}`, file);
 }

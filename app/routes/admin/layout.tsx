@@ -34,12 +34,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   // never ours. Direct users keep the stock header (brand stays null).
   const brand = await brandForUser(email);
   const partnerBrand = brand.partnerId ? brand.name : null;
+  const partnerLogo = brand.partnerId ? (brand.logo ?? null) : null;
   // Pages this user's partner hides. Nav-side only — the routes themselves
   // enforce it in their loaders via requirePageAllowed.
   const hiddenPages = await hiddenPagesFor(email);
   return {
     email,
     partnerBrand,
+    partnerLogo,
     hiddenPages,
     propertyId,
     properties,
@@ -180,7 +182,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, partnerBrand, hiddenPages, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
+  const { email, partnerBrand, partnerLogo, hiddenPages, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -314,10 +316,14 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
               ☰
             </button>
             <Link to="/admin" className="flex items-center gap-3">
-              <span
-                className="inline-block h-3 w-3 rounded-[2px] bg-accent"
-                style={{ transform: "rotate(45deg)" }}
-              />
+              {partnerLogo ? (
+                <img src={partnerLogo} alt="" className="h-7 max-w-[160px] object-contain" />
+              ) : (
+                <span
+                  className="inline-block h-3 w-3 rounded-[2px] bg-accent"
+                  style={{ transform: "rotate(45deg)" }}
+                />
+              )}
               <span className="font-serif text-[19px] font-semibold">{partnerBrand ?? "Booking Admin"}</span>
             </Link>
           </div>
