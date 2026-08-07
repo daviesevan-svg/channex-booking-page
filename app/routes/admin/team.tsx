@@ -13,7 +13,7 @@ import {
   isOwnerOrSuper,
   removePropertyMember,
 } from "~/lib/properties.server";
-import { upsertUser } from "~/lib/users.server";
+import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -40,8 +40,14 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "invite" && email) {
     await addPropertyMember(propertyId, email);
     // Pre-create the user so they can sign in (even once sign-up is locked down)
-    // and show up in the superadmin Users list.
-    await upsertUser(email);
+    // and show up in the superadmin Users list. Under a white-label partner the
+    // invite carries the property's partner, so the new user is scoped (and
+    // branded) as the partner's from their very first sign-in — but an EXISTING
+    // user's affiliation is never rewritten by a mere team invite.
+    const partnerId = (await getProperty(propertyId))?.partnerId;
+    const existing = await getUser(email);
+    if (!existing && partnerId) await setUserPartner(email, partnerId);
+    else await upsertUser(email);
     // Let them know they've been added. The link lands on the sign-in page with
     // their email pre-filled; they request a fresh magic link there.
     const origin = new URL(request.url).origin;

@@ -17,6 +17,7 @@ import { replaceRates, replaceRooms } from "~/lib/catalog.server";
 import { DEFAULT_LANG } from "~/lib/content";
 import { patchSettings, saveOverrides } from "~/lib/overrides.server";
 import { addProperty } from "~/lib/properties.server";
+import { getUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -38,7 +39,10 @@ async function importFromChannex(
   // One pricing mode for the whole property — Channex applies sell mode to the
   // whole channel connection, so a mixed selection is refused in the action.
   const perPerson = rates.some((rp) => importedRoomIds.has(rp.roomTypeId) && rp.sellMode === "per_person");
-  await addProperty(pid, property.title, owner);
+  // A partner_admin onboarding a hotel creates it under their partner, so it is
+  // scoped/branded from birth; direct users create direct properties.
+  const partnerId = (await getUser(owner))?.partnerId;
+  await addProperty(pid, property.title, owner, partnerId);
   await saveOverrides(pid, DEFAULT_LANG, {
     hotelName: property.title,
     address: property.address ?? "",

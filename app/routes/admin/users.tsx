@@ -117,6 +117,11 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
                     {t("usSuperadmin")}{u.envLocked ? " · env" : ""}
                   </span>
                 )}
+                {u.partnerId && (
+                  <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-secondary" title={u.partnerId}>
+                    {u.role === "partner_admin" ? t("usPartnerAdmin") : t("usPartnerUser")} · {u.partnerId}
+                  </span>
+                )}
               </div>
               <div className="mt-0.5 text-[12px] text-muted-2">
                 {t(u.properties === 1 ? "usPropsJoined_one" : "usPropsJoined_other", {

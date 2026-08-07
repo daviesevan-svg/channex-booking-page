@@ -10,11 +10,15 @@
 // into per-key records on read (see getUsers) and then removed.
 import { getConfig, getConfigKV } from "./config.server";
 
-export type Role = "member" | "superadmin";
+export type Role = "member" | "partner_admin" | "superadmin";
 
 export interface User {
   email: string;
   role: Role;
+  /** White-label partner this user belongs to (docs/whitelabel.md). Members get
+   *  it stamped when invited to a partner property; a partner_admin's is set by
+   *  a superadmin and scopes everything they can see. Unset = direct user. */
+  partnerId?: string;
   createdAt: number;
 }
 
@@ -108,6 +112,26 @@ export async function setUserRole(email: string, role: Role): Promise<void> {
   if (!u) return;
   const kv = getConfigKV();
   if (kv) await kv.put(userKey(email), JSON.stringify({ ...u, role }));
+}
+
+/** Stamps (or clears) a user's partner. Creates the record when missing so a
+ *  partner admin can be set up before their first sign-in — canSignIn already
+ *  admits any known user, which is exactly what makes this an invite. */
+export async function setUserPartner(
+  email: string,
+  partnerId: string | undefined,
+  role?: Role,
+): Promise<User> {
+  const existing = await getUser(email);
+  const user: User = {
+    email: norm(email),
+    role: role ?? existing?.role ?? "member",
+    createdAt: existing?.createdAt ?? Date.now(),
+    ...(partnerId ? { partnerId } : {}),
+  };
+  const kv = getConfigKV();
+  if (kv) await kv.put(userKey(email), JSON.stringify(user));
+  return user;
 }
 
 /** Removes a user record. Their properties are left in place (ownerless), so a
