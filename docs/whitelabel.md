@@ -3,6 +3,15 @@
 Let a PMS resell the booking engine under its own brand, for a monthly fee.
 Their hotels get "the PMS's booking engine"; Roompanda is invisible to them.
 
+> **Status (2026-08-07):** phase 1 shipped in #406–#408 (partner model,
+> partner_admin, in-app branding, page access, public exclusions, usage
+> counts); phase 2 domains shipped in #410 (admin hosts + host-bound identity)
+> and #411 (guest hosts + partner picker + slug host-discipline). Answered
+> questions: hotels log in themselves; Channex stays ours; payments stay
+> per-hotel Stripe Connect; pricing deferred to manual invoicing. Still open:
+> per-partner email sending domains (§6 phase 2 half — display-name-only for
+> now) and all of phase 3 (partner API, SSO, metered billing).
+
 The guiding constraint: **one deployment, one codebase**. A partner is a row of
 configuration, not a fork or a second Worker. Everything a partner changes —
 name, logo, domains, sender, visible pages — is data resolved per request, the

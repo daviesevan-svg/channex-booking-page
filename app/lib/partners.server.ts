@@ -30,6 +30,11 @@ export interface Partner {
    *  their brand. Kept in a per-host index like property domains — see
    *  claimPartnerAdminHost. */
   adminHost?: string;
+  /** The partner's shared guest booking hostname (book.theirpms.com). Slug
+   *  paths there serve ONLY this partner's properties, and its root is a
+   *  picker of their public ones under their brand (property-scope.server,
+   *  picker.server). Per-hotel custom domains keep working independently. */
+  guestHost?: string;
   createdAt: number;
 }
 
@@ -127,25 +132,38 @@ export async function brandForUser(email: string): Promise<Brand> {
 // maintained on save and released on change.
 
 const ADMIN_HOST_PREFIX = "partner-admin-host:";
+const GUEST_HOST_PREFIX = "partner-guest-host:";
 const adminHostKey = (host: string) => `${ADMIN_HOST_PREFIX}${host}`;
+const guestHostKey = (host: string) => `${GUEST_HOST_PREFIX}${host}`;
 
-/** The partner whose ADMIN is served on `hostname`, or null. Request-path
- *  lookup: a single KV read. */
-export async function partnerIdForAdminHost(hostname: string): Promise<string | null> {
+async function hostIndexLookup(prefix: string, hostname: string): Promise<string | null> {
   const host = normalizeDomain(hostname);
   if (!host || isOwnHost(host)) return null;
   const kv = getConfigKV();
   if (!kv) return null;
-  return (await kv.get(adminHostKey(host))) || null;
+  return (await kv.get(`${prefix}${host}`)) || null;
 }
+
+/** The partner whose ADMIN is served on `hostname`, or null. Request-path
+ *  lookup: a single KV read. */
+export const partnerIdForAdminHost = (hostname: string) => hostIndexLookup(ADMIN_HOST_PREFIX, hostname);
+
+/** The partner whose GUEST booking domain `hostname` is, or null. */
+export const partnerIdForGuestHost = (hostname: string) => hostIndexLookup(GUEST_HOST_PREFIX, hostname);
 
 export type HostClaim = { ok: true } | { ok: false; error: string };
 
-/** Bind `host` to `partnerId`'s admin, refusing anything already spoken for:
- *  our own hosts, a hotel's live or reserved website domain, or another
+/** Bind a partner-host index key, refusing anything already spoken for: our
+ *  own hosts, a hotel's live or reserved website domain, the partner-host
+ *  namespace it isn't (one hostname can't be both admin and guest), or another
  *  partner. Same read-write-reread shape as domains.server claimKey — KV has
  *  no compare-and-swap, so success is only reported if our write stuck. */
-export async function claimPartnerAdminHost(partnerId: string, hostname: string): Promise<HostClaim> {
+async function claimPartnerHost(
+  partnerId: string,
+  hostname: string,
+  key: (host: string) => string,
+  otherKey: (host: string) => string,
+): Promise<HostClaim> {
   const host = normalizeDomain(hostname);
   if (!host) return { ok: false, error: "Enter a hostname like admin.theirpms.com." };
   if (isOwnHost(host)) return { ok: false, error: "That hostname is one of ours." };
@@ -158,19 +176,31 @@ export async function claimPartnerAdminHost(partnerId: string, hostname: string)
   }
   const kv = getConfigKV();
   if (!kv) return { ok: true };
-  const owner = await kv.get(adminHostKey(host));
+  if (await kv.get(otherKey(host))) {
+    return { ok: false, error: "That hostname is already a partner host of the other kind." };
+  }
+  const owner = await kv.get(key(host));
   if (owner && owner !== partnerId) return { ok: false, error: "Another partner already uses that hostname." };
-  await kv.put(adminHostKey(host), partnerId);
-  const settled = await kv.get(adminHostKey(host));
+  await kv.put(key(host), partnerId);
+  const settled = await kv.get(key(host));
   if (settled !== partnerId) return { ok: false, error: "Another partner already uses that hostname." };
   return { ok: true };
 }
 
+export const claimPartnerAdminHost = (partnerId: string, hostname: string) =>
+  claimPartnerHost(partnerId, hostname, adminHostKey, guestHostKey);
+export const claimPartnerGuestHost = (partnerId: string, hostname: string) =>
+  claimPartnerHost(partnerId, hostname, guestHostKey, adminHostKey);
+
 /** Drop `partnerId`'s claim on `host` (scoped to the owner, like releaseDomain:
  *  a stale stored value must not tear down another partner's live host). */
-export async function releasePartnerAdminHost(partnerId: string, hostname: string | undefined): Promise<void> {
+async function releasePartnerHost(partnerId: string, hostname: string | undefined, key: (h: string) => string) {
   const host = normalizeDomain(hostname ?? "");
   const kv = getConfigKV();
   if (!host || !kv) return;
-  if ((await kv.get(adminHostKey(host))) === partnerId) await kv.delete(adminHostKey(host));
+  if ((await kv.get(key(host))) === partnerId) await kv.delete(key(host));
 }
+export const releasePartnerAdminHost = (partnerId: string, hostname: string | undefined) =>
+  releasePartnerHost(partnerId, hostname, adminHostKey);
+export const releasePartnerGuestHost = (partnerId: string, hostname: string | undefined) =>
+  releasePartnerHost(partnerId, hostname, guestHostKey);
