@@ -49,7 +49,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     hiddenPages,
     hiddenAreas,
     propertyId,
-    properties,
+    // Only what the header chrome reads. The full PropertyRef carries every
+    // visible property's members list and per-teammate access map, which must
+    // not reach the client payload (any teammate could read them).
+    properties: properties.map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
     isSuperadmin: superadmin,
     canManageCurrent,
     testMode,
