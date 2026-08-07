@@ -7,11 +7,13 @@ import { useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import {
   claimPartnerAdminHost,
+  claimPartnerGuestHost,
   DEFAULT_HIDDEN_PAGES,
   getPartner,
   getPartners,
   isValidPartnerId,
   releasePartnerAdminHost,
+  releasePartnerGuestHost,
   savePartner,
   type Partner,
 } from "~/lib/partners.server";
@@ -76,6 +78,7 @@ export async function action({ request }: Route.ActionArgs) {
     // lands in the record; release the previous one only after the new claim
     // stuck (a failed change must not drop the live door).
     const adminHost = normalizeDomain(str("adminHost")) || undefined;
+    const guestHost = normalizeDomain(str("guestHost")) || undefined;
     let provisioning: string | null = null;
     if (adminHost !== partner.adminHost) {
       if (adminHost) {
@@ -86,12 +89,22 @@ export async function action({ request }: Route.ActionArgs) {
       }
       await releasePartnerAdminHost(partnerId, partner.adminHost);
     }
+    if (guestHost !== partner.guestHost) {
+      if (guestHost) {
+        const claim = await claimPartnerGuestHost(partnerId, guestHost);
+        if (!claim.ok) return { error: claim.error };
+        const state = await ensureCustomHostname(guestHost);
+        provisioning = provisioning ?? state.kind;
+      }
+      await releasePartnerGuestHost(partnerId, partner.guestHost);
+    }
     await savePartner({
       ...partner,
       name: str("name") || brandName,
       brandName,
       supportEmail: str("supportEmail") || undefined,
       adminHost,
+      guestHost,
     });
     if (provisioning) return { ok: true as const, provisioning };
   } else if (intent === "assignProperty") {
@@ -188,6 +201,19 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
                     <code className="rounded bg-chip px-1 py-0.5 text-[11px]">CNAME → {cnameTarget}</code>
                   </span>
                 )}
+              </div>
+              <div>
+                <span className={label}>{t("wlpGuestHost")}</span>
+                <input
+                  name="guestHost"
+                  defaultValue={p.guestHost}
+                  placeholder="book.theirpms.com"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[12px] text-faint">{t("wlpGuestHostHint")}</span>
               </div>
               <button type="submit" disabled={busy} className="rounded-[10px] bg-accent px-4 py-2 text-[13px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60">
                 {t("saveChanges")}

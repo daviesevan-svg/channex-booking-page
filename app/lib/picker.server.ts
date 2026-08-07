@@ -9,7 +9,7 @@
 import { getCollections } from "./collections.server";
 import { getConfig } from "./config.server";
 import { getOverrides, getSettings } from "./overrides.server";
-import { getProperty, getPublicProperties } from "./properties.server";
+import { getProperties, getProperty, getPublicProperties } from "./properties.server";
 
 export interface PickerCard {
   href: string;
@@ -26,6 +26,9 @@ export interface PickerCard {
 export interface PickerData {
   items: PickerCard[];
   subtitle: string;
+  /** Heading brand: a white-label partner's name on THEIR guest host; unset =
+   *  ours (the component's default). */
+  brandName?: string;
 }
 
 /** First cover photo among a collection's member properties (checks a few, then
@@ -53,6 +56,33 @@ function subtitle(n: number, kind: "collection" | "property"): string {
  * Cards for the picker. Throws a redirect on single-hotel deploys, where "/" is
  * the property itself rather than a list.
  */
+/** A white-label partner's front door: their PUBLIC properties, their brand.
+ *  No collections (a platform feature), no fall-through to our default
+ *  property — an empty list renders as an empty picker rather than leaking a
+ *  direct hotel onto the partner's domain. */
+export async function loadPartnerPicker(partner: {
+  id: string;
+  brandName: string;
+}): Promise<PickerData> {
+  const properties = (await getProperties()).filter((p) => p.public && p.partnerId === partner.id);
+  const items: PickerCard[] = await Promise.all(
+    properties.map(async (p) => {
+      const [settings, ov] = await Promise.all([getSettings(p.id), getOverrides(p.id)]);
+      const area = [settings.addressCity, settings.addressRegion].filter(Boolean).join(", ");
+      return {
+        href: `/${p.slug || p.id}`,
+        name: ov.hotelName || p.name,
+        tag: ov.propertyType || (settings.singleUnit ? "Apartment" : "Hotel"),
+        meta: area || settings.addressCountry || "",
+        blurb: ov.description || "",
+        cta: "Check availability →",
+        photo: settings.coverImage || null,
+      };
+    }),
+  );
+  return { items, subtitle: subtitle(properties.length, "property"), brandName: partner.brandName };
+}
+
 export async function loadPicker(): Promise<PickerData> {
   // Prefer showcasing curated collections (owner-branded /c/:slug landings).
   // Skip empty ones — a collection with no properties isn't bookable.

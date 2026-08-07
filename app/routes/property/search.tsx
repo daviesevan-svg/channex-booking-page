@@ -1,6 +1,6 @@
 import { addMonths, format } from "date-fns";
 import { useEffect, useState } from "react";
-import { useNavigate, useNavigation, useSearchParams } from "react-router";
+import { redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/search";
 import { pageMeta } from "~/lib/page-meta";
@@ -23,7 +23,8 @@ import { earliestCheckinDate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
 import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
-import { loadPicker } from "~/lib/picker.server";
+import { loadPartnerPicker, loadPicker } from "~/lib/picker.server";
+import { getPartner, partnerIdForAdminHost, partnerIdForGuestHost } from "~/lib/partners.server";
 import { PropertyPicker } from "~/components/property-picker";
 import { useSiteStyle } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -37,7 +38,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // the shared domain's front door, which lists everything bookable instead.
   // Route matching cannot see the hostname, so the branch has to be here.
   const pid = await resolveRequestPropertyOrNull(params.channelId, request);
-  if (!pid) return { mode: "picker" as const, picker: await loadPicker() };
+  if (!pid) {
+    const hostname = new URL(request.url).hostname;
+    // A partner's guest host fronts THEIR properties under THEIR brand; a
+    // partner's admin host has no guest content at all — its root is a door,
+    // so send the visitor to the sign-in it exists for.
+    const guestPartnerId = await partnerIdForGuestHost(hostname);
+    if (guestPartnerId) {
+      const partner = await getPartner(guestPartnerId);
+      if (partner) return { mode: "picker" as const, picker: await loadPartnerPicker(partner) };
+    }
+    if (await partnerIdForAdminHost(hostname)) throw redirect("/admin/login");
+    return { mode: "picker" as const, picker: await loadPicker() };
+  }
   // Availability + min-stay for the calendar, from our inventory (D1). Cover the
   // calendar's horizon (it pages up to ~12 months out).
   const now = new Date();
@@ -74,10 +87,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export function meta({ matches, loaderData }: Route.MetaArgs) {
-  // The picker is ours, not a hotel's — it must not inherit a property's title.
+  // The picker is ours (or a partner's), not a hotel's — it must not inherit a
+  // property's title.
   if (loaderData?.mode === "picker") {
     return [
-      { title: "Book direct — Roompanda" },
+      { title: `Book direct — ${loaderData.picker.brandName ?? "Roompanda"}` },
       {
         name: "description",
         content: "Browse and book hotels and apartments directly, commission-free.",

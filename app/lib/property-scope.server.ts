@@ -14,8 +14,9 @@
 // Child loaders run in PARALLEL with the layout's, so they cannot lean on the
 // layout having already validated the property. This throws its own 404.
 
-import { propertyIdForHost } from "./domains.server";
-import { resolvePropertyId } from "./properties.server";
+import { isOwnHost, propertyIdForHost } from "./domains.server";
+import { partnerIdForGuestHost } from "./partners.server";
+import { getProperty, resolvePropertyId } from "./properties.server";
 
 /**
  * The property id for this request — from the `:channelId` segment when there is
@@ -46,6 +47,22 @@ export async function resolveRequestPropertyOrNull(
   channelId: string | undefined,
   request: Request,
 ): Promise<string | null> {
-  if (channelId) return resolvePropertyId(channelId);
-  return propertyIdForHost(new URL(request.url).hostname);
+  const hostname = new URL(request.url).hostname;
+  if (channelId) {
+    const pid = await resolvePropertyId(channelId);
+    if (!pid) return null;
+    // Slug paths are host-disciplined. On our shared domain every property
+    // resolves, as always. On a white-label partner's guest host, ONLY that
+    // partner's properties exist — book.theirpms.com/otherhotel serving a
+    // stranger's booking page would put one tenant on another's brand. On any
+    // other hostname (a hotel's custom domain, a partner ADMIN host) the slug
+    // mount doesn't exist at all: those hosts serve exactly one thing, and a
+    // slug path there was never a real URL — just an unadvertised alias this
+    // used to answer anyway.
+    if (isOwnHost(hostname)) return pid;
+    const partnerId = await partnerIdForGuestHost(hostname);
+    if (partnerId) return (await getProperty(pid))?.partnerId === partnerId ? pid : null;
+    return null;
+  }
+  return propertyIdForHost(hostname);
 }
