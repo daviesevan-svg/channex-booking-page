@@ -6,13 +6,18 @@ import { FIELD_INPUT } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import {
+  claimPartnerAdminHost,
   DEFAULT_HIDDEN_PAGES,
   getPartner,
   getPartners,
   isValidPartnerId,
+  releasePartnerAdminHost,
   savePartner,
   type Partner,
 } from "~/lib/partners.server";
+import { normalizeDomain } from "~/lib/domains";
+import { ensureCustomHostname } from "~/lib/custom-hostnames.server";
+import { getConfig } from "~/lib/config.server";
 import { getProperties, setPropertyPartner } from "~/lib/properties.server";
 import { getUsers, setUserPartner } from "~/lib/users.server";
 
@@ -24,6 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireSuperadmin(request);
   const [partners, properties, users] = await Promise.all([getPartners(), getProperties(), getUsers()]);
   return {
+    cnameTarget: getConfig().customHostnameTarget ?? null,
     partners: partners.map((p) => ({
       ...p,
       properties: properties.filter((x) => x.partnerId === p.id).map((x) => ({ id: x.id, name: x.name })),
@@ -66,12 +72,28 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "update") {
     const brandName = str("brandName");
     if (!brandName) return { error: "Enter the brand name their users will see." };
+    // Admin host: claim before saving so a hostname another tenant holds never
+    // lands in the record; release the previous one only after the new claim
+    // stuck (a failed change must not drop the live door).
+    const adminHost = normalizeDomain(str("adminHost")) || undefined;
+    let provisioning: string | null = null;
+    if (adminHost !== partner.adminHost) {
+      if (adminHost) {
+        const claim = await claimPartnerAdminHost(partnerId, adminHost);
+        if (!claim.ok) return { error: claim.error };
+        const state = await ensureCustomHostname(adminHost);
+        provisioning = state.kind;
+      }
+      await releasePartnerAdminHost(partnerId, partner.adminHost);
+    }
     await savePartner({
       ...partner,
       name: str("name") || brandName,
       brandName,
       supportEmail: str("supportEmail") || undefined,
+      adminHost,
     });
+    if (provisioning) return { ok: true as const, provisioning };
   } else if (intent === "assignProperty") {
     const propertyId = str("propertyId");
     const all = await getProperties();
@@ -98,7 +120,7 @@ export function meta({ matches }: Route.MetaArgs) {
 const label = "mb-1 block text-[11px] font-semibold uppercase tracking-wider text-faint";
 
 export default function AdminPartners({ loaderData, actionData }: Route.ComponentProps) {
-  const { partners, unassigned } = loaderData;
+  const { partners, unassigned, cnameTarget } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
@@ -110,6 +132,11 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
 
       {actionData && "error" in actionData && actionData.error && (
         <p className="mb-4 text-[13px] text-red-600">{actionData.error}</p>
+      )}
+      {actionData && "provisioning" in actionData && actionData.provisioning && (
+        <p className="mb-4 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">
+          {t("wlpProvisioningState")} <code className="text-[12px]">{actionData.provisioning}</code>
+        </p>
       )}
 
       {partners.map((p) => (
@@ -142,6 +169,25 @@ export default function AdminPartners({ loaderData, actionData }: Route.Componen
                 <span className={label}>{t("wlpSupportEmail")}</span>
                 <input name="supportEmail" type="email" defaultValue={p.supportEmail} placeholder="support@pms.com" className={FIELD_INPUT} />
                 <span className="mt-1 block text-[12px] text-faint">{t("wlpSupportEmailHint")}</span>
+              </div>
+              <div>
+                <span className={label}>{t("wlpAdminHost")}</span>
+                <input
+                  name="adminHost"
+                  defaultValue={p.adminHost}
+                  placeholder="admin.theirpms.com"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={FIELD_INPUT}
+                />
+                <span className="mt-1 block text-[12px] text-faint">{t("wlpAdminHostHint")}</span>
+                {cnameTarget && (
+                  <span className="mt-1 block text-[12px] text-faint">
+                    {t("wlpAdminHostDns")}{" "}
+                    <code className="rounded bg-chip px-1 py-0.5 text-[11px]">CNAME → {cnameTarget}</code>
+                  </span>
+                )}
               </div>
               <button type="submit" disabled={busy} className="rounded-[10px] bg-accent px-4 py-2 text-[13px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60">
                 {t("saveChanges")}

@@ -3,8 +3,8 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import { getConfig, getConfigKV } from "./config.server";
 import { sendEmail } from "./email.server";
 import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
-import { brandForUser } from "./partners.server";
-import { requireCanonicalHost } from "./domains.server";
+import { brandForUser, getPartner, partnerIdForAdminHost } from "./partners.server";
+import { isOwnHost } from "./domains.server";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -101,32 +101,84 @@ function sessionStorage() {
   });
 }
 
-export async function createAdminSession(email: string, redirectTo: string) {
+// ---------- admin hosts ----------
+/**
+ * The white-label partner whose ADMIN this request's host serves: null on our
+ * own (canonical) hosts, the partner id on a registered partner admin host —
+ * and a 404 for every other hostname.
+ *
+ * This replaces requireCanonicalHost for the admin surface. The wildcard
+ * Worker route sends every custom hostname here, so an unrecognised host must
+ * still 404 exactly as before — a hotel's website domain must never render our
+ * (or a partner's) login form.
+ */
+export async function adminHostPartnerId(request: Request): Promise<string | null> {
+  let host = "";
+  try {
+    host = new URL(request.url).hostname;
+  } catch {
+    throw new Response("Not found", { status: 404 });
+  }
+  if (isOwnHost(host)) return null;
+  const partnerId = await partnerIdForAdminHost(host);
+  if (partnerId) return partnerId;
+  throw new Response("Not found", { status: 404 });
+}
+
+/**
+ * Whether `email` may sign in through the door this request arrived at.
+ *
+ * On a partner host: that partner's users and superadmins only — and the user
+ * record must already exist, so partner hosts are invite-only regardless of
+ * ADMIN_EMAILS. On canonical hosts: today's rules, MINUS users whose partner
+ * has its own admin host — their brand lives there, and letting them in here
+ * would show them ours.
+ */
+export async function canSignInOnHost(email: string, hostPartnerId: string | null): Promise<boolean> {
+  if (hostPartnerId) {
+    if (await isSuperadmin(email)) return true;
+    return (await getUser(email))?.partnerId === hostPartnerId;
+  }
+  if (!(await canSignIn(email))) return false;
+  const partnerId = (await getUser(email))?.partnerId;
+  if (!partnerId) return true;
+  return !(await getPartner(partnerId))?.adminHost;
+}
+
+export async function createAdminSession(email: string, redirectTo: string, hostPartnerId: string | null = null) {
   // First sign-in creates the user record (member by default).
   await upsertUser(email);
   // Lockout-safe bootstrap: if no superadmin exists yet, this first sign-in
-  // claims it (instead of treating everyone as superadmin). No-op once claimed.
-  await claimSuperadminIfUnclaimed(email);
+  // claims it (instead of treating everyone as superadmin). No-op once claimed
+  // — and never from a partner host: a PMS's first hotel user must not claim
+  // the platform.
+  if (!hostPartnerId) await claimSuperadminIfUnclaimed(email);
   const storage = sessionStorage();
   const session = await storage.getSession();
   session.set("email", email.toLowerCase());
+  // Bind the session to the door it was minted at. Browsers scope the cookie
+  // per host anyway; this stops a copied cookie VALUE from crossing hosts.
+  session.set("partner", hostPartnerId ?? "");
   return redirect(redirectTo, {
     headers: { "Set-Cookie": await storage.commitSession(session) },
   });
 }
 
 export async function getAdminEmail(request: Request): Promise<string | null> {
+  const hostPartnerId = await adminHostPartnerId(request); // 404s foreign hosts
   const storage = sessionStorage();
   const session = await storage.getSession(request.headers.get("Cookie"));
   const email = session.get("email");
-  return typeof email === "string" && (await canSignIn(email)) ? email : null;
+  if (typeof email !== "string") return null;
+  // Sessions are bound to the door they were minted at (both directions).
+  // Pre-binding sessions carry no claim and read as canonical — exactly what
+  // they were.
+  const mintedFor = (session.get("partner") as string | undefined) || null;
+  if (mintedFor !== hostPartnerId) return null;
+  return (await canSignInOnHost(email, hostPartnerId)) ? email : null;
 }
 
 export async function requireAdmin(request: Request): Promise<string> {
-  // Our admin panel must never be served on a hotel's custom domain — the
-  // wildcard Worker route sends every custom hostname here, so without this the login
-  // form appears at https://www.anyhotel.co.uk/admin.
-  requireCanonicalHost(request);
   const email = await getAdminEmail(request);
   if (!email) throw redirect("/admin/login");
   return email;

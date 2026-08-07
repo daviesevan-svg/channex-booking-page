@@ -1,19 +1,20 @@
 import { Link } from "react-router";
 
 import type { Route } from "./+types/verify";
-import { canSignIn, createAdminSession, verifyMagicToken } from "~/lib/auth.server";
-import { requireCanonicalHost } from "~/lib/domains.server";
+import { adminHostPartnerId, canSignInOnHost, createAdminSession, verifyMagicToken } from "~/lib/auth.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  // Never on a hotel's custom domain — the magic-link target must only ever be our own host.
-  requireCanonicalHost(request);
+  // Our hosts and partner admin hosts only (404s everything else). The session
+  // is minted BOUND to this host's door — a link forged for one door cannot
+  // produce a session for another.
+  const hostPartnerId = await adminHostPartnerId(request);
   const token = new URL(request.url).searchParams.get("token") ?? "";
   const email = await verifyMagicToken(token);
-  if (!email || !(await canSignIn(email))) {
+  if (!email || !(await canSignInOnHost(email, hostPartnerId))) {
     return { error: "This sign-in link is invalid or has expired." };
   }
   // Sets the session cookie and redirects to /admin.
-  throw await createAdminSession(email, "/admin");
+  throw await createAdminSession(email, "/admin", hostPartnerId);
 }
 
 export default function Verify({ loaderData }: Route.ComponentProps) {
