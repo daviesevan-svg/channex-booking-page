@@ -115,6 +115,7 @@ export default [
     route("collections/:slug/analytics", "routes/admin/collection-analytics.tsx"),
     route("users", "routes/admin/users.tsx"),
     route("partners", "routes/admin/partners.tsx"),
+    route("partners/:partnerId", "routes/admin/partner.tsx"),
     route("team", "routes/admin/team.tsx"),
     route("select-property", "routes/admin/select-property.tsx"),
     route("general", "routes/admin/general.tsx"),
