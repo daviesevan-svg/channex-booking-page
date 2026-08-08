@@ -468,9 +468,18 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
         const rates = (Array.isArray(a.rates) ? a.rates : []) as RateIn[];
         // Fields absent from this change bind the ABSENT sentinel → preserved
         // by the upsert. A rate-only change writes no restriction row at all.
+        // Channex is configured to send ONE min-stay field, the generic
+        // `min_stay` — deliberately, so there is a single number to reason
+        // about. It lands in min_stay_arrival, the column the booking logic
+        // reads (min_stay_through is never populated; catalog.server returns
+        // {} for it). Reading only the arrival/through pair silently dropped
+        // every min_stay: the field bound ABSENT, the upsert kept the stored 0,
+        // and the change still counted as applied because stop_sell/cta/ctd
+        // rode along in the same change. The specific field still wins if a
+        // future channel sends it.
         const restr = [
           nbit(a.stop_sell), nbit(a.closed_to_arrival), nbit(a.closed_to_departure),
-          nnum(a.min_stay_arrival), nnum(a.min_stay_through), nnum(a.max_stay),
+          nnum(a.min_stay_arrival ?? a.min_stay), nnum(a.min_stay_through), nnum(a.max_stay),
         ];
         const hasRestr = restr.some((f) => f !== ABSENT);
         for (const d of dates) {
