@@ -94,7 +94,7 @@ export const TOOLS: McpTool[] = [
   {
     name: "create_booking",
     description:
-      "Create a booking. Prices and availability are re-checked server-side, so a stale quote is rejected rather than silently repriced — call search_availability first and use the exact room_id and rate_id it returned.\n\nIf the rate needs paying, the response is status 'pending_payment' with a payment_url. GIVE THAT URL TO THE GUEST — the booking only becomes confirmed once they have paid on it. Never ask the guest for card details and never try to pay on their behalf. If no payment is due, the booking is confirmed immediately.\n\nPass an idempotency_key to make a retry safe: repeating the same key returns the original result instead of booking twice.",
+      "Create a booking. Prices and availability are re-checked server-side, so a stale quote is rejected rather than silently repriced — call search_availability first and use the exact room_id and rate_id it returned.\n\nIf the rate needs paying, the response is status 'pending_payment' with a payment_url. GIVE THAT URL TO THE GUEST — the booking only becomes confirmed once they have paid on it. Never ask the guest for card details and never try to pay on their behalf. If no payment is due, the booking is confirmed immediately.\n\nPass an idempotency_key to make a retry safe: repeating the same key returns the original result instead of booking twice.\n\nRates that take no card at all — no payment and no guarantee — are limited to one booking an hour, because nothing secures the room. Rates with a deposit or a card guarantee have no such limit. A retry with the same idempotency_key does not count against it.",
     inputSchema: {
       type: "object",
       properties: {
