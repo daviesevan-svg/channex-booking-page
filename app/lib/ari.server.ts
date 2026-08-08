@@ -780,9 +780,18 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
 
   const data: InventoryData = { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
   for (const r of av) data.availability[`${r.room_type_id}|${r.date}`] = r.avail;
-  // A rate may have several occupancy rows (per_person pushes from Channex);
-  // prefer the manual occupancy=0 price, else the highest occupancy (the full
-  // rate). Folding every part through one map is the same answer as folding each
+  // A rate may have several occupancy rows: Channex prices a party size
+  // (occupancy>=1), a manual grid or bulk edit writes the occupancy-less row 0.
+  // The CHANNEL WINS — take the highest occupancy>=1, and fall back to row 0
+  // only when the channel has never priced this cell.
+  //
+  // It used to be the other way round (occupancy 0 preferred unconditionally),
+  // which made a manual price permanent: one bulk edit pinned those cells and
+  // every later Channex push was stored, counted and then ignored on read, so a
+  // rate plan silently showed a stale price forever while its neighbour tracked
+  // the channel. Channex is the source of truth for a connected property.
+  //
+  // Folding every part through one map is the same answer as folding each
   // separately, because the key carries the date and the parts are disjoint by
   // date — two parts can never offer a price for the same key.
   const priceOcc: Record<string, number> = {};
@@ -793,7 +802,9 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
     // party size from its own row rather than the collapsed value below).
     (data.pricesByOcc[key] ??= {})[r.occupancy] = price;
     const prevOcc = priceOcc[key];
-    if (prevOcc === undefined || r.occupancy === 0 || (prevOcc !== 0 && r.occupancy > prevOcc)) {
+    // Order-independent: whichever row arrives first, the highest occupancy>=1
+    // ends up winning, and 0 only survives if nothing else priced the cell.
+    if (prevOcc === undefined || (r.occupancy > 0 && (prevOcc === 0 || r.occupancy > prevOcc))) {
       data.prices[key] = price;
       priceOcc[key] = r.occupancy;
     }

@@ -616,6 +616,18 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                               const key = `${room.id}|${rid}|${d}`;
                               const suffix = `${room.id}:${rid}:${d}`;
                               const restr = inventory.restrictions[key];
+                              // The channel owns this cell's price once it has
+                              // pushed one for a party size (occupancy>=1), and
+                              // its value wins on read. The box is DISABLED
+                              // rather than merely ignored: typing here used to
+                              // look like it worked while the display kept
+                              // showing the channel's number. Disabled (not
+                              // read-only) so it isn't submitted at all — a
+                              // resubmitted copy would only add a dead
+                              // occupancy-0 row per visible cell.
+                              const channelPriced = Object.keys(inventory.pricesByOcc[key] ?? {}).some(
+                                (o) => Number(o) > 0,
+                              );
                               return (
                                 <td key={d} className={`px-1.5 py-1.5 align-top ${isWeekend(d) ? "bg-field-hover/40" : ""}`}>
                                   <input
@@ -625,7 +637,9 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                     step="0.01"
                                     defaultValue={inventory.prices[key] ?? ""}
                                     placeholder={base.toFixed(0)}
-                                    className={cellInput}
+                                    disabled={channelPriced}
+                                    title={channelPriced ? t("invChannelPriced") : undefined}
+                                    className={`${cellInput} ${channelPriced ? "text-muted-2" : ""}`}
                                   />
                                   <div className="mt-1 flex items-center justify-center gap-1">
                                     <input
