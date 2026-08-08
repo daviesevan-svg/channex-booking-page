@@ -9,7 +9,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "~/lib/catalog.server";
 import { applyBulkUpdate, getInventory, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
-import { getSettings } from "~/lib/overrides.server";
+import { getSettings, isChannexConnected } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 // Client-safe (rate-pricing.ts has no server imports) — this runs in the grid to
 // show what a blank per-occupancy cell would inherit.
@@ -77,6 +77,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     // id (what the mapping advertises), so per-occupancy lookups need it.
     rates: rates.map((r) => ({ id: r.id, title: r.title, prices: r.prices, channexRateIds: r.channexRateIds })),
     currency: settings.currency || "GBP",
+    // A channel-managed property's ARI belongs to the channel manager: it owns
+    // availability, prices and restrictions, and its next push overwrites
+    // whatever was typed here. The grid is therefore READ-ONLY while connected —
+    // see the action, which refuses the write regardless of what the form sends.
+    channelManaged: await isChannexConnected(propertyId),
     // Per-person property: offer to unfold each cell's per-occupancy prices.
     perPerson: pricingModeOf(settings, rates) === "per_person",
     dates,
@@ -89,6 +94,13 @@ export async function action({ request }: Route.ActionArgs) {
   const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
+  // The channel manager owns the ARI of a connected property, so the grid is
+  // read-only and this refuses every write — bulk included. Enforced HERE and
+  // not only by disabling the inputs: a control you don't render is not a write
+  // you can't make, and this endpoint accepts a plain form POST.
+  if (await isChannexConnected(propertyId)) {
+    return { error: "This property's availability, prices and restrictions come from your channel manager. Change them there." };
+  }
   const actor: AriActor = { source: "user", actor: email };
 
   const form = await request.formData();
@@ -316,7 +328,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
     );
   }
 
-  const { rooms, rates, currency, dates, start, inventory, perPerson } = loaderData;
+  const { rooms, rates, currency, dates, start, inventory, perPerson, channelManaged } = loaderData;
   const shown = dates.slice(0, visible);
   const go = (s: string) => navigate(`/admin/inventory?start=${s}`);
   const today = format(new Date(), "yyyy-MM-dd");
@@ -363,6 +375,14 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           <button type="button" onClick={() => go(nextStart)} aria-label={t("invNextDates")} className="rounded-[8px] border border-line-alt px-2.5 py-1.5 hover:border-accent hover:text-accent">→</button>
         </div>
       </div>
+      {channelManaged && (
+        <p className="mb-5 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">
+          {t("invChannelManaged")}{" "}
+          <Link to="/admin/connectivity" className="font-semibold text-accent">
+            {t("navConnectivity")}
+          </Link>
+        </p>
+      )}
       <p className="mb-5 text-[14px] text-muted">
         {t("invIntroLead", { currency })}{" "}
         <span className="font-semibold text-[#c0392b]">✕</span> {t("invIntroClosed")}{" "}
@@ -370,7 +390,8 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         <span className="font-semibold text-accent">D</span> {t("invIntroNoDeparture")}
       </p>
 
-      <div className="mb-5 rounded-[14px] border border-line bg-surface">
+      {/* Bulk update is an editing tool only — nothing to show read-only. */}
+      <div className="mb-5 rounded-[14px] border border-line bg-surface" hidden={channelManaged}>
         <button
           type="button"
           onClick={() => setBulkOpen((v) => !v)}
@@ -495,13 +516,15 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         <input type="hidden" name="start" value={start} />
         <input type="hidden" name="cols" value={visible} />
         <div className="mb-4 flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-          >
-            {saving ? t("saving") : t("saveChanges")}
-          </button>
+          {!channelManaged && (
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+            >
+              {saving ? t("saving") : t("saveChanges")}
+            </button>
+          )}
           {actionData?.ok && (
             <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
               ✓ {actionData.message ?? t("invSaved")}
@@ -535,6 +558,12 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           </div>
         </div>
 
+        {/* One disabled fieldset makes every cell in the grid read-only —
+            availability, prices, min stay and the three toggles — and keeps
+            them out of the submission, so a future cell is covered without
+            remembering to gate it. The paging and filter controls sit above,
+            outside it, and stay usable. */}
+        <fieldset disabled={channelManaged}>
         <div ref={gridRef} className="flex flex-col gap-5">
           {rooms.map((room) => {
             const roomRates = rates.filter((r) => r.prices[room.id] !== undefined);
@@ -720,6 +749,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
             );
           })}
         </div>
+        </fieldset>
       </Form>
     </div>
   );
