@@ -294,16 +294,28 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(sections.map((s) => [s.id, s.items.some(itemActive)])),
   );
-  // Keep the section containing the current page open across client-side
-  // navigations (without collapsing any the user opened themselves).
+  // Landing on a page opens its section and closes every other one. The nav is
+  // long enough that several open groups make it hard to see where you are, so
+  // navigation always leaves exactly one section expanded. Opening a section by
+  // hand still keeps it open alongside others until the next navigation.
   useEffect(() => {
     const active = sections.find((s) => s.items.some(itemActive));
-    if (active) setOpenSections((o) => (o[active.id] ? o : { ...o, [active.id]: true }));
+    if (!active) return;
+    setOpenSections((o) =>
+      // Keep the same object when it's already the only open section, so this
+      // doesn't re-render on every navigation within one section.
+      o[active.id] && Object.keys(o).every((id) => id === active.id || !o[id]) ? o : { [active.id]: true },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
-  // Wide pages (the inventory grid, the change log table) break out of the
-  // centred column to use the full width.
-  const wide = pathname.startsWith("/admin/inventory") || pathname.startsWith("/admin/ari-log");
+  // Wide pages (the inventory grid, the change log table, the email editor's
+  // form + live preview) break out of the centred column to use the full width.
+  const wide =
+    pathname.startsWith("/admin/inventory") ||
+    pathname.startsWith("/admin/ari-log") ||
+    // The emails index is an ordinary settings form; only the per-template
+    // editors have the side-by-side preview that needs the space.
+    /^\/admin\/emails\/.+/.test(pathname);
   const shell = wide ? "max-w-none" : "max-w-[960px]";
   const [, setSearchParams] = useSearchParams();
   const changeLang = (code: string) =>

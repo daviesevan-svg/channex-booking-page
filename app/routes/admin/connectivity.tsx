@@ -127,6 +127,11 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
   }
 
   const { propertyId, connected, lastAriAt } = loaderData;
+  // Connecting here is only our half of the job — the mapping still has to be
+  // finished in the channel manager. Until the first push lands, nothing has
+  // arrived and the Inventory grid is read-only for no benefit, so say so and
+  // label the way out "cancel" rather than the more final-sounding "disconnect".
+  const pending = connected === "channex" && !lastAriAt;
 
   return (
     <div>
@@ -163,9 +168,15 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                   <div className="text-[12px] text-muted">{t(sys.taglineKey)}</div>
                 </div>
                 {isConnected ? (
-                  <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
-                    {t("cnConnected")}
-                  </span>
+                  pending ? (
+                    <span className="flex-none rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                      {t("cnPending")}
+                    </span>
+                  ) : (
+                    <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
+                      {t("cnConnected")}
+                    </span>
+                  )
                 ) : (
                   !sys.available && (
                     <span className="flex-none rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-muted">
@@ -188,7 +199,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                       disabled={saving}
                       className="w-full rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
                     >
-                      {t("cnDisconnect")}
+                      {pending ? t("cnCancelConnection") : t("cnDisconnect")}
                     </button>
                   </Form>
                 ) : (
@@ -222,6 +233,11 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
         <section className="mt-6 rounded-[14px] border border-line bg-surface p-6">
           <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("cnChannexTitle")}</h2>
           <p className="mb-4 max-w-2xl text-[13px] text-muted">{t("cnChannexIntro")}</p>
+          {pending && (
+            <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
+              {t("cnPendingNote")}
+            </p>
+          )}
           <div className="max-w-xl">
             <CopyField
               label={t("cnPropertyId")}
