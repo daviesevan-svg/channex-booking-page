@@ -184,7 +184,11 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
         {t("emtIntroTail")}
       </p>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Two panes on a wide screen: the editor scrolls with the page while the
+          preview stays pinned in view, so you can see what a change does without
+          scrolling back up. items-start keeps the sticky column from stretching
+          to the row height (a stretched grid item can't stick). */}
+      <div className="grid max-w-[1500px] items-start gap-6 lg:grid-cols-2">
         <div>
           <Form
             ref={formRef}
@@ -242,7 +246,7 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
           </div>
         </div>
 
-        <div>
+        <div className="lg:sticky lg:top-6">
           <div className="mb-2 text-[13px] font-semibold text-secondary">{t("emtPreview")}</div>
           <div className="mb-2 rounded-[10px] border border-line bg-surface-alt px-3 py-2 text-[13px]">
             <span className="text-faint">{t("emtSubjectLabel")} </span>
@@ -252,7 +256,10 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
             title={t("emtPreviewFrame")}
             srcDoc={previewHtml}
             sandbox=""
-            className="h-[640px] w-full rounded-[12px] border border-line bg-white"
+            // Fills the viewport once pinned; fixed height on narrow screens,
+            // where the preview sits below the editor and 100vh would push the
+            // rest of the page off-screen.
+            className="h-[640px] w-full rounded-[12px] border border-line bg-white lg:h-[calc(100vh-165px)] lg:min-h-[420px]"
           />
         </div>
       </div>

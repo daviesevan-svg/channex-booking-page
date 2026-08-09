@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Form, Link, useNavigate, useNavigation } from "react-router";
+import { Form, Link, useFetcher, useNavigate, useNavigation } from "react-router";
 
 import type { Route } from "./+types/inventory";
 import { adminMeta } from "~/lib/admin-meta";
@@ -8,7 +8,7 @@ import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "~/lib/catalog.server";
-import { applyBulkUpdate, getInventory, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
+import { applyBulkUpdate, getInventory, getLastAriReceivedAt, saveInventory, type AriActor, type InventoryEdits } from "~/lib/ari.server";
 import { getSettings, isChannexConnected } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 // Client-safe (rate-pricing.ts has no server imports) — this runs in the grid to
@@ -67,6 +67,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     getSettings(propertyId),
     getInventory(propertyId, dates[0], dates[dates.length - 1]),
   ]);
+  const channelManaged = await isChannexConnected(propertyId);
+  const lastAriAt = channelManaged ? await getLastAriReceivedAt(propertyId) : null;
 
   return {
     configured: true as const,
@@ -81,7 +83,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     // availability, prices and restrictions, and its next push overwrites
     // whatever was typed here. The grid is therefore READ-ONLY while connected —
     // see the action, which refuses the write regardless of what the form sends.
-    channelManaged: await isChannexConnected(propertyId),
+    channelManaged,
+    // Connected, but the channel manager has never pushed anything: the mapping
+    // was most likely started and never finished, so the grid is locked with
+    // nothing to show for it. The banner offers the way straight back out.
+    channelPending: channelManaged && !lastAriAt,
     // Per-person property: offer to unfold each cell's per-occupancy prices.
     perPerson: pricingModeOf(settings, rates) === "per_person",
     dates,
@@ -300,6 +306,8 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   // Per-person properties: unfold each cell's per-occupancy prices (read-only —
   // they come from Channex pushes; the editable price is the occupancy-0 row).
   const [showOcc, setShowOcc] = useState(false);
+  // Undoes an unfinished channel-manager connection from the banner below.
+  const disconnectFetcher = useFetcher();
   const datesLen = loaderData.configured ? loaderData.dates.length : 0;
   useEffect(() => {
     const el = gridRef.current;
@@ -328,7 +336,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
     );
   }
 
-  const { rooms, rates, currency, dates, start, inventory, perPerson, channelManaged } = loaderData;
+  const { rooms, rates, currency, dates, start, inventory, perPerson, channelManaged, channelPending } = loaderData;
   const shown = dates.slice(0, visible);
   const go = (s: string) => navigate(`/admin/inventory?start=${s}`);
   const today = format(new Date(), "yyyy-MM-dd");
@@ -376,12 +384,35 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         </div>
       </div>
       {channelManaged && (
-        <p className="mb-5 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">
-          {t("invChannelManaged")}{" "}
-          <Link to="/admin/connectivity" className="font-semibold text-accent">
-            {t("navConnectivity")}
-          </Link>
-        </p>
+        <div
+          className={`mb-5 rounded-[10px] px-4 py-2.5 text-[13px] ${
+            channelPending ? "border border-amber-200 bg-amber-50 text-amber-900" : "bg-chip text-secondary"
+          }`}
+        >
+          <p>
+            {channelPending ? t("invChannelPending") : t("invChannelManaged")}{" "}
+            <Link to="/admin/connectivity" className="font-semibold text-accent">
+              {t("navConnectivity")}
+            </Link>
+          </p>
+          {/* The connection was never completed, so let it be undone from the
+              page it locked. A fetcher, not a <Form>: a navigation submission to
+              another route's action also NAVIGATES there, which would dump you on
+              Connectivity. The fetcher posts, revalidates this loader and unlocks
+              the grid in place — which is what the button promises. */}
+          {channelPending && (
+            <disconnectFetcher.Form method="post" action="/admin/connectivity" className="mt-2.5">
+              <input type="hidden" name="intent" value="disconnect" />
+              <button
+                type="submit"
+                disabled={disconnectFetcher.state !== "idle"}
+                className="rounded-[8px] border border-amber-300 bg-surface px-3 py-1.5 text-[13px] font-semibold text-amber-900 hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {t("invCancelConnection")}
+              </button>
+            </disconnectFetcher.Form>
+          )}
+        </div>
       )}
       <p className="mb-5 text-[14px] text-muted">
         {t("invIntroLead", { currency })}{" "}
