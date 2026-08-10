@@ -5,6 +5,9 @@ import type { Dict } from "../i18n-dict";
 
 const EL: Dict = {
   manageBooking: "Διαχείριση κράτησης",
+  menu: "Μενού",
+  readMore: "Διαβάστε περισσότερα",
+  readLess: "Εμφάνιση λιγότερων",
   collectionHeading: "Επιλέξτε πού θα μείνετε",
   editDates: "Αλλαγή ημερομηνιών",
   chooseDates: "Επιλογή ημερομηνιών",

@@ -635,12 +635,18 @@ function Field({
   type = "text",
   placeholder,
   error,
+  autoComplete,
+  inputMode,
 }: {
   name: string;
   label: string;
   type?: string;
   placeholder?: string;
   error?: string[];
+  /** Tells the browser and the phone's keychain what this field is, so guest
+   *  details can be filled in one tap instead of typed on a phone keyboard. */
+  autoComplete?: string;
+  inputMode?: "text" | "tel" | "email" | "numeric";
 }) {
   const s = useSlots();
   return (
@@ -650,6 +656,8 @@ function Field({
         name={name}
         type={type}
         placeholder={placeholder}
+        autoComplete={autoComplete}
+        inputMode={inputMode}
         className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
       />
       {error?.[0] && (
@@ -845,10 +853,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" error={errors?.firstName?.map((k) => tr.t(k))} />
-              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" error={errors?.lastName?.map((k) => tr.t(k))} />
-              <Field name="email" label={tr.t("email")} type="email" placeholder="jamie@email.com" error={errors?.email?.map((k) => tr.t(k))} />
-              <Field name="phone" label={tr.t("phone")} placeholder="+44 …" error={errors?.phone?.map((k) => tr.t(k))} />
+              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" autoComplete="given-name" error={errors?.firstName?.map((k) => tr.t(k))} />
+              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" autoComplete="family-name" error={errors?.lastName?.map((k) => tr.t(k))} />
+              <Field name="email" label={tr.t("email")} type="email" autoComplete="email" inputMode="email" placeholder="jamie@email.com" error={errors?.email?.map((k) => tr.t(k))} />
+              {/* type=tel, not text: it's what brings up the phone keypad. The
+                  value stays a free-text string — numbers are typed with spaces,
+                  dashes and country prefixes and the server parses it as text. */}
+              <Field name="phone" label={tr.t("phone")} type="tel" autoComplete="tel" inputMode="tel" placeholder="+44 …" error={errors?.phone?.map((k) => tr.t(k))} />
             </div>
           </section>
 
@@ -995,11 +1006,18 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
           {/* promo code */}
           <div className={cx("border-b", s.rule, "py-4")}>
-            <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
+            {/* htmlFor/id, not nesting: the input sits in a flex row with its
+                Apply button, so it can't be a child of the label. Without the
+                pairing the field was announced with no name at all. */}
+            <label
+              htmlFor="promoCode"
+              className="block text-label font-semibold uppercase tracking-wide text-muted-2"
+            >
               {tr.t("promoCode")}
             </label>
             <div className="mt-2 flex gap-2">
               <input
+                id="promoCode"
                 name="promoCode"
                 defaultValue={promoCodeValue}
                 placeholder="SUMMER10"
@@ -1025,11 +1043,15 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
 
           {/* gift voucher — pays (part of) the amount due today */}
           <div className={cx("border-b", s.rule, "py-4")}>
-            <label className="block text-label font-semibold uppercase tracking-wide text-muted-2">
+            <label
+              htmlFor="voucherCode"
+              className="block text-label font-semibold uppercase tracking-wide text-muted-2"
+            >
               {tr.t("voucherHave")}
             </label>
             <div className="mt-2 flex gap-2">
               <input
+                id="voucherCode"
                 name="voucherCode"
                 defaultValue={voucherCodeValue}
                 placeholder="RP-XXXX-XXXX"

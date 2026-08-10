@@ -10,6 +10,9 @@ import type { Dict } from "../i18n-dict";
 
 const TR: Dict = {
   manageBooking: "Rezervasyonu yönet",
+  menu: "Menü",
+  readMore: "Devamını oku",
+  readLess: "Daha az göster",
   collectionHeading: "Nerede kalacağınızı seçin",
   editDates: "Tarihleri düzenle",
   chooseDates: "Tarih seçin",

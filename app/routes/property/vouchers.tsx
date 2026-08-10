@@ -72,15 +72,17 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
               to={`${base}/vouchers/${p.id}`}
               className={cx("group overflow-hidden", s.panel, "transition-shadow hover:shadow-md")}
             >
-              <div className="h-[170px] overflow-hidden" style={{ background: stripe }}>
-                {p.image && (
+              {/* No image, no frame. A 170px striped block above the only product
+                  on the page read as a broken image rather than a design. */}
+              {p.image && (
+                <div className="h-[170px] overflow-hidden" style={{ background: stripe }}>
                   <img
                     src={p.image}
                     alt=""
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
-                )}
-              </div>
+                </div>
+              )}
               <div className="p-5">
                 <div className="mb-1.5 flex items-center gap-2">
                   <span className="rounded-full bg-chip px-2.5 py-0.5 text-micro font-semibold text-muted">

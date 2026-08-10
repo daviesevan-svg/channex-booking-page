@@ -6,6 +6,9 @@ import type { Dict } from "../i18n-dict";
 
 const EN: Dict = {
   manageBooking: "Manage booking",
+  menu: "Menu",
+  readMore: "Read more",
+  readLess: "Show less",
   collectionHeading: "Choose where you'll stay",
   editDates: "Edit dates",
   chooseDates: "Choose dates",

@@ -341,14 +341,19 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
         ← {text.backLink}
       </Link>
 
-      {/* gallery — click any photo to open the full-screen viewer */}
+      {/* gallery — click any photo to open the full-screen viewer.
+          Only tiles that have a photo are drawn. The thumbnail column used to
+          render its two slots unconditionally, so a room with one photo showed
+          two big striped empties filling 40% of the hero — it read as a page that
+          had failed to load rather than a hotel with one photo of that room. With
+          no photos at all there is no gallery, not an empty frame. */}
+      {hero && (
       <div className="mb-7 flex h-[380px] gap-3">
         <button
           type="button"
-          onClick={() => hero && setLightbox(0)}
-          disabled={!hero}
+          onClick={() => setLightbox(0)}
           aria-label={tr.t("viewAllPhotos")}
-          className="group relative flex-[2] overflow-hidden rounded-panel disabled:cursor-default"
+          className="group relative flex-[2] overflow-hidden rounded-panel"
           style={{ background: stripe }}
         >
           {hero && (
@@ -369,36 +374,36 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             </span>
           )}
         </button>
-        <div className="flex flex-1 flex-col gap-3">
-          {[0, 1].map((i) => {
-            const more = galleryPhotos.length - 3;
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => thumbs[i] && setLightbox(i + 1)}
-                disabled={!thumbs[i]}
-                aria-label={tr.t("viewAllPhotos")}
-                className="group relative flex-1 overflow-hidden rounded-panel disabled:cursor-default"
-                style={{ background: stripe }}
-              >
-                {thumbs[i] && (
+        {thumbs.length > 0 && (
+          <div className="flex flex-1 flex-col gap-3">
+            {thumbs.map((thumb, i) => {
+              const more = galleryPhotos.length - 3;
+              return (
+                <button
+                  key={thumb.url}
+                  type="button"
+                  onClick={() => setLightbox(i + 1)}
+                  aria-label={tr.t("viewAllPhotos")}
+                  className="group relative flex-1 overflow-hidden rounded-panel"
+                  style={{ background: stripe }}
+                >
                   <img
-                    src={thumbs[i].url}
+                    src={thumb.url}
                     alt=""
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
-                )}
-                {i === 1 && more > 0 && thumbs[i] && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-title-sm font-semibold text-white">
-                    +{more}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                  {i === 1 && more > 0 && (
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-title-sm font-semibold text-white">
+                      +{more}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+      )}
       <Lightbox photos={galleryPhotos} index={lightbox} title={room.title} tr={tr} onChange={setLightbox} onClose={() => setLightbox(null)} />
 
       <div className="flex flex-wrap items-start gap-10">

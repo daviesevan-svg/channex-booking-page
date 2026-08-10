@@ -167,6 +167,23 @@ body {
   color: var(--color-faint-2);
 }
 
+/* iOS Safari zooms the whole page in when you focus a control whose text is
+   under 16px, and it does not zoom back out. Checkout's fields are on the
+   `body-lg` step (15px) and the promo/voucher pair on `body` (14px), so every
+   tap on a phone shunted the layout sideways mid-form.
+   Fixed here rather than by moving the type scale: `--text-body-lg` is the prose
+   step too, shared by 63 call sites, and the fix is only about controls at the
+   widths where the zoom happens. Scoped to the guest site via the wrapper's
+   data-style — the admin's inventory grid has hundreds of narrow inputs whose
+   column widths are tuned to the smaller size. */
+@media (max-width: 767px) {
+  [data-style] input:not([type="checkbox"]):not([type="radio"]),
+  [data-style] select,
+  [data-style] textarea {
+    font-size: 16px;
+  }
+}
+
 /* Global navigation progress bar (shown while a route loads/submits) */
 @keyframes nav-progress-slide {
   0% {

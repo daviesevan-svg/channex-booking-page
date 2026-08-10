@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigation, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/layout";
@@ -166,23 +166,28 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
   const conOn = step === "confirmation";
 
   const steps = [
-    { n: 1, label: tr.t(singleUnit ? "step_stay" : "step_room"), on: roomsOn || roomsDone },
-    { n: 2, label: tr.t("step_details"), on: detOn || detDone },
-    { n: 3, label: tr.t("step_confirmation"), on: conOn },
+    { n: 1, label: tr.t(singleUnit ? "step_stay" : "step_room"), on: roomsOn || roomsDone, here: roomsOn },
+    { n: 2, label: tr.t("step_details"), on: detOn || detDone, here: detOn },
+    { n: 3, label: tr.t("step_confirmation"), on: conOn, here: conOn },
   ];
   const lines = [roomsDone, detDone];
 
+  // All three labels laid out side by side need ~520px, so on any phone the row
+  // used to run off the edge and take the whole document with it — every funnel
+  // page scrolled sideways and step 3 sat off-screen. Below `sm` only the step
+  // you're on is labelled (the numbered circles carry the rest) and the
+  // connectors shrink, which brings the row under 320px.
   return (
     <div className="border-b border-nav-border bg-surface-alt">
-      <div className="mx-auto flex max-w-[1160px] items-center gap-3.5 px-7 py-4 text-sm font-semibold">
+      <div className="mx-auto flex max-w-[1160px] items-center gap-2.5 px-4 py-4 text-sm font-semibold sm:gap-3.5 sm:px-7">
         {steps.map((s, i) => (
-          <div key={s.n} className="flex items-center gap-3.5">
+          <div key={s.n} className="flex min-w-0 items-center gap-2.5 sm:gap-3.5">
             <span
-              className="flex items-center gap-2.5"
+              className="flex min-w-0 items-center gap-2.5"
               style={{ color: s.on ? "var(--color-ink)" : "var(--color-faint)" }}
             >
               <span
-                className="flex h-6 w-6 items-center justify-center rounded-full text-caption"
+                className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-caption"
                 style={{
                   background: s.on ? "var(--accent)" : "#efe7db",
                   color: s.on ? "#fff" : "var(--color-faint)",
@@ -190,11 +195,11 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
               >
                 {s.n}
               </span>
-              {s.label}
+              <span className={`truncate ${s.here ? "" : "hidden sm:inline"}`}>{s.label}</span>
             </span>
             {i < lines.length && (
               <span
-                className="h-0.5 w-20 max-w-20 flex-1 rounded"
+                className="h-0.5 w-6 min-w-3 flex-1 rounded sm:w-20 sm:max-w-20"
                 style={{ background: lines[i] ? "var(--accent)" : "#e6ddd2" }}
               />
             )}
@@ -249,8 +254,15 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // The offers list AND one offer's page, hence the prefix rather than an equality
   // check — an offer page is somewhere a guest looks around, like a room page, so
   // hiding the nav there would be a dead end with only Back.
+  // The voucher pages are browsing too — a guest reads what's on offer there and
+  // may well decide not to buy, and the logo-only header left them with no route
+  // to the rooms, the offers or their booking.
   const isBrowsing =
-    isHome || onWebsitePage || here.startsWith(`${base}/offers`) || here.startsWith(`${base}/room/`);
+    isHome ||
+    onWebsitePage ||
+    here.startsWith(`${base}/offers`) ||
+    here.startsWith(`${base}/room/`) ||
+    here.startsWith(`${base}/vouchers`);
 
   // React Router doesn't scroll to a #fragment on navigation, so the "Rooms"
   // link would change the URL and sit still. Sections carry scroll-mt for the
@@ -263,6 +275,25 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   const context: PropertyOutletContext = { property, currency, hotelName, lang };
   const navigation = useNavigation();
   const tr = makeTranslator(lang);
+
+  // One list, rendered twice: inline from `sm` up, and inside the phone menu
+  // below it. Built here so the two can't drift apart.
+  const navItems = isBrowsing
+    ? [
+        ...(websiteRooms ? [{ to: `${base}#rooms`, label: tr.t("roomsNav") }] : []),
+        ...(hasOffers ? [{ to: `${base}/offers`, label: tr.t("offersNav") }] : []),
+        ...navPages.map((p) => ({ to: `${base}/p/${p.slug}`, label: p.label })),
+        ...(hasVouchers ? [{ to: `${base}/vouchers`, label: tr.t("vouchersTitle") }] : []),
+        { to: `${base}/manage`, label: tr.t("manageBooking") },
+      ]
+    : [];
+  // Phones get a disclosure instead of the wrapped link row: five links wrapped
+  // onto two lines and squeezed the hotel name into two, and the phone number was
+  // dropped entirely at exactly the width where tapping to call matters most.
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [pathname]);
+  const telHref = property.phone ? `tel:${property.phone.replace(/[^+\d]/g, "")}` : null;
+  const hasMenu = navItems.length > 0 || Boolean(telHref);
 
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "var(--page)" } as React.CSSProperties;
@@ -345,42 +376,59 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             )}
           </Link>
           {/* Wraps, and closes up its gaps on narrow screens: a hotel's own pages
-              are in here too, so the link count isn't fixed — with four items it
-              ran past the right edge of a phone and scrolled the whole page
-              sideways. */}
-          <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-sm text-muted sm:gap-x-5">
+              are in here too, so the link count isn't fixed. */}
+          <div className="hidden flex-wrap items-center justify-end gap-x-4 gap-y-1.5 text-sm text-muted sm:flex sm:gap-x-5">
             {languages.length > 1 && (
               <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
             )}
-            {isBrowsing && websiteRooms && (
-              <Link to={`${base}#rooms`} className="hover:text-accent">
-                {tr.t("roomsNav")}
+            {navItems.map((item) => (
+              <Link key={item.to} to={item.to} className="hover:text-accent">
+                {item.label}
               </Link>
+            ))}
+            {telHref && (
+              <a href={telHref} className="hover:text-accent">
+                {property.phone}
+              </a>
             )}
-            {isBrowsing && hasOffers && (
-              <Link to={`${base}/offers`} className="hover:text-accent">
-                {tr.t("offersNav")}
-              </Link>
+          </div>
+
+          {/* Phone header: the language switcher stays out in the open (it changes
+              what the whole page says), everything else goes behind the menu. */}
+          <div className="flex items-center gap-2 sm:hidden">
+            {languages.length > 1 && (
+              <LanguageSwitcher languages={languages} current={lang} onSelect={changeLang} />
             )}
-            {isBrowsing &&
-              navPages.map((p) => (
-                <Link key={p.slug} to={`${base}/p/${p.slug}`} className="hover:text-accent">
-                  {p.label}
-                </Link>
-              ))}
-            {isBrowsing && hasVouchers && (
-              <Link to={`${base}/vouchers`} className="hover:text-accent">
-                {tr.t("vouchersTitle")}
-              </Link>
+            {hasMenu && (
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-expanded={menuOpen}
+                aria-label={tr.t("menu")}
+                className="flex h-11 w-11 flex-none items-center justify-center rounded-control border border-line-alt text-lg leading-none text-muted"
+              >
+                {menuOpen ? "✕" : "☰"}
+              </button>
             )}
-            {isBrowsing && (
-              <Link to={`${base}/manage`} className="hover:text-accent">
-                {tr.t("manageBooking")}
-              </Link>
-            )}
-            {property.phone && <span className="hidden sm:inline">{property.phone}</span>}
           </div>
         </div>
+
+        {menuOpen && (
+          <div className="border-t border-nav-border sm:hidden" style={{ background: "var(--page)" }}>
+            <nav className="mx-auto flex max-w-[1160px] flex-col px-7 py-2 text-sm">
+              {navItems.map((item) => (
+                <Link key={item.to} to={item.to} className="border-b border-divider py-3 text-ink last:border-0">
+                  {item.label}
+                </Link>
+              ))}
+              {telHref && (
+                <a href={telHref} className="border-b border-divider py-3 font-semibold text-accent last:border-0">
+                  {property.phone}
+                </a>
+              )}
+            </nav>
+          </div>
+        )}
       </header>
 
       {step !== "search" && <Stepper step={step} tr={tr} singleUnit={singleUnit} />}
