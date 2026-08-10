@@ -155,6 +155,11 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const eyebrow = content.eyebrow || (property.address?.split(",")[1] ?? hotelName).trim();
   const heading = content.heading || DEFAULT_SEARCH.heading;
   const intro = content.intro || DEFAULT_SEARCH.intro;
+  // Only offer the toggle when there's actually something clamped. Six lines at
+  // this size is roughly 300 characters, so anything shorter is left alone and a
+  // normal one-line lede never grows a "read more" it doesn't need.
+  const introLong = intro.length > 300;
+  const [introOpen, setIntroOpen] = useState(false);
   const promoText = content.promoText || DEFAULT_SEARCH.promoText;
   const promoPlaceholder = content.promoPlaceholder || DEFAULT_PROMO_PLACEHOLDER;
   const searchButton = content.searchButton || DEFAULT_SEARCH.searchButton;
@@ -227,17 +232,38 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       >
         {heading}
       </h1>
-      <p
-        className={cx(
-          "whitespace-pre-line text-title-sm leading-[1.6]",
-          mode === "overlay" ? "text-white/90" : "text-secondary",
-          mode === "split" && "mb-0",
-          mode === "wide" && "mb-9 max-w-[560px]",
-          mode === "overlay" && "mx-auto mb-0 max-w-[560px]",
+      {/* The intro is meant to be a lede, but nothing stops a hotel pasting its
+          whole "about us" in — Spilman has four paragraphs here, which on a phone
+          pushed the date picker to y≈1970, more than two screens down a booking
+          page. Clamped to six lines below `sm` with the rest one tap away; the
+          full text is always in the DOM, so nothing is hidden from search engines
+          and desktop is untouched. */}
+      <div className={cx(mode === "wide" && "mb-9", mode !== "wide" && "mb-0")}>
+        <p
+          className={cx(
+            "whitespace-pre-line text-title-sm leading-[1.6]",
+            mode === "overlay" ? "text-white/90" : "text-secondary",
+            mode === "wide" && "max-w-[560px]",
+            mode === "overlay" && "mx-auto max-w-[560px]",
+            !introOpen && "line-clamp-6 sm:line-clamp-none",
+          )}
+        >
+          {intro}
+        </p>
+        {introLong && (
+          <button
+            type="button"
+            onClick={() => setIntroOpen((v) => !v)}
+            aria-expanded={introOpen}
+            className={cx(
+              "mt-2 text-caption font-semibold underline-offset-2 hover:underline sm:hidden",
+              mode === "overlay" ? "text-white" : "text-accent",
+            )}
+          >
+            {introOpen ? tr.t("readLess") : tr.t("readMore")}
+          </button>
         )}
-      >
-        {intro}
-      </p>
+      </div>
     </div>
   );
 

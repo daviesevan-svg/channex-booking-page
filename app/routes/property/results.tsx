@@ -271,7 +271,14 @@ function RoomCard({
         isBestMatch && "ring-2 ring-accent",
       )}
     >
-      <Link to={detailHref} className="relative min-h-[200px] w-[230px] flex-none self-stretch">
+      {/* The card is a wrapping flex row: the media column's fixed 230px is right
+          once the row is side by side, but on a ~333px phone card it left a bare
+          strip of card beside every photo. Full width until the row actually has
+          room for two columns. */}
+      <Link
+        to={detailHref}
+        className="relative min-h-[200px] w-full flex-none self-stretch sm:w-[230px]"
+      >
         {photo ? (
           <img src={photo} alt={room.title} className="h-full w-full object-cover" />
         ) : (
@@ -500,6 +507,60 @@ function CartPanel({
   );
 }
 
+/** Running total + continue, pinned to the bottom of a narrow screen.
+ *
+ *  The CartPanel is `sticky`, which only sticks while it sits in its own column
+ *  beside the list. Below `lg` the two columns stack, so it landed under every
+ *  room card — pick the first room and "continue" was 3,300px down a 4,300px
+ *  page, past five rooms you'd already decided against. This is the same two
+ *  numbers and the same action, always in reach. Shown only once something is
+ *  selected; with an empty cart there is nothing to continue to. */
+function MobileCartBar({
+  count,
+  total,
+  currency,
+  covered,
+  continuePending,
+  onContinue,
+  continueLabel,
+}: {
+  count: number;
+  total: number;
+  currency: string;
+  covered: boolean;
+  continuePending: boolean;
+  onContinue: () => void;
+  continueLabel: string;
+}) {
+  const s = useSlots();
+  const tr = useT();
+  return (
+    <div
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-nav-border px-5 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 lg:hidden"
+      style={{ background: "var(--page)", boxShadow: "0 -10px 30px -22px rgba(70,55,35,0.5)" }}
+    >
+      <div className="mx-auto flex max-w-[560px] items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-label text-muted-2">{tr.p("roomsSelected", count)}</div>
+          <div className="font-serif text-title-md font-semibold">{formatMoney(total, currency)}</div>
+        </div>
+        <button
+          type="button"
+          onClick={onContinue}
+          disabled={!covered || continuePending}
+          className={cx(
+            "flex-none",
+            s.btnPrimary,
+            "px-5 py-[13px] text-body font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+          )}
+        >
+          {continuePending ? tr.t("loading") : continueLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function meta({ matches }: Route.MetaArgs) {
   return pageMeta(matches, { titleKey: "metaRooms", descKey: "metaDescRooms" });
 }
@@ -546,6 +607,10 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   const extrasState = parseExtrasState(searchParams);
   const extrasCounts = cart.map((_, i) => extrasState.lines[i]?.length ?? 0);
 
+  // Drives both the pinned bar and the bottom padding that keeps it from
+  // covering the last room card.
+  const showCartBar = !singleUnit && rooms.length > 0 && cartLines.length > 0;
+
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const summary = `${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
     parseISO(query.checkout),
@@ -553,7 +618,12 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   )} · ${tr.p("night", nights)} · ${occLabel(tr, query.adults, query.childrenAge)}`;
 
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-10">
+    <main
+      className={cx(
+        "mx-auto max-w-[1160px] px-7 pt-10",
+        showCartBar ? "pb-[150px] lg:pb-[72px]" : "pb-[72px]",
+      )}
+    >
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
@@ -562,16 +632,10 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           <h1 className="mb-2 font-serif text-display-lg font-medium tracking-[-0.02em]">
             {singleUnit ? text.cartTitle : text.heading}
           </h1>
-          <div className="text-body-lg text-secondary">
-            {summary}
-            <span className="mx-1.5 text-line-alt">·</span>
-            <Link
-              to={`${base}?${qs}`}
-              className="font-semibold text-accent underline-offset-2 hover:underline"
-            >
-              {text.editSearch}
-            </Link>
-          </div>
+          {/* Summary only. The "edit search" affordance is the button beside it —
+              having both meant two identical controls side by side at every
+              width, and on a phone they stacked one under the other. */}
+          <div className="text-body-lg text-secondary">{summary}</div>
         </div>
         <Link
           to={`${base}?${qs}`}
@@ -667,6 +731,18 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
             />
           </div>
         </div>
+      )}
+
+      {showCartBar && (
+        <MobileCartBar
+          count={cartLines.length}
+          total={coverage.total + extrasSum}
+          currency={currency}
+          covered={covered}
+          continuePending={continuePending}
+          onContinue={onContinue}
+          continueLabel={text.continueButton}
+        />
       )}
     </main>
   );

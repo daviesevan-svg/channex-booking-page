@@ -9,6 +9,9 @@ import type { Dict } from "../i18n-dict";
 
 const TH: Dict = {
   manageBooking: "จัดการการจอง",
+  menu: "เมนู",
+  readMore: "อ่านเพิ่มเติม",
+  readLess: "แสดงน้อยลง",
   collectionHeading: "เลือกที่พักของคุณ",
   editDates: "แก้ไขวันที่",
   chooseDates: "เลือกวันที่",
