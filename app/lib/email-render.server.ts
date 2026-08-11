@@ -155,6 +155,25 @@ function detailsHtml(
     )
     .join("");
 
+  // What the stay's value-added offers include, from the booking's own snapshot.
+  // No prices and no totals row — these cost nothing, which is the point, and a
+  // "£0.00" beside a free dinner reads as a billing error. This block is why the
+  // feature is worth having: it's what reception is asked about on arrival day.
+  const includedBlock = (booking.valueAdds ?? [])
+    .map(
+      (va) =>
+        `<div style="margin-top:10px;padding:12px 14px;background:#f7f2ea;border-radius:8px;">
+           <div style="color:#8a6a45;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${esc(va.name || "Included")}</div>
+           ${va.inclusions
+             .map(
+               (inc) =>
+                 `<div style="color:#3f3a32;font-size:13px;padding-top:5px;">✓ ${esc(inc)}</div>`,
+             )
+             .join("")}
+         </div>`,
+    )
+    .join("");
+
   // Taxes & fees charged on top of the room prices (snapshotted at booking
   // time; legacy bookings without the snapshot just skip these rows).
   const pricingRows = [...(booking.pricing?.charges ?? []), ...(booking.pricing?.taxLines ?? [])]
@@ -200,6 +219,7 @@ function detailsHtml(
         ${ROW("Nights", String(booking.nights))}
       </table>
       <table role="presentation" width="100%">${roomRows}</table>
+      ${includedBlock}
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
       ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
@@ -383,6 +403,13 @@ export function sampleBooking(currency = "GBP"): BookingRecord {
       { roomId: "r1", roomTitle: "Garden Suite", rateId: "rt1", rateTitle: "Bed & Breakfast", adults: 2, children: 1, total: 480 },
     ],
     extras: [{ id: "x1", name: "Airport transfer", unit: "trip", unitPrice: 60, qty: 1, amount: 60 }],
+    // Shows the hotelier what an included-extras block looks like in the editor
+    // preview, the same reason the sample carries an extra and a cancellation
+    // deadline. It is sample data only — a real email renders this block from the
+    // booking's own snapshot, so a hotel with no value-added offers never sends it.
+    valueAdds: [
+      { name: "Long Weekend", inclusions: ["Welcome drink on arrival", "Late checkout at 3pm"] },
+    ],
     consent: { acceptedAt: "2025-01-01T10:00:00.000Z", policyText: [], dueNow: 180, marketingOptIn: false },
     // Sample deposit + refund so the "couldn't confirm" preview shows a real amount.
     payment: {

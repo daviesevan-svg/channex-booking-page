@@ -177,6 +177,10 @@ function serializeRatePlan(rp: RatePlan, room: RoomWithRates, ctx?: StayContext)
     description: rp.description ?? null,
     inclusions: rp.inclusions ?? [],
     offer: rp.offer ? { name: rp.offer.name, percent: rp.offer.percent, original_total_price: rp.offer.originalTotalPrice } : null,
+    /** Value-added offers for this stay: included, not discounted, so nothing
+     *  here changes `total_price`. An agent reading the feed sees the same money
+     *  and a richer description. */
+    value_adds: (rp.valueAdds ?? []).map((va) => ({ name: va.name, inclusions: va.inclusions })),
   };
 }
 
@@ -305,6 +309,10 @@ export function serializeBooking(b: BookingRecord) {
       room_title: x.roomTitle ?? null, // null = whole-stay extra
       info: x.infoLine ?? null,
     })),
+    /** What the stay's value-added offers include, as promised at booking time.
+     *  Not re-derived from the current offers, so it stays true after one is
+     *  edited or withdrawn. */
+    value_adds: (b.valueAdds ?? []).map((va) => ({ name: va.name, inclusions: va.inclusions })),
     cancellation: b.cancellation ? { refundable: b.cancellation.refundable, cancel_by: b.cancellation.cancelByISO } : null,
     voucher: b.voucher
       ? { code: b.voucher.code, title: b.voucher.title ?? null, amount: b.voucher.amount ?? null }

@@ -237,17 +237,27 @@ resolution the guest saw, not recomputed later. A booking is a record of what
 was promised; re-deriving it would quietly rewrite history the first time the
 hotel edits the offer.
 
-### 5.2 Confirmation email and PDF
+### 5.2 Confirmation email, PDF, and the guest's own pages
 
-Both currently print `rateTitle` and nothing about inclusions
-(`email-render.server.ts:146`, `booking-pdf.server.ts:142`). Add an "Included"
-block listing the snapshotted value-adds, after the room lines and before the
-totals. This is the half of the customer's request the rate-plan workaround
-cannot do at all, and it's the half that matters at 6pm on arrival day when
-reception is asked about the dinner.
+An "Included" block after the room lines and before the totals, in all four
+places a guest can see their booking: the confirmation email, the printable PDF,
+the confirmation page and the manage-booking page. No amounts anywhere in it —
+these cost nothing, and a `£0.00` beside a free dinner reads as a billing error.
 
 Email templates are AI-safe and hotel-editable — the block renders from the
 snapshot, not from a token the hotel could delete.
+
+**The PDF cannot use `✓`.** U+2713 is not in the Noto Sans subset the PDF embeds,
+and pdf-lib does not throw on a missing glyph — it silently draws a `.notdef`
+box (see the warning at the top of `fonts/pdf-fonts.ts`). The PDF uses `•`
+(U+2022, verified present in both the regular and bold subsets); the email is
+HTML and has no such constraint. Nothing about the output size reveals this
+class of bug, so any new glyph in the PDF has to be checked against the font.
+
+`sampleBooking` carries a value-add so the email editor's preview shows the block
+— the same reason it carries an extra and a cancellation deadline. Sample data
+only: a real email renders from the booking, so a hotel with no value-added
+offers never sends one.
 
 ### 5.3 API
 
@@ -350,6 +360,8 @@ ARI, so a channel-managed property can have them.
 Steps 1–2 are shippable on their own (a hotel can create the offer; nothing shows
 it yet), and 1–5 deliver João's case end to end. Step 6 is what makes it survive
 past checkout.
+
+**Shipped:** 1–5 in PR #423, 6–7 in PR #424.
 
 ### Verification
 

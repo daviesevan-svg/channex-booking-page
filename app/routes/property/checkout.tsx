@@ -127,7 +127,10 @@ function deriveOffer(lines: ResolvedLine[]) {
   const offer: AppliedPromo | null = hasOffer
     ? { name, type: "percent", value: percent, discount: Math.round((originalSubtotal - saleSubtotal) * 100) / 100 }
     : null;
-  return { offer, originalSubtotal, lines: view };
+  // Stay-level, so any line carries the same list — read it off the first rather
+  // than merging identical copies.
+  const valueAdds = lines[0]?.valueAdds ?? [];
+  return { offer, valueAdds, originalSubtotal, lines: view };
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -280,8 +283,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
   }
   const totals = cartCoverage(lines);
-  // The automatic offer is baked into the line totals; snapshot it on the booking.
-  const { offer } = deriveOffer(lines);
+  // The automatic offer is baked into the line totals; snapshot it, and the
+  // value-adds, on the booking. Both come from this request's resolution of the
+  // stay, so what's stored is what the guest was just shown.
+  const { offer, valueAdds } = deriveOffer(lines);
 
   // "Apply" — preview the discount without booking, so typed guest details stay.
   if (intent === "applyPromo") {
@@ -450,6 +455,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     discountedTotal,
     applied: applied ?? undefined,
     offer: offer ?? undefined,
+    valueAdds,
     extraLines,
     consent,
     lang: langFromRequest(request),

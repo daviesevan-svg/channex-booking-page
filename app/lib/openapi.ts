@@ -48,6 +48,18 @@ const ratePlan = {
         original_total_price: priceString,
       },
     },
+    value_adds: {
+      type: "array",
+      description:
+        "Value-added offers for this stay: things included at no charge (a welcome drink, a late checkout). These do not affect total_price — for a discount see `offer`.",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          inclusions: { type: "array", items: { type: "string" } },
+        },
+      },
+    },
   },
 } as const;
 
@@ -101,6 +113,18 @@ const booking = {
           amount: money,
           room_title: { type: ["string", "null"], description: "The room this extra is attached to; null = whole stay." },
           info: { type: ["string", "null"], description: "One-line summary of captured info fields." },
+        },
+      },
+    },
+    value_adds: {
+      type: "array",
+      description:
+        "Value-added offers this stay qualified for, snapshotted at booking time — what the guest was promised, not what the current offers would say. Free of charge, so they are not part of `total`.",
+      items: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          inclusions: { type: "array", items: { type: "string" } },
         },
       },
     },
