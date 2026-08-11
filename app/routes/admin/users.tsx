@@ -4,12 +4,22 @@ import type { Route } from "./+types/users";
 import { adminMeta } from "~/lib/admin-meta";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
+import { getPartners } from "~/lib/partners.server";
 import { getProperties } from "~/lib/properties.server";
-import { getUsers, isEnvSuperadmin, removeUser, setUserRole, upsertUser } from "~/lib/users.server";
+import {
+  getUser,
+  getUsers,
+  isEnvSuperadmin,
+  isSuperadmin,
+  removeUser,
+  setUserPartner,
+  setUserRole,
+  upsertUser,
+} from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const me = await requireSuperadmin(request);
-  let [users, properties] = await Promise.all([getUsers(), getProperties()]);
+  let [users, properties, partners] = await Promise.all([getUsers(), getProperties(), getPartners()]);
   // Reconcile: anyone referenced as a property owner or teammate must have a
   // user record, so a record lost to an earlier bug (or an owner set outside the
   // normal sign-in flow) still appears here and can be managed.
@@ -39,7 +49,13 @@ export async function loader({ request }: Route.LoaderArgs) {
       };
     })
     .sort((a, b) => a.email.localeCompare(b.email));
-  return { me, rows };
+  return {
+    me,
+    rows,
+    partners: partners
+      .map((p) => ({ id: p.id, name: p.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -63,6 +79,25 @@ export async function action({ request }: Route.ActionArgs) {
     }
     return redirect("/admin/users");
   }
+  // Move a user between partners (or back to direct). This is the fix for
+  // "signed up on the canonical host, now can't sign in on their partner's
+  // admin URL" — canSignInOnHost admits only users whose partnerId matches the
+  // door. Superadmins are excluded: they can sign in anywhere already.
+  if (intent === "setPartner") {
+    const raw = String(form.get("partnerId") || "").trim();
+    if (raw && !(await getPartners()).some((p) => p.id === raw)) {
+      return redirect("/admin/users"); // unknown partner — never clear on a stale form
+    }
+    if (email && email !== me && !(await isSuperadmin(email))) {
+      const u = await getUser(email);
+      // Clearing the partner from a partner_admin demotes them to member — a
+      // partner_admin without a partner is meaningless (matches the partner
+      // page's remove-admin). Everyone else keeps their role.
+      const role = !raw && u?.role === "partner_admin" ? ("member" as const) : undefined;
+      await setUserPartner(email, raw || undefined, role);
+    }
+    return redirect("/admin/users");
+  }
   return redirect("/admin/users");
 }
 
@@ -79,7 +114,7 @@ function fmtDate(ms: number, lang: string): string {
 }
 
 export default function AdminUsers({ loaderData }: Route.ComponentProps) {
-  const { me, rows } = loaderData;
+  const { me, rows, partners } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
@@ -132,6 +167,39 @@ export default function AdminUsers({ loaderData }: Route.ComponentProps) {
             </div>
 
             <div className="flex flex-none items-center gap-3 text-[13px] font-semibold">
+              {/* partner switcher — which door (admin host) this user signs in
+                  through. Hidden for superadmins: they can sign in anywhere. */}
+              {!u.superadmin && partners.length > 0 && (
+                <Form
+                  method="post"
+                  className="flex items-center gap-1.5"
+                  onSubmit={(e) => {
+                    const sel = e.currentTarget.elements.namedItem("partnerId") as unknown as HTMLSelectElement;
+                    if (sel.value === (u.partnerId ?? "")) return e.preventDefault(); // no-op
+                    const msg = sel.value
+                      ? t("usMoveConfirm", { email: u.email, partner: sel.selectedOptions[0]?.text ?? sel.value })
+                      : t("usMoveDirectConfirm", { email: u.email });
+                    if (!confirm(msg)) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="intent" value="setPartner" />
+                  <input type="hidden" name="email" value={u.email} />
+                  <select
+                    name="partnerId"
+                    defaultValue={u.partnerId ?? ""}
+                    className="rounded-[8px] border border-line-alt bg-surface-alt px-2 py-1 text-[12px] font-normal text-ink outline-none focus:border-accent"
+                  >
+                    <option value="">{t("usPartnerDirect")}</option>
+                    {partners.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <button type="submit" disabled={busy} className="text-accent hover:underline disabled:opacity-50">
+                    {t("usMovePartner")}
+                  </button>
+                </Form>
+              )}
+
               {/* role toggle — disabled for yourself and env-locked superadmins */}
               {u.email !== me && !u.envLocked ? (
                 <Form method="post">
