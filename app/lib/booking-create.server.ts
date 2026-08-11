@@ -69,6 +69,8 @@ export interface PreparePendingInput {
   /** Gift voucher applied at checkout: `amount` of the due-now covered by the
    *  voucher (the Stripe charge, if any, is the remainder). */
   voucherPayment?: { code: string; amount: number };
+  /** Funnel-analytics context from the checkout request (absent on API bookings). */
+  funnel?: PendingBooking["funnel"];
 }
 
 export async function preparePendingBooking(input: PreparePendingInput): Promise<PendingBooking> {
@@ -203,5 +205,6 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     returnParams: input.returnParams,
     origin: input.origin,
     voucherRedemption: input.voucherPayment,
+    funnel: input.funnel,
   };
 }

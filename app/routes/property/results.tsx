@@ -26,6 +26,7 @@ import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { getPageText, getSettings } from "~/lib/overrides.server";
 
 import { queueSearchEvent } from "~/lib/search-analytics.server";
+import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -100,6 +101,28 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Demand analytics for the admin dashboard: log each fresh search (an empty
   // cart — adding rooms re-runs this loader with the same dates, and prefetches
   // don't count). Non-fatal by design.
+  // Funnel step: this page is `results` on a fresh search, `cart` once rooms
+  // are selected (same loader, distinguished by the sel param — see cart.ts).
+  const cartSize = parseCart(url.searchParams).length;
+  const fc = await funnelContext(request);
+  if (fc) {
+    queueFunnelEvent({
+      propertyId: pid,
+      step: cartSize > 0 ? "cart" : "results",
+      visitKey: fc.visitKey,
+      source: "web",
+      checkin,
+      nights,
+      adults: occ.adults,
+      children: occ.childrenAge?.length ?? 0,
+      rooms: cartSize || undefined,
+      currency,
+      country: fc.country,
+      lang,
+      device: fc.device,
+    });
+  }
+
   const purpose = request.headers.get("sec-purpose") ?? request.headers.get("purpose") ?? "";
   if (parseCart(url.searchParams).length === 0 && !purpose.includes("prefetch")) {
     queueSearchEvent({
