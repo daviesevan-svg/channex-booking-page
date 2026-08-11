@@ -88,6 +88,10 @@ export interface ResolvedLine extends CartLine {
   /** Automatic offer baked into `total`, for the itemised breakdown. */
   offerName?: string;
   offerPercent?: number;
+  /** Value-added offers that apply to this stay. Stay-level, so identical on
+   *  every line — carried here for the same reason offerName is, so the checkout
+   *  and the API can snapshot it without re-resolving the promotions. */
+  valueAdds?: { name: string; inclusions: string[] }[];
 }
 
 export function resolveCart(lines: CartLine[], rooms: RoomWithRates[]): ResolvedLine[] {

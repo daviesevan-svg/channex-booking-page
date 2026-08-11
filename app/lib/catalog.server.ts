@@ -506,6 +506,7 @@ export async function resolveCartByOccupancy(
         originalTotal: rate.offer ? Number(rate.offer.originalTotalPrice) : Number(rate.totalPrice),
         offerName: rate.offer?.name,
         offerPercent: rate.offer?.percent,
+        valueAdds: rate.valueAdds,
       });
     }
   }

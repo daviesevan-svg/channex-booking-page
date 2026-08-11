@@ -48,6 +48,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let nights = 0;
   let cleaningFee = 0;
   let offer: { name: string; percent: number; discount: number } | null = null;
+  let valueAdds: { name: string; inclusions: string[] }[] = [];
   let extraLines: ResolvedExtra[] = [];
 
   if (checkin && checkout) {
@@ -59,6 +60,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       { adults: occ.adults, childrenAge: occ.childrenAge },
     );
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
+    // Stay-level, so any line carries the same list (see ResolvedLine.valueAdds).
+    valueAdds = lines[0]?.valueAdds ?? [];
     if (lines.length) total = cartCoverage(lines).total;
     cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
     // The automatic offer baked into the prices (per-line data), for the breakdown line.
@@ -121,6 +124,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     discount,
     promoCode: applied?.code ?? null,
     offer,
+    valueAdds,
     pricing,
     extraLines,
     grandTotal,
@@ -139,7 +143,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
-  const { reference, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, valueAdds, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -231,6 +235,21 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             </div>
           ))}
         </div>
+        {/* Included, right where the guest lands after booking — no amounts,
+            because these are free and a money column would read as a charge. */}
+        {valueAdds.map((va) => (
+          <div key={va.name} className={cx("mt-5 flex flex-col gap-1.5 border-b", s.rule, "pb-5")}>
+            <div className="text-label font-semibold uppercase tracking-wider text-accent-deep">
+              {va.name || tr.t("includedTitle")}
+            </div>
+            {va.inclusions.map((inc, i) => (
+              <div key={i} className="flex items-start gap-2 text-body">
+                <span className="mt-[1px] flex-none font-semibold text-accent">✓</span>
+                {inc}
+              </div>
+            ))}
+          </div>
+        ))}
         <div className="mt-5 flex flex-col gap-3 text-body-lg">
           <div className="flex justify-between">
             <span className="text-secondary">{tr.t("dates")}</span>
