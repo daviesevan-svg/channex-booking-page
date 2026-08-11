@@ -31,11 +31,26 @@ export function offerDate(iso: string, tr: Translator): string {
   return fmtDate(iso, "d MMM yyyy", tr.locale);
 }
 
-/** The saving, as the badge states it. */
+/** The saving, as the badge states it — or, for a value-add, how much is in it.
+ *  "0% off" would be a lie dressed as a headline. */
 export function offerHeadline(offer: OfferView, tr: Translator, currency: string): string {
+  if (offer.kind === "value_add") {
+    return tr.p("offerIncludesCount", offer.inclusions?.length ?? 0);
+  }
   return offer.type === "percent"
     ? tr.t("offerPercentOff", { value: offer.value })
     : tr.t("offerAmountOff", { amount: formatMoney(offer.value, currency) });
+}
+
+/** Weekday numbers as a list in the guest's language, Monday first. Names come
+ *  from date-fns via the locale — not a table of 70 translated day names. */
+export function weekdayNames(days: number[], tr: Translator): string {
+  // 2024-01-01 was a Monday, so this walks Mon…Sun in one week.
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return order
+    .filter((d) => days.includes(d))
+    .map((d) => fmtDate(`2024-01-0${d === 0 ? 7 : d}`, "EEEE", tr.locale))
+    .join(", ");
 }
 
 /**
@@ -62,6 +77,8 @@ export function offerRules(offer: OfferView, tr: Translator): string[] {
   } else if (c.stayTo) {
     out.push(tr.t("offerStaysUntil", { to: offerDate(c.stayTo, tr) }));
   }
+  if (c.arrivalDays?.length) out.push(tr.t("offerArriveOn", { days: weekdayNames(c.arrivalDays, tr) }));
+  if (c.departureDays?.length) out.push(tr.t("offerLeaveOn", { days: weekdayNames(c.departureDays, tr) }));
   return out.length ? out : [tr.t("offerAnyStay")];
 }
 
@@ -148,6 +165,19 @@ export function OfferCard({
       </div>
 
       <h3 className={cx("mb-2.5", s.h3)}>{offer.name}</h3>
+
+      {/* What's in it, before the rules that qualify you for it — on a value-add
+          this IS the offer, and the terms are the small print under it. */}
+      {offer.inclusions?.length ? (
+        <ul className="mb-4 flex flex-col gap-1.5">
+          {offer.inclusions.map((inc) => (
+            <li key={inc} className="flex items-start gap-2.5 text-body leading-[1.5] text-ink">
+              <span className="mt-[1px] flex-none font-semibold text-accent">✓</span>
+              {inc}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <ul className="mb-4 flex flex-col gap-1.5">
         {offerRules(offer, tr).map((line) => (

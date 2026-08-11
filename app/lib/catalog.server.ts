@@ -18,7 +18,7 @@ import { roomCapacity } from "./occupancy";
 
 // Re-export so existing importers (admin rate editor) keep their import path.
 export { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
-import { bestAutoOffer } from "./promotions";
+import { bestAutoOffer, valueAddViews } from "./promotions";
 
 export interface CatalogRoom {
   id: string;
@@ -287,9 +287,12 @@ export async function getCatalogRooms(
   const daysAhead = checkinDate
     ? differenceInCalendarDays(parseISO(checkinDate), parseISO(format(new Date(), "yyyy-MM-dd")))
     : 0;
-  const offer = checkinDate
-    ? bestAutoOffer(promotions, { daysAhead, nights, checkin: checkinDate, checkout: checkoutDate })
-    : null;
+  // One context, two independent questions: which discount is best, and what's
+  // included. `bestAutoOffer` returns null when a matching value-add is
+  // exclusive, so the suppression lives in one place rather than here.
+  const stayCtx = { daysAhead, nights, checkin: checkinDate, checkout: checkoutDate };
+  const offer = checkinDate ? bestAutoOffer(promotions, stayCtx) : null;
+  const valueAdds = checkinDate ? valueAddViews(promotions, stayCtx) : [];
   const currency = cur || "GBP";
   // The nights occupied by the stay: checkin .. checkout-1.
   const nightDates = checkinDate
@@ -417,6 +420,7 @@ export async function getCatalogRooms(
                       originalTotalPrice: gross.toFixed(2),
                     }
                   : undefined,
+                valueAdds: valueAdds.length ? valueAdds : undefined,
                 occupancyPricing: op,
                 perPerson: perPersonMode || undefined,
                 perPersonTotals,
