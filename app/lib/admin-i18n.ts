@@ -1499,6 +1499,10 @@ const EN: Record<string, string> = {
   usRemoveConfirm: "Remove {email}? Their properties are kept but become unassigned for you to reassign.",
   usPartnerAdmin: "Partner admin",
   usPartnerUser: "Partner",
+  usPartnerDirect: "Direct (no partner)",
+  usMovePartner: "Move",
+  usMoveConfirm: "Move {email} to {partner}? From now on they sign in through that partner's admin URL, not ours.",
+  usMoveDirectConfirm: "Make {email} a direct user? They sign in through our own admin URL again.",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "Partners",
@@ -3411,6 +3415,10 @@ const DE: Record<string, string> = {
   usRemoveConfirm: "{email} entfernen? Die Unterkünfte bleiben erhalten, werden aber nicht zugewiesen, damit Sie sie neu zuweisen können.",
   usPartnerAdmin: "Partner-Admin",
   usPartnerUser: "Partner",
+  usPartnerDirect: "Direkt (kein Partner)",
+  usMovePartner: "Verschieben",
+  usMoveConfirm: "{email} zu {partner} verschieben? Die Anmeldung läuft ab jetzt über die Admin-URL dieses Partners, nicht über unsere.",
+  usMoveDirectConfirm: "{email} zu einem Direktnutzer machen? Die Anmeldung läuft wieder über unsere eigene Admin-URL.",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "Partner",
@@ -5321,6 +5329,10 @@ const PT: Record<string, string> = {
   usRemoveConfirm: "Remover {email}? As propriedades são mantidas mas ficam sem atribuição para as reatribuir.",
   usPartnerAdmin: "Admin de parceiro",
   usPartnerUser: "Parceiro",
+  usPartnerDirect: "Direto (sem parceiro)",
+  usMovePartner: "Mover",
+  usMoveConfirm: "Mover {email} para {partner}? A partir de agora, o início de sessão será feito pelo URL de administração desse parceiro, não pelo nosso.",
+  usMoveDirectConfirm: "Tornar {email} um utilizador direto? O início de sessão volta a ser feito pelo nosso próprio URL de administração.",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "Parceiros",
@@ -7223,6 +7235,10 @@ const TH: Record<string, string> = {
   usRemoveConfirm: "นำ {email} ออกใช่หรือไม่ ที่พักของพวกเขาจะยังคงอยู่ แต่จะกลายเป็นยังไม่ได้กำหนดเจ้าของ เพื่อให้คุณกำหนดใหม่",
   usPartnerAdmin: "ผู้ดูแลพาร์ตเนอร์",
   usPartnerUser: "พาร์ตเนอร์",
+  usPartnerDirect: "โดยตรง (ไม่มีพาร์ตเนอร์)",
+  usMovePartner: "ย้าย",
+  usMoveConfirm: "ย้าย {email} ไปยัง {partner} หรือไม่? ต่อจากนี้ผู้ใช้จะเข้าสู่ระบบผ่าน URL ผู้ดูแลของพาร์ตเนอร์รายนั้น ไม่ใช่ของเรา",
+  usMoveDirectConfirm: "เปลี่ยน {email} เป็นผู้ใช้โดยตรงหรือไม่? ผู้ใช้จะกลับมาเข้าสู่ระบบผ่าน URL ผู้ดูแลของเราเอง",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "พาร์ตเนอร์",
@@ -9186,6 +9202,10 @@ const TR: Record<string, string> = {
     "{email} kaldırılsın mı? Tesisleri korunur ancak yeniden atamanız için atanmamış duruma geçer.",
   usPartnerAdmin: "İş ortağı yöneticisi",
   usPartnerUser: "İş ortağı",
+  usPartnerDirect: "Doğrudan (iş ortağı yok)",
+  usMovePartner: "Taşı",
+  usMoveConfirm: "{email}, {partner} iş ortağına taşınsın mı? Bundan sonra bizim değil, o iş ortağının yönetici URL'si üzerinden oturum açacak.",
+  usMoveDirectConfirm: "{email} doğrudan kullanıcı yapılsın mı? Yeniden bizim kendi yönetici URL'miz üzerinden oturum açacak.",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "İş ortakları",
@@ -11003,6 +11023,10 @@ const EL: Record<string, string> = {
   usRemoveConfirm: "Αφαίρεση του {email}; Τα καταλύματά του διατηρούνται αλλά μένουν χωρίς ανάθεση, ώστε να τα αναθέσετε εκ νέου.",
   usPartnerAdmin: "Διαχειριστής συνεργάτη",
   usPartnerUser: "Συνεργάτης",
+  usPartnerDirect: "Άμεσος (χωρίς συνεργάτη)",
+  usMovePartner: "Μετακίνηση",
+  usMoveConfirm: "Μετακίνηση του {email} στον {partner}; Από εδώ και πέρα θα συνδέεται μέσω του URL διαχείρισης αυτού του συνεργάτη, όχι του δικού μας.",
+  usMoveDirectConfirm: "Να γίνει ο {email} άμεσος χρήστης; Θα συνδέεται ξανά μέσω του δικού μας URL διαχείρισης.",
 
   // -- white-label partners (superadmin) --
   wlpTitle: "Συνεργάτες",
