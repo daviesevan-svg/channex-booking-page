@@ -125,6 +125,9 @@ export interface Brand {
   logo?: string;
   /** Set when this is a partner brand (surfaces may behave differently). */
   partnerId?: string;
+  /** The partner's guest booking hostname — where "view site" style links must
+   *  point, since slug paths don't exist on their admin host. */
+  guestHost?: string;
 }
 
 export const DEFAULT_BRAND: Brand = { name: "Roompanda" };
@@ -136,6 +139,7 @@ export function brandOf(partner: Partner | undefined): Brand {
         supportEmail: partner.supportEmail,
         logo: partner.logoImage || undefined,
         partnerId: partner.id,
+        guestHost: partner.guestHost || undefined,
       }
     : DEFAULT_BRAND;
 }

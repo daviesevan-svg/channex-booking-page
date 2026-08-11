@@ -36,6 +36,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const brand = await brandForUser(email);
   const partnerBrand = brand.partnerId ? brand.name : null;
   const partnerLogo = brand.partnerId ? (brand.logo ?? null) : null;
+  // Where "View site" must point for a partner user. Slug paths don't exist on
+  // a partner ADMIN host (property-scope host discipline bounces them to the
+  // login), so the link needs the partner's guest host as an absolute URL.
+  // Same scheme/port as this request so dev partner hosts keep working.
+  const url = new URL(request.url);
+  const guestOrigin = brand.guestHost
+    ? `${url.protocol}//${brand.guestHost}${url.port ? `:${url.port}` : ""}`
+    : null;
   // Pages this user's partner hides. Nav-side only — the routes themselves
   // enforce it in their loaders via requirePageAllowed.
   const hiddenPages = await hiddenPagesFor(email);
@@ -46,6 +54,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     email,
     partnerBrand,
     partnerLogo,
+    guestOrigin,
     hiddenPages,
     hiddenAreas,
     propertyId,
@@ -190,7 +199,7 @@ function PropertySwitcher({
 }
 
 export default function AdminLayout({ loaderData }: Route.ComponentProps) {
-  const { email, partnerBrand, partnerLogo, hiddenPages, hiddenAreas, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
+  const { email, partnerBrand, partnerLogo, guestOrigin, hiddenPages, hiddenAreas, propertyId, properties, isSuperadmin, canManageCurrent, testMode, lang, languages, adminLang } =
     loaderData;
   const context: AdminContext = { propertyId, lang };
   const [navOpen, setNavOpen] = useState(true);
@@ -373,13 +382,17 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
             )}
             {propertyId && (
               // Prefer the slug — it's the address guests actually see/share.
-              <Link
-                to={`/${properties.find((p) => p.id === propertyId)?.slug || propertyId}`}
+              // Partner users get an absolute link to their guest host: the
+              // relative path would stay on the admin host, where slug routes
+              // deliberately don't resolve.
+              <a
+                href={`${guestOrigin ?? ""}/${properties.find((p) => p.id === propertyId)?.slug || propertyId}`}
                 className="hover:text-accent"
                 target="_blank"
+                rel="noreferrer"
               >
                 {t("viewSite")} ↗
-              </Link>
+              </a>
             )}
             <Form method="post" action="/admin/lang" className="flex items-center">
               <input type="hidden" name="redirectTo" value={pathname} />
