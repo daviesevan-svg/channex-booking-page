@@ -98,6 +98,8 @@ export default function OfferPage({ loaderData }: Route.ComponentProps) {
     // has to be over by `stayTo`, which is later whenever a minimum stay applies.
     maxCheckin: offer.latestCheckin,
     maxCheckout: offer.conditions?.stayTo,
+    arrivalDays: offer.conditions?.arrivalDays,
+    departureDays: offer.conditions?.departureDays,
     minNights,
     initialCheckin: searchParams.get("checkin") ?? undefined,
     initialCheckout: searchParams.get("checkout") ?? undefined,

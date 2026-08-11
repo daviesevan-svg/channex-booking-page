@@ -78,6 +78,16 @@ export interface UseDateRangeArgs {
   /** A minimum stay the CALLER imposes, on top of whatever the inventory's
    *  per-date min-stay says. The longer of the two applies. */
   minNights?: number;
+  /**
+   * Weekdays a stay may start / end on (0 = Sunday), from an offer's conditions.
+   *
+   * Without these the calendar would happily offer a Tuesday for a
+   * Thursday-arrivals package, the guest would pick it, and the offer would
+   * silently not apply at checkout — the same trap `maxCheckin` exists to close.
+   * Empty or absent = any day, matching PromoConditions.
+   */
+  arrivalDays?: number[];
+  departureDays?: number[];
   initialCheckin?: string;
   initialCheckout?: string;
   tr: Translator;
@@ -88,6 +98,8 @@ export function useDateRange({
   minCheckin,
   maxCheckin,
   maxCheckout,
+  arrivalDays,
+  departureDays,
   minNights: minNightsFloor,
   initialCheckin,
   initialCheckout,
@@ -151,9 +163,15 @@ export function useDateRange({
   // So walk forward from `date` while nights are available and look for a stay
   // length that both meets the minimum AND lands on a day you're allowed to
   // depart. If none exists, the date can't start a booking.
+  // An offer's weekday rules, if any. Local dates here (the calendar renders
+  // local Dates), which is consistent because the comparison is weekday-to-
+  // weekday — the UTC parse in promotions.ts is about the same calendar day.
+  const wrongArrivalDay = (d: Date) => !!arrivalDays?.length && !arrivalDays.includes(d.getDay());
+  const wrongDepartureDay = (d: Date) => !!departureDays?.length && !departureDays.includes(d.getDay());
+
   const arrivalAllowed = (date: Date) => {
     if (isSold(date) || ctaSet.has(iso(date))) return false;
-    if (afterLastArrival(date)) return false;
+    if (afterLastArrival(date) || wrongArrivalDay(date)) return false;
     const need = minStayFor(date);
     let nights = 0;
     while (!isSold(addDays(date, nights))) {
@@ -162,7 +180,7 @@ export function useDateRange({
       // A stay that would have to depart past the ceiling is no use here either:
       // the last eligible arrivals of a window are exactly where this bites.
       if (afterLastDeparture(out)) return false;
-      if (nights >= need && !ctdSet.has(iso(out))) return true;
+      if (nights >= need && !ctdSet.has(iso(out)) && !wrongDepartureDay(out)) return true;
       if (nights >= MAX_LOOKAHEAD_NIGHTS) break;
     }
     return false;
@@ -173,7 +191,7 @@ export function useDateRange({
   // isn't closed-to-departure, and every night in between is available.
   const checkoutAllowed = (date: Date) => {
     if (!checkin || checkout || !isBefore(checkin, date)) return false;
-    if (ctdSet.has(iso(date)) || afterLastDeparture(date)) return false;
+    if (ctdSet.has(iso(date)) || afterLastDeparture(date) || wrongDepartureDay(date)) return false;
     if (differenceInCalendarDays(date, checkin) < minStayFor(checkin)) return false;
     for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) if (isSold(d)) return false;
     return true;

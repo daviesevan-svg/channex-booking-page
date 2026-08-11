@@ -333,6 +333,20 @@ function RoomCard({
             {cheapest.offer.name} · −{cheapest.offer.percent}%
           </div>
         )}
+        {/* Value-adds are stay-level, so every rate carries the same list and
+            reading it off `cheapest` shows it once per card. Deliberately NOT
+            the discount badge's colours: a "−10%" and an "includes dinner" chip
+            that look alike make the second one read as a price claim. */}
+        {cheapest?.valueAdds?.map((va) =>
+          va.name ? (
+            <div
+              key={va.name}
+              className="self-end rounded-full bg-accent-soft px-2.5 py-0.5 text-micro font-semibold text-accent-deep"
+            >
+              {va.name}
+            </div>
+          ) : null,
+        )}
         <div>
           <span className="text-caption text-muted-2">{tr.t("from")} </span>
           {cheapest?.offer && (

@@ -12,10 +12,12 @@ import { formatMoney } from "~/lib/money";
 import { todayISODate } from "~/lib/dates";
 import {
   isPublishedOffer,
+  kindOf,
   normalizeCode,
   publicOffers,
   type DiscountType,
   type PromoConditions,
+  type PromoKind,
   type PromoTrigger,
   type Promotion,
 } from "~/lib/promotions";
@@ -87,23 +89,48 @@ export async function action({ request }: Route.ActionArgs) {
     : String(form.get("type")) === "fixed"
       ? "fixed"
       : "percent") as DiscountType;
+  // Value-adds are auto-only: a code one would need resolveAppliedPromo to
+  // return a promo that moves no money, and every caller of it assumes one does.
+  const kind: PromoKind = trigger === "auto" && form.get("kind") === "value_add" ? "value_add" : "discount";
+  const inclusions = String(form.get("inclusions") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const exclusive = form.get("exclusive") != null;
+  const weekdays = (field: string) => {
+    const days = form.getAll(field).map((d) => Number(d)).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
+    // All seven ticked is the same statement as none: every day qualifies. Stored
+    // as absent so the offer page doesn't print "arrive on Mon, Tue, Wed…".
+    return days.length && days.length < 7 ? [...new Set(days)].sort() : undefined;
+  };
   const values = {
     id,
     trigger,
+    kind,
     code,
     name,
     type,
     publish: publish ? "1" : "",
+    exclusive: exclusive ? "1" : "",
+    inclusions: String(form.get("inclusions") ?? ""),
     value: form.get("value") as string,
     minDaysAhead: String(form.get("minDaysAhead") ?? ""),
     maxDaysAhead: String(form.get("maxDaysAhead") ?? ""),
     minNights: String(form.get("minNights") ?? ""),
     stayFrom: String(form.get("stayFrom") ?? ""),
     stayTo: String(form.get("stayTo") ?? ""),
+    arrivalDays: form.getAll("arrivalDays").map(String),
+    departureDays: form.getAll("departureDays").map(String),
   };
 
-  if (!Number.isFinite(value) || value <= 0) return { error: "Enter a discount greater than 0.", values };
-  if (type === "percent" && value > 100) return { error: "A percentage can’t be more than 100.", values };
+  // A value-add's worth is its inclusions, so that's what's validated. `value`
+  // is stored as 0 and never read for this kind.
+  if (kind === "value_add") {
+    if (!inclusions.length) return { error: "List at least one thing that's included.", values };
+  } else {
+    if (!Number.isFinite(value) || value <= 0) return { error: "Enter a discount greater than 0.", values };
+    if (type === "percent" && value > 100) return { error: "A percentage can’t be more than 100.", values };
+  }
 
   const existing = await getPromotions(propertyId);
   let conditions: PromoConditions | undefined;
@@ -135,7 +162,15 @@ export async function action({ request }: Route.ActionArgs) {
     if (stayFrom && stayTo && stayFrom > stayTo) {
       return { error: "“Check-in on or after” can’t be later than “Check-out on or before”.", values };
     }
-    conditions = { minDaysAhead, maxDaysAhead, minNights, stayFrom, stayTo };
+    conditions = {
+      minDaysAhead,
+      maxDaysAhead,
+      minNights,
+      stayFrom,
+      stayTo,
+      arrivalDays: weekdays("arrivalDays"),
+      departureDays: weekdays("departureDays"),
+    };
   }
 
   const prev = existing.find((p) => p.id === id);
@@ -145,8 +180,13 @@ export async function action({ request }: Route.ActionArgs) {
     code: trigger === "code" ? code : "",
     name: name || undefined,
     conditions: trigger === "auto" ? conditions : undefined,
+    kind,
+    inclusions: kind === "value_add" ? inclusions : undefined,
+    exclusive: kind === "value_add" ? exclusive : undefined,
     type,
-    value: type === "percent" ? Math.round(value) : Math.round(value * 100) / 100,
+    // A value-add stores 0 rather than leaving the record half-typed — `type`
+    // and `value` are what a discount is, and nothing reads them for this kind.
+    value: kind === "value_add" ? 0 : type === "percent" ? Math.round(value) : Math.round(value * 100) / 100,
     enabled,
     publish,
     createdAt: prev?.createdAt ?? new Date().toISOString(),
@@ -160,10 +200,67 @@ export function meta({ matches }: Route.MetaArgs) {
   return adminMeta(matches, { key: "navPromotions" });
 }
 
+/** What the offer gives. "0%" would read as a broken discount, so a value-add
+ *  is summarised by how much is in it instead. */
 function discountSummary(p: Promotion, currency: string, t: AdminT): string {
+  if (kindOf(p) === "value_add") {
+    return t("pmInclusionsSummary", { n: p.inclusions?.length ?? 0 });
+  }
   return p.type === "percent"
     ? t("pmPercentSummary", { value: p.value })
     : t("pmFixedSummary", { value: formatMoney(p.value, currency) });
+}
+
+/** Weekday numbers as a readable list, in week order starting Monday — how a
+ *  hotel says it ("Thursday to Sunday"), not how Date numbers it. */
+function weekdayList(t: AdminT, days: number[]): string {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return order
+    .filter((d) => days.includes(d))
+    .map((d) => t(`pmDay${d}`))
+    .join(", ");
+}
+
+/** Seven day toggles, Monday first — the same control the inventory bulk update
+ *  uses, so the idea reads the same in both places. Nothing ticked means every
+ *  day; the action stores that (and all seven) as "no rule". */
+function WeekdayRow({
+  name,
+  label,
+  hint,
+  selected,
+  t,
+}: {
+  name: string;
+  label: string;
+  hint: string;
+  selected: number[];
+  t: AdminT;
+}) {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return (
+    <div className="block text-[12px] font-semibold text-secondary">
+      {label}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {order.map((d) => (
+          <label
+            key={d}
+            className="cursor-pointer rounded-[8px] border border-line-alt px-2.5 py-1.5 text-[12px] font-semibold text-muted has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:checked]:text-accent-deep"
+          >
+            <input
+              type="checkbox"
+              name={name}
+              value={d}
+              defaultChecked={selected.includes(d)}
+              className="sr-only"
+            />
+            {t(`pmDayShort${d}`)}
+          </label>
+        ))}
+      </div>
+      <span className="mt-1 block text-[11px] font-normal text-faint">{hint}</span>
+    </div>
+  );
 }
 
 /** Human-readable list of an automatic offer's conditions. */
@@ -174,6 +271,8 @@ function conditionSummary(t: AdminT, c?: PromoConditions): string {
   if (c.maxDaysAhead != null) parts.push(t("pmCondMaxDays", { n: c.maxDaysAhead }));
   if (c.minNights != null) parts.push(t("pmCondMinNights", { n: c.minNights }));
   if (c.stayFrom || c.stayTo) parts.push(t("pmCondStay", { from: c.stayFrom ?? "…", to: c.stayTo ?? "…" }));
+  if (c.arrivalDays?.length) parts.push(t("pmCondArriveOn", { days: weekdayList(t, c.arrivalDays) }));
+  if (c.departureDays?.length) parts.push(t("pmCondLeaveOn", { days: weekdayList(t, c.departureDays) }));
   return parts.length ? parts.join(" · ") : t("pmAlwaysOn");
 }
 
@@ -214,7 +313,13 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
     if (editing) return editing.publish ?? editing.trigger === "auto";
     return trigger === "auto";
   });
+  const [kind, setKind] = useState<PromoKind>(
+    (v?.kind as PromoKind) ?? (editing ? kindOf(editing) : "discount"),
+  );
   const isAuto = trigger === "auto";
+  // Auto-only (see the action). Switching back to a code silently returns the
+  // form to a discount rather than saving something the resolver can't apply.
+  const isValueAdd = isAuto && kind === "value_add";
 
   return (
     <div>
@@ -278,6 +383,37 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           ))}
         </div>
 
+        {/* kind — what the guest gets. Only for auto offers; a value-add can't
+            be code-triggered yet (see the action). */}
+        {isAuto && (
+          <div>
+            <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("pmKind")}</div>
+            <div className="flex flex-wrap gap-2">
+              {(["discount", "value_add"] as PromoKind[]).map((k) => (
+                <label
+                  key={k}
+                  className={`cursor-pointer rounded-[10px] border px-4 py-2.5 text-[13px] font-semibold ${
+                    kind === k ? "border-accent bg-accent-soft text-accent-deep" : "border-line-alt text-muted"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="kind"
+                    value={k}
+                    checked={kind === k}
+                    onChange={() => setKind(k)}
+                    className="sr-only"
+                  />
+                  {k === "discount" ? t("pmKindDiscount") : t("pmKindValueAdd")}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[12px] text-faint">
+              {isValueAdd ? t("pmKindValueAddHint") : t("pmKindDiscountHint")}
+            </p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {!isAuto && (
             <label className="block text-[13px] font-semibold text-secondary">
@@ -305,37 +441,65 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
           </label>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {!isAuto && (
+        {isValueAdd ? (
+          <>
             <label className="block text-[13px] font-semibold text-secondary">
-              {t("pmDiscountType")}
-              <select
-                name="type"
-                value={type}
-                onChange={(e) => setType(e.target.value as DiscountType)}
-                className={FIELD_INPUT}
-              >
-                <option value="percent">{t("pmPercentOff")}</option>
-                <option value="fixed">{t("pmFixedOff")}</option>
-              </select>
+              {t("pmInclusions")}
+              <textarea
+                name="inclusions"
+                rows={5}
+                defaultValue={cur("inclusions", editing?.inclusions?.join("\n") ?? "")}
+                placeholder={t("pmInclusionsPlaceholder")}
+                className={`${FIELD_INPUT} font-normal`}
+              />
+              <span className="mt-1 block text-[11px] font-normal text-faint">{t("pmInclusionsHint")}</span>
             </label>
-          )}
-          <label className="block text-[13px] font-semibold text-secondary">
-            {isAuto || type === "percent" ? t("pmPercentOff") : t("pmAmountOff")}
-            <input
-              name="value"
-              type="number"
-              min={0}
-              step={isAuto || type === "percent" ? 1 : "any"}
-              defaultValue={cur("value", editing ? String(editing.value) : "")}
-              placeholder={isAuto || type === "percent" ? "10" : "20"}
-              className={FIELD_INPUT}
-            />
-            <span className="mt-1 block text-[11px] font-normal text-faint">
-              {isAuto || type === "percent" ? t("pmPercentHint") : t("pmFixedHint", { currency })}
-            </span>
-          </label>
-        </div>
+            <label className="flex items-start gap-2.5 text-[13px] text-secondary">
+              <input
+                type="checkbox"
+                name="exclusive"
+                defaultChecked={v ? v.exclusive === "1" : Boolean(editing?.exclusive)}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span>
+                <span className="font-semibold">{t("pmExclusive")}</span>
+                <span className="mt-0.5 block text-[11px] text-faint">{t("pmExclusiveHint")}</span>
+              </span>
+            </label>
+          </>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {!isAuto && (
+              <label className="block text-[13px] font-semibold text-secondary">
+                {t("pmDiscountType")}
+                <select
+                  name="type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as DiscountType)}
+                  className={FIELD_INPUT}
+                >
+                  <option value="percent">{t("pmPercentOff")}</option>
+                  <option value="fixed">{t("pmFixedOff")}</option>
+                </select>
+              </label>
+            )}
+            <label className="block text-[13px] font-semibold text-secondary">
+              {isAuto || type === "percent" ? t("pmPercentOff") : t("pmAmountOff")}
+              <input
+                name="value"
+                type="number"
+                min={0}
+                step={isAuto || type === "percent" ? 1 : "any"}
+                defaultValue={cur("value", editing ? String(editing.value) : "")}
+                placeholder={isAuto || type === "percent" ? "10" : "20"}
+                className={FIELD_INPUT}
+              />
+              <span className="mt-1 block text-[11px] font-normal text-faint">
+                {isAuto || type === "percent" ? t("pmPercentHint") : t("pmFixedHint", { currency })}
+              </span>
+            </label>
+          </div>
+        )}
 
         {isAuto && (
           <div className="rounded-[12px] border border-line bg-surface-alt/40 p-4">
@@ -401,6 +565,26 @@ export default function AdminPromotions({ loaderData, actionData }: Route.Compon
                   {t("pmDateWindowHint")}
                 </span>
               </label>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <WeekdayRow
+                name="arrivalDays"
+                label={t("pmArriveOn")}
+                hint={t("pmWeekdayHint")}
+                selected={
+                  v ? v.arrivalDays.map(Number) : (editing?.conditions?.arrivalDays ?? [])
+                }
+                t={t}
+              />
+              <WeekdayRow
+                name="departureDays"
+                label={t("pmLeaveOn")}
+                hint={t("pmWeekdayHint")}
+                selected={
+                  v ? v.departureDays.map(Number) : (editing?.conditions?.departureDays ?? [])
+                }
+                t={t}
+              />
             </div>
           </div>
         )}

@@ -139,6 +139,16 @@ export interface RatePlan {
   /** Automatic offer baked into totalPrice (set by getCatalogRooms). The
    *  original (pre-discount) price is kept so the UI can show the saving. */
   offer?: { name: string; percent: number; originalTotalPrice: string };
+  /**
+   * Value-added offers that apply to this stay (set by getCatalogRooms).
+   *
+   * Alongside `offer`, never inside it: these change what's included, not the
+   * price, and a stay can have both. Kept out of `inclusions` too — that field is
+   * the rate's own admin content ("In this room"), so a stay-level offer landing
+   * in it would look like the hotel had edited the rate, and would be wrong the
+   * moment the same rate is searched for different dates.
+   */
+  valueAdds?: { name: string; inclusions: string[] }[];
   /** Per-person pricing rules (set by getCatalogRooms from the rate), so the
    *  detail page can re-price live for a chosen room occupancy. */
   occupancyPricing?: OccupancyPricing;

@@ -562,6 +562,32 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               ) : null}
             </div>
           )}
+          {/* Value-adds. Their own block, below the rate's own inclusions and
+              visually distinct from them: "In this room" is what the room always
+              has, this is what these dates get. Rendered once for the stay, not
+              per rate row — every rate carries the same list, so repeating it
+              under each one would say the same three lines three times. */}
+          {chosen?.valueAdds?.map((va) => (
+            <div key={va.name} className="mb-4 rounded-card border border-accent/30 bg-accent-soft p-4">
+              <div className="mb-2 flex items-center gap-2">
+                <span
+                  className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
+                  style={{ transform: "rotate(45deg)" }}
+                />
+                <span className="text-label font-semibold uppercase tracking-wider text-accent-deep">
+                  {va.name || tr.t("includedTitle")}
+                </span>
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {va.inclusions.map((inc, i) => (
+                  <li key={i} className="flex items-start gap-2 text-caption text-[#4a4236]">
+                    <span className="mt-[3px] flex-none text-accent">✓</span>
+                    {inc}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
           <div className={cx("mb-4 flex items-baseline justify-between border-t", s.rule, "pt-4")}>
             <span className="text-sm text-secondary">
               {tr.t("totalNights", { n: nights })}
