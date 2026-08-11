@@ -208,6 +208,8 @@ export async function action({ request }: Route.ActionArgs) {
   const applied = body.promo_code ? await resolveAppliedPromo(pid, body.promo_code, totals.total) : null;
   if (body.promo_code && !applied) return apiError(422, "invalid_promo", "That promo code isn't valid for this booking.");
   const offer = offerFromLines(lines);
+  // Stay-level, identical on every line (see ResolvedLine.valueAdds).
+  const valueAdds = lines[0]?.valueAdds ?? [];
   const discount = applied?.discount ?? 0;
   const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
 
@@ -298,6 +300,7 @@ export async function action({ request }: Route.ActionArgs) {
     discountedTotal,
     applied: applied ?? undefined,
     offer,
+    valueAdds,
     extraLines,
     consent: {
       acceptedAt: new Date().toISOString(),

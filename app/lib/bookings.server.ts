@@ -80,6 +80,16 @@ export interface BookingRecord {
   promo?: AppliedPromo;
   /** Automatic offer baked into the room prices for this stay, if any. */
   offer?: AppliedPromo;
+  /**
+   * Value-added offers the stay qualified for — what was PROMISED, not what the
+   * rules would say today.
+   *
+   * Its own field rather than part of `promo`/`offer`: there can be several and
+   * they carry no money. Snapshotted at creation and never recomputed, so editing
+   * or deleting the offer afterwards can't quietly rewrite what a guest was told
+   * they'd get. Reception reads this at 6pm on arrival day.
+   */
+  valueAdds?: { name: string; inclusions: string[] }[];
   /** Taxes & fees breakdown snapshotted at booking time — the amounts charged on
    *  top of the room prices (fees, city tax, cleaning, on-top VAT) plus the VAT
    *  share already inside inclusive prices. Absent on legacy bookings. */

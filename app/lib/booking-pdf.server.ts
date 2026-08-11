@@ -143,6 +143,27 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     y -= 17;
   }
 
+  // ---- what the stay's value-added offers include ----
+  // No amount column: these are free, and a money value beside them would read as
+  // a charge. Straight from the booking's snapshot, so a printed confirmation says
+  // what was promised even after the offer is edited or withdrawn.
+  for (const va of b.valueAdds ?? []) {
+    ensure(20);
+    text((va.name || "Included").toUpperCase(), { size: 8.5, font: bold, color: MUTED });
+    y -= 13;
+    for (const inc of va.inclusions) {
+      ensure(14);
+      // A bullet, not the ✓ the email uses: U+2713 is NOT in the Noto Sans subset
+      // this PDF embeds, and pdf-lib doesn't throw on a missing glyph — it draws a
+      // .notdef box. Every line would have been prefixed with a black rectangle,
+      // and nothing in the output size would have shown it. U+2022 is in the
+      // subset (checked against the font), and matches the "·" used above.
+      text(`•  ${inc}`, { size: 9.5 });
+      y -= 13;
+    }
+    y -= 5;
+  }
+
   // ---- extras ----
   for (const x of b.extras ?? []) {
     ensure(15);

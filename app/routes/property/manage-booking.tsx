@@ -221,6 +221,22 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             </div>
           ))}
         </div>
+        {/* Included, from the booking's snapshot — no amounts, because these are
+            free and a money column beside them would read as a charge. This is
+            the page a guest opens to check what they were promised. */}
+        {b.valueAdds?.map((va) => (
+          <div key={va.name} className={cx("mt-3 flex flex-col gap-1.5 border-t", s.rule, "pt-3")}>
+            <div className="text-label font-semibold uppercase tracking-wide text-accent-deep">
+              {va.name || tr.t("includedTitle")}
+            </div>
+            {va.inclusions.map((inc, i) => (
+              <div key={i} className="flex items-start gap-2 text-body">
+                <span className="mt-[1px] flex-none font-semibold text-accent">✓</span>
+                {inc}
+              </div>
+            ))}
+          </div>
+        ))}
         {b.extras && b.extras.length > 0 && (
           <div className={cx("mt-3 flex flex-col gap-2 border-t", s.rule, "pt-3")}>
             <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>

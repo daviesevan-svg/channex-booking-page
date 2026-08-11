@@ -47,6 +47,8 @@ export interface PreparePendingInput {
   discountedTotal: number;
   applied?: AppliedPromo;
   offer?: AppliedPromo;
+  /** Value-added offers this stay qualified for, as the guest was shown them. */
+  valueAdds?: { name: string; inclusions: string[] }[];
   /** Taxes & fees breakdown from computePricing — pushed to Channex as services
    *  (the day prices carry only the room amounts) and snapshotted on the record
    *  for display. taxLines = on-top VAT; taxIncluded = VAT inside gross prices. */
@@ -165,6 +167,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     total: grandTotal,
     promo: input.applied,
     offer: input.offer,
+    valueAdds: input.valueAdds?.length ? input.valueAdds : undefined,
     pricing: input.pricing,
     extras: input.extraLines.length ? input.extraLines : undefined,
     consent: input.consent,
