@@ -5,6 +5,9 @@ import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSearchAnalytics } from "~/lib/search-analytics.server";
+import { getFunnelAnalytics } from "~/lib/funnel-analytics.server";
+import { getSettings } from "~/lib/overrides.server";
+import { formatMoney } from "~/lib/money";
 import { COUNTRIES } from "~/lib/countries";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 
@@ -24,8 +27,22 @@ export async function loader({ request }: Route.LoaderArgs) {
     ? Number(url.searchParams.get("days"))
     : 30;
 
-  const data = await getSearchAnalytics(propertyId, days);
-  return { configured: true as const, days, data };
+  // Funnel events are pruned at ~90 days, so the 365-day window would silently
+  // show a quarter's funnel next to a year's searches — cap it and say so.
+  const funnelDays = Math.min(days, 90);
+  const [data, funnel, settings] = await Promise.all([
+    getSearchAnalytics(propertyId, days),
+    getFunnelAnalytics(propertyId, funnelDays),
+    getSettings(propertyId),
+  ]);
+  return {
+    configured: true as const,
+    days,
+    funnelDays,
+    data,
+    funnel,
+    currency: settings.currency || "GBP",
+  };
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -36,6 +53,16 @@ const countryName = (code: string, unknown: string) =>
   code === "??" ? unknown : COUNTRIES.find((c) => c.code === code)?.name ?? code;
 
 const DOW = ["anDowSun", "anDowMon", "anDowTue", "anDowWed", "anDowThu", "anDowFri", "anDowSat"];
+
+// Label keys per funnel step (mirrors FUNNEL_STEPS order; kept local because the
+// component must not import from a *.server module).
+const STEP_KEY: Record<string, string> = {
+  results: "anStepResults",
+  detail: "anStepDetail",
+  cart: "anStepCart",
+  checkout: "anStepCheckout",
+  purchase: "anStepPurchase",
+};
 
 const fmtDate = (iso: string, lang: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang === "de" ? "de-DE" : "en-GB", {
@@ -113,9 +140,11 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const { days, data } = loaderData;
+  const { days, funnelDays, data, funnel, currency } = loaderData;
   const { totals } = data;
   const lostShare = totals.searches > 0 ? Math.round((totals.lost / totals.searches) * 100) : 0;
+  const f = funnel.totals;
+  const hasFunnel = funnel.funnel.some((s) => s.visits > 0) || f.bookings + f.apiBookings > 0;
 
   return (
     <div>
@@ -165,6 +194,67 @@ export default function Analytics({ loaderData }: Route.ComponentProps) {
               sub={t("anKpiStaySub", { party: totals.avgParty ?? "—" })}
             />
           </div>
+
+          {/* Booking funnel — first-party conversion measurement (no cookies,
+              no third-party tags; see docs/internal-analytics.md). */}
+          {hasFunnel && (
+            <>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <Kpi
+                  label={t("anKpiBookings")}
+                  value={String(f.bookings)}
+                  sub={
+                    f.apiBookings > 0
+                      ? t("anApiBookingsNote", { n: f.apiBookings })
+                      : t("anKpiLastDays", { n: funnelDays })
+                  }
+                />
+                <Kpi
+                  label={t("anKpiRevenue")}
+                  value={formatMoney(f.revenue, currency)}
+                  sub={
+                    f.avgBookingValue == null
+                      ? t("anKpiLastDays", { n: funnelDays })
+                      : `⌀ ${formatMoney(f.avgBookingValue, currency)}`
+                  }
+                />
+                <Kpi
+                  label={t("anKpiConversion")}
+                  value={f.conversion == null ? "—" : `${(f.conversion * 100).toFixed(1)}%`}
+                  sub={t("anConversionSub")}
+                />
+                <Kpi
+                  label={t("anKpiAbandoned")}
+                  value={formatMoney(f.abandonedValue, currency)}
+                  sub={t("anAbandonedSub", { n: f.abandonedCheckouts })}
+                />
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <Card
+                  title={t("anFunnelTitle")}
+                  sub={days > funnelDays ? t("anFunnelCapped") : t("anFunnelSub")}
+                >
+                  <Bars
+                    rows={funnel.funnel.map((s) => ({
+                      label: t(STEP_KEY[s.step] ?? s.step),
+                      value: s.visits,
+                    }))}
+                  />
+                </Card>
+
+                <Card title={t("anDevicesTitle")} sub={t("anDevicesSub")}>
+                  <Bars
+                    rows={funnel.devices.map((d) => ({
+                      label: t(d.device === "mobile" ? "anDeviceMobile" : "anDeviceDesktop"),
+                      value: d.visits,
+                      note: d.bookings > 0 ? `· ${t("anDeviceBookedNote", { n: d.bookings })}` : undefined,
+                    }))}
+                  />
+                </Card>
+              </div>
+            </>
+          )}
 
           {/* Lost demand — the actionable one, so it goes first when present. */}
           {data.lostDates.length > 0 && (

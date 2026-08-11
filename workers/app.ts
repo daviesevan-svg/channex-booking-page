@@ -7,6 +7,7 @@ import { scheduledReviewRequests } from "../app/lib/review-requests.server";
 import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
 import { pruneAri } from "../app/lib/ari.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
+import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
@@ -65,6 +66,8 @@ export default {
     ctx.waitUntil(pruneAri().catch((e) => console.log(`[cron] pruneAri failed: ${e}`)));
     // Search-demand events beyond the longest dashboard window get dropped too.
     ctx.waitUntil(pruneSearchEvents().catch((e) => console.log(`[cron] pruneSearchEvents failed: ${e}`)));
+    // Booking-funnel events: 3-month retention keeps the table small by design.
+    ctx.waitUntil(pruneFunnelEvents().catch((e) => console.log(`[cron] pruneFunnelEvents failed: ${e}`)));
     // Collection landing-page engagement events beyond the window get dropped too.
     ctx.waitUntil(pruneCollectionEvents().catch((e) => console.log(`[cron] pruneCollectionEvents failed: ${e}`)));
     // Refresh the Google match status ~daily (self-throttled) so the admin page

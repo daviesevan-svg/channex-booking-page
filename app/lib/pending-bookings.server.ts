@@ -23,6 +23,11 @@ export interface PendingBooking {
   /** Gift-voucher amount held for this checkout — settled onto the voucher
    *  when the booking finalizes, released if it fails. */
   voucherRedemption?: { code: string; amount: number };
+  /** Funnel-analytics context captured at checkout, so the purchase step can be
+   *  logged at finalize time — which may run from the Stripe webhook, with no
+   *  guest request to derive it from. Computed once here, it also stays stable
+   *  across the visit key's midnight salt rotation. Absent on API bookings. */
+  funnel?: { visitKey: string; country: string | null; device: string | null };
 }
 
 // 3 hours. Must exceed the Checkout Session's expires_at (60 min, set in

@@ -25,6 +25,7 @@ import { useT, type Translator } from "~/lib/i18n";
 import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -70,6 +71,26 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(pid, "detail", lang);
+
+  // Funnel step: a room's dated detail page was reached. Non-fatal by design.
+  const fc = await funnelContext(request);
+  if (fc) {
+    queueFunnelEvent({
+      propertyId: pid,
+      step: "detail",
+      visitKey: fc.visitKey,
+      source: "web",
+      checkin,
+      nights,
+      adults,
+      children: childrenAge.length,
+      roomId: room.id,
+      currency,
+      country: fc.country,
+      lang,
+      device: fc.device,
+    });
+  }
 
   // Per-room occupancy: default this room to the still-unassigned slice of the
   // searched party, so adding a 2nd room auto-fills the remainder. Capacity comes

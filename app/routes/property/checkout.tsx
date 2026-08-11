@@ -47,6 +47,7 @@ import { getOverrides, getPageText } from "~/lib/overrides.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { basePath, homePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { funnelContext, queueFunnelEvent, type FunnelContext } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -203,6 +204,29 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
   const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
+
+  // Funnel step: checkout reached, with the money at stake — what the abandoned-
+  // value dashboard number is made of. Non-fatal by design.
+  const fc = await funnelContext(request);
+  if (fc) {
+    queueFunnelEvent({
+      propertyId: pid,
+      step: "checkout",
+      visitKey: fc.visitKey,
+      source: "web",
+      checkin: stay.checkin,
+      nights,
+      adults: lines.reduce((s, l) => s + l.occupancy.adults, 0),
+      children: lines.reduce((s, l) => s + l.occupancy.children, 0),
+      rooms: lines.length,
+      value: grandTotal,
+      currency: stay.currency,
+      country: fc.country,
+      lang,
+      device: fc.device,
+    });
+  }
+
   // Whether a card is actually taken at checkout: only in LIVE mode, with Stripe
   // connected, when the rate charges now or wants a guarantee card. In test mode
   // (or with no Stripe) nothing is collected, so the payment copy mustn't promise
@@ -433,9 +457,14 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (applied?.code) next.set("promo", applied.code);
 
   // Build the booking (Open Channel payload + draft record), shared with the API.
+  // Funnel context rides on the pending booking: finalize may run from the
+  // Stripe webhook, where there is no guest request to derive it from.
+  const funnelCtx: FunnelContext | null = await funnelContext(request);
+
   const pending = await preparePendingBooking({
     pid: stay.channelId,
     reference,
+    funnel: funnelCtx ?? undefined,
     checkin: stay.checkin,
     checkout: stay.checkout,
     currency: stay.currency,

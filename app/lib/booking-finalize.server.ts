@@ -20,6 +20,7 @@ import { deletePending, getPending, type PendingBooking } from "./pending-bookin
 import { releaseGiftHold, settleGiftHold } from "./vouchers.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
 import { dispatchWebhook } from "./webhooks.server";
+import { queueFunnelEvent } from "./funnel-analytics.server";
 import { serializeBooking } from "./api-serialize";
 
 const idOf = (v: unknown): string | undefined =>
@@ -161,6 +162,27 @@ export async function finalizeBooking(
     await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));
     await sendBookingEmails(pid, record, origin);
     await dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now());
+    // Funnel analytics: the ONE place every booking passes exactly once (the
+    // claim above already de-raced Stripe-return vs webhook), so this counts
+    // bookings no client-side tag can see — e.g. the guest who paid and closed
+    // the tab. Web checkouts carry their visit context on the pending booking;
+    // API/agent bookings have none and are reported as their own source.
+    queueFunnelEvent({
+      propertyId: pid,
+      step: "purchase",
+      visitKey: pending.funnel?.visitKey ?? "",
+      source: pending.funnel ? "web" : "api",
+      checkin: record.checkin,
+      nights: record.nights,
+      adults: record.rooms.reduce((s, r) => s + r.adults, 0),
+      children: record.rooms.reduce((s, r) => s + r.children, 0),
+      rooms: record.rooms.length,
+      value: record.total,
+      currency: record.currency,
+      country: pending.funnel?.country ?? null,
+      lang: record.lang ?? null,
+      device: pending.funnel?.device ?? null,
+    });
   } else if (unavailable && payment?.mode === "payment") {
     // Charged, but we can't fulfil the stay — always refund (this is our failure,
     // not a discretionary cancellation). refundBookingCharge is idempotent + safe.
