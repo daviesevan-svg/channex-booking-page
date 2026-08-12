@@ -14,6 +14,7 @@ import {
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadHomeImage } from "~/lib/images.server";
 import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -104,14 +105,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("homeTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("homeTitle")} saved={Boolean(actionData?.ok)} />
       <p className="mb-6 text-[14px] text-muted">{t("homeIntro")}</p>
 
       <Form

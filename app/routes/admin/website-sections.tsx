@@ -33,6 +33,7 @@ import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { BrandPanel } from "~/components/admin-brand-panel";
 import { DesignPreview } from "~/components/admin-design-preview";
+import { AdminPageHeader, SavedPill } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -261,11 +262,7 @@ function TemplatePicker({
       <input type="hidden" name="op" value="style" />
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="font-serif text-[18px] font-semibold">{t("secTemplate")}</div>
-        {applied && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("secTemplateApplied")}
-          </span>
-        )}
+        <SavedPill show={applied}>{t("secTemplateApplied")}</SavedPill>
       </div>
       <p className="mb-4 text-[13px] leading-[1.55] text-muted">{t("secTemplateIntro")}</p>
 
@@ -387,16 +384,7 @@ function Editor({
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">
-          {isHome ? t("secTitle") : pageTitle || t("wpUntitled")}
-        </h1>
-        {saved && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={isHome ? t("secTitle") : pageTitle || t("wpUntitled")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{isHome ? t("secIntro") : t("wpSectionsIntro")}</p>
 
       {!isHome && (

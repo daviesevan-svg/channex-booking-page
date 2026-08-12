@@ -11,6 +11,7 @@ import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
 import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
 import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
+import { AdminPageHeader } from "~/components/admin-page-header";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
 const FALLBACK_TIMEZONES = [
@@ -119,14 +120,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("genTitle")}</h1>
-        {actionData?.ok && !actionData?.slugError && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("genTitle")} saved={Boolean(actionData?.ok && !actionData?.slugError)} />
 
       <Form method="post" className="flex flex-col gap-7 rounded-[14px] border border-line bg-surface p-6">
         {/* Booking link (shortcode) */}

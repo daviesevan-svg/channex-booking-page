@@ -7,6 +7,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { EMAIL_TEMPLATES } from "~/lib/content";
 import { getOverrides, getSettings, saveEmailSettings } from "~/lib/overrides.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -72,12 +73,7 @@ export default function AdminEmails({ loaderData, actionData }: Route.ComponentP
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("emTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
-        )}
-      </div>
+      <AdminPageHeader title={t("emTitle")} saved={Boolean(actionData?.ok)} className="mb-1" />
       <p className="mb-6 text-[14px] text-muted">
         {t("emIntro")}
       </p>

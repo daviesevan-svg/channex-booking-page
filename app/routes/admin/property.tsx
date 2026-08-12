@@ -16,6 +16,7 @@ import { uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.serve
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { setupChecklist } from "~/lib/setup-checklist.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { COUNTRIES } from "~/lib/countries";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -183,14 +184,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("propTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("propTitle")} saved={Boolean(actionData?.ok)} />
       <p className="mb-6 text-[14px] text-muted">
         {t("propIntro")}
       </p>

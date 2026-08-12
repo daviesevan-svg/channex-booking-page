@@ -4,6 +4,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/taxes";
 import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -161,14 +162,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("txTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("txTitle")} saved={Boolean(actionData?.ok)} />
 
       <Form method="post" className="flex flex-col gap-6">
         {/* serialized state */}

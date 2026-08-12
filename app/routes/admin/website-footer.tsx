@@ -20,6 +20,7 @@ import {
 } from "~/lib/footer";
 import { getFooterRaw, saveFooter } from "~/lib/site.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -157,14 +158,7 @@ function Editor({
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("ftTitle")}</h1>
-        {saved && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("ftTitle")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{t("ftIntro")}</p>
 
       {!websiteEnabled && (

@@ -2,6 +2,7 @@ import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/payments";
 import { adminMeta } from "~/lib/admin-meta";
+import { SavedPill } from "~/components/admin-page-header";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
@@ -107,9 +108,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
             </p>
           )}
         </div>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
-        )}
+        <SavedPill show={Boolean(actionData?.ok)} />
       </div>
 
       <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("payIntro")}</p>
