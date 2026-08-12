@@ -50,6 +50,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   let offer: { name: string; percent: number; discount: number } | null = null;
   let valueAdds: { name: string; inclusions: string[] }[] = [];
   let extraLines: ResolvedExtra[] = [];
+  // Headcount for per-person taxes/fees. Falls back to the searched party, but
+  // once the cart resolves it MUST be the per-line occupancy — the headcount
+  // checkout actually charged — or a person/person_night fee differs between
+  // the checkout and confirmation pages.
+  let adults = occ.adults;
+  let children = occ.childrenAge?.length ?? 0;
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
@@ -62,7 +68,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     // Stay-level, so any line carries the same list (see ResolvedLine.valueAdds).
     valueAdds = lines[0]?.valueAdds ?? [];
-    if (lines.length) total = cartCoverage(lines).total;
+    if (lines.length) {
+      const coverage = cartCoverage(lines);
+      total = coverage.total;
+      adults = coverage.adults;
+      children = coverage.children;
+    }
     cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
     // The automatic offer baked into the prices (per-line data), for the breakdown line.
     let orig = 0;
@@ -101,8 +112,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     {
       base: Math.round((total - discount) * 100) / 100,
       nights,
-      adults: occ.adults,
-      children: occ.childrenAge?.length ?? 0,
+      adults,
+      children,
       rooms: rooms.length,
       cleaningFee,
       taxableExtras: taxableExtrasTotal(extraLines),
