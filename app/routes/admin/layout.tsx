@@ -6,7 +6,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getVisibleProperties, hiddenMemberAreasFor, isOwnerOrSuper } from "~/lib/properties.server";
 import type { MemberArea } from "~/lib/member-areas";
 import { isSuperadmin } from "~/lib/users.server";
-import { brandForUser } from "~/lib/partners.server";
+import { brandForUser, guestHostForProperty } from "~/lib/partners.server";
 import { hiddenPagesFor } from "~/lib/page-access.server";
 import { DEFAULT_LANG, enabledLanguages, langParam, langLabel } from "~/lib/content";
 import { getSettings } from "~/lib/overrides.server";
@@ -36,13 +36,18 @@ export async function loader({ request }: Route.LoaderArgs) {
   const brand = await brandForUser(email);
   const partnerBrand = brand.partnerId ? brand.name : null;
   const partnerLogo = brand.partnerId ? (brand.logo ?? null) : null;
-  // Where "View site" must point for a partner user. Slug paths don't exist on
-  // a partner ADMIN host (property-scope host discipline bounces them to the
-  // login), so the link needs the partner's guest host as an absolute URL.
-  // Same scheme/port as this request so dev partner hosts keep working.
+  // Where "View site" must point. The link follows the PROPERTY, not the
+  // viewer: a partner's hotel lives on that partner's guest host even when a
+  // superadmin (who has no partner of their own) is the one looking, and slug
+  // paths don't exist on a partner ADMIN host at all. Same scheme/port as this
+  // request so dev partner hosts keep working.
   const url = new URL(request.url);
-  const guestOrigin = brand.guestHost
-    ? `${url.protocol}//${brand.guestHost}${url.port ? `:${url.port}` : ""}`
+  const guestHost = await guestHostForProperty(
+    properties.find((p) => p.id === propertyId)?.partnerId,
+    email,
+  );
+  const guestOrigin = guestHost
+    ? `${url.protocol}//${guestHost}${url.port ? `:${url.port}` : ""}`
     : null;
   // Pages this user's partner hides. Nav-side only — the routes themselves
   // enforce it in their loaders via requirePageAllowed.

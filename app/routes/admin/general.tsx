@@ -6,6 +6,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
+import { guestHostForProperty } from "~/lib/partners.server";
 import { getConfig } from "~/lib/config.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
 import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
@@ -44,11 +45,16 @@ function supportedTimezones(): string[] {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const settings = await getSettings(propertyId);
   const ref = await getProperty(propertyId);
+  // The link a hotel hands to guests lives on the host that actually serves
+  // their slug: a partner's guest host for a partner property. The request's
+  // own host is wrong for them in both directions — a partner admin would be
+  // shown their admin host, which serves no slug paths at all.
+  const guestHost = await guestHostForProperty(ref?.partnerId, email);
   // Effective, not stored: data saved before the setting existed derives its
   // mode from the legacy per-rate flags, and the select should show that.
   const pricingMode = pricingModeOf(settings, await getRates(propertyId));
@@ -58,7 +64,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     pricingMode,
     slug: ref?.slug ?? "",
     propertyId,
-    host: new URL(request.url).host,
+    host: guestHost ?? new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
     timezones: supportedTimezones(),
   };
