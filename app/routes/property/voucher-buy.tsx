@@ -22,7 +22,7 @@ import { getVoucherProduct, soldCount } from "~/lib/vouchers.server";
 import { generateReference } from "~/lib/bookings.server";
 import { stashPendingVoucher, type PendingVoucher } from "~/lib/pending-vouchers.server";
 import { finalizeVoucher } from "~/lib/voucher-purchase.server";
-import { createCheckoutSession, platformFee } from "~/lib/stripe.server";
+import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -173,37 +173,22 @@ export async function action({ params, request }: Route.ActionArgs) {
   try {
     const session = await createCheckoutSession(
       stripeAccount!,
-      {
-        client_reference_id: reference,
-        customer_email: buyerEmail,
+      buildCheckoutSessionParams({
+        reference,
+        email: buyerEmail,
         metadata: { kind: "voucher", reference, pid },
-        // Same 60-min payment window inside the 3h pending stash as bookings.
-        expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-        success_url: `${url.origin}${base}/vouchers/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}`,
-        cancel_url: `${url.origin}${base}/vouchers/${product.id}`,
+        successUrl: `${url.origin}${base}/vouchers/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}`,
+        cancelUrl: `${url.origin}${base}/vouchers/${product.id}`,
+        currency,
         mode: "payment",
-        payment_intent_data: {
-          description: `${hotelName} voucher · ${product.title} (${record.code})`,
-          metadata: { kind: "voucher", reference, pid },
-          ...platformFee(amountMinor, currency),
-        },
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: currency.toLowerCase(),
-              unit_amount: amountMinor,
-              product_data: {
-                name: `${hotelName} — ${product.title}`,
-                description:
-                  product.kind === "gift"
-                    ? `Gift voucher worth ${formatMoney(product.value ?? product.price, currency)}.`
-                    : product.description || "Stay package voucher.",
-              },
-            },
-          },
-        ],
-      },
+        amountMinor,
+        paymentDescription: `${hotelName} voucher · ${product.title} (${record.code})`,
+        productName: `${hotelName} — ${product.title}`,
+        productDescription:
+          product.kind === "gift"
+            ? `Gift voucher worth ${formatMoney(product.value ?? product.price, currency)}.`
+            : product.description || "Stay package voucher.",
+      }),
       reference,
     );
     sessionUrl = session.url;

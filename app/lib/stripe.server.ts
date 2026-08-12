@@ -190,6 +190,80 @@ export function platformFee(amountMinor: number, currency: string): { applicatio
   return feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, currency) } : {};
 }
 
+export interface CheckoutSessionSpec {
+  /** Booking/voucher reference — becomes `client_reference_id`. */
+  reference: string;
+  email: string;
+  /** Stamped on the session AND its payment/setup intent (webhooks read both). */
+  metadata: Record<string, string>;
+  successUrl: string;
+  cancelUrl: string;
+  currency: string;
+  mode: "payment" | "setup";
+  /** payment mode: the amount collected today, in Stripe minor units. */
+  amountMinor?: number;
+  /** payment mode: line-item name/description shown on the hosted page. */
+  productName?: string;
+  productDescription?: string;
+  /** payment mode: the PaymentIntent description (the Stripe-dashboard line). */
+  paymentDescription?: string;
+  /** Hosted-page language (see stripeLocale); omitted = Stripe's browser default. */
+  locale?: string;
+  /** custom_text.submit — the note under the pay button. */
+  submitMessage?: string;
+}
+
+/**
+ * The one place Checkout Session params are assembled. Owns the invariants a
+ * hand-rolled copy can silently drop: the platform fee (see platformFee — the
+ * v1 API's own copy collected none), the 60-minute expiry that must stay
+ * inside the 3h pending-stash TTL (a payment completed after the stash lapses
+ * charges the guest with no record left to finalize, so no booking and no
+ * refund), and setup mode's explicit currency (required — no line items).
+ * Callers supply only URLs, human copy, and money.
+ */
+export function buildCheckoutSessionParams(spec: CheckoutSessionSpec): Record<string, unknown> {
+  const common = {
+    client_reference_id: spec.reference,
+    customer_email: spec.email,
+    metadata: spec.metadata,
+    ...(spec.locale ? { locale: spec.locale } : {}),
+    expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
+    success_url: spec.successUrl,
+    cancel_url: spec.cancelUrl,
+    ...(spec.submitMessage ? { custom_text: { submit: { message: spec.submitMessage } } } : {}),
+  };
+  if (spec.mode === "setup") {
+    // Guarantee card: collect a card without charging anything.
+    return {
+      ...common,
+      mode: "setup",
+      currency: spec.currency.toLowerCase(),
+      setup_intent_data: { metadata: spec.metadata },
+    };
+  }
+  const amountMinor = spec.amountMinor ?? 0;
+  return {
+    ...common,
+    mode: "payment",
+    payment_intent_data: {
+      description: spec.paymentDescription,
+      metadata: spec.metadata,
+      ...platformFee(amountMinor, spec.currency),
+    },
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: spec.currency.toLowerCase(),
+          unit_amount: amountMinor,
+          product_data: { name: spec.productName, description: spec.productDescription },
+        },
+      },
+    ],
+  };
+}
+
 /** Create a Checkout Session on a connected account. `params` is passed through
  *  to Stripe form-encoded, so nested objects/arrays use the documented shape. */
 export function createCheckoutSession(

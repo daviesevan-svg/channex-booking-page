@@ -34,7 +34,7 @@ import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { taxConfigFrom } from "~/lib/pricing";
-import { createCheckoutSession, platformFee, stripeLocale } from "~/lib/stripe.server";
+import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
@@ -507,23 +507,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     // The language the guest actually chose, as stored on the pending booking.
     // Optional there, so pin the fallback once rather than at three call sites.
     const guestLang = pending.record.lang || "en";
-    const common = {
-      client_reference_id: reference,
-      customer_email: g.email,
-      // Stripe's own chrome — buttons, card labels, errors. Its default is "auto",
-      // meaning the BROWSER's language, so a guest reading the site in German on
-      // an English browser got an English payment page. Pass the language they
-      // actually chose.
-      locale: stripeLocale(guestLang),
-      metadata: { reference, pid: stay.channelId },
-      // Bound the payment window so the session can't outlive the pending-booking
-      // stash (see pending-bookings.server TTL): a payment completed after the
-      // stash expired would be charged with no booking created. 60 min hold,
-      // comfortably inside the stash TTL.
-      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-      success_url: `${url.origin}${base}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
-      cancel_url: `${url.origin}${base}/checkout?${url.searchParams.toString()}`,
-    };
     // A human-readable summary of the stay for Stripe's hosted page — in the
     // guest's language, like the rest of their checkout. The action has no React
     // context, so the translator is built from the language stored on the pending
@@ -546,66 +529,35 @@ export async function action({ params, request }: Route.ActionArgs) {
     const balance = Math.round((grandTotal - due) * 100) / 100;
     const stayLine = `${dateLabel} · ${tr.p("night", nights)} · ${guestLabel}`;
 
-    let sessionParams: Record<string, unknown>;
-    if (stripeMode === "payment") {
-      const amountMinor = toStripeMinor(dueAfterVoucher, stay.currency);
-      const voucherNote = voucherHold
-        ? " " + tr.t("stripeVoucherNote", { amount: money(voucherHold.amount), code: voucherHold.code })
-        : "";
-      const balanceNote =
-        (balance > 0
-          ? tr.t("stripeDepositNote", { balance: money(balance) })
-          : tr.t("stripePaidInFull")) + voucherNote;
-      sessionParams = {
-        ...common,
-        mode: "payment",
-        payment_intent_data: {
-          description: `${hotelName} · ${roomName} · ${dateLabel} (${tr.t("stripeRef", { ref: reference })})`,
-          metadata: { reference, pid: stay.channelId },
-          ...platformFee(amountMinor, stay.currency),
-        },
-        line_items: [
-          {
-            quantity: 1,
-            price_data: {
-              currency: stay.currency.toLowerCase(),
-              unit_amount: amountMinor,
-              product_data: { name: `${hotelName} — ${roomName}`, description: `${stayLine}. ${balanceNote}` },
-            },
-          },
-        ],
-        custom_text: {
-          submit: {
-            message:
-              balance > 0
-                ? tr.t("stripeSubmitDeposit", {
-                    due: money(dueAfterVoucher),
-                    hotel: hotelName,
-                    balance: money(balance),
-                  })
-                : tr.t("stripeSubmitFull", { due: money(dueAfterVoucher), hotel: hotelName }),
-          },
-        },
-      };
-    } else {
-      // Guarantee card: collect a card without charging.
-      sessionParams = {
-        ...common,
-        mode: "setup",
-        // Setup sessions have no line_items, so Stripe requires currency explicitly.
-        currency: stay.currency.toLowerCase(),
-        setup_intent_data: { metadata: { reference, pid: stay.channelId } },
-        custom_text: {
-          submit: {
-            message: tr.t("stripeSubmitGuarantee", {
-              hotel: hotelName,
-              room: roomName,
-              dates: dateLabel,
-            }),
-          },
-        },
-      };
-    }
+    const voucherNote = voucherHold
+      ? " " + tr.t("stripeVoucherNote", { amount: money(voucherHold.amount), code: voucherHold.code })
+      : "";
+    const balanceNote =
+      (balance > 0 ? tr.t("stripeDepositNote", { balance: money(balance) }) : tr.t("stripePaidInFull")) + voucherNote;
+    const sessionParams = buildCheckoutSessionParams({
+      reference,
+      email: g.email,
+      metadata: { reference, pid: stay.channelId },
+      // Stripe's own chrome — buttons, card labels, errors. Its default is "auto",
+      // meaning the BROWSER's language, so a guest reading the site in German on
+      // an English browser got an English payment page. Pass the language they
+      // actually chose.
+      locale: stripeLocale(guestLang),
+      successUrl: `${url.origin}${base}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${next.toString()}`,
+      cancelUrl: `${url.origin}${base}/checkout?${url.searchParams.toString()}`,
+      currency: stay.currency,
+      mode: stripeMode,
+      amountMinor: toStripeMinor(dueAfterVoucher, stay.currency),
+      paymentDescription: `${hotelName} · ${roomName} · ${dateLabel} (${tr.t("stripeRef", { ref: reference })})`,
+      productName: `${hotelName} — ${roomName}`,
+      productDescription: `${stayLine}. ${balanceNote}`,
+      submitMessage:
+        stripeMode === "payment"
+          ? balance > 0
+            ? tr.t("stripeSubmitDeposit", { due: money(dueAfterVoucher), hotel: hotelName, balance: money(balance) })
+            : tr.t("stripeSubmitFull", { due: money(dueAfterVoucher), hotel: hotelName })
+          : tr.t("stripeSubmitGuarantee", { hotel: hotelName, room: roomName, dates: dateLabel }),
+    });
     let sessionUrl: string | undefined;
     try {
       const session = await createCheckoutSession(account, sessionParams, reference);
