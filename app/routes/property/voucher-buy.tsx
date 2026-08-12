@@ -12,7 +12,7 @@ import { pageMeta } from "~/lib/page-meta";
 import { Lightbox } from "~/components/lightbox";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney, toStripeMinor } from "~/lib/money";
+import { formatMoney, roundStripeMinor, toStripeMinor } from "~/lib/money";
 import { getConfig } from "~/lib/config.server";
 
 import { getOverrides, getSettings } from "~/lib/overrides.server";
@@ -186,7 +186,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         payment_intent_data: {
           description: `${hotelName} voucher · ${product.title} (${record.code})`,
           metadata: { kind: "voucher", reference, pid },
-          ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
+          ...(feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, currency) } : {}),
         },
         line_items: [
           {

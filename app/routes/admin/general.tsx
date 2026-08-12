@@ -7,6 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
+import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
 import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
 import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
@@ -179,10 +180,10 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           <select
             name="currency"
             defaultValue={settings.currency || "GBP"}
-            className="block w-full max-w-[200px] rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+            className="block w-full max-w-[360px] rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
           >
-            {["GBP", "EUR", "USD", "AUD", "CAD", "CHF", "JPY", "NZD", "THB", "TRY"].map((c) => (
-              <option key={c} value={c}>{c}</option>
+            {SUPPORTED_CURRENCIES.map(([code, name]) => (
+              <option key={code} value={code}>{code} — {name}</option>
             ))}
           </select>
         </section>
