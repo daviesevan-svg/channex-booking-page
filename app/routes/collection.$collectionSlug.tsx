@@ -8,6 +8,7 @@ import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { accessibleAccent, darkerAccent } from "~/lib/accessible-accent";
 import { getCollectionBySlug } from "~/lib/collections.server";
+import { DEFAULT_BRAND } from "~/lib/partners.server";
 import { queueCollectionEvent } from "~/lib/collection-analytics.server";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { getConfig } from "~/lib/config.server";
@@ -227,6 +228,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     availableCount,
     lang,
     mapKey: getConfig().googleMapKey ?? "",
+    footerBrand: DEFAULT_BRAND.name,
   };
 }
 
@@ -308,6 +310,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
     availableCount,
     lang,
     mapKey,
+    footerBrand,
   } = loaderData;
 
   const tr = makeTranslator(lang);
@@ -662,7 +665,9 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       <footer className="border-t" style={{ borderColor: "#ece4d8", background: "#fffdfa" }}>
         <div className="mx-auto flex max-w-[1420px] flex-wrap items-center justify-between gap-4 px-[clamp(16px,4vw,32px)] py-[22px] text-caption" style={{ color: "var(--color-muted-2)" }}>
           <span>© 2026 {name} · {tr.t("allRightsReserved")}</span>
-          <span>{tr.t("footerRight")}</span>
+          {/* Collections are our own destination platform — never a partner's,
+              so the attribution is always ours. */}
+          <span>{tr.t("footerRight", { brand: footerBrand })}</span>
         </div>
       </footer>
     </div>
