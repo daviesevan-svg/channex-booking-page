@@ -12,30 +12,21 @@
 // anyone across days. This is what keeps the whole feature outside cookie
 // consent. Do not add a visitor cookie, and do not add the booking reference to
 // purchase rows: rows must stay unlinkable to an individual.
-import { waitUntil } from "cloudflare:workers";
 import { isbot } from "isbot";
 
-import { getConfig, getDB } from "./config.server";
+import { getConfig } from "./config.server";
+import { db, fireAndForget, schemaOnce } from "./d1.server";
 import { hmacSha256Hex } from "./hmac.server";
-
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
 
 /** Funnel steps in order. `rank` makes "furthest reached" a MAX() in SQL. */
 export const FUNNEL_STEPS = ["results", "detail", "cart", "checkout", "purchase"] as const;
 export type FunnelStep = (typeof FUNNEL_STEPS)[number];
 const RANK: Record<FunnelStep, number> = { results: 1, detail: 2, cart: 3, checkout: 4, purchase: 5 };
 
-let schemaReady = false;
 /** Idempotently create the funnel_event table (same pattern as search_event). */
-async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db().batch([
-    db().prepare(
-      `CREATE TABLE IF NOT EXISTS funnel_event (
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS funnel_event (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         property_id TEXT NOT NULL,
         ts INTEGER NOT NULL,
@@ -55,12 +46,10 @@ async function ensureSchema(): Promise<void> {
         lang TEXT,
         device TEXT
       )`,
-    ),
-    db().prepare(`CREATE INDEX IF NOT EXISTS funnel_event_prop_ts ON funnel_event (property_id, ts)`),
-    db().prepare(`CREATE INDEX IF NOT EXISTS funnel_event_prop_visit ON funnel_event (property_id, visit_key)`),
-  ]);
-  schemaReady = true;
-}
+  ),
+  d.prepare(`CREATE INDEX IF NOT EXISTS funnel_event_prop_ts ON funnel_event (property_id, ts)`),
+  d.prepare(`CREATE INDEX IF NOT EXISTS funnel_event_prop_visit ON funnel_event (property_id, visit_key)`),
+]);
 
 /** Per-request context for a loggable guest hit, or null when the request must
  *  not be logged (prefetches would count phantom visits; bots would inflate the
@@ -160,15 +149,10 @@ export async function logFunnelEvent(ev: FunnelEvent): Promise<void> {
   }
 }
 
-/** Fire-and-forget wrapper: logs without delaying the guest's response (same
- *  waitUntil-with-fallback shape as queueSearchEvent). */
+/** Fire-and-forget wrapper: logs without delaying the guest's response.
+ *  (logFunnelEvent catches internally, so the promise can't reject.) */
 export function queueFunnelEvent(ev: FunnelEvent): void {
-  const work = logFunnelEvent(ev);
-  try {
-    waitUntil(work);
-  } catch {
-    void work;
-  }
+  fireAndForget(logFunnelEvent(ev));
 }
 
 /** Cron housekeeping: 3-month retention, per the memory budget for this table

@@ -3,23 +3,12 @@
 // the admin Analytics page aggregates them into the patterns a revenue manager
 // cares about: when people want to arrive, how far ahead they shop, how long
 // they stay, where they're from — and which dates turned shoppers away.
-import { waitUntil } from "cloudflare:workers";
+import { db, fireAndForget, schemaOnce } from "./d1.server";
 
-import { getDB } from "./config.server";
-
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
-
-let schemaReady = false;
-/** Idempotently create the search_event table (same pattern as ari.server). */
-async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db().batch([
-    db().prepare(
-      `CREATE TABLE IF NOT EXISTS search_event (
+/** Idempotently create the search_event table. */
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS search_event (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         property_id TEXT NOT NULL,
         ts INTEGER NOT NULL,
@@ -34,11 +23,9 @@ async function ensureSchema(): Promise<void> {
         has_availability INTEGER NOT NULL,
         results_count INTEGER NOT NULL
       )`,
-    ),
-    db().prepare(`CREATE INDEX IF NOT EXISTS search_event_prop_ts ON search_event (property_id, ts)`),
-  ]);
-  schemaReady = true;
-}
+  ),
+  d.prepare(`CREATE INDEX IF NOT EXISTS search_event_prop_ts ON search_event (property_id, ts)`),
+]);
 
 export interface SearchEvent {
   propertyId: string;
@@ -87,16 +74,10 @@ export async function logSearchEvent(ev: SearchEvent): Promise<void> {
   }
 }
 
-/** Fire-and-forget wrapper: logs without delaying the guest's response. The
- *  write is kept alive past the response via waitUntil (falling back to a
- *  floating promise outside a request context, e.g. dev). */
+/** Fire-and-forget wrapper: logs without delaying the guest's response.
+ *  (logSearchEvent catches internally, so the promise can't reject.) */
 export function queueSearchEvent(ev: SearchEvent): void {
-  const work = logSearchEvent(ev);
-  try {
-    waitUntil(work);
-  } catch {
-    void work;
-  }
+  fireAndForget(logSearchEvent(ev));
 }
 
 /** Cron housekeeping: drop events older than the longest dashboard window (plus

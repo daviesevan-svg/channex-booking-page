@@ -23,7 +23,7 @@
 //
 // ANY new store that holds an image url must be added to `referencedBy` below.
 // Missing one there is the only way this can delete a live image.
-import { waitUntil } from "cloudflare:workers";
+import { fireAndForget } from "~/lib/d1.server";
 
 import { getRooms } from "./catalog.server";
 import { getImagesBucket } from "./config.server";
@@ -138,12 +138,7 @@ export async function deleteUnreferencedImages(pid: string, removed: string[]): 
  *  bucket outage can neither delay nor fail the save that triggered it. */
 export function queueImageCleanup(pid: string, removed: string[]): void {
   if (!removed.length) return;
-  const work = deleteUnreferencedImages(pid, removed).catch((err) =>
-    console.error("image gc: sweep failed", err),
+  fireAndForget(
+    deleteUnreferencedImages(pid, removed).catch((err) => console.error("image gc: sweep failed", err)),
   );
-  try {
-    waitUntil(work);
-  } catch {
-    void work;
-  }
 }

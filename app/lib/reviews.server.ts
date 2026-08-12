@@ -1,32 +1,21 @@
 // Guest reviews — one per booking, stored in D1 (per-row writes; a KV list
 // would clobber under concurrent submissions). The full review is JSON in the
 // row; indexed columns cover the admin list and the public display.
-import { getDB } from "./config.server";
+import { db, schemaOnce } from "./d1.server";
 import type { ReviewRecord } from "./reviews";
 
 export type { ReviewRecord } from "./reviews";
 
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
-
-let schemaReady = false;
-async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db()
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS review (
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS review (
         pid TEXT NOT NULL, booking_id TEXT NOT NULL, id TEXT NOT NULL,
         created_at TEXT NOT NULL, stars INTEGER NOT NULL,
         hidden INTEGER NOT NULL DEFAULT 0, json TEXT NOT NULL,
         PRIMARY KEY (pid, booking_id)
       )`,
-    )
-    .run();
-  schemaReady = true;
-}
+  ),
+]);
 
 const parse = (rows: { json: string }[]): ReviewRecord[] => rows.map((r) => JSON.parse(r.json) as ReviewRecord);
 

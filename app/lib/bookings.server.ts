@@ -3,7 +3,8 @@ import { addDays, format, parseISO } from "date-fns";
 import type { CancellationSnapshot } from "./policy.server";
 import type { AppliedPromo } from "./promotions";
 import type { ResolvedExtra } from "./extras";
-import { getConfigKV, getDB } from "./config.server";
+import { getConfigKV } from "./config.server";
+import { db, schemaOnce } from "./d1.server";
 
 /** Per-(room, night) availability units a stay occupies — for decrement on
  *  booking and restore on cancel. */
@@ -156,31 +157,23 @@ export interface BookingRecord {
 // D1 lets us claim a reference atomically = finalize-once (see claimBooking).
 const bookingsKey = (pid: string) => `bookings:${pid}`;
 
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
-
-let schemaReady = false;
-async function ensureBookingSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db()
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS booking (
+// One batch, not sequential .run() calls: the table previously went live
+// before its UNIQUE booking_ref index existed, and a failure between the two
+// left that window open for a concurrent isolate to insert a duplicate
+// reference — the exact thing the finalize-once latch relies on being
+// impossible (see claimBooking).
+const ensureBookingSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS booking (
         pid TEXT NOT NULL, id TEXT NOT NULL, reference TEXT NOT NULL,
         email TEXT NOT NULL, created_at TEXT NOT NULL,
         lifecycle TEXT NOT NULL DEFAULT 'active', json TEXT NOT NULL,
         PRIMARY KEY (pid, id)
       )`,
-    )
-    .run();
-  await db()
-    .prepare(`CREATE UNIQUE INDEX IF NOT EXISTS booking_ref ON booking(pid, reference)`)
-    .run();
-  await db().prepare(`CREATE INDEX IF NOT EXISTS booking_email ON booking(pid, email)`).run();
-  schemaReady = true;
-}
+  ),
+  d.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS booking_ref ON booking(pid, reference)`),
+  d.prepare(`CREATE INDEX IF NOT EXISTS booking_email ON booking(pid, email)`),
+]);
 
 type Row = { json: string };
 const parseRows = (rows: Row[]): BookingRecord[] =>

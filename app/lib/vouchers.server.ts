@@ -9,7 +9,8 @@
 //   and webhook can both finalize without double-issuing; mutations
 //   (redemptions, balance) go through an optimistic CAS on the exact old JSON
 //   so concurrent redemptions can't double-spend.
-import { getConfigKV, getDB } from "./config.server";
+import { getConfigKV } from "./config.server";
+import { db, schemaOnce } from "./d1.server";
 import { clientKey, overLimit, rateLimit } from "./rate-limit.server";
 import { createRefund } from "./stripe.server";
 import { fromStripeMinor } from "./money";
@@ -77,27 +78,16 @@ export async function toggleVoucherProduct(pid: string, id: string): Promise<voi
 
 // ---------- sold vouchers (D1) ----------
 
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
-
-let schemaReady = false;
-async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db()
-    .prepare(
-      `CREATE TABLE IF NOT EXISTS voucher (
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS voucher (
         pid TEXT NOT NULL, code TEXT NOT NULL, id TEXT NOT NULL,
         product_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
         created_at TEXT NOT NULL, expires_at TEXT NOT NULL, json TEXT NOT NULL,
         PRIMARY KEY (pid, code)
       )`,
-    )
-    .run();
-  schemaReady = true;
-}
+  ),
+]);
 
 const parse = (row: { json: string } | null): VoucherRecord | null =>
   row ? (JSON.parse(row.json) as VoucherRecord) : null;
