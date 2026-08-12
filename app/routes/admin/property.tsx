@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, useNavigation } from "react-router";
+import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/property";
 import { adminMeta } from "~/lib/admin-meta";
@@ -14,6 +14,7 @@ import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOver
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
+import { setupChecklist } from "~/lib/setup-checklist.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
 import { COUNTRIES } from "~/lib/countries";
 
@@ -23,11 +24,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const [overrides, settings, googleReadiness, property] = await Promise.all([
+  const [overrides, settings, googleReadiness, property, checklist] = await Promise.all([
     getOverridesRaw(propertyId, lang),
     getSettings(propertyId),
     checkGoogleReadiness(propertyId),
     getProperty(propertyId),
+    setupChecklist(propertyId),
   ]);
   return {
     configured: true as const,
@@ -36,6 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     overrides,
     settings,
     googleReadiness,
+    checklist,
     isPublic: Boolean(property?.public),
     host: new URL(request.url).host,
     // Enables the "Find coordinates" geocode button (unset = button hidden).
@@ -196,6 +199,51 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         <p className="mb-4 rounded-[10px] bg-[#fdecea] px-4 py-2.5 text-[13px] font-semibold text-[#c0392b]">
           {actionData.error}
         </p>
+      )}
+
+      {/* Setup checklist — derived from the stored data every render, so it can
+          never disagree with what the booking engine actually enforces. Hidden
+          for good once every gate is open. */}
+      {!loaderData.checklist.complete && (
+        <section className="mb-6 rounded-[14px] border border-line bg-surface p-6">
+          <div className="mb-1 flex items-baseline justify-between gap-3">
+            <h2 className="font-serif text-[18px] font-semibold">{t("suTitle")}</h2>
+            <span className="text-[12px] font-semibold text-muted">
+              {t("suProgress", { done: loaderData.checklist.doneCount, total: loaderData.checklist.steps.length })}
+            </span>
+          </div>
+          <p className="mb-4 text-[13px] text-muted">{t("suIntro")}</p>
+          <ol className="flex flex-col gap-1.5">
+            {loaderData.checklist.steps.map((s, i) => (
+              <li key={s.key}>
+                <Link
+                  to={s.to}
+                  className={`flex items-center gap-3 rounded-[10px] border px-4 py-2.5 ${
+                    s.done
+                      ? "border-transparent bg-surface-alt opacity-70"
+                      : "border-line-alt bg-surface-alt hover:border-accent"
+                  }`}
+                >
+                  <span
+                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold ${
+                      s.done ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-chip text-muted"
+                    }`}
+                    aria-hidden
+                  >
+                    {s.done ? "✓" : i + 1}
+                  </span>
+                  <span className="flex-1">
+                    <span className={`block text-[14px] font-semibold ${s.done ? "text-muted line-through" : "text-ink"}`}>
+                      {t(`suStep_${s.key}`)}
+                    </span>
+                    {!s.done && <span className="block text-[12px] text-muted">{t(`suHint_${s.key}`)}</span>}
+                  </span>
+                  {!s.done && <span className="flex-none text-[14px] font-semibold text-accent">→</span>}
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
 
       <Form
