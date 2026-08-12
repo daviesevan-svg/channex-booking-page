@@ -152,7 +152,10 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const navigation = useNavigation();
   const searching = navigation.state === "loading";
 
-  const eyebrow = content.eyebrow || (property.address?.split(",")[1] ?? hotelName).trim();
+  // Default is the property name, NOT anything parsed out of the address —
+  // address formats vary too much for a split to be safe (a Portuguese
+  // "Rua da Torre, n12" put the house number in the hero).
+  const eyebrow = content.eyebrow || hotelName;
   const heading = content.heading || DEFAULT_SEARCH.heading;
   const intro = content.intro || DEFAULT_SEARCH.intro;
   // Only offer the toggle when there's actually something clamped. Six lines at
