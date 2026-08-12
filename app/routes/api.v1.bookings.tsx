@@ -31,7 +31,7 @@ import { preparePendingBooking } from "~/lib/booking-create.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { rateLimit } from "~/lib/rate-limit.server";
-import { createCheckoutSession, platformFee } from "~/lib/stripe.server";
+import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { toStripeMinor } from "~/lib/money";
 
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
@@ -335,44 +335,19 @@ export async function action({ request }: Route.ActionArgs) {
   if (stripeMode && stripeConnected) {
     const account = settings.stripeAccountId as string;
     await stashPending(reference, pending);
-    const common = {
-      client_reference_id: reference,
-      customer_email: body.guest.email,
+    const params = buildCheckoutSessionParams({
+      reference,
+      email: body.guest.email,
       metadata: { reference, pid },
-      // Must expire INSIDE the pending stash TTL (3h) — otherwise a guest paying
-      // after the stash lapses is charged with no pending record to finalize, so
-      // no booking and no refund. Mirrors the web checkout's 60-minute window.
-      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-      success_url: `${origin}/${pid}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${rp.toString()}`,
-      cancel_url: `${origin}/${pid}`,
-    };
-    const params =
-      stripeMode === "payment"
-        ? {
-            ...common,
-            mode: "payment",
-            payment_intent_data: {
-              description: `Booking ${reference}`,
-              metadata: { reference, pid },
-              ...platformFee(toStripeMinor(due, currency), currency),
-            },
-            line_items: [
-              {
-                quantity: 1,
-                price_data: {
-                  currency: currency.toLowerCase(),
-                  unit_amount: toStripeMinor(due, currency),
-                  product_data: { name: `Booking ${reference}`, description: `${checkin} – ${checkout} · ${nights} night${nights !== 1 ? "s" : ""}` },
-                },
-              },
-            ],
-          }
-        : {
-            ...common,
-            mode: "setup",
-            currency: currency.toLowerCase(), // required for setup sessions (no line items)
-            setup_intent_data: { metadata: { reference, pid } },
-          };
+      successUrl: `${origin}/${pid}/checkout/complete?session_id={CHECKOUT_SESSION_ID}&ref=${reference}&${rp.toString()}`,
+      cancelUrl: `${origin}/${pid}`,
+      currency,
+      mode: stripeMode,
+      amountMinor: toStripeMinor(due, currency),
+      paymentDescription: `Booking ${reference}`,
+      productName: `Booking ${reference}`,
+      productDescription: `${checkin} – ${checkout} · ${nights} night${nights !== 1 ? "s" : ""}`,
+    });
     let url: string | undefined;
     try {
       url = (await createCheckoutSession(account, params, reference)).url;
