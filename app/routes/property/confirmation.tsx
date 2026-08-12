@@ -16,7 +16,8 @@ import { taxConfigFrom } from "~/lib/pricing";
 import { stayTotals } from "~/lib/checkout-totals";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
-import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
+import { parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
+import { PriceBreakdown } from "~/components/price-breakdown";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -269,48 +270,16 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
               <span className="font-semibold">−{formatMoney(discount, currency)}</span>
             </div>
           )}
-          {total > 0 &&
-            pricing.charges.map((c, i) => (
-              <div key={`charge-${i}`} className="flex justify-between">
-                <span className="text-secondary">{c.label}</span>
-                <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
-              </div>
-            ))}
-          {total > 0 &&
-            pricing.taxLines.map((c, i) => (
-              <div key={`tax-${i}`} className="flex justify-between">
-                <span className="text-secondary">{c.label}</span>
-                <span className="font-semibold">{formatMoney(c.amount, currency)}</span>
-              </div>
-            ))}
-          {groupExtrasByRoom(extraLines).map((g, gi) => (
-            <div key={gi} className="flex flex-col gap-1">
-              <div className="text-label font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
-              {g.lines.map((l) => (
-                <div key={`${l.id}-${l.optionId ?? ""}`} className="flex justify-between pl-2">
-                  <span className="text-secondary">
-                    {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
-                    {l.qty > 1 ? ` ×${l.qty}` : ""}
-                    {l.infoLine ? <span className="block text-label text-muted-2">{l.infoLine}</span> : null}
-                  </span>
-                  <span className="font-semibold">{formatMoney(l.amount, currency)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
-          {total > 0 && (
-            <div className={cx("flex items-baseline justify-between border-t", s.rule, "pt-3")}>
-              <span className="text-secondary">{tr.t("total")}</span>
-              <span className="font-serif text-title-lg font-semibold">
-                {formatMoney(grandTotal, currency)}
-              </span>
-            </div>
-          )}
-          {total > 0 && pricing.taxIncluded > 0 && (
-            <div className="text-right text-label text-muted-2">
-              {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
-            </div>
-          )}
+          {/* Same component and section order as checkout — the guest sees the
+              booking itemised exactly as they approved it one screen earlier. */}
+          <PriceBreakdown
+            pricing={pricing}
+            extraLines={extraLines}
+            grandTotal={grandTotal}
+            currency={currency}
+            variant="confirmation"
+            showMoney={total > 0}
+          />
         </div>
       </div>
 
