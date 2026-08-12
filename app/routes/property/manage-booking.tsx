@@ -6,7 +6,7 @@ import { useProperty } from "~/lib/booking-context";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking } from "~/lib/booking-finalize.server";
 import { groupExtrasByRoom } from "~/lib/extras";
-import { incrementAvailability } from "~/lib/ari.server";
+import { incrementAvailability } from "~/lib/ari/admin.server";
 import { sendCancellationEmails } from "~/lib/email.server";
 import { refundBookingCharge } from "~/lib/refunds.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";

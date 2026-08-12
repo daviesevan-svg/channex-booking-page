@@ -4,7 +4,8 @@
 // (D1) will later override these.
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { getInventory, type MappingRoomType } from "./ari.server";
+import { getInventory } from "./ari/read.server";
+import type { MappingRoomType } from "./ari/schema.server";
 import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit, PricingMode, SiteSettings } from "./content";
@@ -551,7 +552,7 @@ export async function getCalendarAvailability(
       if (avail <= 0) continue; // no inventory set = not bookable
       for (const rt of roomRates) {
         // getInventory keys restrictions/prices by room|rate|date (see
-        // ari.server.ts) — the old rate|date key never matched, so the calendar
+        // ari/read.server.ts) — the old rate|date key never matched, so the calendar
         // showed stop-sell/CTA/CTD/min-stay dates as open. Match the booking
         // gate's key exactly.
         const rid = rateChannexId(rt, room.id);

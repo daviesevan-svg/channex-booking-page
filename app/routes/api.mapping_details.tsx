@@ -1,5 +1,5 @@
 import type { Route } from "./+types/api.mapping_details";
-import { checkApiKey } from "~/lib/ari.server";
+import { checkApiKey } from "~/lib/ari/ingest.server";
 import { getCatalogMapping } from "~/lib/catalog.server";
 import { isChannexConnected } from "~/lib/overrides.server";
 

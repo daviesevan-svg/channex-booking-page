@@ -4,12 +4,13 @@
 // Every step is DERIVED from the stored data at render time — there is no
 // stored todo state to drift out of sync, no "mark as done" to lie with. The
 // list names the exact gates the booking engine actually enforces: a night
-// with no inventory row counts as 0 (ari.server), a room with no priced rate
+// with no inventory row counts as 0 (ari/read.server), a room with no priced rate
 // never renders, checkout without a Stripe account can only simulate, and a
 // property with liveBooking off tells guests it's in test mode.
 import { format, addDays } from "date-fns";
 
-import { getInventory, getLastAriReceivedAt } from "./ari.server";
+import { getLastAriReceivedAt } from "./ari/ingest.server";
+import { getInventory } from "./ari/read.server";
 import { getRates, getRooms } from "./catalog.server";
 import { getGalleryFor } from "./gallery.server";
 import { getHeroImage, getOverrides, getSettings } from "./overrides.server";

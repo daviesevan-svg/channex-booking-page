@@ -5,7 +5,7 @@
 import type { SiteSettings } from "./content";
 import { getOverrides, getSettings, type PropertyOverrides } from "./overrides.server";
 import { getProperty } from "./properties.server";
-import { hasReceivedAri } from "./ari.server";
+import { hasReceivedAri } from "./ari/ingest.server";
 
 /** Whether the property can actually take a booking — required before Google
  *  advertises it. Either an active Stripe connection (we charge the guest

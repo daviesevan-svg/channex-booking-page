@@ -8,7 +8,7 @@
 // matches the site's for the same party.
 import { addDays, format, parseISO } from "date-fns";
 
-import { getInventory } from "../ari.server";
+import { getInventory } from "../ari/read.server";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";

@@ -10,7 +10,7 @@ import {
   type BookingStatus,
   type PaymentInfo,
 } from "./bookings.server";
-import { availabilityShortfall, decrementAvailability } from "./ari.server";
+import { availabilityShortfall, decrementAvailability } from "./ari/admin.server";
 import { pushOpenChannelBooking, pushOpenChannelRevision } from "./open-channel.server";
 import { getConfig } from "./config.server";
 import { fromStripeMinor, toStripeMinor } from "./money";

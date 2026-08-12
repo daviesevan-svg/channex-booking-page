@@ -4,7 +4,8 @@
 // Batched deliberately: the directory renders a page of properties at a time,
 // and doing this per row would be one query per property. One grouped query
 // covers the whole page.
-import { ensureSchema, getLastAriReceivedAt } from "./ari.server";
+import { getLastAriReceivedAt } from "./ari/ingest.server";
+import { ensureSchema } from "./ari/schema.server";
 import { getDB } from "./config.server";
 import { chunkForBinds, placeholders } from "./d1-limits";
 import { openPercent, type PropertyActivity } from "./property-activity";
