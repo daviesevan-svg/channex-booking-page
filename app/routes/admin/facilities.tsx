@@ -20,6 +20,7 @@ import {
   saveFacilitiesExtra,
 } from "~/lib/overrides.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 import { makeTranslator } from "~/lib/i18n";
 
@@ -122,14 +123,7 @@ export default function AdminFacilities({ loaderData, actionData }: Route.Compon
   const { lang, chosen, extra, baseExtra, copyable } = loaderData;
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("facTitle")}</h1>
-        {actionData && "ok" in actionData && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("facTitle")} saved={Boolean(actionData && "ok" in actionData && actionData.ok)} />
       <p className="mb-6 text-[14px] text-muted">{t("facIntro")}</p>
 
       {copyable > 0 && (

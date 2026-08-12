@@ -20,6 +20,7 @@ import {
   type RatePolicy,
 } from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { getConfig } from "~/lib/config.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings } from "~/lib/overrides.server";
@@ -315,14 +316,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
       >
         {t("rtBackAll")}
       </Link>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{isNew ? t("rtNewTitle") : rate?.title}</h1>
-        {actionData && "ok" in actionData && actionData.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={isNew ? t("rtNewTitle") : rate?.title} saved={Boolean(actionData && "ok" in actionData && actionData.ok)} />
 
       <Form ref={formRef} onChange={refreshPreview} method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

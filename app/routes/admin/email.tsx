@@ -10,6 +10,7 @@ import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, save
 import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail } from "~/lib/email.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -170,14 +171,7 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between gap-3">
-        <h1 className="font-serif text-[26px] font-semibold">{t("emtTitle", { label })}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            ✓ {actionData.message}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("emtTitle", { label })} saved={Boolean(actionData?.ok)} message={actionData?.message} className="mb-1 gap-3" />
       <p className="mb-5 text-[14px] text-muted">
         {recipient === "host" ? t("emtIntroLeadHost") : t("emtIntroLead")}{" "}
         {template === "review_request" ? t("emtAutoReview") : t("emtAutoBooking")}{" "}

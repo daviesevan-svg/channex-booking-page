@@ -11,6 +11,7 @@
 import { useState } from "react";
 import { Form } from "react-router";
 
+import { SavedPill } from "~/components/admin-page-header";
 import { DEFAULT_THEME, FONT_PAIRS, THEMES } from "~/lib/content";
 import type { SiteSettings } from "~/lib/content";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -47,11 +48,7 @@ export function BrandPanel({
       <input type="hidden" name="op" value="brand" />
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="font-serif text-[18px] font-semibold">{t("brandTitle")}</div>
-        {saved && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
+        <SavedPill show={saved} />
       </div>
       <p className="mb-4 text-[13px] leading-[1.55] text-muted">{t("brandIntro")}</p>
 

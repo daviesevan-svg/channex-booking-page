@@ -17,6 +17,7 @@ import { MAX_PAGES, slugifyPage } from "~/lib/pages";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { createPage, deletePage, listPages, updatePage } from "~/lib/site.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -98,14 +99,7 @@ export default function AdminWebsitePages({ loaderData, actionData }: Route.Comp
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("wpTitle")}</h1>
-        {saved && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("wpTitle")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{t("wpIntro")}</p>
 
       {!websiteEnabled && (

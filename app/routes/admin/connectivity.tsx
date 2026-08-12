@@ -9,6 +9,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
 import { getLastAriReceivedAt } from "~/lib/ari.server";
 import { useAdminT } from "~/lib/admin-i18n";
+import { AdminPageHeader } from "~/components/admin-page-header";
 
 /** Systems a property can connect to. Only `available` ones can be selected;
  *  the rest are shown as upcoming so the list reads as a roadmap. */
@@ -135,14 +136,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("cnTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("cnTitle")} saved={Boolean(actionData?.ok)} />
 
       <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("cnIntro")}</p>
 

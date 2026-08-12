@@ -15,6 +15,7 @@ import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/pu
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
 import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
+import { AdminPageHeader } from "~/components/admin-page-header";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
@@ -143,12 +144,7 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{programName}</h1>
-        {actionData && "ok" in actionData && actionData.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">{t("saved")}</span>
-        )}
-      </div>
+      <AdminPageHeader title={programName} saved={Boolean(actionData && "ok" in actionData && actionData.ok)} className="" />
 
       <p className="max-w-2xl text-[14px] text-secondary">
         {t("ghIntro", { program: programName, feed: isVr ? t("ghVrListFeed") : t("ghHotelListFeed") })}

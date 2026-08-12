@@ -7,6 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings, savePortalSettings } from "~/lib/overrides.server";
+import { AdminPageHeader } from "~/components/admin-page-header";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -93,14 +94,7 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
 
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("poTitle")}</h1>
-        {actionData?.ok && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader title={t("poTitle")} saved={Boolean(actionData?.ok)} className="mb-1" />
       <p className="mb-6 text-[14px] text-muted">
         {t("poIntro")}
       </p>

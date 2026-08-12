@@ -27,6 +27,7 @@ import {
 } from "~/lib/custom-hostnames.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -249,14 +250,11 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
-        <h1 className="font-serif text-[26px] font-semibold">{t("webTitle")}</h1>
-        {actionData && "ok" in actionData && (
-          <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-            {removed ? t("webDomainRemoved") : t("saved")}
-          </span>
-        )}
-      </div>
+      <AdminPageHeader
+        title={t("webTitle")}
+        saved={Boolean(actionData && "ok" in actionData && actionData.ok)}
+        message={removed ? t("webDomainRemoved") : undefined}
+      />
       <p className="mb-6 text-[14px] text-muted">{t("webIntro")}</p>
 
       {error && (

@@ -4,6 +4,7 @@ import { Form, Link, useFetcher, useNavigate, useNavigation } from "react-router
 
 import type { Route } from "./+types/inventory";
 import { adminMeta } from "~/lib/admin-meta";
+import { SavedPill } from "~/components/admin-page-header";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -556,11 +557,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
               {saving ? t("saving") : t("saveChanges")}
             </button>
           )}
-          {actionData?.ok && (
-            <span className="rounded-full bg-[#e8f0e6] px-3 py-1 text-[13px] font-semibold text-[#3f7a52]">
-              ✓ {actionData.message ?? t("invSaved")}
-            </span>
-          )}
+          <SavedPill show={Boolean(actionData?.ok)}>✓ {actionData?.message ?? t("invSaved")}</SavedPill>
           {actionData?.error && <span className="text-[13px] text-red-600">{actionData.error}</span>}
           <div className="ml-auto flex items-center gap-2 text-[13px] font-semibold">
             {perPerson && (
