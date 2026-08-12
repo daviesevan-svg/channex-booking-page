@@ -152,6 +152,30 @@ export async function brandForUser(email: string): Promise<Brand> {
   return brandOf(await getPartner(user?.partnerId));
 }
 
+/** The hostname a property's PUBLIC pages are served on, for the links we show
+ *  operators ("View site", the booking link they hand to guests).
+ *
+ *  This follows the PROPERTY, not the viewer. A partner's hotel lives on that
+ *  partner's guest host no matter who is looking: a superadmin has no partner
+ *  of their own, and a partner admin's own ADMIN host doesn't serve slug paths
+ *  at all (property-scope.server), so deriving the host from the viewer gives
+ *  a superadmin our domain and a partner admin a 404.
+ *
+ *  Null means our shared domain — for a link, that's the relative path.
+ *
+ *  Takes the partner id rather than a PropertyRef so properties.server stays
+ *  out of this module's imports. */
+export async function guestHostForProperty(
+  partnerId: string | undefined,
+  viewerEmail: string,
+): Promise<string | null> {
+  if (partnerId) return brandOf(await getPartner(partnerId)).guestHost ?? null;
+  // A direct property on our own domain. Falling back to the viewer's partner
+  // host only matters for a partner user holding an unassigned property — a
+  // data mismatch, but their admin host still can't serve the slug.
+  return (await brandForUser(viewerEmail)).guestHost ?? null;
+}
+
 // ===== partner admin hosts =====
 //
 // hostname → partner id, one key per hostname exactly like the property domain
