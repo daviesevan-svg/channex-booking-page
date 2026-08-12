@@ -12,7 +12,7 @@ import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking, payloadWithGuest, pushGuestModification, retryChannexPush } from "~/lib/booking-finalize.server";
 import { FIELD_INPUT } from "~/components/admin-form";
-import { incrementAvailability } from "~/lib/ari.server";
+import { incrementAvailability } from "~/lib/ari/admin.server";
 import { sendCancellationEmails, sendGuestBookingEmail } from "~/lib/email.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";

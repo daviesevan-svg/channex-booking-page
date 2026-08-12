@@ -1,5 +1,5 @@
 import type { Route } from "./+types/api.changes";
-import { applyChanges, checkApiKey } from "~/lib/ari.server";
+import { applyChanges, checkApiKey } from "~/lib/ari/ingest.server";
 import { isChannexConnected } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 

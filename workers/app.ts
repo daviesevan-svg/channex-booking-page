@@ -5,7 +5,7 @@ import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "../app/lib/google-merged-vr-feed.server";
 import { scheduledReviewRequests } from "../app/lib/review-requests.server";
 import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
-import { pruneAri } from "../app/lib/ari.server";
+import { pruneAri } from "../app/lib/ari/admin.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";

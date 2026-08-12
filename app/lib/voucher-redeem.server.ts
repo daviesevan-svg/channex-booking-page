@@ -18,7 +18,8 @@ import {
   updateBooking,
   type BookingRecord,
 } from "./bookings.server";
-import { availabilityShortfall, decrementAvailability, getInventory } from "./ari.server";
+import { availabilityShortfall, decrementAvailability } from "./ari/admin.server";
+import { getInventory } from "./ari/read.server";
 import { getRates, getRooms, rateChannexId } from "./catalog.server";
 import { getSettings } from "./overrides.server";
 import { getConfig } from "./config.server";

@@ -1,5 +1,5 @@
 import type { Route } from "./+types/api.test_connection";
-import { checkApiKey } from "~/lib/ari.server";
+import { checkApiKey } from "~/lib/ari/ingest.server";
 import { isChannexConnected } from "~/lib/overrides.server";
 
 // GET /api/test_connection?hotel_code=... — Channex health check.

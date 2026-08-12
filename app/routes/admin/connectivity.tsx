@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { requirePageAllowed } from "~/lib/page-access.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
-import { getLastAriReceivedAt } from "~/lib/ari.server";
+import { getLastAriReceivedAt } from "~/lib/ari/ingest.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { AdminPageHeader } from "~/components/admin-page-header";
 

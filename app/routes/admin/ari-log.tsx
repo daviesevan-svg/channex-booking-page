@@ -6,7 +6,7 @@ import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, rateChannexId } from "~/lib/catalog.server";
-import { queryAriLog } from "~/lib/ari.server";
+import { queryAriLog } from "~/lib/ari/log.server";
 import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
