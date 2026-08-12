@@ -202,47 +202,82 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       )}
 
       {/* Setup checklist — derived from the stored data every render, so it can
-          never disagree with what the booking engine actually enforces. Hidden
-          for good once every gate is open. */}
-      {!loaderData.checklist.complete && (
+          never disagree with what the booking engine actually enforces. The
+          go-live steps hide once every gate is open; the data check outlives
+          them (a room added next year with no photos reappears here). */}
+      {(!loaderData.checklist.complete || loaderData.checklist.gaps.length > 0) && (
         <section className="mb-6 rounded-[14px] border border-line bg-surface p-6">
-          <div className="mb-1 flex items-baseline justify-between gap-3">
-            <h2 className="font-serif text-[18px] font-semibold">{t("suTitle")}</h2>
-            <span className="text-[12px] font-semibold text-muted">
-              {t("suProgress", { done: loaderData.checklist.doneCount, total: loaderData.checklist.steps.length })}
-            </span>
-          </div>
-          <p className="mb-4 text-[13px] text-muted">{t("suIntro")}</p>
-          <ol className="flex flex-col gap-1.5">
-            {loaderData.checklist.steps.map((s, i) => (
-              <li key={s.key}>
-                <Link
-                  to={s.to}
-                  className={`flex items-center gap-3 rounded-[10px] border px-4 py-2.5 ${
-                    s.done
-                      ? "border-transparent bg-surface-alt opacity-70"
-                      : "border-line-alt bg-surface-alt hover:border-accent"
-                  }`}
-                >
-                  <span
-                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold ${
-                      s.done ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-chip text-muted"
-                    }`}
-                    aria-hidden
-                  >
-                    {s.done ? "✓" : i + 1}
-                  </span>
-                  <span className="flex-1">
-                    <span className={`block text-[14px] font-semibold ${s.done ? "text-muted line-through" : "text-ink"}`}>
-                      {t(`suStep_${s.key}`)}
-                    </span>
-                    {!s.done && <span className="block text-[12px] text-muted">{t(`suHint_${s.key}`)}</span>}
-                  </span>
-                  {!s.done && <span className="flex-none text-[14px] font-semibold text-accent">→</span>}
-                </Link>
-              </li>
-            ))}
-          </ol>
+          {!loaderData.checklist.complete && (
+            <>
+              <div className="mb-1 flex items-baseline justify-between gap-3">
+                <h2 className="font-serif text-[18px] font-semibold">{t("suTitle")}</h2>
+                <span className="text-[12px] font-semibold text-muted">
+                  {t("suProgress", { done: loaderData.checklist.doneCount, total: loaderData.checklist.steps.length })}
+                </span>
+              </div>
+              <p className="mb-4 text-[13px] text-muted">{t("suIntro")}</p>
+              <ol className="flex flex-col gap-1.5">
+                {loaderData.checklist.steps.map((s, i) => (
+                  <li key={s.key}>
+                    <Link
+                      to={s.to}
+                      className={`flex items-center gap-3 rounded-[10px] border px-4 py-2.5 ${
+                        s.done
+                          ? "border-transparent bg-surface-alt opacity-70"
+                          : "border-line-alt bg-surface-alt hover:border-accent"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-6 w-6 flex-none items-center justify-center rounded-full text-[12px] font-bold ${
+                          s.done ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-chip text-muted"
+                        }`}
+                        aria-hidden
+                      >
+                        {s.done ? "✓" : i + 1}
+                      </span>
+                      <span className="flex-1">
+                        <span className={`block text-[14px] font-semibold ${s.done ? "text-muted line-through" : "text-ink"}`}>
+                          {t(`suStep_${s.key}`)}
+                        </span>
+                        {!s.done && <span className="block text-[12px] text-muted">{t(`suHint_${s.key}`)}</span>}
+                      </span>
+                      {!s.done && <span className="flex-none text-[14px] font-semibold text-accent">→</span>}
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+
+          {loaderData.checklist.gaps.length > 0 && (
+            <div className={loaderData.checklist.complete ? "" : "mt-5 border-t border-divider pt-4"}>
+              <h2 className="mb-1 font-serif text-[18px] font-semibold">{t("suGapsTitle")}</h2>
+              <p className="mb-3 text-[13px] text-muted">{t("suGapsIntro")}</p>
+              <ul className="flex flex-col gap-1.5">
+                {loaderData.checklist.gaps.map((g) => (
+                  <li key={g.key}>
+                    <Link
+                      to={g.to}
+                      className="flex items-center gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-2.5 hover:border-accent"
+                    >
+                      <span
+                        className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[#fdf3e0] text-[12px] font-bold text-[#a4700f]"
+                        aria-hidden
+                      >
+                        !
+                      </span>
+                      <span className="flex-1 text-[13px] font-semibold text-ink">
+                        {g.count !== undefined
+                          ? t(`suGap_${g.key}${g.count === 1 ? "_one" : "_other"}`, { n: g.count })
+                          : t(`suGap_${g.key}`)}
+                      </span>
+                      <span className="flex-none text-[14px] font-semibold text-accent">→</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
