@@ -9,7 +9,7 @@ export interface Highlight {
 }
 
 export interface SearchContent {
-  eyebrow?: string; // default derived from the property location
+  eyebrow?: string; // defaults to the property name
   heading?: string;
   intro?: string;
   promoText?: string;
