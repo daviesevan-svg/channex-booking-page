@@ -592,74 +592,10 @@ export async function pruneAri(
   return out;
 }
 
-export interface AriRow {
-  room_type_id: string;
-  rate_plan_id: string;
-  date: string;
-  occupancy: number;
-  price_minor: number;
-  currency: string;
-  fraction_size: number;
-  avail: number | null;
-  stop_sell: number;
-}
-
-/** Bookable rate rows for a stay window [checkin, checkout) — joins rate with
- *  availability/restrictions and drops stop-sold dates. */
-export async function queryRates(hotelCode: string, checkin: string, checkout: string): Promise<AriRow[]> {
-  await ensureSchema();
-  const res = await db()
-    .prepare(
-      `SELECT r.room_type_id, r.rate_plan_id, r.date, r.occupancy, r.price_minor, r.currency, r.fraction_size,
-              a.avail AS avail, COALESCE(x.stop_sell,0) AS stop_sell
-       FROM rate r
-       LEFT JOIN availability a ON a.hotel_code=r.hotel_code AND a.room_type_id=r.room_type_id AND a.date=r.date
-       LEFT JOIN restriction x ON x.hotel_code=r.hotel_code AND x.room_type_id=r.room_type_id AND x.rate_plan_id=r.rate_plan_id AND x.date=r.date
-       WHERE r.hotel_code=? AND r.date>=? AND r.date<?
-       ORDER BY r.room_type_id, r.rate_plan_id, r.occupancy, r.date`,
-    )
-    .bind(hotelCode, checkin, checkout)
-    .all<AriRow>();
-  return res.results ?? [];
-}
-
 export interface MappingRoomType {
   id: string;
   title: string;
   rate_plans: { id: string; title: string; sell_mode: string; max_persons: number; currency: string; read_only: boolean }[];
-}
-
-/** room_types + nested rate_plans for GET /api/mapping_details. */
-export async function getMappingDetails(hotelCode: string): Promise<MappingRoomType[]> {
-  await ensureSchema();
-  const res = await db()
-    .prepare(
-      `SELECT room_type_id, room_title, rate_plan_id, rate_title, sell_mode, max_persons, currency, read_only
-       FROM catalog WHERE hotel_code=? ORDER BY room_title, rate_title`,
-    )
-    .bind(hotelCode)
-    .all<{
-      room_type_id: string; room_title: string | null; rate_plan_id: string; rate_title: string | null;
-      sell_mode: string | null; max_persons: number | null; currency: string | null; read_only: number;
-    }>();
-
-  const byRoom = new Map<string, MappingRoomType>();
-  for (const r of res.results ?? []) {
-    let rt = byRoom.get(r.room_type_id);
-    if (!rt) {
-      rt = { id: r.room_type_id, title: r.room_title ?? r.room_type_id, rate_plans: [] };
-      byRoom.set(r.room_type_id, rt);
-    }
-    rt.rate_plans.push({
-      id: r.rate_plan_id,
-      title: r.rate_title ?? r.rate_plan_id,
-      sell_mode: r.sell_mode ?? "per_room",
-      max_persons: r.max_persons ?? 0,
-      currency: r.currency ?? "GBP",
-      read_only: Boolean(r.read_only),
-    });
-  }
-  return [...byRoom.values()];
 }
 
 // ---- inventory grid (admin-editable ARI) ----

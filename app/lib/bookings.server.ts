@@ -290,21 +290,6 @@ export async function findBookingByRefAndEmail(
   return row ? (JSON.parse(row.json) as BookingRecord) : undefined;
 }
 
-/** Insert a booking. Overwrites any existing row with the same id (upsert). */
-export async function recordBooking(pid: string, record: BookingRecord): Promise<void> {
-  await ready(pid);
-  await db()
-    .prepare(
-      `INSERT INTO booking (pid,id,reference,email,created_at,lifecycle,json)
-       VALUES (?,?,?,?,?,?,?)
-       ON CONFLICT(pid,id) DO UPDATE SET
-         reference=excluded.reference, email=excluded.email, created_at=excluded.created_at,
-         lifecycle=excluded.lifecycle, json=excluded.json`,
-    )
-    .bind(...rowValues(pid, record))
-    .run();
-}
-
 /** Atomically claim a booking's reference. INSERTs the record iff no booking with
  *  that reference exists yet, returning whether we won. This is the finalize-once
  *  latch: only the winner runs the side effects (Channex push, inventory, email),

@@ -10,59 +10,6 @@ export interface Photo {
   position?: number;
 }
 
-export interface HotelPolicy {
-  title?: string;
-  currency?: string;
-  checkinFromTime?: string;
-  checkinToTime?: string;
-  checkoutFromTime?: string;
-  checkoutToTime?: string;
-  childrenMaxAge?: number | null;
-  infantMaxAge?: number | null;
-  maxCountOfGuests?: number;
-  isAdultsOnly?: boolean;
-  internetAccessType?: string | null;
-  internetAccessCost?: string | null;
-  internetAccessCoverage?: string | null;
-  parkingType?: string | null;
-  parkingReservation?: string | null;
-  parkingIsPrivate?: boolean;
-  petsPolicy?: string | null;
-  petsNonRefundableFee?: string | null;
-  petsRefundableDeposit?: string | null;
-  smokingPolicy?: string | null;
-}
-
-export interface FacilityCategory {
-  categoryCode: string;
-  facilities: string[];
-}
-
-export interface PropertyInfo {
-  id: string;
-  title: string;
-  description?: string;
-  address?: string;
-  city?: string;
-  state?: string | null;
-  country?: string;
-  zipCode?: string;
-  location?: { latitude: string; longitude: string } | null;
-  facilities?: FacilityCategory[];
-  photos?: Photo[];
-  logo?: string | null;
-  currency?: string;
-  email?: string;
-  phone?: string;
-  timezone?: string;
-  hideLogo?: boolean;
-  hideTitle?: boolean;
-  exactMatch?: boolean;
-  requestBillingInfo?: boolean;
-  requestCreditCard?: boolean;
-  hotelPolicy?: HotelPolicy;
-}
-
 export interface ClosedDates {
   closed: string[];
   closedToArrival: string[];
@@ -193,21 +140,6 @@ export interface RoomWithRates {
   /** Flat cleaning fee per room per stay (from the manual catalog). */
   cleaningFee?: number;
   ratePlans: RatePlan[];
-}
-
-export interface PropertyListItem {
-  id: string;
-  title: string;
-  description?: string;
-  address?: string;
-  city?: string;
-  state?: string | null;
-  country?: string;
-  zipCode?: string;
-  latitude?: string;
-  longitude?: string;
-  photos?: Photo[];
-  bestOffer?: string | null;
 }
 
 export interface RoomsQuery {

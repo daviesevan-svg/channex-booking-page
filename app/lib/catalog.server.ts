@@ -102,12 +102,6 @@ export function rateChannexId(rate: Pick<CatalogRate, "id" | "channexRateIds">, 
   return rate.channexRateIds?.[roomId] ?? rate.id;
 }
 
-/** Lowest price across the rooms a rate is offered on (undefined if none). */
-export function rateFromPrice(rate: CatalogRate): number | undefined {
-  const vals = Object.values(rate.prices);
-  return vals.length ? Math.min(...vals) : undefined;
-}
-
 const roomsKey = (pid: string) => `catalog_rooms:${pid}`;
 const ratesKey = (pid: string) => `catalog_rates:${pid}`;
 

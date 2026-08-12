@@ -211,13 +211,6 @@ export function slugError(slug: string, id: string, list: PropertyRef[]): string
   return null;
 }
 
-/** A property by its slug (unscoped). */
-export async function getPropertyBySlug(slug: string): Promise<PropertyRef | undefined> {
-  const s = normalizeSlug(slug);
-  if (!s) return undefined;
-  return (await getProperties()).find((p) => p.slug === s);
-}
-
 /** Maps an incoming URL segment (a property id OR a slug) to the real property
  *  id. Exact id match wins (UUID URLs keep working and skip the slug lookup);
  *  otherwise a slug match; otherwise the input is returned unchanged, so unknown
@@ -308,19 +301,6 @@ export async function setPropertyPublic(id: string, isPublic: boolean): Promise<
   const p = list.find((x) => x.id === id);
   if (p) {
     p.public = isPublic;
-    await write(list);
-  }
-}
-
-/** Toggles whether a property appears in the directory collection operators
- *  browse. Opt-OUT rather than opt-in: what the directory shows is already
- *  public on the property's own booking page, and an empty directory makes the
- *  feature pointless. */
-export async function setPropertyDirectoryListed(id: string, listed: boolean): Promise<void> {
-  const list = await getProperties();
-  const p = list.find((x) => x.id === id);
-  if (p) {
-    p.directoryListed = listed;
     await write(list);
   }
 }

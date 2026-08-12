@@ -94,27 +94,6 @@ export interface ResolvedLine extends CartLine {
   valueAdds?: { name: string; inclusions: string[] }[];
 }
 
-export function resolveCart(lines: CartLine[], rooms: RoomWithRates[]): ResolvedLine[] {
-  const resolved: ResolvedLine[] = [];
-  for (const line of lines) {
-    const room = rooms.find((r) => r.id === line.roomId);
-    const rate = room?.ratePlans.find((p) => p.id === line.rateId);
-    if (room && rate) {
-      resolved.push({
-        ...line,
-        roomTitle: room.title,
-        rateTitle: rate.title,
-        occupancy: rate.occupancy,
-        total: Number(rate.totalPrice),
-        net: Number(rate.netPrice ?? rate.totalPrice),
-        cleaningFee: Number(room.cleaningFee ?? 0),
-        photo: room.photos?.[0]?.url,
-      });
-    }
-  }
-  return resolved;
-}
-
 export interface CartCoverage {
   adults: number;
   children: number;

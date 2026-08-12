@@ -70,10 +70,6 @@ export async function importImageFromUrl(prefix: string, url: string): Promise<s
   return `/images/${key}`;
 }
 
-export function uploadRoomImage(propertyId: string, roomId: string, file: File): Promise<string> {
-  return uploadImage(`rooms/${propertyId}/${roomId}`, file);
-}
-
 export function uploadHomeImage(propertyId: string, file: File): Promise<string> {
   return uploadImage(`home/${propertyId}`, file);
 }
@@ -116,12 +112,4 @@ export function uploadExtraImage(propertyId: string, extraId: string, file: File
 
 export function uploadVoucherImage(propertyId: string, productId: string, file: File): Promise<string> {
   return uploadImage(`vouchers/${propertyId}/${productId}`, file);
-}
-
-export function uploadRatePlanImage(
-  propertyId: string,
-  rateId: string,
-  file: File,
-): Promise<string> {
-  return uploadImage(`rateplans/${propertyId}/${rateId}`, file);
 }

@@ -206,10 +206,6 @@ export function checkinDisallowedReason(
   return null;
 }
 
-export function isCheckinAllowed(pkg: PackageRules, checkinISO: string, todayISO: string): boolean {
-  return checkinDisallowedReason(pkg, checkinISO, todayISO) === null;
-}
-
 /** Remaining spendable value on a gift voucher: stored balance minus live
  *  pending checkout holds (expired holds no longer count). */
 export function giftBalance(v: VoucherRecord, now = Date.now()): number {

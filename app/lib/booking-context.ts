@@ -27,9 +27,3 @@ const NO_CONTEXT: PropertyOutletContext = {
 };
 
 export const useProperty = () => useOutletContext<PropertyOutletContext>() ?? NO_CONTEXT;
-
-/** ISO currency code -> symbol for compact display (falls back to code). */
-export function currencySymbol(currency: string): string {
-  const map: Record<string, string> = { GBP: "£", EUR: "€", USD: "$" };
-  return map[currency] ?? currency;
-}

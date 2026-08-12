@@ -37,7 +37,6 @@
 		"CHANNEX_API_URL": "https://app.channex.io",
 		"CHANNEL_CODE": "OpenShopping",
 		"DEFAULT_PROPERTY_ID": "439ec597-8caf-47be-b07d-663a9602c79c",
-		"PCI_URL": "https://pci.vaultera.co",
 		"ALLOW_LIVE_BOOKING": "false",
 		"APP_URL": "https://book.roompanda.com",
 		// Custom domains (Cloudflare for SaaS). The CNAME target hotels point their
