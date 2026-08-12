@@ -33,12 +33,12 @@ import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
-import { createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
+import { createCheckoutSession, platformFee, stripeLocale } from "~/lib/stripe.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
-import { formatMoney, roundStripeMinor, toStripeMinor } from "~/lib/money";
+import { formatMoney, toStripeMinor } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
@@ -573,7 +573,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     let sessionParams: Record<string, unknown>;
     if (stripeMode === "payment") {
       const amountMinor = toStripeMinor(dueAfterVoucher, stay.currency);
-      const feeBps = config.stripePlatformFeeBps;
       const voucherNote = voucherHold
         ? " " + tr.t("stripeVoucherNote", { amount: money(voucherHold.amount), code: voucherHold.code })
         : "";
@@ -587,7 +586,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         payment_intent_data: {
           description: `${hotelName} · ${roomName} · ${dateLabel} (${tr.t("stripeRef", { ref: reference })})`,
           metadata: { reference, pid: stay.channelId },
-          ...(feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, stay.currency) } : {}),
+          ...platformFee(amountMinor, stay.currency),
         },
         line_items: [
           {
