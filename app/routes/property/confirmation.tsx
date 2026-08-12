@@ -4,7 +4,7 @@ import { Link } from "react-router";
 import type { Route } from "./+types/confirmation";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
-import { cartCoverage, parseCart } from "~/lib/cart";
+import { cartCoverage, parseCart, type ResolvedLine } from "~/lib/cart";
 import { formatMoney } from "~/lib/money";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -12,10 +12,11 @@ import { readOccupancy } from "~/lib/occupancy";
 import { getPageText, getSettings } from "~/lib/overrides.server";
 
 import { resolveAppliedPromo } from "~/lib/promotions.server";
-import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { taxConfigFrom } from "~/lib/pricing";
+import { stayTotals } from "~/lib/checkout-totals";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
-import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "~/lib/extras";
+import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -44,22 +45,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const currency = settings.currency || "GBP";
 
   let rooms: { title: string; rate: string }[] = [];
+  let lines: ResolvedLine[] = [];
   let total = 0;
   let nights = 0;
-  let cleaningFee = 0;
   let offer: { name: string; percent: number; discount: number } | null = null;
   let valueAdds: { name: string; inclusions: string[] }[] = [];
   let extraLines: ResolvedExtra[] = [];
-  // Headcount for per-person taxes/fees. Falls back to the searched party, but
-  // once the cart resolves it MUST be the per-line occupancy — the headcount
-  // checkout actually charged — or a person/person_night fee differs between
-  // the checkout and confirmation pages.
-  let adults = occ.adults;
-  let children = occ.childrenAge?.length ?? 0;
 
   if (checkin && checkout) {
     nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
-    const lines = await resolveCartByOccupancy(
+    lines = await resolveCartByOccupancy(
       pid,
       { checkin, checkout, currency },
       parseCart(url.searchParams),
@@ -68,13 +63,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
     // Stay-level, so any line carries the same list (see ResolvedLine.valueAdds).
     valueAdds = lines[0]?.valueAdds ?? [];
-    if (lines.length) {
-      const coverage = cartCoverage(lines);
-      total = coverage.total;
-      adults = coverage.adults;
-      children = coverage.children;
-    }
-    cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
+    if (lines.length) total = cartCoverage(lines).total;
     // The automatic offer baked into the prices (per-line data), for the breakdown line.
     let orig = 0;
     let oName = "";
@@ -107,22 +96,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const applied =
     total > 0 ? await resolveAppliedPromo(pid, url.searchParams.get("promo") || "", total) : null;
 
-  const discount = applied?.discount ?? 0;
-  const pricing = computePricing(
-    {
-      base: Math.round((total - discount) * 100) / 100,
-      nights,
-      adults,
-      children,
-      rooms: rooms.length,
-      cleaningFee,
-      taxableExtras: taxableExtrasTotal(extraLines),
-      checkin: checkin ?? undefined,
-    },
+  // The same stayTotals checkout charged from, so the itemisation here matches
+  // the one the guest just paid. The searched party is only the headcount while
+  // no cart lines resolve (the page reloaded without its cart params).
+  const { pricing, grandTotal } = stayTotals(
+    lines,
+    extraLines,
+    { nights, checkin: checkin ?? undefined, discount: applied?.discount },
     taxConfigFrom(settings),
+    { adults: occ.adults, children: occ.childrenAge?.length ?? 0 },
   );
-
-  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   return {
     reference: params.ref,
@@ -132,7 +115,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     rooms,
     currency,
     total,
-    discount,
+    discount: applied?.discount ?? 0,
     promoCode: applied?.code ?? null,
     offer,
     valueAdds,
