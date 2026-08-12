@@ -26,7 +26,7 @@ const FR: Dict = {
   staysAvailable_other: "{n} établissements disponibles",
   staysInView_one: "{n} établissement visible",
   staysInView_other: "{n} établissements visibles",
-  footerRight: "Réservation sécurisée · Propulsé par Roompanda",
+  footerRight: "Réservation sécurisée · Propulsé par {brand}",
   allRightsReserved: "Tous droits réservés",
   admin: "Admin",
   step_room: "Choisir une chambre",

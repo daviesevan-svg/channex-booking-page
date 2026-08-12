@@ -71,7 +71,7 @@ const EL: Dict = {
   penaltyPercent: "{n}% της διαμονής",
   afterDeadlineCharge: "Μετά από αυτό, χρεώνεται {penalty} σε περίπτωση ακύρωσης.",
   noShowCharge: "Μη εμφάνιση: χρεώνεται {penalty}.",
-  footerRight: "Ασφαλής κράτηση · Powered by Roompanda",
+  footerRight: "Ασφαλής κράτηση · Powered by {brand}",
   allRightsReserved: "Με επιφύλαξη παντός δικαιώματος",
   admin: "Διαχείριση",
   step_room: "Επιλογή δωματίου",

@@ -25,6 +25,7 @@ import { SiteStyleProvider } from "~/components/site-style";
 import { isSiteStyleId, siteStyle } from "~/lib/site-style";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty } from "~/lib/properties.server";
+import { DEFAULT_BRAND, getPartner } from "~/lib/partners.server";
 import { propertyIdForHost } from "~/lib/domains.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 import { basePath, useBase, useHome } from "~/lib/base";
@@ -52,7 +53,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // A property that isn't in the registry (never existed, or was deleted) must
   // 404 — its KV data can linger after removal, so we gate on the registry, not
   // on whether settings/overrides happen to still be readable.
-  if (!(await getProperty(pid))) {
+  const ref = await getProperty(pid);
+  if (!ref) {
     throw new Response("Property not found", { status: 404 });
   }
   const [overrides, settings] = await Promise.all([
@@ -90,6 +92,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   ]);
 
   const url = new URL(request.url);
+  // Footer attribution and the back-office link follow the PROPERTY's partner,
+  // the same rule as every operator-facing link (guestHostForProperty): a
+  // white-label hotel's public page must not carry our name, and /admin is a
+  // 404 on a partner's guest host — their back office lives on the partner's
+  // own admin host. No partner admin host = no link at all, rather than one
+  // pointing at our brand. Same scheme/port as this request so dev works.
+  const partner = await getPartner(ref.partnerId);
+  const footerBrand = partner?.brandName ?? DEFAULT_BRAND.name;
+  const adminHref = partner
+    ? partner.adminHost
+      ? `${url.protocol}//${partner.adminHost}${url.port ? `:${url.port}` : ""}/admin`
+      : null
+    : "/admin";
   const wantStyle = url.searchParams.get("style");
   const wantFont = url.searchParams.get("font");
   const preview =
@@ -142,6 +157,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
     termsUrl: settings.termsUrl ?? null,
     privacyUrl: settings.privacyUrl ?? null,
+    footerBrand,
+    adminHref,
   };
 }
 
@@ -216,7 +233,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl } =
+  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -465,17 +482,26 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-caption text-muted-2">
           <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
           <span className="flex items-center gap-2">
-            {tr.t("footerRight")}
+            {tr.t("footerRight", { brand: footerBrand })}
             {/* Only on the shared domain. /admin is refused on a hotel's own
                 hostname (requireCanonicalHost), so on a custom domain this was a
                 dead link to our back office sitting on their public site.
-                `params.channelId` is the tell: absent means the root mount. */}
-            {isHome && params.channelId && (
+                `params.channelId` is the tell: absent means the root mount.
+                `adminHref` is absolute for a partner property (their own admin
+                host) and null when a partner has none — see the loader. */}
+            {isHome && params.channelId && adminHref && (
               <>
                 <span className="text-faint">·</span>
-                <Link to="/admin" className="text-faint hover:text-accent">
-                  {tr.t("admin")}
-                </Link>
+                {adminHref.startsWith("http") ? (
+                  // Cross-origin: a router Link would try to navigate in-app.
+                  <a href={adminHref} className="text-faint hover:text-accent">
+                    {tr.t("admin")}
+                  </a>
+                ) : (
+                  <Link to={adminHref} className="text-faint hover:text-accent">
+                    {tr.t("admin")}
+                  </Link>
+                )}
               </>
             )}
           </span>

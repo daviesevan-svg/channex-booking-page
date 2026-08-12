@@ -82,7 +82,7 @@ const TR: Dict = {
   penaltyPercent: "konaklamanın %{n}’i",
   afterDeadlineCharge: "Bu tarihten sonra iptal ederseniz {penalty} tahsil edilir.",
   noShowCharge: "Gelmeme durumunda {penalty} tahsil edilir.",
-  footerRight: "Güvenli rezervasyon · Roompanda altyapısıyla",
+  footerRight: "Güvenli rezervasyon · {brand} altyapısıyla",
   allRightsReserved: "Tüm hakları saklıdır",
   admin: "Yönetim",
   step_room: "Oda seçin",

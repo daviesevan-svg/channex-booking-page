@@ -26,7 +26,7 @@ const NL: Dict = {
   staysAvailable_other: "{n} accommodaties beschikbaar",
   staysInView_one: "{n} accommodatie in beeld",
   staysInView_other: "{n} accommodaties in beeld",
-  footerRight: "Veilig boeken · Mogelijk gemaakt door Roompanda",
+  footerRight: "Veilig boeken · Mogelijk gemaakt door {brand}",
   allRightsReserved: "Alle rechten voorbehouden",
   admin: "Admin",
   step_room: "Kamer kiezen",
