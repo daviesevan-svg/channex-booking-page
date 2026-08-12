@@ -7,6 +7,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_PROMO_PLACEHOLDER, langParam, pickLang, searchDefaults, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,
+  getOverrides,
   getSearchContentRaw,
   saveHeroImage,
   saveSearchContent,
@@ -25,7 +26,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const lang = langParam(request);
   const content = await getSearchContentRaw(propertyId, lang);
   const heroImage = await getHeroImage(propertyId);
-  return { configured: true as const, content, heroImage, lang };
+  // The eyebrow's default IS the property name (property/search.tsx), so the
+  // field's placeholder shows it — same "what guests see when this is blank"
+  // contract as every other placeholder on this form.
+  const { hotelName } = await getOverrides(propertyId, lang);
+  return { configured: true as const, content, heroImage, hotelName, lang };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -97,7 +102,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
     );
   }
 
-  const { content, heroImage, lang } = loaderData;
+  const { content, heroImage, hotelName, lang } = loaderData;
   const currentHero = heroImage;
 
   return (
@@ -112,11 +117,36 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="eyebrow" label={t("homeEyebrow")} value={content.eyebrow} placeholder="Carmarthen" />
-        <Field name="heading" label={t("homeHeading")} value={content.heading} placeholder={d.heading} />
-        <Field name="intro" label={t("homeIntroField")} value={content.intro} placeholder={d.intro} textarea />
+        <Field
+          name="eyebrow"
+          label={t("homeEyebrow")}
+          value={content.eyebrow}
+          placeholder={hotelName || t("homeEyebrowPlaceholder")}
+          hint={t("homeEyebrowHint")}
+        />
+        <Field
+          name="heading"
+          label={t("homeHeading")}
+          value={content.heading}
+          placeholder={d.heading}
+          hint={t("homeHeadingHint")}
+        />
+        <Field
+          name="intro"
+          label={t("homeIntroField")}
+          value={content.intro}
+          placeholder={d.intro}
+          hint={t("homeIntroFieldHint")}
+          textarea
+        />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <Field name="searchButton" label={t("homeSearchButton")} value={content.searchButton} placeholder={d.searchButton} />
+          <Field
+            name="searchButton"
+            label={t("homeSearchButton")}
+            value={content.searchButton}
+            placeholder={d.searchButton}
+            hint={t("homeSearchButtonHint")}
+          />
           <Field
             name="promoText"
             label={t("homePromoText")}
@@ -134,7 +164,8 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
         </div>
 
         <div className="border-t border-divider pt-5">
-          <div className="mb-3 font-serif text-[18px] font-semibold">{t("homeHighlights")}</div>
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("homeHighlights")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("homeHighlightsHint")}</p>
           <div className="flex flex-col gap-4">
             {[0, 1, 2].map((i) => (
               <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.6fr]">

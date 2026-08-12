@@ -278,7 +278,15 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
         <input type="hidden" name="lang" value={lang} />
-        <Field name="hotelName" label={t("propHotelNameLabel")} value={overrides.hotelName} placeholder="Spilman Hotel" />
+        {/* Placeholder is the guest-side fallback for an unset name (see
+            property/layout.tsx), not an invented example hotel. */}
+        <Field
+          name="hotelName"
+          label={t("propHotelNameLabel")}
+          value={overrides.hotelName}
+          placeholder={t("propHotelNamePlaceholder")}
+          hint={t("propHotelNameHint")}
+        />
 
         {/* Public listing (registry flag, global — not per-language). Same
             control as the Properties page, surfaced here where it's edited. */}
@@ -471,11 +479,11 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               {t("propLatitudeLabel")}
-              <input name="latitude" defaultValue={settings.latitude} placeholder="51.8576" className={FIELD_INPUT} />
+              <input name="latitude" defaultValue={settings.latitude} placeholder="51.5074" className={FIELD_INPUT} />
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               {t("propLongitudeLabel")}
-              <input name="longitude" defaultValue={settings.longitude} placeholder="-4.3121" className={FIELD_INPUT} />
+              <input name="longitude" defaultValue={settings.longitude} placeholder="-0.1278" className={FIELD_INPUT} />
             </label>
           </div>
           {mapKey && (

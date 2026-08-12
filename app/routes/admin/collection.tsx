@@ -300,7 +300,7 @@ export default function AdminCollection({ loaderData, actionData }: Route.Compon
             </label>
             <label className="block text-[13px] font-semibold text-secondary">
               {t("coPhone")} <span className="font-normal text-faint">{t("coHeaderNote")}</span>
-              <input name="phone" defaultValue={c.phone} placeholder="+353 1 555 0192" className={FIELD_INPUT} />
+              <input name="phone" defaultValue={c.phone} placeholder="+353 …" className={FIELD_INPUT} />
             </label>
           </div>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
