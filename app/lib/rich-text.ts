@@ -126,11 +126,3 @@ export function parseRichText(src: string): Block[] {
   return blocks;
 }
 
-/** True when `src` contains nothing this parser would treat as formatting, so a
- *  caller can skip the tree entirely and render the string as it always was. */
-export function isPlainText(src: string): boolean {
-  const blocks = parseRichText(src);
-  if (blocks.length !== 1 || blocks[0].kind !== "p") return false;
-  const kids = blocks[0].children;
-  return kids.length <= 1 && (kids.length === 0 || kids[0].kind === "text");
-}

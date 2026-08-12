@@ -58,7 +58,3 @@ export function formatAddress(parts: AddressParts): string {
   return addressLines(parts).join("\n");
 }
 
-/** One-line form, for places with no room to breathe (meta tags, alt text). */
-export function addressOneLine(parts: AddressParts): string {
-  return addressLines(parts).join(", ");
-}

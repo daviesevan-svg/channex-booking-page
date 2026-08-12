@@ -213,14 +213,6 @@ export async function getCollectionBySlug(slug: string): Promise<Collection | un
   return readOne(s);
 }
 
-/** Whether `email` may administer this collection: the owner, a named operator,
- *  or a superadmin. */
-export async function isCollectionOperator(c: Collection, email: string): Promise<boolean> {
-  if (c.owner === email) return true;
-  if (c.operators?.includes(email)) return true;
-  return isSuperadmin(email);
-}
-
 /** Collections the signed-in user may see/edit: superadmins see all; everyone
  *  else sees the ones they own or operate. */
 export async function getVisibleCollections(request: Request): Promise<Collection[]> {

@@ -23,10 +23,6 @@ export async function getActiveExtras(pid: string): Promise<Extra[]> {
   return (await getExtras(pid)).filter((e) => e.active);
 }
 
-export async function getExtra(pid: string, id: string): Promise<Extra | undefined> {
-  return (await getExtras(pid)).find((e) => e.id === id);
-}
-
 async function writeExtras(pid: string, list: Extra[]): Promise<void> {
   const kv = getConfigKV();
   if (kv) await kv.put(extrasKey(pid), JSON.stringify(list));

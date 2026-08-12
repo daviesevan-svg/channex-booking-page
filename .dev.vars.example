@@ -1,13 +1,49 @@
+# Copy to .dev.vars for local dev. Everything is optional except SESSION_SECRET —
+# features whose keys are empty are skipped or simulated.
 CHANNEX_API_URL="https://app.channex.io"
 CHANNEL_CODE="OpenShopping"
-DEFAULT_PROPERTY_ID=""
-GROUP_ID=""
-PCI_URL="https://pci.vaultera.co"
+DEFAULT_PROPERTY_ID=""                  # single-hotel deploys: route "/" straight here
 GOOGLE_MAP_KEY=""
 ALLOW_LIVE_BOOKING="false"
+
 # Admin (magic-link login)
 ADMIN_EMAILS="you@example.com"          # comma-separated login allowlist; empty = open self-signup
 SUPERADMIN_EMAILS="you@example.com"     # see every property + manage users; empty bootstraps first user
 SESSION_SECRET="change-me-to-a-long-random-string"
 APP_URL="http://localhost:5173"         # used to build magic links
-RESEND_API_KEY=""                       # set to send real emails (else link shown on screen)
+
+# Transactional email (SparkPost Transmissions API).
+# WARNING: a real key here sends REAL email from local dev — there is no local
+# catcher. Leave empty and magic links are shown on screen instead.
+SPARKPOST_API_KEY=""
+SPARKPOST_API_URL=""                    # empty = US host; https://api.eu.sparkpost.com for EU accounts
+EMAIL_FROM=""                           # "Your Hotel <noreply@domain>" on a SparkPost-verified domain
+
+# Stripe (Connect Standard platform)
+STRIPE_SECRET_KEY=""
+STRIPE_CONNECT_CLIENT_ID=""
+STRIPE_WEBHOOK_SECRET=""
+STRIPE_PLATFORM_FEE_BPS=""              # e.g. "100" = 1% platform fee on payments
+
+# Channex Open Channel push (live ARI/booking connectivity)
+OPEN_CHANNEL_API_KEY=""
+OPEN_CHANNEL_BOOKING_KEY=""
+PROVIDER_CODE=""
+
+# Custom domains (Cloudflare for SaaS)
+CLOUDFLARE_API_TOKEN=""
+CLOUDFLARE_ZONE_ID=""
+CUSTOM_HOSTNAME_TARGET=""
+OWN_HOSTS=""                            # comma-separated hosts that are ours, never claimable
+
+# Booking.com listing import (onboarding)
+SCRAPFLY_API_KEY=""
+
+# Google Hotels direct ARI push
+GOOGLE_ARI_BASE_URL=""
+GOOGLE_ARI_PARTNER_KEY=""
+GOOGLE_ARI_PROXY_KEY=""
+GOOGLE_VR_PARTNER_KEY=""
+GOOGLE_TRAVELPARTNER_ACCOUNT_ID=""
+GOOGLE_TRAVELPARTNER_SA_EMAIL=""
+GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY=""

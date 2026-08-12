@@ -80,13 +80,6 @@ export function writeOccupancy(sp: URLSearchParams, occ: Occupancy): URLSearchPa
   return next;
 }
 
-export function occupancyLabel(adults: number, childrenAge: number[]): string {
-  const parts = [`${adults} adult${adults === 1 ? "" : "s"}`];
-  const c = childrenAge.length;
-  if (c) parts.push(`${c} child${c === 1 ? "" : "ren"}`);
-  return parts.join(" · ");
-}
-
 /** childrenAge array for an API query — undefined when empty (so it's omitted). */
 export function childrenAgeParam(childrenAge: number[]): number[] | undefined {
   return childrenAge.length ? childrenAge : undefined;

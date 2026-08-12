@@ -505,12 +505,6 @@ function resolveFooter(config: SiteConfig, lang: string): ResolvedFooter {
   };
 }
 
-/** Guest-facing: the footer with text resolved for `lang`, per field, falling
- *  back to the default language so a half-translated footer still reads. */
-export async function getFooterFor(pid: string, lang: string): Promise<ResolvedFooter> {
-  return resolveFooter(await read(pid), lang);
-}
-
 /** Save footer structure and ONE language's text together. */
 export async function saveFooter(
   pid: string,

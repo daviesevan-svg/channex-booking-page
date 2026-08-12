@@ -25,10 +25,6 @@ export async function getPromotions(pid: string): Promise<Promotion[]> {
   }
 }
 
-export async function getPromotion(pid: string, id: string): Promise<Promotion | undefined> {
-  return (await getPromotions(pid)).find((p) => p.id === id);
-}
-
 /** The enabled promotion matching a guest-entered code, if any. */
 export async function findPromotionByCode(
   pid: string,

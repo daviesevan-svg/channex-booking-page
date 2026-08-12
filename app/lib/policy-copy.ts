@@ -66,22 +66,3 @@ export function dueNow(p: RatePolicy, total: number, nights: number): number {
   return 0; // pay_at_hotel
 }
 
-/** i18n key (+ params) describing a penalty amount, e.g. "{n}% of the stay". */
-export type PenaltyMsg = { key: string; params?: Record<string, string | number> };
-
-export function penaltyMsg(penalty: PenaltyType, value?: number): PenaltyMsg | null {
-  switch (penalty) {
-    case "none":
-      return { key: "penaltyNone" };
-    case "first_night":
-      return { key: "penaltyFirstNight" };
-    case "full_stay":
-      return { key: "penaltyFullStay" };
-    case "percent":
-      return value ? { key: "penaltyPercent", params: { n: value } } : null;
-    case "fixed":
-      return value ? { key: "penaltyFixedAmount" } : null; // amount formatted by the caller
-    default:
-      return null;
-  }
-}

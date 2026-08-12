@@ -28,17 +28,3 @@ export function imageSize(url: string | undefined | null): ImageSize | null {
   if (!width || !height || width > MAX_DIM || height > MAX_DIM) return null;
   return { width, height };
 }
-
-/**
- * `width`/`height` props for an `<img>`, or nothing when the size is unknown.
- *
- * These are the intrinsic pixels, NOT the display size: the browser uses the
- * ratio to reserve the right box before the bytes arrive, and CSS still decides
- * how big it actually draws. That is what stops the page jumping as images load.
- */
-export function imageDimensionProps(
-  url: string | undefined | null,
-): { width: number; height: number } | Record<string, never> {
-  const size = imageSize(url);
-  return size ? { width: size.width, height: size.height } : {};
-}

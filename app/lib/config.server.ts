@@ -1,12 +1,13 @@
 import { env } from "cloudflare:workers";
 
-import { createChannexClient, type ChannexConfig } from "./channex/client";
-
 // Runtime configuration, read from Worker env bindings at request time.
 // Set these in wrangler.jsonc (`vars`) for local/dev and in the Cloudflare
 // dashboard for production. Changing them needs no rebuild.
-export interface AppConfig extends ChannexConfig {
-  pciUrl: string;
+export interface AppConfig {
+  /** Channex API origin, e.g. https://app.channex.io */
+  apiUrl: string;
+  /** Booking Engine meta-channel code (REACT_APP_CHANNEL_CODE) */
+  channelCode: string;
   googleMapKey?: string;
   /** When false, checkout simulates the booking instead of calling push_booking. */
   allowLiveBooking: boolean;
@@ -111,8 +112,6 @@ export function getConfig(): AppConfig {
   const config: AppConfig = {
     apiUrl: read("CHANNEX_API_URL", "https://app.channex.io"),
     channelCode: read("CHANNEL_CODE"),
-    groupId: read("GROUP_ID") || undefined,
-    pciUrl: read("PCI_URL", "https://pci.vaultera.co"),
     googleMapKey: read("GOOGLE_MAP_KEY") || undefined,
     allowLiveBooking: read("ALLOW_LIVE_BOOKING") === "true",
     defaultPropertyId: read("DEFAULT_PROPERTY_ID") || undefined,
@@ -167,11 +166,6 @@ export function getConfig(): AppConfig {
     );
   }
   return config;
-}
-
-/** Convenience: a Channex client built from runtime config. */
-export function getChannexClient() {
-  return createChannexClient(getConfig());
 }
 
 /** The KV namespace holding per-property content overrides. */

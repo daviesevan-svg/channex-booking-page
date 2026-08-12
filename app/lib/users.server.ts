@@ -153,12 +153,6 @@ async function hasStoredSuperadmin(): Promise<boolean> {
   return (await getUsers()).some((u) => u.role === "superadmin");
 }
 
-/** True once any superadmin exists — via env list or a stored superadmin record. */
-export async function hasAnySuperadmin(): Promise<boolean> {
-  if (getConfig().superadminEmails.length > 0) return true;
-  return hasStoredSuperadmin();
-}
-
 export async function isSuperadmin(email: string): Promise<boolean> {
   const { superadminEmails } = getConfig();
   if (superadminEmails.includes(norm(email))) return true;
