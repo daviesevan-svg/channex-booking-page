@@ -22,10 +22,31 @@ export interface SetupStep {
   to: string;
 }
 
+/** A data-entry hole that doesn't BLOCK bookings but that guests (or the
+ *  owner's accountant) will notice: a room nobody priced, missing photos,
+ *  no contact details. Room-scoped gaps carry a count. */
+export interface SetupGap {
+  key:
+    | "rooms_photos"
+    | "rooms_desc"
+    | "rooms_unpriced"
+    | "rooms_closed"
+    | "contact"
+    | "description"
+    | "times"
+    | "location"
+    | "legal"
+    | "taxes";
+  count?: number;
+  /** Admin page where the gap is fixed. */
+  to: string;
+}
+
 export interface SetupChecklist {
   steps: SetupStep[];
   doneCount: number;
   complete: boolean;
+  gaps: SetupGap[];
 }
 
 export async function setupChecklist(pid: string): Promise<SetupChecklist> {
@@ -49,15 +70,21 @@ export async function setupChecklist(pid: string): Promise<SetupChecklist> {
 
   // Availability: Channex properties receive it by ARI push; native ones must
   // set inventory by hand, and a night with no row is NOT bookable — so look
-  // for any open night in the next 30 days.
+  // for any open night in the next 30 days. The per-room view feeds the gap
+  // audit below: "the property has availability" and "every room does" differ
+  // exactly where a room was forgotten.
   let hasAvailability = false;
+  const openRooms = new Set<string>();
   if (channex) {
     hasAvailability = (await getLastAriReceivedAt(pid)) != null;
   } else if (rooms.length > 0) {
     const from = format(new Date(), "yyyy-MM-dd");
     const to = format(addDays(new Date(), 30), "yyyy-MM-dd");
     const inv = await getInventory(pid, from, to);
-    hasAvailability = Object.values(inv.availability).some((n) => n > 0);
+    for (const [key, n] of Object.entries(inv.availability)) {
+      if (n > 0) openRooms.add(key.split("|")[0]);
+    }
+    hasAvailability = openRooms.size > 0;
   }
 
   const steps: SetupStep[] = [
@@ -74,5 +101,43 @@ export async function setupChecklist(pid: string): Promise<SetupChecklist> {
     { key: "golive", done: settings.liveBooking === true, to: "/admin/general" },
   ];
   const doneCount = steps.filter((s) => s.done).length;
-  return { steps, doneCount, complete: doneCount === steps.length };
+
+  // ---- data-entry gaps ----
+  // These never block the go-live gates above; they name the holes a hurried
+  // setup leaves behind. Room-scoped checks only make sense once rooms exist,
+  // and the availability one only once the property has ANY open nights —
+  // before that the gate itself is the message.
+  const gaps: SetupGap[] = [];
+  const pushRoomGap = (key: SetupGap["key"], to: string, count: number) => {
+    if (count > 0) gaps.push({ key, to, count });
+  };
+
+  if (rooms.length > 0) {
+    pushRoomGap("rooms_photos", "/admin/rooms", rooms.filter((r) => r.images.length === 0).length);
+    pushRoomGap("rooms_desc", "/admin/rooms", rooms.filter((r) => !r.description?.trim()).length);
+    // A room no rate plan prices never renders to guests — the most invisible
+    // miss there is. Channex rates carry ARI-fed prices, so there presence in
+    // the rate's per-room price map is the test; native needs a real amount.
+    const roomPriced = (roomId: string) =>
+      rates.some((r) => {
+        if (!r.active) return false;
+        const p = r.prices[roomId];
+        return channex ? p !== undefined : typeof p === "number" && p > 0;
+      });
+    pushRoomGap("rooms_unpriced", "/admin/rates", rooms.filter((r) => !roomPriced(r.id)).length);
+    if (!channex && hasAvailability) {
+      pushRoomGap("rooms_closed", "/admin/inventory", rooms.filter((r) => !openRooms.has(r.id)).length);
+    }
+  }
+  if (!overrides.email?.trim() && !overrides.phone?.trim()) gaps.push({ key: "contact", to: "/admin" });
+  if (!overrides.description?.trim()) gaps.push({ key: "description", to: "/admin" });
+  if (!settings.checkinTime || !settings.checkoutTime) gaps.push({ key: "times", to: "/admin" });
+  if (!settings.latitude || !settings.longitude) gaps.push({ key: "location", to: "/admin" });
+  if (!settings.termsUrl && !settings.privacyUrl) gaps.push({ key: "legal", to: "/admin/general" });
+  // Legitimately absent when prices are all-inclusive — the copy says so.
+  if (!(settings.taxes?.length || settings.fees?.length || settings.cityTax?.enabled)) {
+    gaps.push({ key: "taxes", to: "/admin/taxes" });
+  }
+
+  return { steps, doneCount, complete: doneCount === steps.length, gaps };
 }
