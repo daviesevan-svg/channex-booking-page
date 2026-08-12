@@ -22,7 +22,7 @@ import {
   type PropertyRoom,
 } from "./xml";
 import { getProperties } from "../properties.server";
-import { waitUntil } from "cloudflare:workers";
+import { fireAndForget } from "../d1.server";
 import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
 import { googlePromotions } from "./promotions.server";
 import { getGoogleMatchStatus } from "./status.server";
@@ -247,14 +247,11 @@ export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriP
  *  dev). Used by the Channex change webhook and admin edits. */
 export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promise<void> {
   if (!(await getSettings(pid)).googleAriPush) return;
-  const work = runAndRecord(pid, kinds).catch((e) =>
-    console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
+  fireAndForget(
+    runAndRecord(pid, kinds).catch((e) =>
+      console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
+    ),
   );
-  try {
-    waitUntil(work);
-  } catch {
-    void work; // outside a request context (or dev): let it run detached
-  }
 }
 
 /** Cron entry: push everything for every property that has ARI push enabled.

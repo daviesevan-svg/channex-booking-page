@@ -10,23 +10,12 @@
 // forget capture that never breaks a guest page, GROUP-BY aggregations for the
 // dashboard, and a cron prune. No PII — country is coarse ISO alpha-2 from
 // Cloudflare, no IP stored.
-import { waitUntil } from "cloudflare:workers";
+import { db, fireAndForget, schemaOnce } from "./d1.server";
 
-import { getDB } from "./config.server";
-
-function db(): D1Database {
-  const d = getDB();
-  if (!d) throw new Error("D1 database (binding DB) is not configured.");
-  return d;
-}
-
-let schemaReady = false;
-/** Idempotently create the collection_event table (same pattern as ari.server). */
-async function ensureSchema(): Promise<void> {
-  if (schemaReady) return;
-  await db().batch([
-    db().prepare(
-      `CREATE TABLE IF NOT EXISTS collection_event (
+/** Idempotently create the collection_event table. */
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS collection_event (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         collection_slug TEXT NOT NULL,
         ts INTEGER NOT NULL,
@@ -42,11 +31,9 @@ async function ensureSchema(): Promise<void> {
         country TEXT,
         lang TEXT
       )`,
-    ),
-    db().prepare(`CREATE INDEX IF NOT EXISTS collection_event_slug_ts ON collection_event (collection_slug, ts)`),
-  ]);
-  schemaReady = true;
-}
+  ),
+  d.prepare(`CREATE INDEX IF NOT EXISTS collection_event_slug_ts ON collection_event (collection_slug, ts)`),
+]);
 
 export type CollectionEventType = "view" | "click";
 
@@ -104,16 +91,10 @@ export async function logCollectionEvent(ev: CollectionEvent): Promise<void> {
   }
 }
 
-/** Fire-and-forget wrapper: logs without delaying the response. The write is
- *  kept alive past the response via waitUntil (falling back to a floating
- *  promise outside a request context, e.g. dev). */
+/** Fire-and-forget wrapper: logs without delaying the response.
+ *  (logCollectionEvent catches internally, so the promise can't reject.) */
 export function queueCollectionEvent(ev: CollectionEvent): void {
-  const work = logCollectionEvent(ev);
-  try {
-    waitUntil(work);
-  } catch {
-    void work;
-  }
+  fireAndForget(logCollectionEvent(ev));
 }
 
 /** Cron housekeeping: drop events older than the longest dashboard window (plus
