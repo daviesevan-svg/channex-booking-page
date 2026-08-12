@@ -264,6 +264,20 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
         <span className="flex-none text-[15px] font-semibold text-accent">{t("prsStart")}</span>
       </Link>
 
+      {/* Import from Booking.com — scrape the public listing once, review, create. */}
+      <Link
+        to="/admin/properties/onboard-booking"
+        className="mb-4 flex items-center justify-between gap-3 rounded-[14px] border border-line bg-surface px-6 py-5 hover:border-accent"
+      >
+        <span>
+          <span className="block font-serif text-[18px] font-semibold">{t("prsOnboardBookingTitle")}</span>
+          <span className="block text-[13px] text-muted">
+            {t("prsOnboardBookingDesc")}
+          </span>
+        </span>
+        <span className="flex-none text-[15px] font-semibold text-accent">{t("prsStart")}</span>
+      </Link>
+
       {/* add — reloadDocument: creating switches the session to the new property
           (see the Edit button above for why SPA nav is unsafe here). */}
       <Form method="post" reloadDocument className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">

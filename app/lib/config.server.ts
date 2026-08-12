@@ -85,6 +85,10 @@ export interface AppConfig extends ChannexConfig {
    *  admin/API traffic arriving on a hotel's custom domain, and to stop a hotel
    *  claiming one of our own addresses. */
   ownHosts?: string;
+  /** Scrapfly API key (secret — never in wrangler `vars`). Used only by the
+   *  one-shot Booking.com onboarding import; unset = that wizard says the
+   *  import isn't available and the owner adds the property manually. */
+  scrapflyApiKey?: string;
 }
 
 function read(key: string, fallback = ""): string {
@@ -153,6 +157,7 @@ export function getConfig(): AppConfig {
     googleTravelPartnerAccountId: read("GOOGLE_TRAVELPARTNER_ACCOUNT_ID") || undefined,
     googleTravelPartnerSaEmail: read("GOOGLE_TRAVELPARTNER_SA_EMAIL") || undefined,
     googleTravelPartnerSaKey: read("GOOGLE_TRAVELPARTNER_SA_PRIVATE_KEY") || undefined,
+    scrapflyApiKey: read("SCRAPFLY_API_KEY") || undefined,
   };
   // Fail closed: a production build must never sign with the public default
   // secret. (Dev builds keep the placeholder so local dev needs no setup.)

@@ -47,6 +47,29 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
   return `/images/${key}`;
 }
 
+/** Fetch an image by URL (the Booking.com onboarding import) and store it in R2
+ *  like an upload. Same guards as uploadImage — type, size, uuid key — plus one
+ *  more: only https URLs, so a crafted payload can't make the Worker fetch
+ *  internal endpoints. Content type comes from the response, extension from the
+ *  type (CDN URLs carry query-string tokens that would pollute a name-derived
+ *  extension). */
+export async function importImageFromUrl(prefix: string, url: string): Promise<string> {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:") throw new Error("Only https image URLs can be imported.");
+  const bucket = getImagesBucket();
+  if (!bucket) throw new Error("Image storage (R2) is not configured.");
+  const res = await fetch(parsed.toString());
+  if (!res.ok) throw new Error(`Image fetch failed (${res.status}).`);
+  const type = res.headers.get("content-type")?.split(";")[0].trim() ?? "";
+  if (!type.startsWith("image/")) throw new Error("URL did not return an image.");
+  const bytes = await res.arrayBuffer();
+  if (bytes.byteLength > MAX_BYTES) throw new Error("Image is too large (max 8MB).");
+  const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif", "image/gif": "gif" }[type] ?? "jpg";
+  const key = `${prefix}/${crypto.randomUUID()}${await sizeSuffix(bytes)}.${ext}`;
+  await bucket.put(key, bytes, { httpMetadata: { contentType: type } });
+  return `/images/${key}`;
+}
+
 export function uploadRoomImage(propertyId: string, roomId: string, file: File): Promise<string> {
   return uploadImage(`rooms/${propertyId}/${roomId}`, file);
 }

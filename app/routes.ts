@@ -110,6 +110,7 @@ export default [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
     route("properties/onboard", "routes/admin/onboard-channex.tsx"),
+    route("properties/onboard-booking", "routes/admin/onboard-booking.tsx"),
     route("collections", "routes/admin/collections.tsx"),
     route("collections/:slug", "routes/admin/collection.tsx"),
     route("collections/:slug/analytics", "routes/admin/collection-analytics.tsx"),
