@@ -1,7 +1,5 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
-import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { getBookingCutoff } from "~/lib/overrides.server";
 import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
@@ -23,7 +21,7 @@ import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, seri
 import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
-import { getPageText, getSettings } from "~/lib/overrides.server";
+import { getPageText } from "~/lib/overrides.server";
 
 import { queueSearchEvent } from "~/lib/search-analytics.server";
 import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
@@ -35,39 +33,19 @@ import {
   childrenAgeParam,
   partySize,
   ratePlansForParty,
-  readOccupancy,
   roomAvailability,
   roomCapacity,
   roomFits,
 } from "~/lib/occupancy";
-import { basePath, homePath, useBase, useHome } from "~/lib/base";
+import { useBase, useHome } from "~/lib/base";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
-import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { requireDatedStay } from "~/lib/dated-stay.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  const url = new URL(request.url);
-  const checkin = url.searchParams.get("checkin");
-  const checkout = url.searchParams.get("checkout");
-  const occ = readOccupancy(url.searchParams);
+  const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
+    await requireDatedStay(params.channelId, request);
   const lang = langFromRequest(request);
-  // :channelId may be a slug — resolve to the real id for data lookups; redirects
-  // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolveRequestProperty(params.channelId, request);
-
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) {
-    throw redirect(home);
-  }
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) {
-    throw redirect(home);
-  }
-
-  // Currency is the property's, not the URL param — there's no conversion, so a
-  // spoofed ?currency= would only mislabel prices (and the charge; see checkout).
-  const settings = await getSettings(pid);
-  const currency = settings.currency || "GBP";
 
   const rooms = await getCatalogRooms(
     pid,
@@ -82,7 +60,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
 
   const party = partySize(occ);
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
 
   // Can the property seat this party AT ALL on these dates — even taking every
   // bookable room? Sum each room type's (sellable count × its capacity). If the

@@ -1,7 +1,4 @@
-import { differenceInCalendarDays, parseISO } from "date-fns";
-
-import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
+import { getPageText } from "~/lib/overrides.server";
 
 import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
@@ -27,28 +24,16 @@ import {
   type ExtraSelection,
 } from "~/lib/extras";
 import { formatMoney } from "~/lib/money";
-import { partySize, readOccupancy } from "~/lib/occupancy";
+import { partySize } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
-import { basePath, homePath, useBase, useHome } from "~/lib/base";
-import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useBase, useHome } from "~/lib/base";
+import { requireDatedStay } from "~/lib/dated-stay.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  const url = new URL(request.url);
-  const checkin = url.searchParams.get("checkin");
-  const checkout = url.searchParams.get("checkout");
-  const occ = readOccupancy(url.searchParams);
-  // :channelId may be a slug — resolve to the real id for data lookups; redirects
-  // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolveRequestProperty(params.channelId, request);
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(home);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(home);
-
-  // Currency is the property's, not the URL param (no conversion exists).
-  const currency = (await getSettings(pid)).currency || "GBP";
+  const { pid, base, url, checkin, checkout, occ, currency, nights } =
+    await requireDatedStay(params.channelId, request);
 
   const sp = url.searchParams.toString();
   const lineIndex = Number(url.searchParams.get("line"));
@@ -74,7 +59,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(`${base}/rooms?${sp}`);
   }
 
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const state = parseExtrasState(url.searchParams);
   const text = await getPageText(pid, "extras", langFromRequest(request));
   return {

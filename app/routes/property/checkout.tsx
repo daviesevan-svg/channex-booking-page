@@ -1,6 +1,5 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 
-import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
@@ -32,7 +31,6 @@ import { getActiveExtras } from "~/lib/extras.server";
 import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
-import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 import { taxConfigFrom } from "~/lib/pricing";
 import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
 import { stashPending } from "~/lib/pending-bookings.server";
@@ -40,14 +38,14 @@ import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { formatMoney, toStripeMinor } from "~/lib/money";
-import { readOccupancy, type Occupancy } from "~/lib/occupancy";
+import type { Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getOverrides, getPageText } from "~/lib/overrides.server";
 
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
-import { basePath, homePath, useBase, useHome } from "~/lib/base";
-import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { useBase, useHome } from "~/lib/base";
+import { requireDatedStay } from "~/lib/dated-stay.server";
 import { funnelContext, queueFunnelEvent, type FunnelContext } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -58,19 +56,6 @@ interface Stay {
   checkout: string;
   currency: string;
   occ: Occupancy;
-}
-
-function readStay(url: URL, channelId: string): Stay | null {
-  const checkin = url.searchParams.get("checkin");
-  const checkout = url.searchParams.get("checkout");
-  if (!checkin || !checkout) return null;
-  return {
-    channelId,
-    checkin,
-    checkout,
-    currency: url.searchParams.get("currency") || "GBP",
-    occ: readOccupancy(url.searchParams),
-  };
 }
 
 async function resolveStayCart(
@@ -136,22 +121,14 @@ function deriveOffer(lines: ResolvedLine[]) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  const url = new URL(request.url);
-  // :channelId may be a slug — resolve to the real id and carry it on the stay,
-  // so every data lookup + the booking record use the UUID. Redirects/links keep
-  // params.channelId so the slug stays in the URL through the flow.
-  const pid = await resolveRequestProperty(params.channelId, request);
-  const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(home);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(home);
-
-  const settings = await getSettings(pid);
-  // Currency is the property's configured currency — NEVER the URL param. There
-  // is no conversion anywhere, so a spoofed ?currency= would just re-denominate
-  // the same number at checkout (pay ¥500 for a £500 room).
-  stay.currency = settings.currency || "GBP";
+  // requireDatedStay resolves a slug :channelId to the real id, which the stay
+  // carries so every data lookup + the booking record use the UUID; redirects
+  // and links keep params.channelId so the slug stays in the URL through the
+  // flow. The currency is the property's — the URL's is never read (see the
+  // helper: this is the charge path, a spoofed ?currency= must not survive).
+  const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
+    await requireDatedStay(params.channelId, request);
+  const stay: Stay = { channelId: pid, checkin, checkout, currency, occ };
 
   const lang = langFromRequest(request);
   const { rooms, lines } = await resolveStayCart(stay, url);
@@ -159,7 +136,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
   }
 
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   const text = await getPageText(pid, "checkout", lang);
   const totals = cartCoverage(lines);
   // The automatic offer (if any) is already baked into the line totals; derive
@@ -273,20 +249,12 @@ const GuestSchema = z.object({
 });
 
 export async function action({ params, request }: Route.ActionArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  const url = new URL(request.url);
-  // Resolve slug→id: stay.channelId (the booking's pid, Stripe metadata, etc.)
-  // must be the real UUID. Redirect/return URLs keep params.channelId (the slug).
-  const pid = await resolveRequestProperty(params.channelId, request);
-  const stay = readStay(url, pid);
-  if (!stay || !isStayBookable(stay.checkin, stay.checkout)) throw redirect(home);
-  if (isTooLastMinute(stay.checkin, await getBookingCutoff(pid))) throw redirect(home);
-
-  // Currency is the property's, never the URL (see loader) — this is the charge
-  // path, so the guard matters most here.
-  const settings = await getSettings(stay.channelId);
-  stay.currency = settings.currency || "GBP";
+  // Same preamble as the loader — one shared implementation, so the action
+  // (the charge path, where the currency guard matters most) can never drift
+  // from what the page showed.
+  const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
+    await requireDatedStay(params.channelId, request);
+  const stay: Stay = { channelId: pid, checkin, checkout, currency, occ };
 
   const form = await request.formData();
   const intent = String(form.get("intent") || "book");
@@ -352,7 +320,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   // otherwise simulate, even in live mode (there's nothing to push to).
   const live =
     (settings.liveBooking ?? config.allowLiveBooking) && settings.connectedSystem === "channex";
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(stay.checkout), parseISO(stay.checkin)));
   // Random, unguessable reference — also the guest's manage-booking credential.
   const reference = generateReference();
 

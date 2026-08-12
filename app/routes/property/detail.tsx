@@ -1,6 +1,5 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { format, parseISO } from "date-fns";
 
-import { isStayBookable, isTooLastMinute } from "~/lib/dates";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
@@ -12,7 +11,7 @@ import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
-import { getBookingCutoff, getPageText, getSettings } from "~/lib/overrides.server";
+import { getPageText } from "~/lib/overrides.server";
 
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { formatMoney } from "~/lib/money";
@@ -22,30 +21,17 @@ import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice } from "~/l
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { langFromRequest } from "~/lib/content";
 import { useT, type Translator } from "~/lib/i18n";
-import { childrenAgeParam, partySize, ratePlansForParty, readOccupancy, roomCapacity } from "~/lib/occupancy";
-import { basePath, homePath, useBase, useHome } from "~/lib/base";
-import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { childrenAgeParam, partySize, ratePlansForParty, roomCapacity } from "~/lib/occupancy";
+import { useBase, useHome } from "~/lib/base";
+import { requireDatedStay } from "~/lib/dated-stay.server";
 import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  const url = new URL(request.url);
-  const checkin = url.searchParams.get("checkin");
-  const checkout = url.searchParams.get("checkout");
-  const { adults, childrenAge } = readOccupancy(url.searchParams);
-  // :channelId may be a slug — resolve to the real id for data lookups; redirects
-  // and links keep params.channelId so the slug stays in the URL.
-  const pid = await resolveRequestProperty(params.channelId, request);
-
-  if (!checkin || !checkout || !isStayBookable(checkin, checkout)) throw redirect(home);
-  if (isTooLastMinute(checkin, await getBookingCutoff(pid))) throw redirect(home);
-
-  // Currency is the property's, not the URL param (no conversion exists).
-  const settings = await getSettings(pid);
-  const currency = settings.currency || "GBP";
+  const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
+    await requireDatedStay(params.channelId, request);
+  const { adults, childrenAge } = occ;
 
   const lang = langFromRequest(request);
   const rooms = await getCatalogRooms(
@@ -69,7 +55,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         : `${base}/rooms?${url.searchParams.toString()}`,
     );
 
-  const nights = Math.max(1, differenceInCalendarDays(parseISO(checkout), parseISO(checkin)));
   const text = await getPageText(pid, "detail", lang);
 
   // Funnel step: a room's dated detail page was reached. Non-fatal by design.
