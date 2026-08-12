@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/partner";
@@ -150,6 +151,11 @@ export default function AdminPartner({ loaderData, actionData }: Route.Component
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
+  // Filter for the assign picker — the unassigned list is every direct
+  // property on the platform, far too long to scan by eye.
+  const [assignQ, setAssignQ] = useState("");
+  const needle = assignQ.trim().toLowerCase();
+  const assignable = needle ? unassigned.filter((u) => u.name.toLowerCase().includes(needle)) : unassigned;
 
   return (
     <div>
@@ -296,16 +302,34 @@ export default function AdminPartner({ loaderData, actionData }: Route.Component
                 ))}
               </ul>
               {unassigned.length > 0 ? (
-                <Form method="post" className="mt-2 flex items-center gap-2">
+                <Form method="post" className="mt-2 space-y-2">
                   <input type="hidden" name="intent" value="assignProperty" />
-                  <select name="propertyId" className="min-w-0 flex-1 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent">
-                    {unassigned.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
-                  <button type="submit" disabled={busy} className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[13px] font-semibold hover:border-accent hover:text-accent">
-                    {t("wlpAssign")}
-                  </button>
+                  <input
+                    value={assignQ}
+                    onChange={(e) => setAssignQ(e.target.value)}
+                    // Enter here must not submit — with the select filtered, the
+                    // form would silently assign the first match.
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.preventDefault();
+                    }}
+                    placeholder={t("searchProperties")}
+                    aria-label={t("searchProperties")}
+                    className="w-full rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent"
+                  />
+                  {assignable.length > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <select name="propertyId" className="min-w-0 flex-1 rounded-[8px] border border-line-alt bg-surface-alt px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent">
+                        {assignable.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                      <button type="submit" disabled={busy} className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[13px] font-semibold hover:border-accent hover:text-accent">
+                        {t("wlpAssign")}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-muted">{t("noPropertiesMatch", { q: assignQ.trim() })}</p>
+                  )}
                 </Form>
               ) : (
                 <p className="mt-2 text-[12px] text-faint">{t("wlpNoUnassigned")}</p>
