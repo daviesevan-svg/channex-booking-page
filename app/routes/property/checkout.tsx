@@ -28,7 +28,8 @@ import { consentGate, stayTotals } from "~/lib/checkout-totals";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
-import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
+import { parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
+import { PriceBreakdown } from "~/components/price-breakdown";
 import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { taxConfigFrom } from "~/lib/pricing";
@@ -993,51 +994,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             )}
           </div>
 
-          {extraLines.length > 0 && (
-            <div className={cx("flex flex-col gap-3 border-b", s.rule, "py-4 text-body")}>
-              <div className="text-label font-semibold uppercase tracking-wide text-muted-2">{tr.t("extrasLabel")}</div>
-              {groupExtrasByRoom(extraLines).map((g, gi) => (
-                <div key={gi} className="flex flex-col gap-1.5">
-                  <div className="text-label font-semibold text-secondary">{g.roomTitle ?? tr.t("forYourStay")}</div>
-                  {g.lines.map((l) => (
-                    <div key={`${l.id}-${l.optionId ?? ""}`} className="flex items-start justify-between gap-3 pl-2">
-                      <div className="min-w-0">
-                        <span>
-                          {l.optionName ? `${l.name} · ${l.optionName}` : l.name}
-                          {l.qty > 1 ? ` ×${l.qty}` : ""}
-                        </span>
-                        {l.infoLine && <div className="text-label text-muted-2">{l.infoLine}</div>}
-                      </div>
-                      <span className="whitespace-nowrap font-semibold">{formatMoney(l.amount, currency)}</span>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {(pricing.charges.length > 0 || pricing.taxLines.length > 0) && (
-            <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
-              {pricing.charges.map((c, i) => (
-                <Row key={`charge-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
-              ))}
-              {pricing.taxLines.map((c, i) => (
-                <Row key={`tax-${i}`} label={c.label} value={formatMoney(c.amount, currency)} />
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-baseline justify-between pt-4">
-            <span className="text-lead font-semibold">{tr.t("total")}</span>
-            <span className="font-serif text-display-sm font-semibold">
-              {formatMoney(grandTotal, currency)}
-            </span>
-          </div>
-          {pricing.taxIncluded > 0 && (
-            <p className="pb-4 pt-1 text-right text-label text-muted-2">
-              {tr.t("includesTaxes", { amount: formatMoney(pricing.taxIncluded, currency) })}
-            </p>
-          )}
+          <PriceBreakdown
+            pricing={pricing}
+            extraLines={extraLines}
+            grandTotal={grandTotal}
+            currency={currency}
+            variant="checkout"
+          />
 
           {/* consent — required ticks sit directly above the booking button */}
           <div className={cx("mb-3 flex flex-col gap-2.5 border-t", s.rule, "pt-4")}>
