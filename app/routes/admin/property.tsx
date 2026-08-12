@@ -12,7 +12,7 @@ import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } fro
 import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
+import { resolveImageField, uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { setupChecklist } from "~/lib/setup-checklist.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
@@ -61,31 +61,27 @@ export async function action({ request }: Route.ActionArgs) {
   // both old values are read once up front.
   const before = await getSettings(propertyId);
   // Property cover photo (global; shown on Collections cards).
-  const coverUpload = form.get("coverUpload");
-  if (coverUpload instanceof File && coverUpload.size > 0) {
-    try {
-      await patchSettings(propertyId, { coverImage: await uploadPropertyCoverImage(propertyId, coverUpload) });
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Cover image upload failed." };
-    }
-  } else if (form.get("removeCover") === "1") {
-    await patchSettings(propertyId, { coverImage: "" });
-  }
+  const cover = await resolveImageField(form, {
+    fileKey: "coverUpload",
+    removeKey: "removeCover",
+    previous: before.coverImage || undefined,
+    upload: (f) => uploadPropertyCoverImage(propertyId, f),
+  });
+  if (!cover.ok) return { error: cover.error };
+  await patchSettings(propertyId, { coverImage: cover.url ?? "" });
   if (before.coverImage) {
     const now = (await getSettings(propertyId)).coverImage;
     if (now !== before.coverImage) queueImageCleanup(propertyId, [before.coverImage]);
   }
   // Property logo (global; shown in the guest booking header).
-  const logoUpload = form.get("logoUpload");
-  if (logoUpload instanceof File && logoUpload.size > 0) {
-    try {
-      await patchSettings(propertyId, { logoImage: await uploadPropertyLogo(propertyId, logoUpload) });
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Logo upload failed." };
-    }
-  } else if (form.get("removeLogo") === "1") {
-    await patchSettings(propertyId, { logoImage: "" });
-  }
+  const logo = await resolveImageField(form, {
+    fileKey: "logoUpload",
+    removeKey: "removeLogo",
+    previous: before.logoImage || undefined,
+    upload: (f) => uploadPropertyLogo(propertyId, f),
+  });
+  if (!logo.ok) return { error: logo.error };
+  await patchSettings(propertyId, { logoImage: logo.url ?? "" });
   if (before.logoImage) {
     const now = (await getSettings(propertyId)).logoImage;
     if (now !== before.logoImage) queueImageCleanup(propertyId, [before.logoImage]);

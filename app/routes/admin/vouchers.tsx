@@ -38,7 +38,7 @@ import {
 import { sendVoucherEmails } from "~/lib/voucher-purchase.server";
 import { fmtDate } from "~/lib/dates";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadVoucherImage } from "~/lib/images.server";
+import { resolveImageField, uploadVoucherImage } from "~/lib/images.server";
 import { getRooms } from "~/lib/catalog.server";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -339,15 +339,14 @@ export async function action({ request }: Route.ActionArgs) {
   const prev = existing.find((p) => p.id === id);
   const finalId = id || crypto.randomUUID();
 
-  let image = form.get("removeImage") != null ? undefined : prev?.image;
-  const upload = form.getAll("image").find((f): f is File => f instanceof File && f.size > 0);
-  if (upload) {
-    try {
-      image = await uploadVoucherImage(propertyId, finalId, upload);
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Image upload failed." };
-    }
-  }
+  const img = await resolveImageField(form, {
+    fileKey: "image",
+    removeKey: "removeImage",
+    previous: prev?.image,
+    upload: (f) => uploadVoucherImage(propertyId, finalId, f),
+  });
+  if (!img.ok) return { error: img.error };
+  const image = img.url;
 
   const product: VoucherProduct = {
     id: finalId,
