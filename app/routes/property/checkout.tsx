@@ -22,17 +22,18 @@ import {
 } from "~/lib/cart";
 import { generateReference } from "~/lib/bookings.server";
 import { cancellationVaries, resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
-import { dueNow, policyToCancellation } from "~/lib/policy-copy";
+import { dueNow } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
+import { consentGate, stayTotals } from "~/lib/checkout-totals";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
-import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, taxableExtrasTotal, untaxedExtrasTotal, type ExtraContextLine } from "~/lib/extras";
+import { groupExtrasByRoom, parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
 import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
-import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { taxConfigFrom } from "~/lib/pricing";
 import { createCheckoutSession, platformFee, stripeLocale } from "~/lib/stripe.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
@@ -187,23 +188,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   // Google Hotel price structured data — the final all-in total the guest sees,
   // so Google's price matches right through the last step (no surprise charges).
-  // Mirrors the grand-total computation in the component below.
-  const discount = urlPromo?.discount ?? 0;
-  const discountedRoom = Math.round((totals.total - discount) * 100) / 100;
-  const pricing = computePricing(
-    {
-      base: discountedRoom,
-      nights,
-      adults: lines.reduce((s, l) => s + l.occupancy.adults, 0),
-      children: lines.reduce((s, l) => s + l.occupancy.children, 0),
-      rooms: lines.length,
-      cleaningFee: lines.reduce((s, l) => s + l.cleaningFee, 0),
-      taxableExtras: taxableExtrasTotal(extraLines),
-      checkin: stay.checkin,
-    },
+  const { grandTotal, adults, children } = stayTotals(
+    lines,
+    extraLines,
+    { nights, checkin: stay.checkin, discount: urlPromo?.discount },
     taxConfigFrom(settings),
   );
-  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   // Funnel step: checkout reached, with the money at stake — what the abandoned-
   // value dashboard number is made of. Non-fatal by design.
@@ -216,8 +206,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       source: "web",
       checkin: stay.checkin,
       nights,
-      adults: lines.reduce((s, l) => s + l.occupancy.adults, 0),
-      children: lines.reduce((s, l) => s + l.occupancy.children, 0),
+      adults,
+      children,
       rooms: lines.length,
       value: grandTotal,
       currency: stay.currency,
@@ -343,9 +333,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (normalizeCode(promoCode) && !applied) {
     return { promoError: true, promoCode: normalizeCode(promoCode) };
   }
-  const discount = applied?.discount ?? 0;
-  const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
-
   const g = parsed.data;
 
   // Throttle booking creation per client. Nothing else guards this: the endpoint
@@ -369,10 +356,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   // Random, unguessable reference — also the guest's manage-booking credential.
   const reference = generateReference();
 
-  // Full price the guest pays = discounted room + taxes/fees.
-  const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
-  const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
-  const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
   // Extras re-priced server-side. VAT-applicable extras fold into the room's VAT
   // base; the rest are added on top untaxed.
   const party = stay.occ.adults + (stay.occ.childrenAge?.length ?? 0);
@@ -383,20 +366,15 @@ export async function action({ params, request }: Route.ActionArgs) {
     nights,
     party,
   );
-  const pricing = computePricing(
-    {
-      base: discountedTotal,
-      nights,
-      adults,
-      children,
-      rooms: lines.length,
-      cleaningFee,
-      taxableExtras: taxableExtrasTotal(extraLines),
-      checkin: stay.checkin,
-    },
+  // Full price the guest pays = discounted room + taxes/fees. The same
+  // stayTotals the loader and component use, so what the guest saw is what
+  // the booking charges.
+  const { pricing, grandTotal, adults, children, discountedRoom: discountedTotal } = stayTotals(
+    lines,
+    extraLines,
+    { nights, checkin: stay.checkin, discount: applied?.discount },
     taxConfigFrom(settings),
   );
-  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   // Consent is required before we create the booking. A non-refundable or
   // charged-today rate needs the distinct acknowledgment too.
@@ -420,16 +398,14 @@ export async function action({ params, request }: Route.ActionArgs) {
     voucherHold = { code: gv.code, amount: Math.min(balance, Math.round(due * 100) / 100) };
   }
   const dueAfterVoucher = Math.round((due - (voucherHold?.amount ?? 0)) * 100) / 100;
-  // A refundable rate whose free-cancellation window has already closed is, for
-  // this booking, non-refundable — so it needs the same acknowledgment.
-  const anchor = { time: settings.cancelAnchorTime, timezone: settings.timezone };
-  const cancelAtBooking = policyToCancellation(policy, stay.checkin, anchor);
-  const freeWindowClosed =
-    cancelAtBooking.refundable && cancelAtBooking.cancelByISO != null && Date.now() > parseISO(cancelAtBooking.cancelByISO).getTime();
-  // Mirrors the UI: the charged-today acknowledgment is only required when a
-  // card is really collected (live + Stripe connected + something due).
-  const chargesToday = live && Boolean(settings.stripeAccountId && config.stripeSecretKey) && dueAfterVoucher > 0;
-  const needAck = !policy.cancellation.refundable || freeWindowClosed || chargesToday;
+  // The same gate the form rendered its checkboxes from — see consentGate.
+  const { needAck } = consentGate({
+    policy,
+    checkin: stay.checkin,
+    anchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
+    dueNow: dueAfterVoucher,
+    collectsCard: live && Boolean(settings.stripeAccountId && config.stripeSecretKey),
+  });
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
   if (!agreed || (needAck && !nonRefundableAck)) {
@@ -763,24 +739,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const submitting = nav.state === "submitting";
 
   const discount = appliedPromo?.discount ?? 0;
-  const discountedRoom = Math.round((totals.total - discount) * 100) / 100;
-  const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
-  const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
-  const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
-  const pricing = computePricing(
-    {
-      base: discountedRoom,
-      nights,
-      adults,
-      children,
-      rooms: lines.length,
-      cleaningFee,
-      taxableExtras: taxableExtrasTotal(extraLines),
-      checkin: stay.checkin,
-    },
+  // The same stayTotals the loader and action use — the number on the button
+  // is the number the action charges.
+  const { pricing, grandTotal } = stayTotals(
+    lines,
+    extraLines,
+    { nights, checkin: stay.checkin, discount },
     loaderData.taxConfig,
   );
-  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   // ---- payment + policy summary (display only; no real charging) ----
   const due = dueNow(policy, grandTotal, nights);
@@ -803,13 +769,15 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
         return "";
     }
   };
-  // Cancellation: the override note wins; else the translated free-until / non-refundable line.
+  // Cancellation + consent, from the same gate the action rejects on.
   // atBooking → a free window that's already closed reads as non-refundable, not a past date.
-  const cancelInfo = policyToCancellation(policy, stay.checkin, cancelAnchor);
-  // A refundable rate whose free-cancellation window has already closed is, for
-  // this booking, non-refundable (the guest can't go back and cancel for free).
-  const freeWindowClosed =
-    cancelInfo.refundable && cancelInfo.cancelByISO != null && Date.now() > parseISO(cancelInfo.cancelByISO).getTime();
+  const { cancelInfo, freeWindowClosed, nonRefundable, chargedToday, needAck } = consentGate({
+    policy,
+    checkin: stay.checkin,
+    anchor: cancelAnchor,
+    dueNow: dueShown,
+    collectsCard,
+  });
   const cancelMsg = cancellationMessage(cancelInfo, Date.now(), { atBooking: true });
   const cancellationText =
     policy.overrideNote ||
@@ -829,14 +797,6 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
 
   // ---- consent ----
-  // Either the rate is non-refundable, or its free-cancellation window already
-  // closed before this booking is being made — both mean "can't cancel free".
-  const nonRefundable = !policy.cancellation.refundable || freeWindowClosed;
-  // "Charged today" is only true when a card is really collected at checkout —
-  // a prepay policy without payments set up charges nothing, so the guest must
-  // not be asked to acknowledge a charge that won't happen.
-  const chargedToday = dueShown > 0 && collectsCard;
-  const needAck = nonRefundable || chargedToday;
   const ackText = nonRefundable
     ? chargedToday
       ? tr.t("ackNonRefundableCharged", { amount: formatMoney(dueShown, currency) })

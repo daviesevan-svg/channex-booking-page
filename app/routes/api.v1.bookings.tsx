@@ -14,17 +14,16 @@ import {
   isConfigurable,
   resolveAllExtras,
   scopeOf,
-  taxableExtrasTotal,
-  untaxedExtrasTotal,
   type Extra,
   type ExtraContextLine,
   type ExtraSelection,
   type ResolvedExtra,
 } from "~/lib/extras";
 import { getActiveExtras } from "~/lib/extras.server";
-import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { taxConfigFrom } from "~/lib/pricing";
+import { consentGate, stayTotals } from "~/lib/checkout-totals";
 import { resolveBookingPolicy } from "~/lib/policy.server";
-import { dueNow, policyToCancellation } from "~/lib/policy-copy";
+import { dueNow } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import type { AppliedPromo } from "~/lib/promotions";
@@ -210,13 +209,6 @@ export async function action({ request }: Route.ActionArgs) {
   const offer = offerFromLines(lines);
   // Stay-level, identical on every line (see ResolvedLine.valueAdds).
   const valueAdds = lines[0]?.valueAdds ?? [];
-  const discount = applied?.discount ?? 0;
-  const discountedTotal = Math.round((totals.total - discount) * 100) / 100;
-
-  const adults = lines.reduce((s, l) => s + l.occupancy.adults, 0);
-  const children = lines.reduce((s, l) => s + l.occupancy.children, 0);
-  const cleaningFee = lines.reduce((s, l) => s + l.cleaningFee, 0);
-
   // Add-ons: reject any invalid selection outright (never silently drop a paid
   // extra), then price authoritatively from the catalog — mirroring checkout.
   // `lines` preserves body.rooms order, so per-room buckets align by index.
@@ -244,25 +236,30 @@ export async function action({ request }: Route.ActionArgs) {
       { lines: body.rooms.map((r) => (r.extras ?? []).map(toSelection)), booking: (body.extras ?? []).map(toSelection) },
       ctx,
       nights,
-      adults + children,
+      totals.adults + totals.children,
     );
   }
 
-  const pricing = computePricing(
-    { base: discountedTotal, nights, adults, children, rooms: lines.length, cleaningFee, taxableExtras: taxableExtrasTotal(extraLines), checkin },
+  // The same stayTotals the web checkout charges from (per-line headcount,
+  // discounted room base, untaxed extras on top).
+  const { pricing, grandTotal, adults, children, discountedRoom: discountedTotal } = stayTotals(
+    lines,
+    extraLines,
+    { nights, checkin, discount: applied?.discount },
     taxConfigFrom(settings),
   );
-  // VAT-exempt extras ride on top of the taxed total untouched (same as checkout).
-  const grandTotal = Math.round((pricing.total + untaxedExtrasTotal(extraLines)) * 100) / 100;
 
   const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
   const due = dueNow(policy, grandTotal, nights);
-  const cancelInfo = policyToCancellation(policy, checkin, {
-    time: settings.cancelAnchorTime,
-    timezone: settings.timezone,
+  // collectsCard is unconditional here: a due>0 booking with payments not set
+  // up is rejected below, so an ack is recorded whenever anything is due.
+  const { needAck } = consentGate({
+    policy,
+    checkin,
+    anchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
+    dueNow: due,
+    collectsCard: true,
   });
-  const freeWindowClosed = cancelInfo.refundable && cancelInfo.cancelByISO != null && Date.now() > Date.parse(cancelInfo.cancelByISO);
-  const needAck = !policy.cancellation.refundable || freeWindowClosed || due > 0;
   const desc = describePolicy(policy, settings.cancelAnchorTime);
 
   // test-mode keys never push to Channex; live keys honour the property's setting.
