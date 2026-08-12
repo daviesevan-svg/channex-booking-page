@@ -38,7 +38,7 @@ import { stashPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
-import { formatMoney, toStripeMinor } from "~/lib/money";
+import { formatMoney, roundStripeMinor, toStripeMinor } from "~/lib/money";
 import { readOccupancy, type Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
@@ -587,7 +587,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         payment_intent_data: {
           description: `${hotelName} · ${roomName} · ${dateLabel} (${tr.t("stripeRef", { ref: reference })})`,
           metadata: { reference, pid: stay.channelId },
-          ...(feeBps > 0 ? { application_fee_amount: Math.round((amountMinor * feeBps) / 10000) } : {}),
+          ...(feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, stay.currency) } : {}),
         },
         line_items: [
           {

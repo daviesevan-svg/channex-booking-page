@@ -26,9 +26,16 @@ export const MONEY_LOCALE = "en-US";
 // Deliberately a list rather than a blanket `currencyDisplay: "narrowSymbol"`:
 // the narrow form also drops the prefix that tells the dollars apart, collapsing
 // AUD (A$), CAD (CA$), NZD (NZ$) and SGD to a bare "$". Adding a currency to the
-// list in admin General? Print it both ways first — take the narrow form only
-// when the default gives back the code and the narrow one is unambiguous.
-const NARROW_SYMBOL = new Set(["THB", "TRY"]);
+// list? Take the narrow form only when the default gives back the code, the
+// narrow one is unambiguous (every $, £, kr and Rs collides with another
+// currency here), and BOTH embedded PDF faces have the glyph — a missing one
+// draws a silent .notdef box (that check kept AFN ؋, AMD ֏, BDT ৳ and KHR ៛
+// out, and KGS's ⃀ is too new a codepoint to trust on guests' devices). The
+// 2026-08 sweep over all 139 supported currencies picked exactly these.
+const NARROW_SYMBOL = new Set([
+  "THB", "TRY", // ฿ ₺
+  "AZN", "CRC", "GEL", "KZT", "LAK", "MNT", "NGN", "PYG", "RUB", "UAH", // ₼ ₡ ₾ ₸ ₭ ₮ ₦ ₲ ₽ ₴
+]);
 
 /** How `currency` should name itself. Exported for the one other place that
  *  builds its own Intl formatter (the voucher email's big gift value). */
@@ -67,37 +74,86 @@ export function formatMoney(
 // ¥20,000 is 20000, not 2000000. Multiplying one of those by 100 charges the
 // guest a hundred times the price, and Stripe cannot tell that apart from an
 // expensive booking. https://docs.stripe.com/currencies#zero-decimal
+//
+// UGX and ISK are NOT in this set even though they display without decimals:
+// both "became effectively zero-decimal" after Stripe fixed its API shape, so
+// the API still takes them ×100 and rejects any amount not divisible by 100
+// (probed against the live test API, 2026-08-12 — amount=500 ugx is USh 5.00,
+// amount=501 is an error). Treating them as zero-decimal here would UNDERcharge
+// a hundredfold; the divisible-by-100 rule falls out of toStripeMinor rounding
+// to the displayed (whole-unit) precision before scaling.
 const STRIPE_ZERO_DECIMAL = new Set([
   "BIF", "CLP", "DJF", "GNF", "JPY", "KMF", "KRW", "MGA",
-  "PYG", "RWF", "UGX", "VND", "VUV", "XAF", "XOF", "XPF",
+  "PYG", "RWF", "VND", "VUV", "XAF", "XOF", "XPF",
 ]);
 
-// Deliberately NOT handled: Stripe's three-decimal currencies (BHD, JOD, KWD,
-// OMR, TND), which take amounts ×1000 rounded to the nearest 10. None of them
-// are on the currency list in admin General — add them here before one is.
-// Note that formatMoney already PRINTS those with three decimals (Intl knows
-// the minor unit), so adding one without coming here would show a price the
-// charge doesn't match.
+// Stripe's three-decimal currencies take amounts ×1000, and the API requires
+// the last digit to be 0 — the smallest chargeable step is 10 minor units, i.e.
+// two decimal places of the major unit. formatMoney prints whatever precision
+// the data carries (Intl gives these three decimals), so price these in two
+// decimals; a third decimal place would show a price the charge can't match.
+const STRIPE_THREE_DECIMAL = new Set(["BHD", "JOD", "KWD", "OMR", "TND"]);
 
-/** True when the currency has no minor unit at all — ¥, ₩, ₫. Sourced from
- *  Stripe's list, but it's a property of the currency, so display code can ask
- *  too: a fraction of one of these is not a real amount. */
+const norm = (currency: string) => currency.trim().toUpperCase();
+
+// How many fraction digits formatMoney shows for `currency` — Intl's
+// per-currency default in MONEY_LOCALE, the same formatter formatMoney builds.
+// Charging derives from this so a guest is charged the number they saw.
+const displayDigitsCache = new Map<string, number>();
+function displayFractionDigits(currency: string): number {
+  const c = norm(currency);
+  let digits = displayDigitsCache.get(c);
+  if (digits === undefined) {
+    try {
+      digits = new Intl.NumberFormat(MONEY_LOCALE, { style: "currency", currency: c })
+        .resolvedOptions().maximumFractionDigits ?? 2;
+    } catch {
+      digits = 2;
+    }
+    displayDigitsCache.set(c, digits);
+  }
+  return digits;
+}
+
+/** True when the currency DISPLAYS with no minor unit — ¥, ₩, ₫, but also ISK
+ *  and UGX, which Stripe still charges ×100. Display code only: the charge
+ *  factor is stripeMinorFactor, and they disagree exactly where it matters. */
 export function isZeroDecimal(currency: string): boolean {
-  return STRIPE_ZERO_DECIMAL.has(currency.trim().toUpperCase());
+  return displayFractionDigits(currency) === 0;
 }
 
-/** Minor units per major unit for `currency` at Stripe: 1 or 100. */
+/** Minor units per major unit for `currency` at Stripe: 1, 100 or 1000. */
 export function stripeMinorFactor(currency: string): number {
-  return isZeroDecimal(currency) ? 1 : 100;
+  const c = norm(currency);
+  if (STRIPE_THREE_DECIMAL.has(c)) return 1000;
+  return STRIPE_ZERO_DECIMAL.has(c) ? 1 : 100;
 }
 
-/** A major-unit amount (12.34, or 20000 for ¥) as the minor units Stripe charges. */
+/** A major-unit amount (12.34, or 20000 for ¥) as the minor units Stripe
+ *  charges. The amount is first rounded to the currency's DISPLAY precision,
+ *  so the charge always equals the price formatMoney showed the guest — for
+ *  currencies that display whole units but charge ×100 (ISK, UGX, COP, HUF,
+ *  IDR…) a fractional computed amount would otherwise charge a different
+ *  number than the page did, and for ISK/UGX Stripe outright rejects it. */
 export function toStripeMinor(amount: number, currency: string): number {
-  return Math.round(amount * stripeMinorFactor(currency));
+  // Three-decimal: display shows 3 digits but the API's finest step is 10
+  // minor units, so charge at two-decimal precision (last digit 0, as required).
+  if (STRIPE_THREE_DECIMAL.has(norm(currency))) return Math.round(amount * 100) * 10;
+  const scale = 10 ** displayFractionDigits(currency);
+  const displayed = Math.round(amount * scale) / scale;
+  return Math.round(displayed * stripeMinorFactor(currency));
 }
 
 /** Stripe's minor units back to a major-unit amount, for storing and display. */
 export function fromStripeMinor(minor: number, currency: string): number {
-  const factor = stripeMinorFactor(currency);
-  return factor === 1 ? Math.round(minor) : Math.round(minor) / factor;
+  return Math.round(minor) / stripeMinorFactor(currency);
+}
+
+/** Round a DERIVED minor-unit amount (a platform fee computed in bps) to
+ *  something Stripe will accept: whole minor units, and for the three-decimal
+ *  currencies the same last-digit-0 rule as the charge itself — a 256-fils
+ *  application fee on a KWD session is rejected exactly like a 5124 charge. */
+export function roundStripeMinor(minor: number, currency: string): number {
+  if (STRIPE_THREE_DECIMAL.has(norm(currency))) return Math.round(minor / 10) * 10;
+  return Math.round(minor);
 }

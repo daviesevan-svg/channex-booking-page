@@ -1,4 +1,5 @@
 import { getConfigKV } from "./config.server";
+import { isSupportedCurrency } from "./currencies";
 import { parseHHMM } from "./dates";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
@@ -328,7 +329,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
   const existing = await getSettings(pid);
   const next: SiteSettings = {
     ...existing,
-    currency: String(form.get("currency") ?? "").trim().toUpperCase() || undefined,
+    currency: cleanCurrency(form.get("currency"), existing.currency),
     pricingMode: form.get("pricingMode") === "per_person" ? "per_person" : "per_room",
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),
@@ -361,6 +362,14 @@ export async function savePropertyMeta(pid: string, form: FormData): Promise<Sit
   };
   await writeJson(settingsKey(pid), next);
   return next;
+}
+
+/** A supported currency code, or the property's current one — a malformed POST
+ *  must not switch a live property to a code Stripe would refuse to charge. */
+function cleanCurrency(v: FormDataEntryValue | null, current: string | undefined): string | undefined {
+  const s = String(v ?? "").trim().toUpperCase();
+  if (!s) return undefined;
+  return isSupportedCurrency(s) ? s : current;
 }
 
 /** A valid IANA timezone string, or undefined. */
