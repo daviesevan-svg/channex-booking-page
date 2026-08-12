@@ -134,7 +134,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             <input
               name="slug"
               defaultValue={slug}
-              placeholder="spilmanhotel"
+              placeholder="yourhotel"
               autoCapitalize="off"
               autoCorrect="off"
               spellCheck={false}
