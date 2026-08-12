@@ -12,7 +12,7 @@ import { pageMeta } from "~/lib/page-meta";
 import { Lightbox } from "~/components/lightbox";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney, roundStripeMinor, toStripeMinor } from "~/lib/money";
+import { formatMoney, toStripeMinor } from "~/lib/money";
 import { getConfig } from "~/lib/config.server";
 
 import { getOverrides, getSettings } from "~/lib/overrides.server";
@@ -22,7 +22,7 @@ import { getVoucherProduct, soldCount } from "~/lib/vouchers.server";
 import { generateReference } from "~/lib/bookings.server";
 import { stashPendingVoucher, type PendingVoucher } from "~/lib/pending-vouchers.server";
 import { finalizeVoucher } from "~/lib/voucher-purchase.server";
-import { createCheckoutSession } from "~/lib/stripe.server";
+import { createCheckoutSession, platformFee } from "~/lib/stripe.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -168,7 +168,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   await stashPendingVoucher(reference, pending);
   const currency = settings.currency || "GBP";
   const amountMinor = toStripeMinor(product.price, currency);
-  const feeBps = config.stripePlatformFeeBps;
   const hotelName = (await getOverrides(pid)).hotelName || "Your hotel";
   let sessionUrl: string | undefined;
   try {
@@ -186,7 +185,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         payment_intent_data: {
           description: `${hotelName} voucher · ${product.title} (${record.code})`,
           metadata: { kind: "voucher", reference, pid },
-          ...(feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, currency) } : {}),
+          ...platformFee(amountMinor, currency),
         },
         line_items: [
           {

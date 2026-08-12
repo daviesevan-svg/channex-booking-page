@@ -32,7 +32,7 @@ import { preparePendingBooking } from "~/lib/booking-create.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { stashPending } from "~/lib/pending-bookings.server";
 import { rateLimit } from "~/lib/rate-limit.server";
-import { createCheckoutSession } from "~/lib/stripe.server";
+import { createCheckoutSession, platformFee } from "~/lib/stripe.server";
 import { toStripeMinor } from "~/lib/money";
 
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
@@ -354,7 +354,11 @@ export async function action({ request }: Route.ActionArgs) {
         ? {
             ...common,
             mode: "payment",
-            payment_intent_data: { description: `Booking ${reference}`, metadata: { reference, pid } },
+            payment_intent_data: {
+              description: `Booking ${reference}`,
+              metadata: { reference, pid },
+              ...platformFee(toStripeMinor(due, currency), currency),
+            },
             line_items: [
               {
                 quantity: 1,

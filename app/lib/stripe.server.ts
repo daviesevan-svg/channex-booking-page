@@ -7,6 +7,7 @@
 // `Stripe-Account` header. This module is the platform-side client.
 import { getConfig } from "./config.server";
 import { hmacSha256Hex, timingSafeEqual } from "./hmac.server";
+import { roundStripeMinor } from "./money";
 
 const API_BASE = "https://api.stripe.com";
 const CONNECT_BASE = "https://connect.stripe.com";
@@ -176,6 +177,17 @@ export function stripeLocale(lang: string): string {
   // Fall back from a region to its base language ("de-AT" -> "de") before giving up.
   const base = l.split("-")[0];
   return STRIPE_LOCALES.has(base) ? base : "auto";
+}
+
+/**
+ * The platform's revenue share as a `payment_intent_data` fragment, spread into
+ * every payment-mode Checkout Session. Centralised because a session built
+ * without it charges the guest identically but collects zero platform fee —
+ * exactly what happened when the v1 API grew its own session-building copy.
+ */
+export function platformFee(amountMinor: number, currency: string): { application_fee_amount?: number } {
+  const feeBps = getConfig().stripePlatformFeeBps;
+  return feeBps > 0 ? { application_fee_amount: roundStripeMinor((amountMinor * feeBps) / 10000, currency) } : {};
 }
 
 /** Create a Checkout Session on a connected account. `params` is passed through
