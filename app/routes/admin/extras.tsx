@@ -20,7 +20,7 @@ import {
 } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadExtraImage } from "~/lib/images.server";
+import { resolveImageField, uploadExtraImage } from "~/lib/images.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
 const UNITS: ExtraUnit[] = ["stay", "night", "person", "person_night", "trip"];
@@ -150,16 +150,15 @@ export async function action({ request }: Route.ActionArgs) {
   const prev = existing.find((e) => e.id === id);
   const finalId = id || crypto.randomUUID();
 
-  // Image: keep the current one unless "remove" is ticked or a new file replaces it.
-  let image = form.get("removeImage") != null ? undefined : prev?.image;
-  const upload = form.getAll("image").find((f): f is File => f instanceof File && f.size > 0);
-  if (upload) {
-    try {
-      image = await uploadExtraImage(propertyId, finalId, upload);
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Image upload failed.", values };
-    }
-  }
+  // Image: a new file wins, then "remove", then the current one.
+  const img = await resolveImageField(form, {
+    fileKey: "image",
+    removeKey: "removeImage",
+    previous: prev?.image,
+    upload: (f) => uploadExtraImage(propertyId, finalId, f),
+  });
+  if (!img.ok) return { error: img.error, values };
+  const image = img.url;
 
   const extra: Extra = {
     id: finalId,

@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/partner";
 import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
-import { uploadPartnerFavicon, uploadPartnerLogo } from "~/lib/images.server";
+import { resolveImageField, uploadPartnerFavicon, uploadPartnerLogo } from "~/lib/images.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireSuperadmin } from "~/lib/auth.server";
 import {
@@ -83,20 +83,22 @@ export async function action({ request, params }: Route.ActionArgs) {
     // Brand assets. Replaced/removed files are left in R2 — the image GC is
     // property-scoped and partner uploads are superadmin-rare; orphaned bytes
     // are cheaper than teaching the sweeper a second ownership model.
-    let logoImage = partner.logoImage;
-    let faviconImage = partner.faviconImage;
-    try {
-      const logoUpload = form.get("logoUpload");
-      if (logoUpload instanceof File && logoUpload.size > 0) {
-        logoImage = await uploadPartnerLogo(partnerId, logoUpload);
-      } else if (form.get("removeLogo") === "1") logoImage = undefined;
-      const faviconUpload = form.get("faviconUpload");
-      if (faviconUpload instanceof File && faviconUpload.size > 0) {
-        faviconImage = await uploadPartnerFavicon(partnerId, faviconUpload);
-      } else if (form.get("removeFavicon") === "1") faviconImage = undefined;
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Upload failed." };
-    }
+    const logo = await resolveImageField(form, {
+      fileKey: "logoUpload",
+      removeKey: "removeLogo",
+      previous: partner.logoImage,
+      upload: (f) => uploadPartnerLogo(partnerId, f),
+    });
+    if (!logo.ok) return { error: logo.error };
+    const favicon = await resolveImageField(form, {
+      fileKey: "faviconUpload",
+      removeKey: "removeFavicon",
+      previous: partner.faviconImage,
+      upload: (f) => uploadPartnerFavicon(partnerId, f),
+    });
+    if (!favicon.ok) return { error: favicon.error };
+    const logoImage = logo.url;
+    const faviconImage = favicon.url;
     await savePartner({
       ...partner,
       name: str("name") || brandName,

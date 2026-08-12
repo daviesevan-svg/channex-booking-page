@@ -28,6 +28,37 @@ async function sizeSuffix(bytes: ArrayBuffer): Promise<string> {
   }
 }
 
+/**
+ * Resolve one optional image field off an admin form: a freshly attached file
+ * wins (stored via `upload`), then an explicit remove, then the previous
+ * value. The seven hand-rolled copies of this disagreed on the remove-flag
+ * encoding ("1" / any value / truthy) and each had its own fallback error
+ * string; this is the one implementation. The caller still owns persisting
+ * the value and GC'ing a replaced file — those are genuinely per-store.
+ */
+export async function resolveImageField(
+  form: FormData,
+  opts: {
+    /** Form field holding the File (read via getAll — some pickers post several inputs). */
+    fileKey: string;
+    /** Checkbox field requesting removal; any truthy value counts. */
+    removeKey: string;
+    previous: string | undefined;
+    upload: (file: File) => Promise<string>;
+  },
+): Promise<{ ok: true; url: string | undefined } | { ok: false; error: string }> {
+  const file = form.getAll(opts.fileKey).find((f): f is File => f instanceof File && f.size > 0);
+  if (file) {
+    try {
+      return { ok: true, url: await opts.upload(file) };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "Image upload failed." };
+    }
+  }
+  if (form.get(opts.removeKey)) return { ok: true, url: undefined };
+  return { ok: true, url: opts.previous };
+}
+
 /** Store an uploaded image in R2 under the given key prefix and return the path
  *  to serve it (/images/<key>). */
 async function uploadImage(prefix: string, file: File): Promise<string> {

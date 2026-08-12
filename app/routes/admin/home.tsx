@@ -12,7 +12,7 @@ import {
   saveSearchContent,
 } from "~/lib/overrides.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadHomeImage } from "~/lib/images.server";
+import { resolveImageField, uploadHomeImage } from "~/lib/images.server";
 import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
@@ -56,19 +56,16 @@ export async function action({ request }: Route.ActionArgs) {
   // text-only save keeps the previously uploaded image.
   await saveSearchContent(propertyId, pickLang(s(form.get("lang"))), content);
 
-  const upload = form.get("heroUpload");
-  const file = upload instanceof File && upload.size > 0 ? upload : null;
   // Replacing or clearing the hero orphans the file that was there.
   const previousHero = await getHeroImage(propertyId);
-  try {
-    if (form.get("removeHero")) {
-      await saveHeroImage(propertyId, null);
-    } else if (file) {
-      await saveHeroImage(propertyId, await uploadHomeImage(propertyId, file));
-    }
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Image upload failed." };
-  }
+  const hero = await resolveImageField(form, {
+    fileKey: "heroUpload",
+    removeKey: "removeHero",
+    previous: previousHero ?? undefined,
+    upload: (f) => uploadHomeImage(propertyId, f),
+  });
+  if (!hero.ok) return { error: hero.error };
+  await saveHeroImage(propertyId, hero.url ?? null);
   if (previousHero && previousHero !== (await getHeroImage(propertyId))) {
     queueImageCleanup(propertyId, [previousHero]);
   }
