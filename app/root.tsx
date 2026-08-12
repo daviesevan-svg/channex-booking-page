@@ -11,7 +11,8 @@ import {
 import type { Route } from "./+types/root";
 import { DEFAULT_FONTS_HREF, langFromRequest } from "./lib/content";
 import { FontStylesheet } from "./components/font-stylesheet";
-import { adminLangFromRequest } from "./lib/admin-i18n";
+import { adminLangFromRequest, registerAdminDict } from "./lib/admin-i18n";
+import { adminDictFor } from "./lib/admin-i18n-locales.server";
 import { isOwnHost } from "./lib/domains.server";
 import { getPartner, partnerIdForAdminHost, partnerIdForGuestHost } from "./lib/partners.server";
 import { registerDict } from "./lib/i18n";
@@ -43,10 +44,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   // admin labelled lang="en" gets "BILGI" where Turkish wants "BİLGİ", because
   // only tr maps i → İ. The admin needs no guest dictionary; it has its own.
   if (url.pathname.startsWith("/admin")) {
-    return { lang: adminLangFromRequest(request), dict: null, favicon };
+    // The admin's own dictionary rides the same channel as the guest one:
+    // data for the one language being served, not JS for all six.
+    const adminLang = adminLangFromRequest(request);
+    return { lang: adminLang, dict: null, adminDict: adminDictFor(adminLang), favicon };
   }
   const lang = langFromRequest(request);
-  return { lang, dict: guestDictFor(lang), favicon };
+  return { lang, dict: guestDictFor(lang), adminDict: null, favicon };
 }
 
 export const links: Route.LinksFunction = () => [
@@ -68,6 +72,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   // error render, where there is no loader data.
   const data = useRouteLoaderData<typeof loader>("root");
   registerDict(data?.lang ?? "", data?.dict);
+  // On admin pages `lang` IS the admin language (see the loader) and this must
+  // run before <Meta /> renders — adminMeta() translates the tab title.
+  registerAdminDict(data?.lang ?? "", data?.adminDict);
 
   return (
     // Was hardcoded "en", which told screen readers and search engines that a
