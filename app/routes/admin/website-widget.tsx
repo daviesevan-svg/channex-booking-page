@@ -8,18 +8,30 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, saveThemeTokens } from "~/lib/overrides.server";
+import { guestHostForProperty } from "~/lib/partners.server";
 import { FONT_PAIRS, fontPair } from "~/lib/content";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await isOwnerOrSuper(request, propertyId);
   const settings = await getSettings(propertyId);
-  const appUrl = getConfig().appUrl.replace(/\/+$/, "");
   // Prefer the shortcode in the snippet/links when one is set (it resolves to the
   // same property); fall back to the id.
-  const linkId = (await getProperty(propertyId))?.slug || propertyId;
+  const ref = await getProperty(propertyId);
+  const linkId = ref?.slug || propertyId;
+  // The snippet, preview and deep link all follow the PROPERTY's partner, the
+  // same rule as every guest link (PR448/PR454): a white-label hotel pastes its
+  // partner's guest host into its own site, never our domain. embed.js derives
+  // its origin from the serving URL and /embed/:channelId is host-disciplined,
+  // so the snippet works on that host as-is. Request scheme/port so dev partner
+  // hosts keep working; no partner guest host = our shared domain.
+  const url = new URL(request.url);
+  const guestHost = await guestHostForProperty(ref?.partnerId, email);
+  const appUrl = guestHost
+    ? `${url.protocol}//${guestHost}${url.port ? `:${url.port}` : ""}`
+    : getConfig().appUrl.replace(/\/+$/, "");
   return {
     configured: true as const,
     canManage,

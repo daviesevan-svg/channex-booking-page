@@ -6,7 +6,7 @@ import { accessibleAccent, darkerAccent, mixWithWhite } from "~/lib/accessible-a
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
-import { resolvePropertyId } from "~/lib/properties.server";
+import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 // Bare, chrome-less shell for the embeddable widget iframe (/embed/:channelId).
 // It provides the same Outlet context the property pages do (so shared bits like
@@ -16,7 +16,12 @@ import { resolvePropertyId } from "~/lib/properties.server";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for the theme lookup.
-  const pid = await resolvePropertyId(params.channelId);
+  // Host-disciplined like every slug mount (property-scope.server.ts): on our
+  // shared domain any property embeds; on a white-label partner's guest host
+  // only that partner's properties do; anywhere else this route is a 404. The
+  // widget snippet serves from the property's own brand host, so a foreign
+  // tenant's widget must not render under it.
+  const pid = await resolveRequestProperty(params.channelId, request);
   const [overrides, settings] = await Promise.all([
     getOverrides(pid, lang),
     getSettings(pid),
