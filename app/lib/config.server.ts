@@ -172,9 +172,10 @@ export function getConfig(): AppConfig {
 
 /** The KV namespace holding per-property content overrides. Reads are deduped
  *  per request (see request-cache.server.ts): plain `get(key)` calls hit a
- *  request-scoped cache, and `put`/`delete` drop the key so read-after-write
- *  within one action stays correct. Gets with options (type/cacheTtl — none in
- *  this codebase today) bypass the cache rather than risk mixing shapes. */
+ *  request-scoped cache, and `put`/`delete` store the written value so a
+ *  read-after-write within one request sees it (KV itself may serve the stale
+ *  value for up to a minute). Gets with options (type/cacheTtl — none in this
+ *  codebase today) bypass the cache rather than risk mixing shapes. */
 export function getConfigKV(): KVNamespace {
   const kv = (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
   const cache = requestKvCache();
@@ -201,8 +202,26 @@ export function getConfigKV(): KVNamespace {
       }
       if (prop === "put" || prop === "delete") {
         return (key: unknown, ...rest: unknown[]) => {
-          if (typeof key === "string") cache.delete(key);
-          return fn.call(target, key, ...rest);
+          if (typeof key !== "string") return fn.call(target, key, ...rest);
+          const write = fn.call(target, key, ...rest) as Promise<unknown>;
+          if (prop === "put" && typeof rest[0] !== "string") {
+            // Can't mirror a stream/buffer value — just stop serving the old read.
+            cache.delete(key);
+            return write;
+          }
+          // Serve read-your-own-writes for the rest of the request: KV's edge
+          // cache can return the stale value for up to a minute after a put, so
+          // a re-read of a key this request just wrote must come from here, not
+          // KV. (This made the OFF→ON Google push toggle silently no-op: the
+          // re-push re-read the flag it had just written and saw the stale off.)
+          const value = prop === "delete" ? null : (rest[0] as string);
+          const entry = write.then(() => value) as Promise<string | null>;
+          cache.set(key, entry);
+          // A failed write must not masquerade as a successful read later.
+          entry.catch(() => {
+            if (cache.get(key) === entry) cache.delete(key);
+          });
+          return write;
         };
       }
       return fn.bind(target);

@@ -14,7 +14,7 @@ import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import {
   runAndRecord,
   queueGoogleAriBlock,
-  queueGoogleAriPush,
+  queueGoogleAriResync,
   ALL_SYNC_KINDS,
   type SyncKind,
 } from "~/lib/google-ari/push.server";
@@ -101,8 +101,10 @@ export async function action({ request }: Route.ActionArgs) {
     // the property there (zero inventory + stop-sell everything, then an empty
     // room/rate overlay), turning it back ON re-pushes the full setup like a
     // new connection. Both run in the background.
+    // The re-push must not re-read the flag it just wrote (a stale KV read
+    // made it silently no-op) — the transition itself is the authority.
     if (wasOn && !push) queueGoogleAriBlock(propertyId);
-    else if (!wasOn && push) await queueGoogleAriPush(propertyId, ALL_SYNC_KINDS);
+    else if (!wasOn && push) queueGoogleAriResync(propertyId, ALL_SYNC_KINDS);
     return { ok: true as const };
   }
   if (intent === "push") {

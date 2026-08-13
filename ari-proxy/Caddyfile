@@ -22,9 +22,23 @@
 		header X-Ari-Proxy-Key {$ARI_PROXY_KEY}
 	}
 	handle @ari {
-		reverse_proxy https://www.google.com {
+		# Google is dual-stack, but only the static egress IPv4 is whitelisted in
+		# Hotel Center — dialing the AAAA record egresses from the (non-whitelisted)
+		# IPv6 and Google rejects the push. Resolve A records only so every dial
+		# leaves from the whitelisted IPv4.
+		reverse_proxy {
+			dynamic a {
+				name www.google.com
+				port 443
+				refresh 1m
+				versions ipv4
+			}
 			header_up Host www.google.com
 			header_up -X-Ari-Proxy-Key
+			transport http {
+				tls
+				tls_server_name www.google.com
+			}
 		}
 	}
 
