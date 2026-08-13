@@ -6,6 +6,7 @@ import {
   Scripts,
   ScrollRestoration,
   useRouteLoaderData,
+  type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -26,6 +27,22 @@ import "./app.css";
  * the language actually being served, instead of as JS for all of them. English
  * pages send nothing extra at all.
  */
+/** Root data is a function of the host (favicon), the /admin boundary, and the
+ *  language — not of the funnel's ever-changing search params. Left to the
+ *  default, every cart edit re-ran this loader and re-shipped the entire guest
+ *  dictionary in the .data payload. Language switches are either a `?lang=`
+ *  navigation (compared here) or a cookie set by a mutation (formMethod). */
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
+  if (currentUrl.pathname.startsWith("/admin") !== nextUrl.pathname.startsWith("/admin")) return true;
+  return currentUrl.searchParams.get("lang") !== nextUrl.searchParams.get("lang");
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   // A white-label partner's hosts (admin door and guest booking domain) carry
   // the partner's favicon on every page. Only looked up off our own hosts, so

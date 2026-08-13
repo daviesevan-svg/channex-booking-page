@@ -277,6 +277,7 @@ function RoomCard({
           room for two columns. */}
       <Link
         to={detailHref}
+        prefetch="intent"
         className="relative min-h-[200px] w-full flex-none self-stretch sm:w-[230px]"
       >
         {photo ? (
@@ -297,7 +298,7 @@ function RoomCard({
         )}
       </Link>
       <div className="flex min-w-[240px] flex-1 flex-col p-6">
-        <Link to={detailHref}>
+        <Link to={detailHref} prefetch="intent">
           <h3 className="mb-1.5 font-serif text-title-lg font-semibold tracking-[-0.01em] hover:text-accent">
             {room.title}
           </h3>
@@ -367,8 +368,12 @@ function RoomCard({
             {tr.t("allAvailableAdded", { n: available })}
           </div>
         ) : (
+          // prefetch="intent": the detail loader starts on hover, so choosing a
+          // rate doesn't wait a full round trip. Analytics stay honest —
+          // funnelContext() ignores prefetch requests.
           <Link
             to={detailHref}
+            prefetch="intent"
             className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-white transition-colors hover:bg-accent-deep"
           >
             {tr.t("chooseRate")}
@@ -447,6 +452,7 @@ function CartPanel({
                 </Link>
                 <Link
                   to={`${base}/extras?line=${i}&${qs}`}
+                  prefetch="intent"
                   className="mt-1 inline-block text-label font-semibold text-accent hover:underline"
                 >
                   {extrasCounts[i] ? tr.t("editExtrasCount", { n: extrasCounts[i] }) : tr.t("addExtras")}

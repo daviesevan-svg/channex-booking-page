@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Link, Outlet, useLocation, useNavigation, useSearchParams } from "react-router";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigation,
+  useSearchParams,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 
 import type { Route } from "./+types/layout";
 import { accessibleAccent, darkerAccent, mixWithWhite } from "~/lib/accessible-accent";
@@ -31,6 +38,29 @@ import { makeTranslator, type Translator } from "~/lib/i18n";
 import { basePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { getAdminEmail } from "~/lib/auth.server";
+
+/** The booking funnel carries its state in search params (dates, occupancy,
+ *  cart, extras), so by default this layout's loader re-ran on EVERY funnel
+ *  step — re-reading chrome, footer, vouchers and offers that only depend on
+ *  the property and language. That was most of the KV traffic behind "select a
+ *  rate → wait". Only re-run for the inputs the loader actually reads: the
+ *  property segment, the language, the admin design-preview params — and any
+ *  mutation, which may have changed the underlying content. */
+export function shouldRevalidate({
+  currentParams,
+  nextParams,
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
+  if (currentParams.channelId !== nextParams.channelId) return true;
+  for (const p of ["lang", "style", "font"]) {
+    if (currentUrl.searchParams.get(p) !== nextUrl.searchParams.get(p)) return true;
+  }
+  return false;
+}
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).

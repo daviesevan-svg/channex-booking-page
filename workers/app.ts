@@ -11,6 +11,7 @@ import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
+import { runWithRequestCache } from "../app/lib/request-cache.server";
 
 
 const requestHandler = createRequestHandler(
@@ -50,7 +51,12 @@ function canonicalRedirect(request: Request): Response | null {
 
 export default {
   async fetch(request) {
-    return canonicalRedirect(request) ?? requestHandler(request);
+    // One KV-read cache per request (see request-cache.server.ts) — every
+    // loader that runs for this navigation shares it, so the auth/property
+    // plumbing reads each key once instead of once per loader. Cron stays
+    // outside the scope on purpose: its tasks are long-lived and concurrent,
+    // and read-through is the safer default there.
+    return runWithRequestCache(() => canonicalRedirect(request) ?? requestHandler(request));
   },
   // Cron (see wrangler.jsonc `triggers.crons`): (1) keep Google's ARI in sync by
   // re-pushing every ARI-enabled property — a backstop to the change-driven and
