@@ -1185,6 +1185,8 @@ const PT: Record<string, string> = {
   ghProgramHintVr: "Envia para a sua conta Vacation Rentals como uma listagem de unidade única com disponibilidade binária.",
   ghProgramHintHotels: "Envia para a sua conta Hotel Center. O Vacation Rentals está disponível para propriedades de unidade única.",
   ghPushToggle: "Enviar esta propriedade para {program}",
+  ghPushToggleHint:
+    "Ao desativar, a propriedade é apagada no Google — é enviada disponibilidade zero e a configuração de quartos e tarifas é removida. Ao reativar, tudo é reenviado, como uma nova ligação.",
   ghWindowDays: "Dias futuros a enviar",
   ghWindowDaysHint: "A disponibilidade e as tarifas são enviadas para hoje + este número de dias (máx. 500).",
   ghSaveSettings: "Guardar configurações",

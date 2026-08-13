@@ -1218,6 +1218,8 @@ const TR: Record<string, string> = {
   ghProgramHintHotels:
     "Hotel Center hesabınıza gönderir. Vacation Rentals, tek üniteli tesisler için kullanılabilir.",
   ghPushToggle: "Bu tesisi {program} hizmetine gönder",
+  ghPushToggleHint:
+    "Kapatıldığında tesis Google'dan silinir — sıfır müsaitlik gönderilir ve oda & fiyat kurulumu kaldırılır. Yeniden açıldığında her şey yeni bir bağlantı gibi baştan gönderilir.",
   ghWindowDays: "Kaç gün ileriye gönderilsin",
   ghWindowDaysHint: "Müsaitlik ve fiyatlar bugün + bu kadar gün için gönderilir (en fazla 500).",
   ghSaveSettings: "Ayarları kaydet",
