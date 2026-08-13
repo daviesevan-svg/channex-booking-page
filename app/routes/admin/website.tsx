@@ -25,6 +25,7 @@ import {
   type CredentialCheck,
   type ProvisionState,
 } from "~/lib/custom-hostnames.server";
+import { guestHostForProperty } from "~/lib/partners.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -37,7 +38,16 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const [settings, ref] = await Promise.all([getSettings(propertyId), getProperty(propertyId)]);
   const config = getConfig();
-  const base = config.appUrl.replace(/\/+$/, "");
+  // The address follows the PROPERTY's partner, the same rule as every guest
+  // link since PR448: a white-label hotel's pages live on its partner's guest
+  // host, never on our shared domain — and this box is the first place an
+  // invited hotel looks for their URL. Same scheme/port as this request so dev
+  // partner hosts keep working. No partner guest host = our shared domain.
+  const url = new URL(request.url);
+  const guestHost = await guestHostForProperty(ref?.partnerId, email);
+  const base = guestHost
+    ? `${url.protocol}//${guestHost}${url.port ? `:${url.port}` : ""}`
+    : config.appUrl.replace(/\/+$/, "");
   const domain = settings.websiteDomain ?? "";
 
   // Read-only: the loader never creates a hostname, so refreshing the page can't
@@ -62,8 +72,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Unset on this deployment = custom domains genuinely aren't available, and
     // the page says so instead of printing a target that wouldn't work.
     cnameTarget: config.customHostnameTarget ?? "",
-    // So the field validates client-side exactly as the action will.
-    ownHost: safeHostname(config.appUrl),
+    // So the field validates client-side exactly as the action will. The
+    // partner's guest host is "ours" for this purpose too — the pages already
+    // live there, so entering it as a custom domain is the same mistake.
+    ownHosts: [safeHostname(config.appUrl), guestHost ?? ""].filter(Boolean),
     // Gates the credential diagnostic below. Hotels must never see our infra
     // state — and a zone id is ours, not theirs.
     isSuperadmin: await isSuperadmin(email),
@@ -123,7 +135,11 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   if (domain) {
-    const err = domainError(domain, [safeHostname(config.appUrl)]);
+    // Same "own hosts" set as the loader advertises for client-side checks:
+    // ours, plus the partner guest host a white-label property already lives on.
+    const partnerId = (await getProperty(propertyId))?.partnerId;
+    const guestHost = await guestHostForProperty(partnerId, email);
+    const err = domainError(domain, [safeHostname(config.appUrl), guestHost ?? ""].filter(Boolean));
     if (err) return { error: err };
   }
 
@@ -231,7 +247,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { websiteEnabled, websiteDomain, address, cnameTarget, ownHost } = loaderData;
+  const { websiteEnabled, websiteDomain, address, cnameTarget, ownHosts } = loaderData;
   const dns = actionData && "dns" in actionData ? actionData.dns : undefined;
   const error = actionData && "error" in actionData ? actionData.error : undefined;
   // A submit that touched provisioning knows more than the loader did.
@@ -246,7 +262,7 @@ export default function AdminWebsite({ loaderData, actionData }: Route.Component
   const cleanTyped = normalizeDomain(typed);
   // Only offer a DNS record once the domain is actually usable — showing one for
   // "notadomain" invites someone to go and create it.
-  const typedIsValid = Boolean(cleanTyped) && domainError(cleanTyped, [ownHost]) === null;
+  const typedIsValid = Boolean(cleanTyped) && domainError(cleanTyped, ownHosts) === null;
 
   return (
     <div>
