@@ -3,13 +3,14 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/onboard-booking";
 import { adminMeta } from "~/lib/admin-meta";
 import { FIELD_INPUT } from "~/components/admin-form";
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { requireAdmin, setSessionProperty } from "~/lib/auth.server";
 import {
   fetchBookingListing,
   importBookingListing,
   normalizeBookingUrl,
   type BookingImport,
+  type BookingImportRate,
 } from "~/lib/booking-import.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
@@ -31,6 +32,19 @@ function onlyBookingCdn(urls: string[]): string[] {
       return false;
     }
   });
+}
+
+/** "Free cancellation up to 2 days before arrival" / "Non-refundable" — the
+ *  policy the imported rate will carry, in the admin's own language. */
+function cancellationLabel(t: AdminT, rate: BookingImportRate): string {
+  if (!rate.refundable) return t("obbRateNonRefundable");
+  const n = rate.cancelDeadlineValue;
+  if (n === undefined) return t("obbRateFreeCancellation");
+  const unit =
+    rate.cancelDeadlineUnit === "days"
+      ? t(n === 1 ? "obbRateDays_one" : "obbRateDays_other", { n })
+      : t(n === 1 ? "obbRateHours_one" : "obbRateHours_other", { n });
+  return t("obbRateFreeUntil", { window: unit });
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -59,6 +73,9 @@ export async function action({ request }: Route.ActionArgs) {
     }
     payload.photos = onlyBookingCdn(payload.photos ?? []);
     for (const r of payload.rooms) r.photos = onlyBookingCdn(r.photos ?? []);
+    // A listing with no bookable offers has no rate plans; an older review form
+    // (or a tampered one) may not carry the field at all.
+    payload.rates = Array.isArray(payload.rates) ? payload.rates : [];
 
     const roomRefs = new Set(form.getAll("rooms").map(String));
     if (roomRefs.size === 0) {
@@ -66,6 +83,7 @@ export async function action({ request }: Route.ActionArgs) {
     }
     const pid = await importBookingListing(email, payload, {
       roomRefs,
+      rateRefs: new Set(form.getAll("rates").map(String)),
       importPhotos: form.get("importPhotos") === "on",
       importFacilities: form.get("importFacilities") === "on",
       currency: String(form.get("currency") ?? "") || undefined,
@@ -212,6 +230,47 @@ export default function OnboardBooking({ loaderData, actionData }: Route.Compone
                 </label>
               ))}
             </div>
+          </section>
+
+          <section className="rounded-[14px] border border-line bg-surface p-6">
+            <div className="mb-1 font-serif text-[18px] font-semibold">
+              {t("obbRatePlans")}{" "}
+              <span className="font-sans text-[13px] font-normal text-muted">({payload.rates.length})</span>
+            </div>
+            <p className="mb-3 max-w-[560px] text-[12px] text-muted">{t("obbRatePlansHint")}</p>
+            {payload.rates.length === 0 ? (
+              <p className="text-[13px] text-secondary">{t("obbRatePlansNone")}</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {payload.rates.map((r) => (
+                  <label
+                    key={r.ref}
+                    className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3"
+                  >
+                    <input type="checkbox" name="rates" value={r.ref} defaultChecked className="mt-1" />
+                    <span className="flex-1">
+                      <span className="block text-[14px] font-semibold text-ink">{r.name}</span>
+                      <span className="block text-[12px] text-muted">
+                        {[
+                          r.mealPlan || t("rtRoomOnly"),
+                          cancellationLabel(t, r),
+                          r.prepayment,
+                          t(r.roomCount === 1 ? "obbRateRooms_one" : "obbRateRooms_other", { n: r.roomCount }),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                      {/* Booking's own wording, kept when no cancellation window
+                          could be read from it — the owner should see exactly
+                          what the rate will say. */}
+                      {r.cancellationNote && (
+                        <span className="mt-1 block text-[12px] text-secondary">{r.cancellationNote}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-[14px] border border-line bg-surface p-6">
