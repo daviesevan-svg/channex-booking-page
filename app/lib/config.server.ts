@@ -1,5 +1,7 @@
 import { env } from "cloudflare:workers";
 
+import { requestKvCache } from "./request-cache.server";
+
 // Runtime configuration, read from Worker env bindings at request time.
 // Set these in wrangler.jsonc (`vars`) for local/dev and in the Cloudflare
 // dashboard for production. Changing them needs no rebuild.
@@ -168,9 +170,44 @@ export function getConfig(): AppConfig {
   return config;
 }
 
-/** The KV namespace holding per-property content overrides. */
+/** The KV namespace holding per-property content overrides. Reads are deduped
+ *  per request (see request-cache.server.ts): plain `get(key)` calls hit a
+ *  request-scoped cache, and `put`/`delete` drop the key so read-after-write
+ *  within one action stays correct. Gets with options (type/cacheTtl — none in
+ *  this codebase today) bypass the cache rather than risk mixing shapes. */
 export function getConfigKV(): KVNamespace {
-  return (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
+  const kv = (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
+  const cache = requestKvCache();
+  if (!kv || !cache) return kv;
+  return new Proxy(kv, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== "function") return v;
+      const fn = v as (...a: unknown[]) => unknown;
+      if (prop === "get") {
+        return (key: unknown, ...rest: unknown[]) => {
+          if (typeof key !== "string" || rest.length > 0) return fn.call(target, key, ...rest);
+          const hit = cache.get(key);
+          if (hit) return hit;
+          const read = fn.call(target, key) as Promise<string | null>;
+          cache.set(key, read);
+          // A failed read must not be replayed to later callers as a cached
+          // rejection — drop it so they retry against KV.
+          read.catch(() => {
+            if (cache.get(key) === read) cache.delete(key);
+          });
+          return read;
+        };
+      }
+      if (prop === "put" || prop === "delete") {
+        return (key: unknown, ...rest: unknown[]) => {
+          if (typeof key === "string") cache.delete(key);
+          return fn.call(target, key, ...rest);
+        };
+      }
+      return fn.bind(target);
+    },
+  });
 }
 
 /** The R2 bucket holding uploaded images (undefined if not bound). */

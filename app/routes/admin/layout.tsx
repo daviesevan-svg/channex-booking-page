@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { Form, Link, NavLink, Outlet, useLocation, useSearchParams } from "react-router";
+import {
+  Form,
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useSearchParams,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
@@ -16,6 +24,24 @@ import { ADMIN_LANGS, adminLangFromRequest, adminT, type AdminT } from "~/lib/ad
 export interface AdminContext {
   propertyId?: string;
   lang: string;
+}
+
+/** Everything this layout loads — the property list, the selected property,
+ *  branding, the test-mode banner, hidden areas — changes only through
+ *  mutations (switching property, saving settings, editing the team), never by
+ *  merely opening another admin page. Single fetch re-runs all matched loaders
+ *  on every navigation by default, which made each menu click re-pay this
+ *  loader's whole auth + KV chain; skip it on plain GET navigations and keep
+ *  the default after any mutation. The admin language switch and `?lang`
+ *  preview are GET-visible inputs, so those params still revalidate. */
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
+  return currentUrl.searchParams.get("lang") !== nextUrl.searchParams.get("lang");
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -470,7 +496,9 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
                 {isOpen && (
                   <div className="space-y-1">
                     {items.map((item) => (
-                      <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+                      // prefetch="intent": start the target loader on hover/focus,
+                      // so the click lands on data that's already in flight.
+                      <NavLink key={item.to} to={item.to} end={item.end} prefetch="intent" className={navLinkClass}>
                         {item.label}
                       </NavLink>
                     ))}
