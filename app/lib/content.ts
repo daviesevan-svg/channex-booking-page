@@ -286,6 +286,13 @@ export interface SiteSettings {
   /** Hide the text hotel name in the header when a logo is set — for logos that
    *  already contain the name. Ignored when there's no logo. */
   logoHideName?: boolean;
+  /** Browser-tab icon for this hotel's GUEST pages (/images/… path). Wins over a
+   *  white-label partner's favicon on a property page, since the tab belongs to
+   *  the hotel; unset falls back to the partner's, then to ours. Admin pages are
+   *  unaffected — that chrome is never the hotel's.
+   *
+   *  Registered in image-gc.server so the GC counts it as referenced. */
+  faviconImage?: string;
   // ----- Website -----
   /** Opt in to the website layer. Off (default) = `/:channelId` is the booking
    *  search page exactly as before; on = it renders the website home page and

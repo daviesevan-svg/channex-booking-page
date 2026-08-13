@@ -122,6 +122,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     hotelName: overrides.hotelName || "Your hotel",
     logoImage: settings.logoImage || null,
     logoHideName: settings.logoHideName ?? false,
+    faviconImage: settings.faviconImage || null,
     hasVouchers,
     hasOffers,
     theme: settings.theme ?? DEFAULT_THEME,
@@ -233,7 +234,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, footerBrand, adminHref } =
+  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -358,6 +359,14 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           It's rendered here rather than in `links()` because the chosen pair only
           becomes known from loader data. */}
       <FontStylesheet href={font.href} />
+      {/* The hotel's own tab icon. Rendered here, not in root: root resolves a
+          favicon from the HOSTNAME (a partner's), and only this layout knows
+          which property the request is for — resolving it up there would mean
+          re-deriving the property and two more KV reads on every guest page.
+          React hoists it into <head>, and being emitted after root's it also
+          wins over a white-label partner's icon on a property page, which is
+          the precedence we want: the tab belongs to the hotel. */}
+      {faviconImage && <link rel="icon" href={faviconImage} />}
       {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"

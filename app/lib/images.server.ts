@@ -133,6 +133,10 @@ export function uploadPropertyLogo(propertyId: string, file: File): Promise<stri
   return uploadImage(`logo/${propertyId}`, file);
 }
 
+export function uploadPropertyFavicon(propertyId: string, file: File): Promise<string> {
+  return uploadImage(`favicon/${propertyId}`, file);
+}
+
 export function uploadCatalogRoomImage(propertyId: string, roomId: string, file: File): Promise<string> {
   return uploadImage(`catalog/${propertyId}/${roomId}`, file);
 }
