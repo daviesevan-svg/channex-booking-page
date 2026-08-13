@@ -11,7 +11,13 @@ import { isSuperadmin } from "~/lib/users.server";
 import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
-import { runAndRecord, ALL_SYNC_KINDS, type SyncKind } from "~/lib/google-ari/push.server";
+import {
+  runAndRecord,
+  queueGoogleAriBlock,
+  queueGoogleAriPush,
+  ALL_SYNC_KINDS,
+  type SyncKind,
+} from "~/lib/google-ari/push.server";
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
 import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
@@ -88,7 +94,14 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "save") {
     const windowDays = Number(form.get("windowDays"));
     const program = form.get("program") === "vacation_rentals" ? "vacation_rentals" : "hotels";
-    await saveGoogleAriSettings(propertyId, { push: form.get("push") === "on", windowDays, program });
+    const push = form.get("push") === "on";
+    const wasOn = (await getSettings(propertyId)).googleAriPush === true;
+    await saveGoogleAriSettings(propertyId, { push, windowDays, program });
+    // Toggling the push changes what Google should sell: turning it OFF blocks
+    // the property there (zero inventory + stop-sell everything), turning it
+    // back ON re-pushes the full setup. Both run in the background.
+    if (wasOn && !push) queueGoogleAriBlock(propertyId);
+    else if (!wasOn && push) await queueGoogleAriPush(propertyId, ALL_SYNC_KINDS);
     return { ok: true as const };
   }
   if (intent === "push") {
@@ -216,10 +229,13 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
               {isVr ? t("ghProgramHintVr") : t("ghProgramHintHotels")}
             </span>
           </div>
-          <label className="flex items-center gap-2.5 text-[14px] font-semibold text-ink">
-            <input type="checkbox" name="push" defaultChecked={push} className="h-4 w-4 accent-[var(--accent)]" />
-            {t("ghPushToggle", { program: programName })}
-          </label>
+          <div>
+            <label className="flex items-center gap-2.5 text-[14px] font-semibold text-ink">
+              <input type="checkbox" name="push" defaultChecked={push} className="h-4 w-4 accent-[var(--accent)]" />
+              {t("ghPushToggle", { program: programName })}
+            </label>
+            <span className="mt-1 block text-[12px] text-muted">{t("ghPushToggleHint")}</span>
+          </div>
           <label className="block max-w-xs">
             <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("ghWindowDays")}</span>
             <input

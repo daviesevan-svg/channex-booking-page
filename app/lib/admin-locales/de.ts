@@ -1189,6 +1189,8 @@ const DE: Record<string, string> = {
   ghProgramHintVr: "Pusht an Ihr Vacation-Rentals-Konto als Einzeleinheit-Inserat mit binärer Verfügbarkeit.",
   ghProgramHintHotels: "Pusht an Ihr Hotel-Center-Konto. Vacation Rentals ist für Unterkünfte mit einer Einheit verfügbar.",
   ghPushToggle: "Diese Unterkunft an {program} pushen",
+  ghPushToggleHint:
+    "Beim Ausschalten wird die Unterkunft auf Google blockiert — es wird null Verfügbarkeit gepusht, sodass dort nichts mehr buchbar ist. Beim Wiedereinschalten wird das komplette Setup erneut gepusht.",
   ghWindowDays: "Tage im Voraus pushen",
   ghWindowDaysHint: "Verfügbarkeit & Raten werden für heute + diese Anzahl Tage gepusht (max. 500).",
   ghSaveSettings: "Einstellungen speichern",

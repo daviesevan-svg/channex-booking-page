@@ -1182,6 +1182,8 @@ const EN: Record<string, string> = {
   ghProgramHintVr: "Pushes to your Vacation Rentals account as a single-unit listing with binary availability.",
   ghProgramHintHotels: "Pushes to your Hotel Center account. Vacation Rentals is available for single-unit properties.",
   ghPushToggle: "Push this property to {program}",
+  ghPushToggleHint:
+    "Turning this off blocks the property on Google — zero availability is pushed so nothing stays bookable there. Turning it back on re-pushes the full setup.",
   ghWindowDays: "Days ahead to push",
   ghWindowDaysHint: "Availability & rates are pushed for today + this many days (max 500).",
   ghSaveSettings: "Save settings",

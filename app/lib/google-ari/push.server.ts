@@ -6,7 +6,7 @@
 // never throw into callers; every push returns a structured result and the
 // outcome is recorded on the property so the admin can show it.
 import { getConfig } from "../config.server";
-import { getRooms, getRates } from "../catalog.server";
+import { getRooms, getRates, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { checkGoogleReadiness } from "../google-readiness.server";
 import { getSettings, recordGoogleAriSync } from "../overrides.server";
@@ -18,6 +18,8 @@ import {
   buildRateAmountXml,
   buildTaxesXml,
   type AriEnvelope,
+  type AvailEntry,
+  type InvEntry,
   type PropertyRate,
   type PropertyRoom,
 } from "./xml";
@@ -250,6 +252,65 @@ export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promis
   fireAndForget(
     runAndRecord(pid, kinds).catch((e) =>
       console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
+    ),
+  );
+}
+
+/** Block the property on Google: zero inventory for every room plus stop-sell
+ *  Close for every room × rate, over the full 500-day horizon Google accepts.
+ *  Sent once when the admin turns the push OFF, so the property stops being
+ *  bookable there (the ARI equivalent of pushing an empty room/rate setup to a
+ *  channel). Deliberately bypasses envelopeFor's gates: the push flag is
+ *  already off by the time this runs, and readiness/match regressions must
+ *  never stop a block — if Google never matched the property the messages are
+ *  harmless no-ops. Only the partner key is a hard requirement. */
+export async function blockOnGoogle(pid: string): Promise<AriPushResult[]> {
+  const { googleAriPartnerKey, googleVrPartnerKey } = getConfig();
+  const settings = await getSettings(pid);
+  const program: GoogleProgram = settings.googleProgram === "vacation_rentals" ? "vacation_rentals" : "hotels";
+  const partner = program === "vacation_rentals" ? googleVrPartnerKey : googleAriPartnerKey;
+  const record = async (results: AriPushResult[]) => {
+    await recordGoogleAriSync(pid, { at: nowTimestamp(), results });
+    return results;
+  };
+  if (!partner) {
+    const which = program === "vacation_rentals" ? "GOOGLE_VR_PARTNER_KEY" : "GOOGLE_ARI_PARTNER_KEY";
+    return record([{ kind: "block", ok: false, detail: `${which} is not configured.` }]);
+  }
+  const env = (k: string): AriEnvelope => ({ partner, hotelId: pid, id: messageId(k), timestamp: nowTimestamp() });
+  // Close the widest window Google accepts, NOT the configured push window —
+  // earlier pushes may have covered more days than the current setting.
+  const { from, to } = ariWindow(500);
+  const [rooms, rates] = await Promise.all([getRooms(pid), getRates(pid)]);
+  // Close every rate plan code we may ever have pushed under: rate messages use
+  // the room's Channex rate id while property data uses our rate id, so cover
+  // both (deduped). Inactive rates too — they may have been active and pushed.
+  const avail: AvailEntry[] = rooms.flatMap((room) => {
+    const rateIds = [...new Set(rates.flatMap((r) => [r.id, rateChannexId(r, room.id)]))];
+    return rateIds.map((rateId) => ({
+      roomId: room.id,
+      rateId,
+      start: from,
+      end: to,
+      stopSell: true,
+      cta: false,
+      ctd: false,
+      minStay: 1,
+    }));
+  });
+  const inv: InvEntry[] = rooms.map((room) => ({ roomId: room.id, start: from, end: to, count: 0 }));
+  const out: AriPushResult[] = [];
+  out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(env("avail"), avail)));
+  out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(env("inventory"), inv)));
+  return record(out);
+}
+
+/** Fire-and-forget wrapper for blockOnGoogle — used by the settings save so
+ *  turning the toggle off doesn't block the response on Google's round-trip. */
+export function queueGoogleAriBlock(pid: string): void {
+  fireAndForget(
+    blockOnGoogle(pid).catch((e) =>
+      console.log(`[google-ari] block push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
     ),
   );
 }
