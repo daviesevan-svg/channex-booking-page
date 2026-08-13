@@ -97,9 +97,10 @@ export async function action({ request }: Route.ActionArgs) {
     const push = form.get("push") === "on";
     const wasOn = (await getSettings(propertyId)).googleAriPush === true;
     await saveGoogleAriSettings(propertyId, { push, windowDays, program });
-    // Toggling the push changes what Google should sell: turning it OFF blocks
-    // the property there (zero inventory + stop-sell everything), turning it
-    // back ON re-pushes the full setup. Both run in the background.
+    // Toggling the push changes what Google should sell: turning it OFF wipes
+    // the property there (zero inventory + stop-sell everything, then an empty
+    // room/rate overlay), turning it back ON re-pushes the full setup like a
+    // new connection. Both run in the background.
     if (wasOn && !push) queueGoogleAriBlock(propertyId);
     else if (!wasOn && push) await queueGoogleAriPush(propertyId, ALL_SYNC_KINDS);
     return { ok: true as const };

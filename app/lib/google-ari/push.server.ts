@@ -257,10 +257,12 @@ export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promis
 }
 
 /** Block the property on Google: zero inventory for every room plus stop-sell
- *  Close for every room × rate, over the full 500-day horizon Google accepts.
- *  Sent once when the admin turns the push OFF, so the property stops being
- *  bookable there (the ARI equivalent of pushing an empty room/rate setup to a
- *  channel). Deliberately bypasses envelopeFor's gates: the push flag is
+ *  Close for every room × rate over the full 500-day horizon Google accepts,
+ *  then an empty property-data overlay. A PropertyDataSet is "all data about
+ *  the property" and overwrites what Google stored, so the empty overlay wipes
+ *  every room and rate-plan definition — re-enabling later starts from a clean
+ *  account, exactly like a brand-new connection (the ON path re-pushes
+ *  ALL_SYNC_KINDS). Deliberately bypasses envelopeFor's gates: the push flag is
  *  already off by the time this runs, and readiness/match regressions must
  *  never stop a block — if Google never matched the property the messages are
  *  harmless no-ops. Only the partner key is a hard requirement. */
@@ -302,6 +304,11 @@ export async function blockOnGoogle(pid: string): Promise<AriPushResult[]> {
   const out: AriPushResult[] = [];
   out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(env("avail"), avail)));
   out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(env("inventory"), inv)));
+  // Last, after the closes: an overlay with no rooms/rates erases the stored
+  // definitions, so the closes above must still reference ids Google knows.
+  out.push(
+    await postToGoogleAri("property_data", ARI_PATHS.propertyData, buildPropertyDataXml(env("property_data"), [], [])),
+  );
   return record(out);
 }
 
