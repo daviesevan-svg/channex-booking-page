@@ -382,6 +382,10 @@ const TR: Record<string, string> = {
     "Logo tanımlanmadı — rezervasyon sayfaları otel adınızı metin olarak gösterir. Adın yanında görünmesi için bir logo yükleyin.",
   propLogoHint:
     "Rezervasyon başlığında yaklaşık 40 piksel yüksekliğinde gösterilir — saydam zeminli geniş bir kelime logosu (PNG/WebP) en iyi sonucu verir.",
+  propFaviconLabel: "Favicon",
+  propFaviconAlt: "Tesis favicon'u",
+  propFaviconEmpty: "Favicon ayarlanmadı — tarayıcı sekmeleri platformun simgesini gösterir. Kendi simgenizi göstermek için bir tane yükleyin.",
+  propFaviconHint: "Tarayıcı sekmesindeki küçük simge. Kare, 32×32 veya daha büyük (PNG, ICO veya SVG) — bu boyutta ince ayrıntılar kaybolur, bu yüzden basit bir işaret veya baş harf en iyi sonucu verir.",
   propLogoHideName: "Otel adı metnini gizle — logomda ad zaten var",
   propCoverLabel: "Kapak fotoğrafı",
   propCoverAlt: "Tesis kapağı",

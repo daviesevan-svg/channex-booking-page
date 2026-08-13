@@ -12,7 +12,12 @@ import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } fro
 import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { resolveImageField, uploadPropertyCoverImage, uploadPropertyLogo } from "~/lib/images.server";
+import {
+  resolveImageField,
+  uploadPropertyCoverImage,
+  uploadPropertyFavicon,
+  uploadPropertyLogo,
+} from "~/lib/images.server";
 import { checkGoogleReadiness } from "~/lib/google-readiness.server";
 import { setupChecklist } from "~/lib/setup-checklist.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
@@ -89,6 +94,19 @@ export async function action({ request }: Route.ActionArgs) {
   // Whether to hide the text hotel name beside the logo (only meaningful when a
   // logo is set; the guest header ignores it otherwise).
   await patchSettings(propertyId, { logoHideName: form.get("logoHideName") === "1" });
+  // Browser-tab icon for the hotel's guest pages (global — not per language).
+  const favicon = await resolveImageField(form, {
+    fileKey: "faviconUpload",
+    removeKey: "removeFavicon",
+    previous: before.faviconImage || undefined,
+    upload: (f) => uploadPropertyFavicon(propertyId, f),
+  });
+  if (!favicon.ok) return { error: favicon.error };
+  await patchSettings(propertyId, { faviconImage: favicon.url ?? "" });
+  if (before.faviconImage) {
+    const now = (await getSettings(propertyId)).faviconImage;
+    if (now !== before.faviconImage) queueImageCleanup(propertyId, [before.faviconImage]);
+  }
   // Property amenities (global; shown to guests + sent to Google). Only known
   // vocabulary keys / enum values are stored. Unit size is a Google VR go-live
   // requirement for single-unit properties; blank leaves the stored value.
@@ -329,6 +347,33 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               {t("propLogoHideName")}
             </label>
           )}
+        </div>
+
+        {/* Favicon — the browser-tab icon on this hotel's guest pages. Global
+            (not per-language). Previewed at 32px on a chip because that is
+            roughly the size a tab actually renders it at, where a detailed logo
+            turns to mush. */}
+        <div>
+          <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("propFaviconLabel")}</div>
+          {settings.faviconImage ? (
+            <div className="mb-2 flex items-center gap-3">
+              <div className="flex h-16 w-16 flex-none items-center justify-center rounded-[10px] border border-line-alt bg-chip">
+                <img src={settings.faviconImage} alt={t("propFaviconAlt")} className="h-8 w-8 object-contain" />
+              </div>
+              <label className="flex items-center gap-2 text-[13px] text-secondary">
+                <input type="checkbox" name="removeFavicon" value="1" /> {t("propRemove")}
+              </label>
+            </div>
+          ) : (
+            <p className="mb-2 text-[12px] text-muted">{t("propFaviconEmpty")}</p>
+          )}
+          {/* ICO and SVG alongside the usual raster types — both are ordinary
+              favicon formats a hotel's designer is likely to hand them. */}
+          <FilePicker
+            name="faviconUpload"
+            accept="image/png,image/x-icon,image/vnd.microsoft.icon,image/svg+xml,image/jpeg,image/webp"
+          />
+          <p className="mt-1 text-[11px] text-faint">{t("propFaviconHint")}</p>
         </div>
 
         {/* Cover photo — the property's image on Collections cards. Global (not

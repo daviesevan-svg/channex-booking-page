@@ -83,6 +83,7 @@ async function referencedBy(pid: string): Promise<string[]> {
     ...sold,
     settings.coverImage,
     settings.logoImage,
+    settings.faviconImage,
     hero,
   ].filter((u): u is string => typeof u === "string" && u.length > 0);
 }
