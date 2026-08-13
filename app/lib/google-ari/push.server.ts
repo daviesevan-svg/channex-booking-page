@@ -249,6 +249,14 @@ export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriP
  *  dev). Used by the Channex change webhook and admin edits. */
 export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promise<void> {
   if (!(await getSettings(pid)).googleAriPush) return;
+  queueGoogleAriResync(pid, kinds);
+}
+
+/** Fire-and-forget push WITHOUT the enabled check. For the OFF→ON toggle
+ *  transition: the flag was written in this same request, and re-reading it is
+ *  a KV read-after-write that can return the stale "off" value — which made the
+ *  re-push silently no-op. The caller just decided the flag's value; trust it. */
+export function queueGoogleAriResync(pid: string, kinds: SyncKind[]): void {
   fireAndForget(
     runAndRecord(pid, kinds).catch((e) =>
       console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
