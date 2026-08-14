@@ -56,7 +56,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       adults: occ.adults,
       childrenAge: childrenAgeParam(occ.childrenAge),
     },
-    { gate: true },
+    { gate: true, lang },
   );
 
   const party = partySize(occ);

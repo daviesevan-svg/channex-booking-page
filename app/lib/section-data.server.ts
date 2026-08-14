@@ -9,7 +9,7 @@
 // touches D1, and a page with no rooms section never reads the catalog.
 
 import { formatAddress } from "./address";
-import { getRooms } from "./catalog.server";
+import { getRooms, localizeRoom } from "./catalog.server";
 import { getConfig } from "./config.server";
 import { normalizeFacilities } from "./content";
 import { todayISODate } from "./dates";
@@ -47,7 +47,11 @@ export async function loadSectionData(
 
   const [rooms, offers, gallery, facilitiesExtra, reviews, hasVouchers, overrides, heroPhoto] =
     await Promise.all([
-      has("rooms") ? getRooms(pid).catch(() => []) : Promise.resolve([]),
+      has("rooms")
+        ? getRooms(pid)
+            .then((rs) => rs.map((r) => localizeRoom(r, lang)))
+            .catch(() => [])
+        : Promise.resolve([]),
       // Already fails open to an empty list, so no .catch() here.
       has("offers") ? getPublicOffers(pid) : Promise.resolve([]),
       has("gallery") ? getGalleryFor(pid, lang).catch(() => []) : Promise.resolve([]),

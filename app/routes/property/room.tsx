@@ -17,8 +17,8 @@ import { CalendarLegend, CalendarMonths, CalendarNav } from "~/components/calend
 import { GuestSelector } from "~/components/guest-selector";
 import { Diamond } from "~/components/sections";
 import { useT } from "~/lib/i18n";
-import { VR_AMENITY_KEYS } from "~/lib/content";
-import { getCalendarAvailability, getRoom, getRatesForRoom } from "~/lib/catalog.server";
+import { langFromRequest, VR_AMENITY_KEYS } from "~/lib/content";
+import { getCalendarAvailability, getRoom, getRatesForRoom, localizeRoom } from "~/lib/catalog.server";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 
 import { earliestCheckinDate } from "~/lib/dates";
@@ -35,8 +35,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // website, so this URL shouldn't exist — 404 rather than serve an orphan.
   if (!settings.websiteEnabled) throw new Response("Not Found", { status: 404 });
 
-  const room = await getRoom(pid, params.roomId);
-  if (!room) throw new Response("Not Found", { status: 404 });
+  const rawRoom = await getRoom(pid, params.roomId);
+  if (!rawRoom) throw new Response("Not Found", { status: 404 });
+  const room = localizeRoom(rawRoom, langFromRequest(request));
 
   const now = new Date();
   const [closedDates, cutoff, rates] = await Promise.all([
