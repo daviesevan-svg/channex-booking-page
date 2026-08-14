@@ -1467,6 +1467,8 @@ const DE: Record<string, string> = {
   wlpSupportEmailHint: "Antwortadresse der Betreiber-E-Mails und deren erste Support-Anlaufstelle.",
   wlpEmailFrom: "Absenderadresse",
   wlpEmailFromHint: "E-Mails an deren Hotels und Gäste werden von dieser Adresse statt von unserer gesendet. Die Domain muss zuvor in SparkPost verifiziert sein; leer lassen = Versand über die Plattform-Domain.",
+  wlpAccentColor: "Markenfarbe",
+  wlpAccentColorHint: "Akzentfarbe der Betreiber-E-Mails (Team-Einladungen), damit jede von ihnen angebundene Unterkunft dieselbe E-Mail-Optik sendet. Hex wie #b5651d; leer = Plattform-Standard.",
   wlpAdminHost: "Admin-Hostname",
   wlpAdminHostHint: "Deren eigener Zugang: sobald er aktiv ist, melden sich deren Nutzer nur noch hier an — unsere Hosts lassen sie nicht mehr herein. Die Anmeldeseite trägt deren Marke.",
   wlpAdminHostDns: "Sie verweisen darauf mit:",
