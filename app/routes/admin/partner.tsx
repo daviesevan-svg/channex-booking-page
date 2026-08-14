@@ -100,11 +100,19 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (!favicon.ok) return { error: favicon.error };
     const logoImage = logo.url;
     const faviconImage = favicon.url;
+    // Their sending address — the domain is verified by hand in SparkPost, so
+    // the only guard worth having here is "looks like one email address" (a
+    // stray display name or comma would corrupt every From header we build).
+    const emailFrom = str("emailFrom").toLowerCase() || undefined;
+    if (emailFrom && !/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(emailFrom)) {
+      return { error: "Sending address must be a bare email address like noreply@theirpms.com." };
+    }
     await savePartner({
       ...partner,
       name: str("name") || brandName,
       brandName,
       supportEmail: str("supportEmail") || undefined,
+      emailFrom,
       adminHost,
       guestHost,
       logoImage,
@@ -212,6 +220,20 @@ export default function AdminPartner({ loaderData, actionData }: Route.Component
               <span className={label}>{t("wlpSupportEmail")}</span>
               <input name="supportEmail" type="email" defaultValue={p.supportEmail} placeholder="support@pms.com" className={FIELD_INPUT} />
               <span className="mt-1 block text-[12px] text-faint">{t("wlpSupportEmailHint")}</span>
+            </div>
+            <div>
+              <span className={label}>{t("wlpEmailFrom")}</span>
+              <input
+                name="emailFrom"
+                type="email"
+                defaultValue={p.emailFrom}
+                placeholder="noreply@theirpms.com"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className={FIELD_INPUT}
+              />
+              <span className="mt-1 block text-[12px] text-faint">{t("wlpEmailFromHint")}</span>
             </div>
             <div>
               <span className={label}>{t("wlpAdminHost")}</span>

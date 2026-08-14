@@ -8,7 +8,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
 import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, sampleBooking } from "~/lib/email-render.server";
-import { sendEmail } from "~/lib/email.server";
+import { sendEmail, senderFor } from "~/lib/email.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -83,7 +83,8 @@ export async function action({ params, request }: Route.ActionArgs) {
       def.id === "review_request"
         ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
         : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl });
-    const { sent, error } = await sendEmail({ to: adminEmail, subject, html, replyTo: settings.emailReplyTo });
+    // Same sender as the real thing, so the test also proves deliverability.
+    const { sent, error } = await sendEmail({ to: adminEmail, subject, html, from: await senderFor(pid, settings), replyTo: settings.emailReplyTo });
     return sent
       ? { ok: true as const, message: `Test sent to ${adminEmail}.` }
       : { error: `Test not sent — ${error ?? "email provider not configured"}.` };

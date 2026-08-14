@@ -8,9 +8,10 @@ Their hotels get "the PMS's booking engine"; Roompanda is invisible to them.
 > counts); phase 2 domains shipped in #410 (admin hosts + host-bound identity)
 > and #411 (guest hosts + partner picker + slug host-discipline). Answered
 > questions: hotels log in themselves; Channex stays ours; payments stay
-> per-hotel Stripe Connect; pricing deferred to manual invoicing. Still open:
-> per-partner email sending domains (§6 phase 2 half — display-name-only for
-> now) and all of phase 3 (partner API, SSO, metered billing).
+> per-hotel Stripe Connect; pricing deferred to manual invoicing. Per-partner
+> email sending domains shipped 2026-08-14 (§6 phase 2 — `partner.emailFrom`,
+> domain verified by hand in SparkPost). Still open: all of phase 3 (partner
+> API, SSO, metered billing).
 
 The guiding constraint: **one deployment, one codebase**. A partner is a row of
 configuration, not a fork or a second Worker. Everything a partner changes —
@@ -200,11 +201,18 @@ interpolations in the six dictionaries rather than new copy.
 - **Phase 1:** keep the single verified SparkPost sending domain; partner
   branding is display-name only (`"HotelSoft Bookings" <no-reply@<global>>`),
   reply-to = partner support. Zero deliverability risk, zero partner DNS work.
-- **Phase 2:** optional per-partner verified sending domain (SparkPost domain
-  verification is DKIM/SPF records the PMS adds — same shape as the guest
-  custom-domain CNAME flow, so the admin UX pattern exists). `partner.emailFrom`
-  only becomes active once verified; fall back to phase-1 behaviour otherwise.
-  Guest emails from a hotel under a partner switch to the partner domain too.
+- **Phase 2 (SHIPPED):** optional per-partner sending address
+  (`partner.emailFrom`, e.g. `noreply@theirpms.com`), set by a superadmin on the
+  partner page. Verification is deliberately MANUAL: we add the domain + DKIM in
+  the SparkPost dashboard first, then enter the address — which is why the field
+  is superadmin-only rather than partner self-service, and why there's no in-app
+  DNS flow. Once set, every email for that partner follows it: magic links and
+  team invites (display name = brand name), and all guest/host emails for the
+  partner's properties — bookings, cancellations, reviews, vouchers, contact,
+  collections — via `senderFor(pid)` (email.server), which resolves the
+  property's partner and keeps the property's `emailFromName` display-name
+  override on top. Unset = phase-1 behaviour (global domain). In-app DNS
+  self-service via the SparkPost API can come later if partners need it.
 
 ---
 

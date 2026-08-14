@@ -23,10 +23,10 @@
 // into a vendor's defaults.
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
-import { getConfig, type AppConfig } from "./config.server";
+import { getConfig } from "./config.server";
 import { accentHex, composeEmail, composeReviewEmail, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
-import { brandOf, getPartner } from "./partners.server";
+import { brandOf, getPartner, partnerForProperty } from "./partners.server";
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -90,10 +90,12 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
 }
 
 // ---------- high-level booking emails ----------
-// The sending domain is global (EMAIL_FROM); the property only overrides the
-// display name.
-function senderFrom(settings: SiteSettings, config: AppConfig): string | undefined {
-  const base = config.emailFrom;
+// The sending ADDRESS follows the property's partner when it has its own
+// verified sender (docs/whitelabel.md §6 phase 2), else the global EMAIL_FROM;
+// the property's emailFromName still only overrides the display name. Exported
+// for the other property-scoped senders (voucher-purchase.server).
+export async function senderFor(pid: string, settings: SiteSettings): Promise<string | undefined> {
+  const base = brandOf(await partnerForProperty(pid)).emailFrom || getConfig().emailFrom;
   if (!base || !settings.emailFromName) return base;
   const addr = base.match(/<([^>]+)>/)?.[1] ?? base;
   return `${settings.emailFromName} <${addr}>`;
@@ -107,7 +109,7 @@ export async function sendGuestBookingEmail(pid: string, booking: BookingRecord,
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
     const brand = await emailBrand(pid, accentHex(settings));
-    const from = senderFrom(settings, getConfig());
+    const from = await senderFor(pid, settings);
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
     const gtext = await getEmailTemplate(pid, "booking_confirmation", booking.lang);
     const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, brand, manageUrl });
@@ -126,7 +128,7 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
     const brand = await emailBrand(pid, accentHex(settings));
-    const from = senderFrom(settings, getConfig());
+    const from = await senderFor(pid, settings);
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
     await sendGuestBookingEmail(pid, booking, origin);
@@ -149,7 +151,7 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
-    const from = senderFrom(settings, getConfig());
+    const from = await senderFor(pid, settings);
     const text = await getEmailTemplate(pid, "booking_failed", booking.lang);
     const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl: "" });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
@@ -189,7 +191,7 @@ export async function sendReviewRequestEmail(
       to: booking.guest.email,
       subject,
       html,
-      from: senderFrom(settings, getConfig()),
+      from: await senderFor(pid, settings),
       replyTo: settings.emailReplyTo,
     });
     return r.sent;
@@ -228,7 +230,7 @@ export async function sendTeamInviteEmail(
     return await sendEmail({
       to: toEmail,
       subject: `You've been added to ${hotelName} on ${product.name}`,
-      from: senderFrom(settings, getConfig()),
+      from: await senderFor(pid, settings),
       replyTo: product.supportEmail || settings.emailReplyTo,
       html,
     });
@@ -298,7 +300,7 @@ export async function sendCollectionMembershipEmail(args: {
     return await sendEmail({
       to: args.to,
       subject: copy.subject,
-      from: senderFrom(settings, getConfig()),
+      from: await senderFor(args.pid, settings),
       replyTo: settings.emailReplyTo,
       html: renderSimpleEmail({
         hotelName,
@@ -371,6 +373,7 @@ export async function sendContactEmail(args: {
       to: args.to,
       // Fixed text plus the hotel's own name — nothing the sender controls.
       subject: `Website enquiry — ${args.hotelName}`,
+      from: await senderFor(args.pid, settings),
       replyTo: args.guestEmail,
       html: renderSimpleEmail({
         hotelName: args.hotelName,
@@ -393,7 +396,7 @@ export async function sendCancellationEmails(pid: string, booking: BookingRecord
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
     const brand = await emailBrand(pid, accentHex(settings));
-    const from = senderFrom(settings, getConfig());
+    const from = await senderFor(pid, settings);
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
     const gtext = await getEmailTemplate(pid, "booking_cancellation", booking.lang);

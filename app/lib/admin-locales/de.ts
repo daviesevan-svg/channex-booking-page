@@ -1465,6 +1465,8 @@ const DE: Record<string, string> = {
   wlpInternalName: "Interner Name",
   wlpSupportEmail: "Support-E-Mail",
   wlpSupportEmailHint: "Antwortadresse der Betreiber-E-Mails und deren erste Support-Anlaufstelle.",
+  wlpEmailFrom: "Absenderadresse",
+  wlpEmailFromHint: "E-Mails an deren Hotels und Gäste werden von dieser Adresse statt von unserer gesendet. Die Domain muss zuvor in SparkPost verifiziert sein; leer lassen = Versand über die Plattform-Domain.",
   wlpAdminHost: "Admin-Hostname",
   wlpAdminHostHint: "Deren eigener Zugang: sobald er aktiv ist, melden sich deren Nutzer nur noch hier an — unsere Hosts lassen sie nicht mehr herein. Die Anmeldeseite trägt deren Marke.",
   wlpAdminHostDns: "Sie verweisen darauf mit:",

@@ -231,6 +231,7 @@ export async function sendMagicLink(email: string, link: string): Promise<{ sent
     to: email,
     subject: brand.partnerId ? `Sign in to ${brand.name}` : "Your admin sign-in link",
     html: `<p>Click to sign in to ${brand.partnerId ? brand.name : "the booking admin"}:</p><p><a href="${link}">${link}</a></p><p>This link expires in 15 minutes.</p>`,
+    from: brand.emailFrom,
     replyTo: brand.supportEmail,
   });
   if (!sent || import.meta.env.DEV) {
