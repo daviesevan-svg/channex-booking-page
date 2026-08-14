@@ -4,9 +4,9 @@ import type { Route } from "./+types/page";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { langParam, pageDef, pickLang } from "~/lib/content";
+import { DEFAULT_LANG, langParam, pageDef, pickLang } from "~/lib/content";
 import { getPageOverridesRaw, savePageContent } from "~/lib/overrides.server";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -70,9 +70,11 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
   return (
     <div>
       <AdminPageHeader title={t("pgTitle", { label })} saved={Boolean(actionData?.ok)} />
-      <p className="mb-6 text-[14px] text-muted">
-        {t("pgIntro", { label: label.toLowerCase() })}
-      </p>
+      {loaderData.lang === DEFAULT_LANG ? (
+        <p className="mb-6 text-[14px] text-muted">{t("pgIntro", { label: label.toLowerCase() })}</p>
+      ) : (
+        <TranslationNote lang={loaderData.lang} />
+      )}
 
       <Form
         method="post"
@@ -88,14 +90,14 @@ export default function AdminPage({ loaderData, actionData }: Route.ComponentPro
                 name={f.key}
                 rows={3}
                 defaultValue={overrides[f.key]}
-                placeholder={f.default}
+                placeholder={loaderData.lang === DEFAULT_LANG ? f.default : undefined}
                 className={`${inputCls} resize-y`}
               />
             ) : (
               <input
                 name={f.key}
                 defaultValue={overrides[f.key]}
-                placeholder={f.default}
+                placeholder={loaderData.lang === DEFAULT_LANG ? f.default : undefined}
                 className={inputCls}
               />
             )}

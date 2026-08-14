@@ -4,7 +4,7 @@ import type { Route } from "./+types/home";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { DEFAULT_PROMO_PLACEHOLDER, langParam, pickLang, searchDefaults, type SearchContent } from "~/lib/content";
+import { DEFAULT_LANG, DEFAULT_PROMO_PLACEHOLDER, langParam, pickLang, searchDefaults, type SearchContent } from "~/lib/content";
 import {
   getHeroImage,
   getOverrides,
@@ -14,7 +14,7 @@ import {
 } from "~/lib/overrides.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { resolveImageField, uploadHomeImage } from "~/lib/images.server";
-import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { Field, FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 
@@ -86,9 +86,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const t = useAdminT();
-  // Example placeholders in the admin's language. They're only samples — what
-  // guests actually see when a field is empty is searchDefaults(guest lang).
-  const d = searchDefaults(useAdminLang());
+  const adminLang = useAdminLang();
 
   if (!loaderData.configured) {
     return (
@@ -104,11 +102,21 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
 
   const { content, heroImage, hotelName, lang } = loaderData;
   const currentHero = heroImage;
+  // Content placeholders ("what guests see when this is blank") only make
+  // sense on the default-language tab. On a translation tab they showed the
+  // default text inside every empty field, which read as untranslated content
+  // (TranslationNote) — there the fields stay visibly empty.
+  const isBase = lang === DEFAULT_LANG;
+  const d = searchDefaults(adminLang);
 
   return (
     <div>
       <AdminPageHeader title={t("homeTitle")} saved={Boolean(actionData?.ok)} />
-      <p className="mb-6 text-[14px] text-muted">{t("homeIntro")}</p>
+      {isBase ? (
+        <p className="mb-6 text-[14px] text-muted">{t("homeIntro")}</p>
+      ) : (
+        <TranslationNote lang={lang} />
+      )}
 
       <Form
         method="post"
@@ -121,21 +129,21 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
           name="eyebrow"
           label={t("homeEyebrow")}
           value={content.eyebrow}
-          placeholder={hotelName || t("homeEyebrowPlaceholder")}
+          placeholder={isBase ? hotelName || t("homeEyebrowPlaceholder") : undefined}
           hint={t("homeEyebrowHint")}
         />
         <Field
           name="heading"
           label={t("homeHeading")}
           value={content.heading}
-          placeholder={d.heading}
+          placeholder={isBase ? d.heading : undefined}
           hint={t("homeHeadingHint")}
         />
         <Field
           name="intro"
           label={t("homeIntroField")}
           value={content.intro}
-          placeholder={d.intro}
+          placeholder={isBase ? d.intro : undefined}
           hint={t("homeIntroFieldHint")}
           textarea
         />
@@ -144,21 +152,21 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
             name="searchButton"
             label={t("homeSearchButton")}
             value={content.searchButton}
-            placeholder={d.searchButton}
+            placeholder={isBase ? d.searchButton : undefined}
             hint={t("homeSearchButtonHint")}
           />
           <Field
             name="promoText"
             label={t("homePromoText")}
             value={content.promoText}
-            placeholder={d.promoText}
+            placeholder={isBase ? d.promoText : undefined}
             hint={t("homePromoTextHint")}
           />
           <Field
             name="promoPlaceholder"
             label={t("homePromoPlaceholder")}
             value={content.promoPlaceholder}
-            placeholder={DEFAULT_PROMO_PLACEHOLDER}
+            placeholder={isBase ? DEFAULT_PROMO_PLACEHOLDER : undefined}
             hint={t("homePromoPlaceholderHint")}
           />
         </div>
@@ -174,7 +182,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightTitle"
                     defaultValue={content.highlights?.[i]?.title}
-                    placeholder={d.highlights[i].title}
+                    placeholder={isBase ? d.highlights[i].title : undefined}
                     className={FIELD_INPUT}
                   />
                 </label>
@@ -183,7 +191,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightDesc"
                     defaultValue={content.highlights?.[i]?.description}
-                    placeholder={d.highlights[i].description}
+                    placeholder={isBase ? d.highlights[i].description : undefined}
                     className={FIELD_INPUT}
                   />
                 </label>

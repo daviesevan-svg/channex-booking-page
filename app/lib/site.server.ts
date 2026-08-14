@@ -254,10 +254,10 @@ export async function getPageEditor(
 ): Promise<{
   page: SitePage;
   isHome: boolean;
+  /** Raw text for THIS language only, no default-language fallback: the
+   *  editor shows what IS set here, and an untranslated field stays visibly
+   *  empty (TranslationNote explains the fallback to the operator). */
   text: Record<string, string>;
-  /** The default language's text, shown as a placeholder — no fallback here:
-   *  the editor must show what IS set in this language. */
-  baseText: Record<string, string>;
 } | null> {
   const config = await read(pid);
   const page = pagesOf(config).find((p) => p.id === pageId);
@@ -266,7 +266,6 @@ export async function getPageEditor(
     page,
     isHome: isHome(page),
     text: config.copy[lang] ?? {},
-    baseText: lang === DEFAULT_LANG ? {} : (config.copy[DEFAULT_LANG] ?? {}),
   };
 }
 
@@ -474,12 +473,11 @@ export async function saveSiteCopy(
 export async function getFooterRaw(
   pid: string,
   lang: string,
-): Promise<{ footer: SiteFooter; text: Record<string, string>; baseText: Record<string, string> }> {
+): Promise<{ footer: SiteFooter; text: Record<string, string> }> {
   const config = await read(pid);
   return {
     footer: normalizeFooter(config.footer),
     text: config.footerCopy?.[lang] ?? {},
-    baseText: lang === DEFAULT_LANG ? {} : (config.footerCopy?.[DEFAULT_LANG] ?? {}),
   };
 }
 

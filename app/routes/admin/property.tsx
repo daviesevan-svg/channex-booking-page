@@ -5,7 +5,7 @@ import type { Route } from "./+types/property";
 import { adminMeta } from "~/lib/admin-meta";
 import { geocodeAddress } from "~/lib/google-maps-client";
 import { getConfig } from "~/lib/config.server";
-import { Field, FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { Field, FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
@@ -202,6 +202,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
       <p className="mb-6 text-[14px] text-muted">
         {t("propIntro")}
       </p>
+      <TranslationNote lang={lang} />
 
       {actionData && "error" in actionData && actionData.error && (
         <p className="mb-4 rounded-[10px] bg-[#fdecea] px-4 py-2.5 text-[13px] font-semibold text-[#c0392b]">
