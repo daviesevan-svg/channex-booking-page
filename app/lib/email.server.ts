@@ -24,7 +24,8 @@
 import type { BookingRecord } from "./bookings.server";
 import { emailDef, type SiteSettings } from "./content";
 import { getConfig } from "./config.server";
-import { accentHex, composeEmail, composeReviewEmail, emailBrand, renderSimpleEmail } from "./email-render.server";
+import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailBrand, renderSimpleEmail } from "./email-render.server";
+import { emailBrandFor } from "./site-style";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 import { brandOf, getPartner, partnerForProperty } from "./partners.server";
 
@@ -217,9 +218,17 @@ export async function sendTeamInviteEmail(
       getPartner(partnerId).then(brandOf),
     ]);
     const hotelName = ov.hotelName || "the property";
+    // A partner's invites are UNIFORM: every hotel they onboard sends the same-
+    // looking mail (partner accent, default email template), because the
+    // recipient judges the PMS by this email, not the hotel — per-property
+    // theming here read as inconsistent branding to partners. Direct
+    // properties keep their own theme; guest emails stay hotel-themed always.
+    const brand = product.partnerId
+      ? emailBrandFor(product.accent ?? DEFAULT_ACCENT_HEX, undefined)
+      : await emailBrand(pid, accentHex(settings));
     const html = renderSimpleEmail({
       hotelName,
-      brand: await emailBrand(pid, accentHex(settings)),
+      brand,
       heading: `You've been added to ${hotelName}`,
       body:
         `${invitedBy} has given you access to manage ${hotelName} on ${product.name}.\n\n` +

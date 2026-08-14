@@ -27,6 +27,10 @@ export function accentHex(settings: SiteSettings): string {
   return ACCENT_HEX[id] ?? ACCENT_HEX.terracotta;
 }
 
+/** The accent an email falls back to when no theme is in play (a partner with
+ *  no accentColor set) — the same terracotta accentHex defaults to. */
+export const DEFAULT_ACCENT_HEX = ACCENT_HEX.terracotta;
+
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 

@@ -1463,6 +1463,8 @@ const PT: Record<string, string> = {
   wlpSupportEmailHint: "Endereço de resposta dos emails de operação e primeira linha de suporte deles.",
   wlpEmailFrom: "Endereço de envio",
   wlpEmailFromHint: "Os emails para os hotéis e hóspedes deles são enviados a partir deste endereço em vez do nosso. O domínio tem de estar verificado no SparkPost primeiro; em branco = envio pelo domínio da plataforma.",
+  wlpAccentColor: "Cor da marca",
+  wlpAccentColorHint: "Cor de destaque dos emails de operação (convites de equipa), para que todos os hotéis que eles integram enviem emails com o mesmo aspeto. Hex como #b5651d; em branco = padrão da plataforma.",
   wlpAdminHost: "Hostname de administração",
   wlpAdminHostHint: "A porta deles: assim que estiver ativa, os utilizadores deles iniciam sessão aqui e SÓ aqui — os nossos hosts deixam de os admitir. A página de início de sessão usa a marca deles.",
   wlpAdminHostDns: "Apontam-no para nós com:",

@@ -1518,6 +1518,8 @@ const TR: Record<string, string> = {
   wlpSupportEmailHint: "Operatör e-postalarının yanıt adresi ve ilk destek hattı.",
   wlpEmailFrom: "Gönderim adresi",
   wlpEmailFromHint: "Otellerine ve misafirlerine giden e-postalar bizimki yerine bu adresten gönderilir. Alan adının önce SparkPost'ta doğrulanması gerekir; boş bırakılırsa platform alan adından gönderilir.",
+  wlpAccentColor: "Marka rengi",
+  wlpAccentColorHint: "Operatör e-postalarının (ekip davetleri) vurgu rengi; böylece dahil ettikleri her otel aynı görünümde e-posta gönderir. #b5651d gibi hex; boş = platform varsayılanı.",
   wlpAdminHost: "Yönetim ana bilgisayar adı",
   wlpAdminHostHint: "Onların kendi kapısı: yayına girdiğinde kullanıcıları yalnızca buradan oturum açar — bizim adreslerimiz onları artık kabul etmez. Giriş sayfası onların markasını taşır.",
   wlpAdminHostDns: "Bize şununla yönlendirirler:",

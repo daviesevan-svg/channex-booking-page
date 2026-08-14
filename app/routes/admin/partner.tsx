@@ -107,12 +107,18 @@ export async function action({ request, params }: Route.ActionArgs) {
     if (emailFrom && !/^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/.test(emailFrom)) {
       return { error: "Sending address must be a bare email address like noreply@theirpms.com." };
     }
+    // Strict hex only — this lands in inline email CSS verbatim.
+    const accentColor = str("accentColor").toLowerCase() || undefined;
+    if (accentColor && !/^#[0-9a-f]{6}$/.test(accentColor)) {
+      return { error: "Brand colour must be a hex value like #b5651d." };
+    }
     await savePartner({
       ...partner,
       name: str("name") || brandName,
       brandName,
       supportEmail: str("supportEmail") || undefined,
       emailFrom,
+      accentColor,
       adminHost,
       guestHost,
       logoImage,
@@ -234,6 +240,28 @@ export default function AdminPartner({ loaderData, actionData }: Route.Component
                 className={FIELD_INPUT}
               />
               <span className="mt-1 block text-[12px] text-faint">{t("wlpEmailFromHint")}</span>
+            </div>
+            <div>
+              <span className={label}>{t("wlpAccentColor")}</span>
+              <div className="flex items-center gap-2">
+                <input
+                  name="accentColor"
+                  defaultValue={p.accentColor}
+                  placeholder="#b5651d"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={FIELD_INPUT}
+                />
+                {p.accentColor && (
+                  <span
+                    aria-hidden
+                    className="h-6 w-6 shrink-0 rounded-[6px] border border-line"
+                    style={{ backgroundColor: p.accentColor }}
+                  />
+                )}
+              </div>
+              <span className="mt-1 block text-[12px] text-faint">{t("wlpAccentColorHint")}</span>
             </div>
             <div>
               <span className={label}>{t("wlpAdminHost")}</span>

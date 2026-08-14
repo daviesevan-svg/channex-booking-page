@@ -54,7 +54,7 @@ interface Partner {
   name: string;                  // "HotelSoft Ltd" (internal)
   brandName: string;             // "HotelSoft Bookings" — used everywhere we'd say Roompanda
   logoImage?: string;            // admin header + login card + emails
-  accentColor?: string;          // admin chrome accent (reuse theme token override)
+  accentColor?: string;          // operator-email accent (team invites render uniform per partner, not per hotel theme); admin chrome later
   supportEmail?: string;         // reply-to on operator emails; shown on errors
   // ----- domains (phase 2) -----
   adminHost?: string;            // admin.hotelsoft.com  → partner-branded admin
@@ -131,6 +131,12 @@ Two consequences worth stating out loud:
   name = `brandName`, copy loses the hardcoded "on Roompanda", reply-to =
   `supportEmail`. One `brandForRequest()/brandForProperty()` helper resolves
   partner → defaults, used by every operator-facing email.
+- **Invites are visually UNIFORM per partner** (shipped 2026-08-14): a partner
+  property's team invite renders with `partner.accentColor` (default: platform
+  accent) on the default email template, never the hotel's theme — a partner's
+  hotels each had their own colours, which read as inconsistent PMS branding to
+  the partner. Direct properties keep their hotel theme; guest emails stay
+  hotel-themed always.
 - **First-sign-in superadmin claim** (`claimSuperadminIfUnclaimed`) must be
   canonical-host-only — a partner's first hotel user must never claim anything.
 - `/admin/users` stays superadmin. `partner_admin` gets a scoped equivalent

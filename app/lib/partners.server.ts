@@ -28,6 +28,13 @@ export interface Partner {
    *  why this is a superadmin-only field and not partner self-service. Unset =
    *  global sending domain. */
   emailFrom?: string;
+  /** Brand accent (#rrggbb) for the partner's OPERATOR emails (team invites).
+   *  A partner's invites must look the same from every hotel they onboard —
+   *  the recipient judges the PMS by that mail, not the hotel — so these render
+   *  with this accent on the default email template instead of the property's
+   *  theme. Unset = the platform default accent. Guest emails stay
+   *  hotel-themed. */
+  accentColor?: string;
   /** Brand mark (/images/… path) shown in the admin chrome, on their login
    *  page, and on their guest-host picker — wherever the diamond would be. */
   logoImage?: string;
@@ -131,6 +138,8 @@ export interface Brand {
   /** Full sender ("HotelSoft <noreply@theirpms.com>") when the partner has its
    *  own verified sending address; unset = the global EMAIL_FROM applies. */
   emailFrom?: string;
+  /** Accent hex for the partner's operator emails; unset = platform default. */
+  accent?: string;
   /** Brand mark path — shown where the diamond would be. */
   logo?: string;
   /** Set when this is a partner brand (surfaces may behave differently). */
@@ -148,6 +157,7 @@ export function brandOf(partner: Partner | undefined): Brand {
         name: partner.brandName,
         supportEmail: partner.supportEmail,
         emailFrom: partner.emailFrom ? `${partner.brandName} <${partner.emailFrom}>` : undefined,
+        accent: partner.accentColor || undefined,
         logo: partner.logoImage || undefined,
         partnerId: partner.id,
         guestHost: partner.guestHost || undefined,
