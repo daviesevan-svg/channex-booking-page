@@ -21,6 +21,13 @@ export interface Partner {
   brandName: string;
   /** Reply-to for operator emails; shown as the support contact. */
   supportEmail?: string;
+  /** Per-partner sending address (noreply@theirpms.com) — every email for this
+   *  partner's properties and users is sent from it instead of the global
+   *  EMAIL_FROM (docs/whitelabel.md §6 phase 2). The domain must already be
+   *  verified in SparkPost — that's done by hand in their dashboard, which is
+   *  why this is a superadmin-only field and not partner self-service. Unset =
+   *  global sending domain. */
+  emailFrom?: string;
   /** Brand mark (/images/… path) shown in the admin chrome, on their login
    *  page, and on their guest-host picker — wherever the diamond would be. */
   logoImage?: string;
@@ -121,6 +128,9 @@ export async function deletePartner(partner: Partner): Promise<void> {
 export interface Brand {
   name: string;
   supportEmail?: string;
+  /** Full sender ("HotelSoft <noreply@theirpms.com>") when the partner has its
+   *  own verified sending address; unset = the global EMAIL_FROM applies. */
+  emailFrom?: string;
   /** Brand mark path — shown where the diamond would be. */
   logo?: string;
   /** Set when this is a partner brand (surfaces may behave differently). */
@@ -137,6 +147,7 @@ export function brandOf(partner: Partner | undefined): Brand {
     ? {
         name: partner.brandName,
         supportEmail: partner.supportEmail,
+        emailFrom: partner.emailFrom ? `${partner.brandName} <${partner.emailFrom}>` : undefined,
         logo: partner.logoImage || undefined,
         partnerId: partner.id,
         guestHost: partner.guestHost || undefined,
@@ -150,6 +161,28 @@ export function brandOf(partner: Partner | undefined): Brand {
 export async function brandForUser(email: string): Promise<Brand> {
   const user = await getUser(email);
   return brandOf(await getPartner(user?.partnerId));
+}
+
+/** The partner a PROPERTY belongs to — for the emails we send about it, whose
+ *  sending address must follow the property's partner, not the viewer (same
+ *  rule as guest links).
+ *
+ *  Reads the property registry KV key directly rather than importing
+ *  properties.server: that module imports auth.server, which imports
+ *  email.server, and email.server is exactly who needs this — a cycle. The
+ *  shape (PropertyRef[] under "properties") is owned by properties.server. */
+export async function partnerForProperty(propertyId: string): Promise<Partner | undefined> {
+  const kv = getConfigKV();
+  if (!kv) return undefined;
+  const raw = await kv.get("properties");
+  if (!raw) return undefined;
+  try {
+    const list = JSON.parse(raw) as Array<{ id?: string; partnerId?: string }>;
+    const ref = Array.isArray(list) ? list.find((p) => p?.id === propertyId) : undefined;
+    return ref?.partnerId ? getPartner(ref.partnerId) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** The hostname a property's PUBLIC pages are served on, for the links we show

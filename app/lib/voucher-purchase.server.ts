@@ -7,7 +7,7 @@ import { deletePendingVoucher, getPendingVoucher, type PendingVoucher } from "./
 import { paymentFromSession } from "./booking-finalize.server";
 import { retrieveCheckoutSession } from "./stripe.server";
 import { getOverrides, getSettings } from "./overrides.server";
-import { sendEmail } from "./email.server";
+import { sendEmail, senderFor } from "./email.server";
 import { accentHex, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { composeVoucherEmail } from "./voucher-email.server";
 import { formatMoney } from "./money";
@@ -58,6 +58,7 @@ async function sendVoucherSaleHostEmail(pid: string, v: VoucherRecord, origin: s
       ? "Test purchase — no payment was taken."
       : `Paid ${formatMoney(v.payment?.amount ?? v.product.price, currency)} online.`;
     await sendEmail({
+      from: await senderFor(pid, settings),
       to: hostTo,
       subject: `Voucher sold — ${v.product.title} (${v.code})`,
       html: renderSimpleEmail({
@@ -115,12 +116,15 @@ export async function sendVoucherEmails(
       shopUrl: `${base}${basePath(channel)}/vouchers`,
     };
 
+    const from = await senderFor(pid, settings);
+
     // Buyer receipt.
     const receipt = composeVoucherEmail({ variant: "receipt", ...ctx });
     await sendEmail({
       to: v.buyer.email,
       subject: receipt.subject,
       html: receipt.html,
+      from,
       replyTo: settings.emailReplyTo,
     });
 
@@ -131,6 +135,7 @@ export async function sendVoucherEmails(
         to: v.gift.recipientEmail,
         subject: delivery.subject,
         html: delivery.html,
+        from,
         replyTo: settings.emailReplyTo,
       });
     }
@@ -166,6 +171,7 @@ export async function sendVoucherReminderEmail(
       to: v.gift.recipientEmail,
       subject: reminder.subject,
       html: reminder.html,
+      from: await senderFor(pid, settings),
       replyTo: settings.emailReplyTo,
     });
     return r.sent;
@@ -189,8 +195,10 @@ export async function sendVoucherCancelEmails(
     const brand = await emailBrand(pid, accent);
     const currency = settings.currency || "GBP";
     const money = (n: number) => formatMoney(n, currency);
+    const from = await senderFor(pid, settings);
 
     await sendEmail({
+      from,
       to: v.buyer.email,
       subject: `Your ${hotelName} voucher has been cancelled`,
       html: renderSimpleEmail({
@@ -211,6 +219,7 @@ export async function sendVoucherCancelEmails(
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (hostTo) {
       await sendEmail({
+        from,
         to: hostTo,
         subject: `Voucher ${v.code} cancelled by the buyer`,
         html: renderSimpleEmail({
