@@ -546,6 +546,16 @@ const DE: Dict = {
   metaDescOffer: "{offer} im {hotel} — was das Angebot umfasst, für welche Termine es gilt, und die aktuelle Verfügbarkeit.",
   helperMaxArrival: "Für diese Termine ist eine Anreise nur bis {date} möglich.",
   helperMaxDeparture: "Für diese Termine ist eine Abreise nur bis {date} möglich.",
+
+  // ---- transactional emails (booking details block + review request) ----
+  paid: "Bezahlt",
+  guest: "Gast",
+  requests: "Wünsche",
+  giftVoucher: "Geschenkgutschein {code}",
+  star_one: "{n} Stern",
+  star_other: "{n} Sterne",
+  reviewTapStar: "Tippen Sie auf einen Stern, um Ihre Bewertung zu beginnen",
+  reviewOpenPage: "Oder öffnen Sie die Bewertungsseite",
 };
 
 export default DE;

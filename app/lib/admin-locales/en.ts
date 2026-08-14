@@ -1463,6 +1463,8 @@ const EN: Record<string, string> = {
   wlpAccentColor: "Brand colour",
   wlpAccentColorHint: "Accent for their operator emails (team invites), so every hotel they onboard sends the same-looking mail. Hex like #b5651d; blank = the platform default.",
   i18nUntranslatedNote: "You're editing the {lang} text. Empty fields aren't translated yet — guests see the {base} text for those until you fill them in.",
+  i18nEmailFallbackNote: "You're editing the {lang} version. Fields you leave empty fall back automatically — the preview shows exactly what a {lang} guest receives.",
+  emtHostLang: "This email is sent to you, not the guest, so it isn't translated per guest language — there is one version, in the default language.",
   wlpAdminHost: "Admin hostname",
   wlpAdminHostHint: "Their own door: once this serves, their users sign in here and ONLY here — our hosts stop admitting them. The login page carries their brand.",
   wlpAdminHostDns: "They point it at us with:",

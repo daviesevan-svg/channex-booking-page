@@ -546,6 +546,16 @@ const NL: Dict = {
   metaDescOffer: "{offer} bij {hotel} — wat de aanbieding inhoudt, wanneer die geldt, en de actuele beschikbaarheid.",
   helperMaxArrival: "Deze data staan aankomst alleen toe tot {date}.",
   helperMaxDeparture: "Deze data staan vertrek alleen toe tot {date}.",
+
+  // ---- transactional emails (booking details block + review request) ----
+  paid: "Betaald",
+  guest: "Gast",
+  requests: "Verzoeken",
+  giftVoucher: "Cadeaubon {code}",
+  star_one: "{n} ster",
+  star_other: "{n} sterren",
+  reviewTapStar: "Tik op een ster om je beoordeling te starten",
+  reviewOpenPage: "Of open de beoordelingspagina",
 };
 
 export default NL;

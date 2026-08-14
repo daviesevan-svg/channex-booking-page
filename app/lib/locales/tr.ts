@@ -572,6 +572,16 @@ const TR: Dict = {
     "{hotel} tesisinde {offer} — kampanyanın kapsamı, geçerlilik tarihleri ve canlı müsaitlik.",
   helperMaxArrival: "Bu tarihlerde yalnızca {date} tarihine kadar giriş yapılabilir.",
   helperMaxDeparture: "Bu tarihlerde yalnızca {date} tarihine kadar çıkış yapılabilir.",
+
+  // ---- transactional emails (booking details block + review request) ----
+  paid: "Ödendi",
+  guest: "Misafir",
+  requests: "İstekler",
+  giftVoucher: "Hediye çeki {code}",
+  star_one: "{n} yıldız",
+  star_other: "{n} yıldız",
+  reviewTapStar: "Değerlendirmenize başlamak için bir yıldıza dokunun",
+  reviewOpenPage: "Veya değerlendirme sayfasını açın",
 };
 
 export default TR;

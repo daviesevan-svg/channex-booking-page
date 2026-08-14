@@ -534,6 +534,16 @@ const EL: Dict = {
   metaDescOffer: "{offer} στο {hotel} — τι περιλαμβάνει η προσφορά, πότε ισχύει και η τρέχουσα διαθεσιμότητα.",
   helperMaxArrival: "Αυτές οι ημερομηνίες επιτρέπουν άφιξη μόνο έως {date}.",
   helperMaxDeparture: "Αυτές οι ημερομηνίες επιτρέπουν αναχώρηση μόνο έως {date}.",
+
+  // ---- transactional emails (booking details block + review request) ----
+  paid: "Πληρώθηκε",
+  guest: "Επισκέπτης",
+  requests: "Αιτήματα",
+  giftVoucher: "Δωροεπιταγή {code}",
+  star_one: "{n} αστέρι",
+  star_other: "{n} αστέρια",
+  reviewTapStar: "Πατήστε ένα αστέρι για να ξεκινήσετε την αξιολόγησή σας",
+  reviewOpenPage: "Ή ανοίξτε τη σελίδα αξιολόγησης",
 };
 
 export default EL;

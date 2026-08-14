@@ -25,12 +25,21 @@ export function FeatureUnavailable({ title, body }: { title: string; body: strin
  *  translated — deliberately: prefilled or placeholder English made operators
  *  think their translations were overwritten (a partner reported it as a bug).
  *  This note is the one place that explains what an empty field means. */
-export function TranslationNote({ lang }: { lang: string }) {
+export function TranslationNote({
+  lang,
+  /** Editors whose empty fields fall back to something OTHER than the default
+   *  language's text (the email templates ship built-in translations) pass
+   *  their own message key so the note never lies about the fallback. */
+  messageKey = "i18nUntranslatedNote",
+}: {
+  lang: string;
+  messageKey?: string;
+}) {
   const t = useAdminT();
   if (lang === DEFAULT_LANG) return null;
   return (
     <p className="mb-5 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">
-      {t("i18nUntranslatedNote", { lang: langLabel(lang), base: langLabel(DEFAULT_LANG) })}
+      {t(messageKey, { lang: langLabel(lang), base: langLabel(DEFAULT_LANG) })}
     </p>
   );
 }
