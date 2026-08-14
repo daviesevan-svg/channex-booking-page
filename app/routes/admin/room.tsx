@@ -5,13 +5,13 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom } from "~/lib/catalog.server";
-import { VR_AMENITY_KEYS } from "~/lib/content";
+import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom, type RoomTranslation } from "~/lib/catalog.server";
+import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_KEYS } from "~/lib/content";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { AmenitiesPicker } from "~/components/amenities-picker";
-import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -21,7 +21,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const isNew = params.roomId === "new";
   const room = isNew ? null : await getRoom(propertyId, params.roomId);
   if (!isNew && !room) throw redirect("/admin/rooms");
-  return { isNew, room };
+  // A new room is always created in the default language — there is no default
+  // text to translate yet — so the editor ignores the language tab until saved.
+  const lang = isNew ? DEFAULT_LANG : langParam(request);
+  // RAW per-language text, empty until translated (see TranslationNote) — the
+  // default-language content must never appear editable on a translation tab,
+  // or saving it writes the default text into the translation (or worse).
+  const tr: RoomTranslation = lang === DEFAULT_LANG ? {} : (room?.translations?.[lang] ?? {});
+  return { isNew, room, lang, tr };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -44,8 +51,15 @@ export async function action({ params, request }: Route.ActionArgs) {
   const existing = isNew ? undefined : await getRoom(propertyId, params.roomId);
   const id = existing?.id ?? crypto.randomUUID();
 
+  // The language tab the form was rendered under. New rooms always save the
+  // default: there is no default text to translate yet.
+  const lang = isNew ? DEFAULT_LANG : pickLang(String(form.get("lang") ?? ""));
+  const onDefault = lang === DEFAULT_LANG;
+
   const title = String(form.get("title") ?? "").trim();
-  if (!title) return { error: "Enter a room name." };
+  // A translation tab may leave any text blank (= fall back to the default),
+  // but the default name is what everything falls back TO, so it must exist.
+  if (onDefault && !title) return { error: "Enter a room name." };
 
   const keep = form.getAll("keepImage").map(String);
   const urls = String(form.get("imageUrls") ?? "")
@@ -60,24 +74,46 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { error: e instanceof Error ? e.message : "Upload failed." };
   }
 
+  const description = String(form.get("description") ?? "").trim();
+  const facilities = String(form.get("facilities") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // On a translation tab the three text fields hold THAT language's raw text
+  // (empty = untranslated), so they update only translations[lang] — the
+  // default text isn't even in the form and must be carried over untouched.
+  // Everything else (numbers, amenities, photos) is language-independent and
+  // saves the same whichever tab is open.
+  let translations = existing?.translations;
+  if (!onDefault) {
+    const entry: RoomTranslation = {
+      ...(title ? { title } : {}),
+      ...(description ? { description } : {}),
+      ...(facilities.length ? { facilities } : {}),
+    };
+    const next = { ...translations };
+    if (Object.keys(entry).length) next[lang] = entry;
+    else delete next[lang];
+    translations = Object.keys(next).length ? next : undefined;
+  }
+
   const posInt = (v: FormDataEntryValue | null, min = 1) => Math.max(min, Math.round(Number(v) || min));
   const rooms = await getRooms(propertyId);
   const room: CatalogRoom = {
     id,
-    title,
-    description: String(form.get("description") ?? "").trim() || undefined,
+    title: onDefault ? title : (existing?.title ?? title),
+    description: onDefault ? description || undefined : existing?.description,
     images: [...keep, ...uploaded, ...urls],
     maxAdults: posInt(form.get("maxAdults")),
     maxGuests: posInt(form.get("maxGuests")),
     cleaningFee: Math.max(0, Math.round((Number(form.get("cleaningFee")) || 0) * 100) / 100) || undefined,
-    facilities: String(form.get("facilities") ?? "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    facilities: onDefault ? facilities : (existing?.facilities ?? []),
     // Structured amenities — only known vocabulary keys are stored.
     amenities: form.getAll("amenity").map(String).filter((k) => VR_AMENITY_KEYS.has(k)),
     position: existing?.position ?? rooms.length,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    translations,
   };
   await saveRoom(propertyId, room);
   // Unticking "keep" is how a photo is removed here, so the dropped ones are
@@ -87,8 +123,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
   // Back to the rooms list after every save. Staying on the editor left the
   // chosen file in the upload input, so a second save re-uploaded it and created
-  // a duplicate image; navigating away clears the form.
-  return redirect("/admin/rooms");
+  // a duplicate image; navigating away clears the form. Keep the language tab —
+  // resetting the Editing dropdown to the default mid-translation invites the
+  // next save to land in the wrong language.
+  return redirect(onDefault ? "/admin/rooms" : `/admin/rooms?lang=${lang}`);
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -97,7 +135,8 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function AdminRoom({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
-  const { isNew, room } = loaderData;
+  const { isNew, room, lang, tr } = loaderData;
+  const onDefault = lang === DEFAULT_LANG;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const existing = room?.images ?? [];
@@ -116,14 +155,23 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         </h1>
       </div>
 
+      <TranslationNote lang={lang} />
+
       <Form
         method="post"
+        key={lang}
         encType="multipart/form-data"
         className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6"
       >
+        <input type="hidden" name="lang" value={lang} />
         <label className="block text-[13px] font-semibold text-secondary">
           {t("rmNameLabel")}
-          <input name="title" defaultValue={room?.title} placeholder={t("rmNamePlaceholder")} className={FIELD_INPUT} />
+          <input
+            name="title"
+            defaultValue={onDefault ? room?.title : tr.title}
+            placeholder={onDefault ? t("rmNamePlaceholder") : undefined}
+            className={FIELD_INPUT}
+          />
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
@@ -131,8 +179,8 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
           <textarea
             name="description"
             rows={5}
-            defaultValue={room?.description}
-            placeholder={t("rmDescriptionPlaceholder")}
+            defaultValue={onDefault ? room?.description : tr.description}
+            placeholder={onDefault ? t("rmDescriptionPlaceholder") : undefined}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
@@ -177,8 +225,8 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
           <textarea
             name="facilities"
             rows={4}
-            defaultValue={room?.facilities.join("\n")}
-            placeholder={t("rmFacilitiesPlaceholder")}
+            defaultValue={onDefault ? room?.facilities.join("\n") : tr.facilities?.join("\n")}
+            placeholder={onDefault ? t("rmFacilitiesPlaceholder") : undefined}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>

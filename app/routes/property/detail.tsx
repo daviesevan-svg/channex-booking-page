@@ -43,7 +43,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       adults,
       childrenAge: childrenAgeParam(childrenAge),
     },
-    { gate: true },
+    { gate: true, lang },
   );
   const room = rooms.find((r) => r.id === params.roomId);
   // Single-unit properties auto-forward /rooms → here, so a not-found bounce must

@@ -21,6 +21,15 @@ import { roomCapacity } from "./occupancy";
 export { occupancyNightlyDelta, type OccupancyPricing } from "./rate-pricing";
 import { bestAutoOffer, valueAddViews } from "./promotions";
 
+/** Per-language overrides of a room's guest-facing free text. A missing field
+ *  falls back to the room's own (default-language) value — same contract as
+ *  every other LangMap-style content store. */
+export interface RoomTranslation {
+  title?: string;
+  description?: string;
+  facilities?: string[];
+}
+
 export interface CatalogRoom {
   id: string;
   title: string;
@@ -40,6 +49,25 @@ export interface CatalogRoom {
   amenities?: string[];
   position: number;
   createdAt: string;
+  /** Guest-language text overrides, keyed by language code. Edited on the room
+   *  editor's non-default language tabs; never contains DEFAULT_LANG. */
+  translations?: Record<string, RoomTranslation>;
+}
+
+/** The room as a guest reading `lang` should see it: translated title /
+ *  description / facilities where present, the default text otherwise. The
+ *  translations map itself is stripped so loaders don't serialize every
+ *  language's text into the page. */
+export function localizeRoom(room: CatalogRoom, lang: string): CatalogRoom {
+  const { translations, ...base } = room;
+  const tr = translations?.[lang];
+  if (!tr) return base;
+  return {
+    ...base,
+    title: tr.title?.trim() || base.title,
+    description: tr.description?.trim() || base.description,
+    facilities: tr.facilities?.length ? tr.facilities : base.facilities,
+  };
 }
 
 export interface CatalogRate {
@@ -249,7 +277,7 @@ export interface GateReason {
 export async function getCatalogRooms(
   pid: string,
   query: RoomsQuery = {},
-  opts: { gate?: boolean; reasons?: GateReason[] } = {},
+  opts: { gate?: boolean; reasons?: GateReason[]; lang?: string } = {},
 ): Promise<RoomWithRates[]> {
   const gate = opts.gate ?? false;
   // Collected rather than returned: a room whose every rate is gated out is
@@ -258,7 +286,9 @@ export async function getCatalogRooms(
   // WHY something isn't bookable instead of having it silently vanish.
   const note = (r: GateReason) => opts.reasons?.push(r);
   const [rooms, rates, promotions, settings] = await Promise.all([
-    getRooms(pid),
+    // Guest pages pass their language so room text arrives translated; callers
+    // that feed machines (v1 API, Google pushes) omit it and get the defaults.
+    getRooms(pid).then((rs) => (opts.lang ? rs.map((r) => localizeRoom(r, opts.lang!)) : rs)),
     getRates(pid),
     getPromotions(pid),
     // For the cancellation anchor: a rate card's free-until date has to be the
