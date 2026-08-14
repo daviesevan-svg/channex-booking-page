@@ -19,7 +19,7 @@ import {
   type SocialPlatform,
 } from "~/lib/footer";
 import { getFooterRaw, saveFooter } from "~/lib/site.server";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -29,7 +29,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const [{ footer, text, baseText }, settings] = await Promise.all([
+  const [{ footer, text }, settings] = await Promise.all([
     getFooterRaw(propertyId, lang),
     getSettings(propertyId),
   ]);
@@ -38,7 +38,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     lang,
     footer,
     text,
-    baseText,
     websiteEnabled: settings.websiteEnabled ?? false,
   };
 }
@@ -107,14 +106,13 @@ export default function AdminWebsiteFooter({ loaderData, actionData }: Route.Com
     );
   }
 
-  const { lang, footer, text, baseText, websiteEnabled } = loaderData;
+  const { lang, footer, text, websiteEnabled } = loaderData;
   return (
     <Editor
       key={`${lang}:${(footer.links ?? []).map((l) => l.id).join(",")}`}
       lang={lang}
       footer={footer}
       text={text}
-      baseText={baseText}
       websiteEnabled={websiteEnabled}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
@@ -129,7 +127,6 @@ function Editor({
   lang,
   footer,
   text,
-  baseText,
   websiteEnabled,
   saving,
   saved,
@@ -140,7 +137,6 @@ function Editor({
   lang: string;
   footer: SiteFooter;
   text: Record<string, string>;
-  baseText: Record<string, string>;
   websiteEnabled: boolean;
   saving: boolean;
   saved: boolean;
@@ -160,6 +156,7 @@ function Editor({
     <div>
       <AdminPageHeader title={t("ftTitle")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{t("ftIntro")}</p>
+      <TranslationNote lang={lang} />
 
       {!websiteEnabled && (
         <p className="mb-5 rounded-[10px] border border-[#e6dcc4] bg-[#fbf6ea] px-4 py-3 text-[12px] leading-[1.55] text-[#7a6636]">
@@ -191,7 +188,7 @@ function Editor({
             name="blurb"
             rows={3}
             defaultValue={text[footerBlurbKey()] ?? ""}
-            placeholder={baseText[footerBlurbKey()] ?? t("ftBlurbPlaceholder")}
+            placeholder={t("ftBlurbPlaceholder")}
             className={FIELD_INPUT}
           />
         </div>
@@ -251,7 +248,6 @@ function Editor({
                     <input
                       name={`linkLabel:${l.id}`}
                       defaultValue={text[footerLinkKey(l.id)] ?? ""}
-                      placeholder={baseText[footerLinkKey(l.id)] ?? ""}
                       className={FIELD_INPUT}
                     />
                   </label>

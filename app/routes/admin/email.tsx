@@ -5,11 +5,11 @@ import type { Route } from "./+types/email";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { emailDef, langParam, pickLang } from "~/lib/content";
+import { DEFAULT_LANG, emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
 import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail, senderFor } from "~/lib/email.server";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -175,9 +175,12 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
       <AdminPageHeader title={t("emtTitle", { label })} saved={Boolean(actionData?.ok)} message={actionData?.message} className="mb-1 gap-3" />
       <p className="mb-5 text-[14px] text-muted">
         {recipient === "host" ? t("emtIntroLeadHost") : t("emtIntroLead")}{" "}
-        {template === "review_request" ? t("emtAutoReview") : t("emtAutoBooking")}{" "}
-        {t("emtIntroTail")}
+        {template === "review_request" ? t("emtAutoReview") : t("emtAutoBooking")}
+        {/* The "empty = the defaults shown" claim only holds where defaults ARE
+            shown — the default-language tab. */}
+        {lang === DEFAULT_LANG ? <> {t("emtIntroTail")}</> : null}
       </p>
+      <TranslationNote lang={lang} />
 
       {/* Two panes on a wide screen: the editor scrolls with the page while the
           preview stays pinned in view, so you can see what a change does without
@@ -197,9 +200,9 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
               <label key={f.key} className="block text-[13px] font-semibold text-secondary">
                 {f.label}
                 {f.textarea ? (
-                  <textarea name={f.key} rows={4} defaultValue={overrides[f.key]} placeholder={f.default} className={`${FIELD_INPUT} resize-y`} />
+                  <textarea name={f.key} rows={4} defaultValue={overrides[f.key]} placeholder={lang === DEFAULT_LANG ? f.default : undefined} className={`${FIELD_INPUT} resize-y`} />
                 ) : (
-                  <input name={f.key} defaultValue={overrides[f.key]} placeholder={f.default} className={FIELD_INPUT} />
+                  <input name={f.key} defaultValue={overrides[f.key]} placeholder={lang === DEFAULT_LANG ? f.default : undefined} className={FIELD_INPUT} />
                 )}
               </label>
             ))}

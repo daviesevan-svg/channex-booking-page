@@ -5,12 +5,12 @@ import type { Route } from "./+types/gallery";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
+import { langParam, pickLang } from "~/lib/content";
 import { MAX_GALLERY_IMAGES, type GalleryText } from "~/lib/gallery";
 import { addImages, getGallery, removeImage, saveGalleryLang } from "~/lib/gallery.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadGalleryImage } from "~/lib/images.server";
-import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -26,9 +26,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     lang,
     images: gallery.images,
     text: gallery.text[lang] ?? {},
-    // Shown as placeholders when editing a non-default language, so the editor
-    // can see what a guest falls back to instead of guessing.
-    baseText: lang === DEFAULT_LANG ? {} : (gallery.text[DEFAULT_LANG] ?? {}),
   };
 }
 
@@ -97,13 +94,12 @@ export default function AdminGallery({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { images, text, baseText, lang } = loaderData;
+  const { images, text, lang } = loaderData;
   return (
     <GalleryEditor
       key={`${lang}:${images.map((i) => i.id).join(",")}`}
       images={images}
       text={text}
-      baseText={baseText}
       lang={lang}
       saving={saving}
       error={actionData && "error" in actionData ? actionData.error : undefined}
@@ -116,7 +112,6 @@ export default function AdminGallery({ loaderData, actionData }: Route.Component
 function GalleryEditor({
   images,
   text,
-  baseText,
   lang,
   saving,
   error,
@@ -125,7 +120,6 @@ function GalleryEditor({
 }: {
   images: { id: string; url: string }[];
   text: Record<string, GalleryText>;
-  baseText: Record<string, GalleryText>;
   lang: string;
   saving: boolean;
   error?: string;
@@ -151,6 +145,7 @@ function GalleryEditor({
     <div>
       <AdminPageHeader title={t("galTitle")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{t("galIntro")}</p>
+      <TranslationNote lang={lang} />
 
       {/* Upload — its own form so a file pick can't carry the text fields. */}
       <Form
@@ -206,7 +201,7 @@ function GalleryEditor({
                   <input
                     name={`alt:${img.id}`}
                     defaultValue={text[img.id]?.alt ?? ""}
-                    placeholder={baseText[img.id]?.alt ?? t("galAltPlaceholder")}
+                    placeholder={t("galAltPlaceholder")}
                     className={FIELD_INPUT}
                   />
                 </label>
@@ -215,7 +210,6 @@ function GalleryEditor({
                   <input
                     name={`caption:${img.id}`}
                     defaultValue={text[img.id]?.caption ?? ""}
-                    placeholder={baseText[img.id]?.caption ?? ""}
                     className={FIELD_INPUT}
                   />
                 </label>

@@ -5,7 +5,6 @@ import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import {
-  DEFAULT_LANG,
   facilityLabelKey,
   langParam,
   normalizeFacilities,
@@ -13,13 +12,12 @@ import {
   PROPERTY_FACILITIES,
 } from "~/lib/content";
 import {
-  getFacilitiesExtra,
   getFacilitiesExtraRaw,
   getSettings,
   patchSettings,
   saveFacilitiesExtra,
 } from "~/lib/overrides.server";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminLang, useAdminT } from "~/lib/admin-i18n";
 import { makeTranslator } from "~/lib/i18n";
@@ -47,10 +45,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!propertyId) return { configured: false as const };
 
   const lang = langParam(request);
-  const [settings, extra, baseExtra] = await Promise.all([
+  const [settings, extra] = await Promise.all([
     getSettings(propertyId),
     getFacilitiesExtraRaw(propertyId, lang),
-    lang === DEFAULT_LANG ? Promise.resolve([]) : getFacilitiesExtra(propertyId, DEFAULT_LANG),
   ]);
   const chosen = settings.facilities ?? [];
   return {
@@ -58,7 +55,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     lang,
     chosen,
     extra,
-    baseExtra,
     // Only offer the shortcut when there's something to copy that isn't ticked.
     copyable: (settings.vrAmenities ?? [])
       .map((k) => FROM_VR[k])
@@ -120,11 +116,12 @@ export default function AdminFacilities({ loaderData, actionData }: Route.Compon
     );
   }
 
-  const { lang, chosen, extra, baseExtra, copyable } = loaderData;
+  const { lang, chosen, extra, copyable } = loaderData;
   return (
     <div>
       <AdminPageHeader title={t("facTitle")} saved={Boolean(actionData && "ok" in actionData && actionData.ok)} />
       <p className="mb-6 text-[14px] text-muted">{t("facIntro")}</p>
+      <TranslationNote lang={lang} />
 
       {copyable > 0 && (
         <Form method="post" className="mb-6 flex flex-wrap items-center gap-4 rounded-[14px] border border-line bg-surface-alt px-5 py-4">
@@ -179,7 +176,7 @@ export default function AdminFacilities({ loaderData, actionData }: Route.Compon
             name="extra"
             rows={5}
             defaultValue={extra.join("\n")}
-            placeholder={baseExtra.length ? baseExtra.join("\n") : t("facExtraPlaceholder")}
+            placeholder={t("facExtraPlaceholder")}
             className={FIELD_INPUT}
           />
         </div>

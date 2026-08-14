@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 import { useAdminT } from "~/lib/admin-i18n";
+import { DEFAULT_LANG, langLabel } from "~/lib/content";
 
 /** Standard text-input styling used across the admin editors. */
 export const FIELD_INPUT =
@@ -16,6 +17,21 @@ export function FeatureUnavailable({ title, body }: { title: string; body: strin
       <h1 className="mb-2 font-serif text-display-sm font-semibold">{title}</h1>
       <p className="rounded-card border border-line bg-surface px-5 py-4 text-body leading-relaxed text-muted">{body}</p>
     </div>
+  );
+}
+
+/** Shown at the top of a content editor when a NON-default language is being
+ *  edited. Fields there hold that language's raw text and are empty until
+ *  translated — deliberately: prefilled or placeholder English made operators
+ *  think their translations were overwritten (a partner reported it as a bug).
+ *  This note is the one place that explains what an empty field means. */
+export function TranslationNote({ lang }: { lang: string }) {
+  const t = useAdminT();
+  if (lang === DEFAULT_LANG) return null;
+  return (
+    <p className="mb-5 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">
+      {t("i18nUntranslatedNote", { lang: langLabel(lang), base: langLabel(DEFAULT_LANG) })}
+    </p>
   );
 }
 

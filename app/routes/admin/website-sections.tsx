@@ -30,7 +30,7 @@ import {
   saveSiteStyle,
 } from "~/lib/site.server";
 import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/site-style";
-import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
+import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { BrandPanel } from "~/components/admin-brand-panel";
 import { DesignPreview } from "~/components/admin-design-preview";
 import { AdminPageHeader, SavedPill } from "~/components/admin-page-header";
@@ -63,7 +63,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     pageTitle: pages.find((p) => p.id === pageId)?.title ?? "",
     sections: editor.page.sections,
     text: editor.text,
-    baseText: editor.baseText,
     websiteEnabled: settings.websiteEnabled ?? false,
     // Resolved rather than raw, so an unknown stored id shows as the default
     // selected instead of leaving every radio unchecked.
@@ -199,7 +198,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, pageId, isHome, pageTitle, sections, text, baseText, websiteEnabled, style, settings, previewPath } =
+  const { lang, pageId, isHome, pageTitle, sections, text, websiteEnabled, style, settings, previewPath } =
     loaderData;
   const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
@@ -218,7 +217,6 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       pageTitle={pageTitle}
       initial={sections}
       text={text}
-      baseText={baseText}
       websiteEnabled={websiteEnabled}
       style={style}
       settings={settings}
@@ -316,7 +314,6 @@ function Editor({
   pageTitle,
   initial,
   text,
-  baseText,
   websiteEnabled,
   style,
   settings,
@@ -333,7 +330,6 @@ function Editor({
   pageTitle: string;
   initial: SiteSection[];
   text: Record<string, string>;
-  baseText: Record<string, string>;
   websiteEnabled: boolean;
   style: string;
   settings: SiteSettings;
@@ -386,6 +382,7 @@ function Editor({
     <div>
       <AdminPageHeader title={isHome ? t("secTitle") : pageTitle || t("wpUntitled")} saved={Boolean(saved)} />
       <p className="mb-6 text-[14px] text-muted">{isHome ? t("secIntro") : t("wpSectionsIntro")}</p>
+      <TranslationNote lang={lang} />
 
       {!isHome && (
         <p className="mb-5 text-[13px]">
@@ -459,7 +456,6 @@ function Editor({
                 const common = {
                   name: `t:page_${pageId}:${field}`,
                   defaultValue: text[tKey] ?? "",
-                  placeholder: baseText[tKey] ?? "",
                   className: FIELD_INPUT,
                 };
                 return (
@@ -545,7 +541,7 @@ function Editor({
                       const common = {
                         name: `t:${section.id}:${f.key}`,
                         defaultValue: text[tKey] ?? "",
-                        placeholder: baseText[tKey] ?? placeholderFor(section.type, f.key, t),
+                        placeholder: placeholderFor(section.type, f.key, t),
                         className: FIELD_INPUT,
                       };
                       return (
@@ -630,7 +626,6 @@ function Editor({
                 <SectionImages
                   section={section}
                   text={text}
-                  baseText={baseText}
                   saving={saving}
                   t={t}
                   onMove={(from, to) =>
@@ -702,7 +697,6 @@ function Editor({
 function SectionImages({
   section,
   text,
-  baseText,
   saving,
   t,
   onMove,
@@ -710,7 +704,6 @@ function SectionImages({
 }: {
   section: SiteSection;
   text: Record<string, string>;
-  baseText: Record<string, string>;
   saving: boolean;
   t: ReturnType<typeof useAdminT>;
   onMove: (from: number, to: number) => void;
@@ -748,7 +741,7 @@ function SectionImages({
                   <input
                     name={`t:${section.id}:${imageAltKey(img.id)}`}
                     defaultValue={text[key] ?? ""}
-                    placeholder={baseText[key] ?? t("secImageAltPlaceholder")}
+                    placeholder={t("secImageAltPlaceholder")}
                     maxLength={200}
                     className={`${FIELD_INPUT} !mt-1`}
                   />
