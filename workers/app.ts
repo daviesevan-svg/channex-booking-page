@@ -49,6 +49,32 @@ function canonicalRedirect(request: Request): Response | null {
   }
 }
 
+/**
+ * Redirect document requests that carry React Router's internal `_routes`
+ * param to the same URL without it.
+ *
+ * `_routes` belongs only to single-fetch `.data` requests — it tells the server
+ * to run a subset of the matched loaders. When a URL carrying it is opened as a
+ * document (copied out of devtools, indexed by a crawler, forwarded by a guest),
+ * the initial HTML renders fine because document requests ignore the param —
+ * but the poisoned value sits in the address bar, so the first client-side
+ * navigation that copies the current search params (the language switcher, the
+ * date picker) sends a `.data` request filtered to a route that may not even
+ * match the page. The server then returns a payload missing the layout/root
+ * data and the client crashes into the error boundary.
+ *
+ * Real `.data` requests keep their `_routes` untouched, and non-GET requests
+ * are left alone (redirecting a POST would drop its body).
+ */
+function stripInternalParams(request: Request): Response | null {
+  if (request.method !== "GET" && request.method !== "HEAD") return null;
+  const url = new URL(request.url);
+  if (url.pathname.endsWith(".data")) return null;
+  if (!url.searchParams.has("_routes")) return null;
+  url.searchParams.delete("_routes");
+  return Response.redirect(url.toString(), 301);
+}
+
 export default {
   async fetch(request) {
     // One KV-read cache per request (see request-cache.server.ts) — every
@@ -56,7 +82,12 @@ export default {
     // plumbing reads each key once instead of once per loader. Cron stays
     // outside the scope on purpose: its tasks are long-lived and concurrent,
     // and read-through is the safer default there.
-    return runWithRequestCache(() => canonicalRedirect(request) ?? requestHandler(request));
+    return runWithRequestCache(
+      () =>
+        canonicalRedirect(request) ??
+        stripInternalParams(request) ??
+        requestHandler(request),
+    );
   },
   // Cron (see wrangler.jsonc `triggers.crons`): (1) keep Google's ARI in sync by
   // re-pushing every ARI-enabled property — a backstop to the change-driven and
