@@ -18,7 +18,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const def = emailDef(params.template);
   if (!def) throw redirect("/admin/emails");
   const pid = await currentPropertyId(request);
-  const lang = langParam(request);
+  const lang = def.recipient === "host" ? DEFAULT_LANG : langParam(request);
   if (!pid) {
     return { configured: false as const, label: def.label, template: params.template, lang };
   }
@@ -30,16 +30,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getEmailTemplate(pid, params.template, lang),
   ]);
   const hotelName = ov.hotelName || "Your hotel";
-  const sample = sampleBooking(settings.currency || "GBP");
+  const sample = { ...sampleBooking(settings.currency || "GBP"), lang };
   const origin = new URL(request.url).origin;
   const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
   const { subject, html } =
     def.id === "review_request"
       ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-      : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl });
+      : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang });
 
   // Example value per token, for the "variables" reference table.
-  const vars = bookingVars(sample, hotelName, manageUrl);
+  const vars = bookingVars(sample, hotelName, manageUrl, lang);
   const tokens = def.tokens.map((t) => ({
     token: t.token,
     desc: t.desc,
@@ -67,7 +67,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const def = emailDef(params.template);
   if (!def) return { error: "Unknown template." };
   const form = await request.formData();
-  const lang = pickLang(String(form.get("lang") ?? ""));
+  const lang = def.recipient === "host" ? DEFAULT_LANG : pickLang(String(form.get("lang") ?? ""));
 
   if (String(form.get("intent")) === "test") {
     const [settings, ov, text] = await Promise.all([
@@ -75,14 +75,14 @@ export async function action({ params, request }: Route.ActionArgs) {
       getOverrides(pid, lang),
       getEmailTemplate(pid, params.template, lang),
     ]);
-    const sample = sampleBooking(settings.currency || "GBP");
+    const sample = { ...sampleBooking(settings.currency || "GBP"), lang };
     const origin = new URL(request.url).origin;
     const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
     const hotelName = ov.hotelName || "Your hotel";
     const { subject, html } =
       def.id === "review_request"
         ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-        : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl });
+        : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang });
     // Same sender as the real thing, so the test also proves deliverability.
     const { sent, error } = await sendEmail({ to: adminEmail, subject, html, from: await senderFor(pid, settings), replyTo: settings.emailReplyTo });
     return sent
@@ -180,7 +180,8 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
             shown — the default-language tab. */}
         {lang === DEFAULT_LANG ? <> {t("emtIntroTail")}</> : null}
       </p>
-      <TranslationNote lang={lang} />
+      {recipient === "host" && <p className="mb-5 rounded-[10px] bg-chip px-4 py-2.5 text-[13px] text-secondary">{t("emtHostLang")}</p>}
+      <TranslationNote lang={lang} messageKey="i18nEmailFallbackNote" />
 
       {/* Two panes on a wide screen: the editor scrolls with the page while the
           preview stays pinned in view, so you can see what a change does without

@@ -547,6 +547,16 @@ const TH: Dict = {
   metaDescOffer: "{offer} ที่ {hotel} — โปรโมชันครอบคลุมอะไร ใช้ได้ช่วงไหน และห้องว่างล่าสุด",
   helperMaxArrival: "ช่วงวันที่นี้เข้าพักได้ไม่เกินวันที่ {date}",
   helperMaxDeparture: "ช่วงวันที่นี้เช็คเอาท์ได้ไม่เกินวันที่ {date}",
+
+  // ---- transactional emails (booking details block + review request) ----
+  paid: "ชำระแล้ว",
+  guest: "ผู้เข้าพัก",
+  requests: "คำขอ",
+  giftVoucher: "บัตรของขวัญ {code}",
+  star_one: "{n} ดาว",
+  star_other: "{n} ดาว",
+  reviewTapStar: "แตะดาวเพื่อเริ่มเขียนรีวิว",
+  reviewOpenPage: "หรือเปิดหน้ารีวิว",
 };
 
 export default TH;

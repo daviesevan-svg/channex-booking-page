@@ -1521,6 +1521,8 @@ const TR: Record<string, string> = {
   wlpAccentColor: "Marka rengi",
   wlpAccentColorHint: "Operatör e-postalarının (ekip davetleri) vurgu rengi; böylece dahil ettikleri her otel aynı görünümde e-posta gönderir. #b5651d gibi hex; boş = platform varsayılanı.",
   i18nUntranslatedNote: "{lang} metnini düzenliyorsunuz. Boş alanlar henüz çevrilmedi — siz doldurana kadar misafirler oralarda {base} metnini görür.",
+  i18nEmailFallbackNote: "{lang} sürümünü düzenliyorsunuz. Boş bıraktığınız alanlar otomatik olarak yerleşik metne döner — önizleme, {lang} konuşan bir misafirin tam olarak ne alacağını gösterir.",
+  emtHostLang: "Bu e-posta misafire değil size gönderilir; bu yüzden misafir diline göre çevrilmez — varsayılan dilde tek bir sürümü vardır.",
   wlpAdminHost: "Yönetim ana bilgisayar adı",
   wlpAdminHostHint: "Onların kendi kapısı: yayına girdiğinde kullanıcıları yalnızca buradan oturum açar — bizim adreslerimiz onları artık kabul etmez. Giriş sayfası onların markasını taşır.",
   wlpAdminHostDns: "Bize şununla yönlendirirler:",

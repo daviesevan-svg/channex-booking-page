@@ -14,11 +14,11 @@ import {
   pageDef,
   searchDefaults,
   withDefaults,
-  withEmailDefaults,
   type BookingCutoff,
   type SearchContent,
   type SiteSettings,
 } from "./content";
+import { withEmailDefaults } from "./email-defaults.server";
 
 // Localized content is stored per language: KV value is { [lang]: data }.
 // Guests read their language merged over the default language; the admin edits

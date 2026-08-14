@@ -22,7 +22,7 @@
 // fetch to a mail API somewhere else in the codebase would quietly opt us back
 // into a vendor's defaults.
 import type { BookingRecord } from "./bookings.server";
-import { emailDef, type SiteSettings } from "./content";
+import { DEFAULT_LANG, emailDef, type SiteSettings } from "./content";
 import { getConfig } from "./config.server";
 import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailBrand, renderSimpleEmail } from "./email-render.server";
 import { emailBrandFor } from "./site-style";
@@ -136,8 +136,10 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
 
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (settings.notifyHostOnBooking !== false && hostTo) {
-      const htext = await getEmailTemplate(pid, "host_notification", booking.lang);
-      const h = composeEmail({ def: emailDef("host_notification")!, text: htext, booking, hotelName, brand, manageUrl });
+      // Host emails stay in the default language: the recipient is the
+      // hotelier, and the guest's language says nothing about theirs.
+      const htext = await getEmailTemplate(pid, "host_notification");
+      const h = composeEmail({ def: emailDef("host_notification")!, text: htext, booking, hotelName, brand, manageUrl, lang: DEFAULT_LANG });
       await sendEmail({ to: hostTo, subject: h.subject, html: h.html, from, replyTo: booking.guest.email });
     }
   } catch (e) {
@@ -414,8 +416,9 @@ export async function sendCancellationEmails(pid: string, booking: BookingRecord
 
     const hostTo = settings.hostNotifyEmail || ov.email;
     if (settings.notifyHostOnCancel !== false && hostTo) {
-      const htext = await getEmailTemplate(pid, "cancellation_notification", booking.lang);
-      const h = composeEmail({ def: emailDef("cancellation_notification")!, text: htext, booking, hotelName, brand, manageUrl });
+      // Default language for the hotelier, as with the new-booking email.
+      const htext = await getEmailTemplate(pid, "cancellation_notification");
+      const h = composeEmail({ def: emailDef("cancellation_notification")!, text: htext, booking, hotelName, brand, manageUrl, lang: DEFAULT_LANG });
       await sendEmail({ to: hostTo, subject: h.subject, html: h.html, from, replyTo: booking.guest.email });
     }
   } catch (e) {

@@ -1466,6 +1466,8 @@ const PT: Record<string, string> = {
   wlpAccentColor: "Cor da marca",
   wlpAccentColorHint: "Cor de destaque dos emails de operação (convites de equipa), para que todos os hotéis que eles integram enviem emails com o mesmo aspeto. Hex como #b5651d; em branco = padrão da plataforma.",
   i18nUntranslatedNote: "Está a editar o texto em {lang}. Os campos vazios ainda não foram traduzidos — os hóspedes veem o texto em {base} até os preencher.",
+  i18nEmailFallbackNote: "Está a editar a versão em {lang}. Os campos vazios usam automaticamente o texto incorporado — a pré-visualização mostra exatamente o que um hóspede em {lang} recebe.",
+  emtHostLang: "Este email é enviado para si, não para o hóspede, por isso não é traduzido por idioma do hóspede — existe uma única versão, no idioma padrão.",
   wlpAdminHost: "Hostname de administração",
   wlpAdminHostHint: "A porta deles: assim que estiver ativa, os utilizadores deles iniciam sessão aqui e SÓ aqui — os nossos hosts deixam de os admitir. A página de início de sessão usa a marca deles.",
   wlpAdminHostDns: "Apontam-no para nós com:",

@@ -6,7 +6,11 @@ import { format, parseISO } from "date-fns";
 import type { BookingRecord } from "./bookings.server";
 import { formatCancelDeadline } from "./cancellation";
 import type { EmailDef, SiteSettings } from "./content";
-import { THEMES, type ThemeId } from "./content";
+import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
+// Side effect: registers every guest dictionary so makeTranslator can serve
+// any booking.lang here on the server.
+import "./i18n-locales.server";
+import { makeTranslator, type Translator } from "./i18n";
 import { formatMoney } from "./money";
 import { getSiteStyle } from "./site.server";
 import { emailBrandFor, type EmailBrand } from "./site-style";
@@ -53,9 +57,9 @@ function paragraphs(text: string): string {
     .join("");
 }
 
-const fmtDate = (iso: string) => {
+const fmtDate = (iso: string, tr?: Translator) => {
   try {
-    return format(parseISO(iso), "EEE d MMM yyyy");
+    return format(parseISO(iso), "EEE d MMM yyyy", tr ? { locale: tr.locale } : undefined);
   } catch {
     return iso;
   }
@@ -69,15 +73,17 @@ const fmtDateTime = (iso: string) => {
 };
 /** A cancellation deadline: the hotel's own wall clock when the booking has it,
  *  else the instant as before (bookings made before deadlines were anchored). */
-const fmtDeadline = (c: { cancelByISO: string | null; cancelByLocal?: string }) =>
-  formatCancelDeadline({ iso: c.cancelByISO ?? "", local: c.cancelByLocal }, "d MMM yyyy");
+const fmtDeadline = (c: { cancelByISO: string | null; cancelByLocal?: string }, tr?: Translator) =>
+  formatCancelDeadline({ iso: c.cancelByISO ?? "", local: c.cancelByLocal }, "d MMM yyyy", tr?.locale);
 
 /** Plain (unescaped) token values for subject + prose substitution. */
 export function bookingVars(
   booking: BookingRecord,
   hotelName: string,
   manageUrl: string,
+  lang: string = DEFAULT_LANG,
 ): Record<string, string> {
+  const tr = makeTranslator(lang);
   const money = (n: number) => formatMoney(n, booking.currency);
   // Mirror detailsHtml: once a payment was captured, {due_now} is what was paid
   // and {due_at_hotel} is the true remainder — not the policy's pre-payment split.
@@ -89,8 +95,8 @@ export function bookingVars(
     guest_first_name: booking.guest.firstName,
     guest_last_name: booking.guest.lastName,
     reference: booking.reference,
-    checkin: fmtDate(booking.checkin),
-    checkout: fmtDate(booking.checkout),
+    checkin: fmtDate(booking.checkin, tr),
+    checkout: fmtDate(booking.checkout, tr),
     nights: String(booking.nights),
     total: money(booking.total),
     due_now: money(dueNow),
@@ -125,8 +131,9 @@ export async function emailBrand(pid: string, accent: string): Promise<EmailBran
 
 function detailsHtml(
   booking: BookingRecord,
-  opts: { recipient: "guest" | "host"; manageUrl: string; brand: EmailBrand },
+  opts: { recipient: "guest" | "host"; manageUrl: string; brand: EmailBrand; tr: Translator },
 ): string {
+  const { tr } = opts;
   const ROW = row(opts.brand);
   const money = (n: number) => formatMoney(n, booking.currency);
   // What was actually captured wins over the policy's "due now": a guest who has
@@ -139,8 +146,7 @@ function detailsHtml(
   const voucherPaid = booking.voucher?.amount ?? 0;
   const dueAtHotel = Math.max(0, booking.total - voucherPaid - (paid > 0 ? paid : dueNow));
 
-  const occ = (a: number, c: number) =>
-    `${a} adult${a === 1 ? "" : "s"}${c ? `, ${c} child${c === 1 ? "" : "ren"}` : ""}`;
+  const occ = (a: number, c: number) => tr.p("adult", a) + (c ? `, ${tr.p("child", c)}` : "");
 
   const roomRows = booking.rooms
     .map(
@@ -167,7 +173,7 @@ function detailsHtml(
     .map(
       (va) =>
         `<div style="margin-top:10px;padding:12px 14px;background:#f7f2ea;border-radius:8px;">
-           <div style="color:#8a6a45;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${esc(va.name || "Included")}</div>
+           <div style="color:#8a6a45;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">${esc(va.name || tr.t("includedTitle"))}</div>
            ${va.inclusions
              .map(
                (inc) =>
@@ -193,46 +199,46 @@ function detailsHtml(
         ? // The hotel's wall clock when the booking carries it — a confirmation
           // email that turns "6pm" into the server's UTC "17:00" is the hotel's
           // policy quietly restated an hour early.
-          `Free cancellation until ${fmtDeadline(cancel)}`
-        : "Free cancellation"
-      : "Non-refundable";
+          tr.t("freeCancellationUntil", { date: fmtDeadline(cancel, tr) })
+        : tr.t("freeCancellationAnytime")
+      : tr.t("nonRefundableBooking");
 
   const manageBtn =
     opts.recipient === "guest" && opts.manageUrl
       ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:${opts.brand.radiusButton}px;background:${opts.brand.accent};">
-           <a href="${esc(opts.manageUrl)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Manage booking</a>
+           <a href="${esc(opts.manageUrl)}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${esc(tr.t("manageBooking"))}</a>
          </td></tr></table>`
       : "";
 
   const contactBlock =
     opts.recipient === "host"
       ? `<table role="presentation" width="100%" style="margin-top:14px;border-top:1px solid #eee;">
-           ${ROW("Guest", `${booking.guest.firstName} ${booking.guest.lastName}`)}
-           ${ROW("Email", booking.guest.email)}
-           ${booking.guest.phone ? ROW("Phone", booking.guest.phone) : ""}
-           ${booking.guest.requests ? ROW("Requests", booking.guest.requests) : ""}
+           ${ROW(tr.t("guest"), `${booking.guest.firstName} ${booking.guest.lastName}`)}
+           ${ROW(tr.t("email"), booking.guest.email)}
+           ${booking.guest.phone ? ROW(tr.t("phone"), booking.guest.phone) : ""}
+           ${booking.guest.requests ? ROW(tr.t("requests"), booking.guest.requests) : ""}
          </table>`
       : "";
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 4px;border:1px solid #ececec;border-radius:${opts.brand.radiusPanel}px;padding:18px;background:#fbfafa;">
     <tr><td>
       <table role="presentation" width="100%">
-        ${ROW("Reference", booking.reference)}
-        ${ROW("Check-in", fmtDate(booking.checkin))}
-        ${ROW("Check-out", fmtDate(booking.checkout))}
-        ${ROW("Nights", String(booking.nights))}
+        ${ROW(tr.t("reference"), booking.reference)}
+        ${ROW(tr.t("checkIn"), fmtDate(booking.checkin, tr))}
+        ${ROW(tr.t("checkOut"), fmtDate(booking.checkout, tr))}
+        ${ROW(tr.t("nights"), String(booking.nights))}
       </table>
       <table role="presentation" width="100%">${roomRows}</table>
       ${includedBlock}
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
       ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
-        ${ROW("Total", money(booking.total), true)}
-        ${booking.voucher?.amount ? ROW(`Gift voucher ${booking.voucher.code}`, `−${money(booking.voucher.amount)}`) : ""}
-        ${paid > 0 ? ROW("Paid", money(paid)) : dueNow > 0 ? ROW("Due now", money(dueNow)) : ""}
-        ${dueAtHotel > 0 ? ROW("Due at the hotel", money(dueAtHotel)) : ""}
+        ${ROW(tr.t("total"), money(booking.total), true)}
+        ${booking.voucher?.amount ? ROW(tr.t("giftVoucher", { code: booking.voucher.code }), `−${money(booking.voucher.amount)}`) : ""}
+        ${paid > 0 ? ROW(tr.t("paid"), money(paid)) : dueNow > 0 ? ROW(tr.t("dueNow"), money(dueNow)) : ""}
+        ${dueAtHotel > 0 ? ROW(tr.t("dueAtHotel"), money(dueAtHotel)) : ""}
       </table>
-      ${taxIncluded > 0 ? `<p style="margin:4px 0 0;color:#8a8a8a;font-size:11px;text-align:right;">Includes ${esc(money(taxIncluded))} VAT</p>` : ""}
+      ${taxIncluded > 0 ? `<p style="margin:4px 0 0;color:#8a8a8a;font-size:11px;text-align:right;">${esc(tr.t("includesTaxes", { amount: money(taxIncluded) }))}</p>` : ""}
       ${cancelLine ? `<p style="margin:12px 0 0;color:#8a8a8a;font-size:12px;">${esc(cancelLine)}</p>` : ""}
       ${contactBlock}
       ${manageBtn}
@@ -278,8 +284,14 @@ export function composeEmail(args: {
   hotelName: string;
   brand: EmailBrand;
   manageUrl: string;
+  /** Language for the fixed labels and dates. Defaults to the guest's
+   *  booking language; HOST emails must pass DEFAULT_LANG — the recipient is
+   *  the hotelier, whose language the guest's choice says nothing about. */
+  lang?: string;
 }): { subject: string; html: string } {
-  const vars = bookingVars(args.booking, args.hotelName, args.manageUrl);
+  const lang = args.lang ?? args.booking.lang ?? DEFAULT_LANG;
+  const tr = makeTranslator(lang);
+  const vars = bookingVars(args.booking, args.hotelName, args.manageUrl, lang);
   const subject = renderTemplate(args.text.subject ?? "", vars);
   const heading = esc(renderTemplate(args.text.heading ?? "", vars));
   const introHtml = paragraphs(renderTemplate(args.text.intro ?? "", vars));
@@ -288,6 +300,7 @@ export function composeEmail(args: {
     recipient: args.def.recipient,
     manageUrl: args.manageUrl,
     brand: args.brand,
+    tr,
   });
   return {
     subject,
@@ -323,12 +336,13 @@ export function renderSimpleEmail(args: {
 
 /** Plain token values for the review-request template (no money/manage link). */
 export function reviewVars(booking: BookingRecord, hotelName: string): Record<string, string> {
+  const tr = makeTranslator(booking.lang ?? DEFAULT_LANG);
   return {
     hotel_name: hotelName,
     guest_first_name: booking.guest.firstName,
     guest_last_name: booking.guest.lastName,
-    checkin: fmtDate(booking.checkin),
-    checkout: fmtDate(booking.checkout),
+    checkin: fmtDate(booking.checkin, tr),
+    checkout: fmtDate(booking.checkout, tr),
     nights: String(booking.nights),
   };
 }
@@ -336,15 +350,15 @@ export function reviewVars(booking: BookingRecord, hotelName: string): Record<st
 /** The system-rendered widget for the review email: a row of five tappable
  *  stars, each deep-linking into the review page with that rating prefilled
  *  (?stars=N), plus a plain fallback link. `reviewUrl` must have no query. */
-function reviewStarsHtml(reviewUrl: string, accent: string): string {
+function reviewStarsHtml(reviewUrl: string, accent: string, tr: Translator): string {
   const stars = Array.from({ length: 5 }, (_, i) => {
     const n = i + 1;
-    return `<a href="${esc(`${reviewUrl}?stars=${n}`)}" style="text-decoration:none;font-size:40px;line-height:1;color:#f5b301;padding:0 6px;" aria-label="${n} star${n === 1 ? "" : "s"}">★</a>`;
+    return `<a href="${esc(`${reviewUrl}?stars=${n}`)}" style="text-decoration:none;font-size:40px;line-height:1;color:#f5b301;padding:0 6px;" aria-label="${esc(tr.p("star", n))}">★</a>`;
   }).join("");
   return `
     <div style="text-align:center;margin:20px 0 6px;">${stars}</div>
-    <p style="text-align:center;margin:6px 0 18px;color:#8a8a8a;font-size:13px;">Tap a star to start your review</p>
-    <p style="text-align:center;margin:0;"><a href="${esc(reviewUrl)}" style="color:${accent};font-size:13px;">Or open the review page</a></p>`;
+    <p style="text-align:center;margin:6px 0 18px;color:#8a8a8a;font-size:13px;">${esc(tr.t("reviewTapStar"))}</p>
+    <p style="text-align:center;margin:0;"><a href="${esc(reviewUrl)}" style="color:${accent};font-size:13px;">${esc(tr.t("reviewOpenPage"))}</a></p>`;
 }
 
 /** Compose the review-request email (subject + HTML) from the editable template
@@ -358,6 +372,7 @@ export function composeReviewEmail(args: {
   brand: EmailBrand;
   reviewUrl: string;
 }): { subject: string; html: string } {
+  const tr = makeTranslator(args.booking.lang ?? DEFAULT_LANG);
   const vars = reviewVars(args.booking, args.hotelName);
   const subject = renderTemplate(args.text.subject ?? "", vars);
   const heading = esc(renderTemplate(args.text.heading ?? "", vars));
@@ -370,7 +385,7 @@ export function composeReviewEmail(args: {
       brand: args.brand,
       heading,
       introHtml,
-      details: reviewStarsHtml(args.reviewUrl, args.brand.accent),
+      details: reviewStarsHtml(args.reviewUrl, args.brand.accent, tr),
       outroHtml,
     }),
   };

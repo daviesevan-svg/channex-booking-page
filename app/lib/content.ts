@@ -847,27 +847,5 @@ export function emailDef(id: string): EmailDef | undefined {
   return EMAIL_TEMPLATES.find((e) => e.id === id);
 }
 
-// English lives in the defaults above. Non-English templates fall back to
-// English until an operator translates them via the ?lang editor (seed here).
-const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> = {};
-
-/** Built-in email defaults for a language (English fields fill any gaps). */
-export function emailDefaults(id: string, lang: string): Record<string, string> {
-  const def = emailDef(id);
-  const en: Record<string, string> = {};
-  if (def) for (const f of def.fields) en[f.key] = f.default;
-  if (lang === DEFAULT_LANG) return en;
-  return { ...en, ...(EMAIL_TRANSLATIONS[id]?.[lang] ?? {}) };
-}
-
-/** Merge stored overrides over an email template's language-aware defaults. */
-export function withEmailDefaults(
-  id: string,
-  overrides: Record<string, string | undefined> = {},
-  lang: string = DEFAULT_LANG,
-): Record<string, string> {
-  const defaults = emailDefaults(id, lang);
-  const out: Record<string, string> = {};
-  for (const key of Object.keys(defaults)) out[key] = overrides[key]?.trim() || defaults[key];
-  return out;
-}
+// The built-in non-English email copy lives in email-defaults.server.ts
+// (server-only on purpose — this module is in the client bundle).

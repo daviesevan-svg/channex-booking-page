@@ -1470,6 +1470,8 @@ const DE: Record<string, string> = {
   wlpAccentColor: "Markenfarbe",
   wlpAccentColorHint: "Akzentfarbe der Betreiber-E-Mails (Team-Einladungen), damit jede von ihnen angebundene Unterkunft dieselbe E-Mail-Optik sendet. Hex wie #b5651d; leer = Plattform-Standard.",
   i18nUntranslatedNote: "Sie bearbeiten den Text auf {lang}. Leere Felder sind noch nicht übersetzt — Gäste sehen dort den Text auf {base}, bis Sie sie ausfüllen.",
+  i18nEmailFallbackNote: "Sie bearbeiten die Version auf {lang}. Leere Felder greifen automatisch auf die eingebauten Texte zurück — die Vorschau zeigt genau, was ein Gast auf {lang} erhält.",
+  emtHostLang: "Diese E-Mail geht an Sie, nicht an den Gast — sie wird daher nicht pro Gästesprache übersetzt; es gibt eine Version in der Standardsprache.",
   wlpAdminHost: "Admin-Hostname",
   wlpAdminHostHint: "Deren eigener Zugang: sobald er aktiv ist, melden sich deren Nutzer nur noch hier an — unsere Hosts lassen sie nicht mehr herein. Die Anmeldeseite trägt deren Marke.",
   wlpAdminHostDns: "Sie verweisen darauf mit:",
