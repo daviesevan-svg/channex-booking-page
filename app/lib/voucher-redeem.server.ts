@@ -24,6 +24,7 @@ import { getRates, getRooms, rateChannexId } from "./catalog.server";
 import { getSettings } from "./overrides.server";
 import { getConfig } from "./config.server";
 import { pushOpenChannelBooking } from "./open-channel.server";
+import { payloadWithPayment } from "./booking-finalize.server";
 import { sendBookingEmails } from "./email.server";
 import { dispatchWebhook } from "./webhooks.server";
 import { serializeBooking } from "./api-serialize";
@@ -194,12 +195,16 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
   const claim = await claimBooking(pid, provisional);
   if (!claim.won) return { ok: true, booking: claim.existing ?? provisional };
 
+  // Stamp the prepaid-package payment onto the payload (meta.payment), same as
+  // a normal finalize — the note above already tells the PMS in plain text.
+  const payload = payloadWithPayment(channexPayload, provisional);
+
   let status: BookingRecord["status"] = "simulated";
   let channexId: string | undefined;
   let error: string | undefined;
   if (live) {
     try {
-      const result = (await pushOpenChannelBooking(channexPayload)) as { reservation_id?: string; id?: string } | undefined;
+      const result = (await pushOpenChannelBooking(payload)) as { reservation_id?: string; id?: string } | undefined;
       channexId = result?.reservation_id || result?.id || undefined;
       status = "confirmed";
     } catch (e) {
@@ -211,7 +216,7 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
     status,
     channexId,
     error,
-    channexPayload,
+    channexPayload: payload,
     inventoryHeld: status !== "failed",
   };
   const booking: BookingRecord = (await updateBooking(pid, bookingId, patch)) ?? { ...provisional, ...patch };

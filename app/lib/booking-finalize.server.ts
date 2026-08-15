@@ -13,7 +13,7 @@ import {
 import { availabilityShortfall, decrementAvailability } from "./ari/admin.server";
 import { pushOpenChannelBooking, pushOpenChannelRevision } from "./open-channel.server";
 import { getConfig } from "./config.server";
-import { fromStripeMinor, toStripeMinor } from "./money";
+import { formatMoney, fromStripeMinor, toStripeMinor } from "./money";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
@@ -58,6 +58,81 @@ export function paymentFromSession(account: string, sessionId: string, session: 
   return null;
 }
 
+/** Enrich an Open Channel payload with how the booking was paid, once the
+ *  payment outcome is known: a plain-text `notes` line (every PMS displays
+ *  guest/booking notes) plus a structured `meta.payment` block with the amounts
+ *  and the Stripe ids. The charge/setup ran on the hotel's own connected Stripe
+ *  account, so an integrated PMS can use those ids with the hotel's keys to
+ *  collect the balance or charge the guarantee card. */
+export function payloadWithPayment(
+  payload: unknown,
+  booking: Pick<BookingRecord, "total" | "currency" | "payment" | "voucher">,
+): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  const { payment, currency } = booking;
+  const voucherPaid = booking.voucher?.amount ?? 0;
+  if (!payment && !voucherPaid) return payload;
+
+  const charged = payment?.mode === "payment" ? (payment.amount ?? 0) : 0;
+  // Balance computed in Stripe minor units so a float remainder can't turn a
+  // fully-paid booking into a one-cent "deposit".
+  const balance = fromStripeMinor(
+    Math.max(0, toStripeMinor(booking.total, currency) - toStripeMinor(charged + voucherPaid, currency)),
+    currency,
+  );
+
+  const base = payload as Record<string, unknown>;
+  const fmt = (n: number) => formatMoney(n, currency);
+  // Append to any note set at prepare time (e.g. the gift-voucher line).
+  const lines = typeof base.notes === "string" && base.notes ? [base.notes] : [];
+  if (payment?.provider === "stripe") {
+    if (payment.mode === "payment") {
+      lines.push(
+        balance > 0
+          ? `Deposit of ${fmt(charged)} collected via Stripe at booking. Balance due: ${fmt(balance)}.`
+          : `Fully prepaid — ${fmt(charged)} collected via Stripe at booking.`,
+      );
+    } else {
+      const card = [payment.cardBrand, payment.cardLast4 ? `**** ${payment.cardLast4}` : ""].filter(Boolean).join(" ");
+      lines.push(
+        `No charge taken at booking — card on file with Stripe as guarantee${card ? ` (${card})` : ""}. Balance due: ${fmt(balance)}.`,
+      );
+    }
+  }
+
+  const type = payment?.mode === "setup" ? "guarantee_card" : balance > 0 ? "deposit" : "full_prepayment";
+  return {
+    ...base,
+    ...(lines.length ? { notes: lines.join("\n") } : {}),
+    meta: {
+      ...(base.meta && typeof base.meta === "object" ? (base.meta as Record<string, unknown>) : {}),
+      payment: {
+        type,
+        currency,
+        paid_at_booking: charged + voucherPaid,
+        balance_due: balance,
+        ...(payment?.provider === "stripe"
+          ? {
+              provider: "stripe",
+              stripe_account: payment.accountId,
+              stripe_checkout_session: payment.sessionId,
+              ...(payment.paymentIntentId ? { stripe_payment_intent: payment.paymentIntentId } : {}),
+              ...(payment.customerId ? { stripe_customer: payment.customerId } : {}),
+              ...(payment.paymentMethodId ? { stripe_payment_method: payment.paymentMethodId } : {}),
+              ...(payment.cardBrand ? { card_brand: payment.cardBrand } : {}),
+              ...(payment.cardLast4 ? { card_last4: payment.cardLast4 } : {}),
+            }
+          : payment
+            ? { provider: payment.provider }
+            : {}),
+        ...(voucherPaid && booking.voucher
+          ? { gift_voucher: { code: booking.voucher.code, amount: voucherPaid } }
+          : {}),
+      },
+    },
+  };
+}
+
 /** Look up the pending booking, retrieve its Stripe session, and finalize if it
  *  completed. Used by the webhook backstop. No-op if nothing pending or unpaid. */
 export async function finalizeFromStripeSession(ref: string, sessionId: string): Promise<BookingRecord | null> {
@@ -78,7 +153,15 @@ export async function finalizeBooking(
   payment: PaymentInfo | undefined,
   origin: string,
 ): Promise<BookingRecord> {
-  const { pid, record: draft, channexPayload, live } = pending;
+  const { pid, record: draft, live } = pending;
+  // The payload was assembled before payment; now the outcome is known, stamp
+  // how the guest paid onto it (notes + meta) so the PMS sees the split.
+  const channexPayload = payloadWithPayment(pending.channexPayload, {
+    total: draft.total,
+    currency: draft.currency,
+    payment,
+    voucher: draft.voucher,
+  });
 
   // Atomically claim the reference. Only the winner proceeds to the side effects
   // below (Channex push, inventory, emails); a concurrent finalize (Stripe return
