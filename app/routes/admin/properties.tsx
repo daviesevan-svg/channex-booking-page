@@ -230,7 +230,7 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
                     </button>
                   </Form>
                 )}
-                {p.canManage && properties.length > 1 && (
+                {p.canManage && (
                   <Form
                     method="post"
                     onSubmit={(e) => {
