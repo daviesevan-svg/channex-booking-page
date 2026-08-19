@@ -1364,6 +1364,8 @@ const PT: Record<string, string> = {
   rtExtraAdult: "Preço por adulto extra",
   rtPerNightHint: "(/noite)",
   rtFewerAdult: "Desconto por cada adulto a menos",
+  rtChildAsAdults: "Crianças pagam preço de adulto",
+  rtChildAsAdultsHint: "(cada criança paga o preço de adulto — as faixas etárias não se aplicam)",
   rtChildTitle: "Preço por criança por noite",
   rtChildHint: "(por criança, por idade)",
   rtAge0to3: "0–3 anos",

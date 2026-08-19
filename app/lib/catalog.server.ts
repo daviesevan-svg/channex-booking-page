@@ -11,7 +11,7 @@ import { getConfigKV } from "./config.server";
 import type { DeadlineUnit, PricingMode, SiteSettings } from "./content";
 import { getSettings } from "./overrides.server";
 import { getPromotions } from "./promotions.server";
-import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, type OccupancyPricing } from "./rate-pricing";
+import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, pricedOccupancy, type OccupancyPricing } from "./rate-pricing";
 import { ratePolicyOf, type RatePolicy } from "./rate-policy";
 import { policyToCancellation } from "./policy-copy";
 import { lineOccupancy, type CartLine, type ResolvedLine } from "./cart";
@@ -397,21 +397,27 @@ export async function getCatalogRooms(
                 return (invPrice ?? base) + occupancyNightlyDelta(op, nAdults, []);
               };
               const childDelta = childrenNightlyDelta(op, childrenAge);
+              // The occupancy the party is PRICED at: children count as adults
+              // when the rate says so (their age-band delta is 0 in that case).
+              const pricedAdults = pricedOccupancy(op, adults, childrenAge);
               // Effective nightly price for the stay: the ARI price when set, else
               // the rate's base. A night priced at 0 means no rate is loaded (or
               // it's free) — we don't sell free rooms, so any unpriced night makes
               // the rate unbookable (and a room with no priced rate drops out).
               const nightly = nightDates.length
-                ? nightDates.map((d) => nightlyFor(adults, d) + childDelta)
-                : [nightlyFor(adults) + childDelta];
+                ? nightDates.map((d) => nightlyFor(pricedAdults, d) + childDelta)
+                : [nightlyFor(pricedAdults) + childDelta];
               if (nightly.some((n) => n <= 0)) return null;
               // Room-only stay totals for every party size, so the detail page
               // can re-price live as the guest changes adults — a per-person
               // rate's prices vary by date, so a flat per-night delta can't
               // express them the way `occupancyPricing` does for flat rates.
+              // With children priced as adults the lookup key can reach the
+              // room's full capacity, so cover up to maxGuests.
+              const maxPriced = op?.childrenAsAdults ? Math.max(room.maxAdults, room.maxGuests) : room.maxAdults;
               const perPersonTotals: Record<number, number> | undefined = perPersonMode
                 ? Object.fromEntries(
-                    Array.from({ length: Math.max(1, room.maxAdults) }, (_, i) => {
+                    Array.from({ length: Math.max(1, maxPriced) }, (_, i) => {
                       const n = i + 1;
                       const tot = nightDates.length
                         ? nightDates.reduce((s, d) => s + nightlyFor(n, d), 0)

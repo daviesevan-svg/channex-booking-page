@@ -158,6 +158,10 @@ export async function action({ params, request }: Route.ActionArgs) {
   // manual prices multiply by the party's adults).
   const perPerson = (await getPricingMode(propertyId)) === "per_person";
 
+  // Children priced as adults is a rate-wide switch: it rides on every
+  // occupancyPricing object (including per-room overrides) so the pricing
+  // math sees it wherever the effective `op` comes from.
+  const childrenAsAdults = form.get("childrenAsAdults") != null || undefined;
   // Occupancy pricing is opt-in: only stored when a default occupancy is set.
   const readOccupancy = (prefix: string): OccupancyPricing | undefined => {
     const defaultOccupancy = posInt(form.get(`${prefix}defaultOccupancy`));
@@ -169,21 +173,24 @@ export async function action({ params, request }: Route.ActionArgs) {
       child0to3: money(form.get(`${prefix}child0to3`)),
       child4to12: money(form.get(`${prefix}child4to12`)),
       child13plus: money(form.get(`${prefix}child13plus`)),
+      childrenAsAdults,
     };
   };
   // Rate-wide default (also the fallback for rooms without a per-room override).
   let occupancyPricing = readOccupancy("");
   // A per-person rate needs no default occupancy — adults price themselves —
-  // but the child age bands still ride on occupancyPricing, so store them with
-  // a nominal default occupancy when any band is set. (The adult fields are
-  // ignored by per-person pricing either way.)
+  // but the child age bands (and the children-as-adults switch) still ride on
+  // occupancyPricing, so store them with a nominal default occupancy when set.
+  // (The adult fields are ignored by per-person pricing either way.)
   if (perPerson && !occupancyPricing) {
     const kids = {
       child0to3: money(form.get("child0to3")),
       child4to12: money(form.get("child4to12")),
       child13plus: money(form.get("child13plus")),
     };
-    if (kids.child0to3 || kids.child4to12 || kids.child13plus) occupancyPricing = { defaultOccupancy: 1, ...kids };
+    if (kids.child0to3 || kids.child4to12 || kids.child13plus || childrenAsAdults) {
+      occupancyPricing = { defaultOccupancy: 1, ...kids, childrenAsAdults };
+    }
   }
   // Optional per-room overrides — only when the "per room" toggle is on. Each
   // room needs its own default occupancy to be included, mirroring the rate-wide
@@ -273,6 +280,10 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [perRoomOcc, setPerRoomOcc] = useState<boolean>(
     !!rate?.occupancyPricingByRoom && Object.keys(rate.occupancyPricingByRoom).length > 0,
   );
+  // Children priced as adults: the age-band fields become dead config, so hide
+  // them (kept mounted so their values survive toggling the switch off again).
+  const [childAsAdults, setChildAsAdults] = useState<boolean>(!!rate?.occupancyPricing?.childrenAsAdults);
+  const childField = (f: OpField) => f === "child0to3" || f === "child4to12" || f === "child13plus";
   // Per-person pricing (property-wide, from General): prices are per adult, so
   // the adult occupancy fields (default occupancy / extra adult / fewer adults)
   // don't apply and are hidden.
@@ -454,22 +465,37 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             </label>
           </div>
           )}
-          <div className="mt-3 text-[13px] font-semibold text-secondary">
-            {t("rtChildTitle")} <span className="font-normal text-faint">{t("rtChildHint")}</span>
-          </div>
-          <div className="mt-1.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <label className="block text-[12px] font-semibold text-muted-2">
-              {t("rtAge0to3")}
-              <input name="child0to3" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child0to3 ?? ""} placeholder="0" className={FIELD_INPUT} />
-            </label>
-            <label className="block text-[12px] font-semibold text-muted-2">
-              {t("rtAge4to12")}
-              <input name="child4to12" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child4to12 ?? ""} placeholder="15" className={FIELD_INPUT} />
-            </label>
-            <label className="block text-[12px] font-semibold text-muted-2">
-              {t("rtAge13plus")}
-              <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
-            </label>
+          <label className="mt-4 flex items-center gap-2.5 text-[14px] font-semibold">
+            <input
+              type="checkbox"
+              name="childrenAsAdults"
+              checked={childAsAdults}
+              onChange={(e) => setChildAsAdults(e.target.checked)}
+              className={checkbox}
+            />
+            {t("rtChildAsAdults")}
+            <span className="font-normal text-faint">{t("rtChildAsAdultsHint")}</span>
+          </label>
+          {/* Hidden (not unmounted) when children price as adults, so the band
+              values keep submitting and survive toggling the switch back off. */}
+          <div className={childAsAdults ? "hidden" : undefined}>
+            <div className="mt-3 text-[13px] font-semibold text-secondary">
+              {t("rtChildTitle")} <span className="font-normal text-faint">{t("rtChildHint")}</span>
+            </div>
+            <div className="mt-1.5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <label className="block text-[12px] font-semibold text-muted-2">
+                {t("rtAge0to3")}
+                <input name="child0to3" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child0to3 ?? ""} placeholder="0" className={FIELD_INPUT} />
+              </label>
+              <label className="block text-[12px] font-semibold text-muted-2">
+                {t("rtAge4to12")}
+                <input name="child4to12" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child4to12 ?? ""} placeholder="15" className={FIELD_INPUT} />
+              </label>
+              <label className="block text-[12px] font-semibold text-muted-2">
+                {t("rtAge13plus")}
+                <input name="child13plus" type="number" min={0} step="0.01" defaultValue={rate?.occupancyPricing?.child13plus ?? ""} placeholder="25" className={FIELD_INPUT} />
+              </label>
+            </div>
           </div>
 
           {!perPerson && (
@@ -495,7 +521,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                     <tr className="bg-surface-alt/60 text-[11px] font-semibold uppercase tracking-wide text-muted-2">
                       <th className="px-3 py-2 text-left">{t("rtRoomCol")}</th>
                       {OP_FIELDS.map((f) => (
-                        <th key={f} className="px-2 py-2 text-center font-semibold">{OP_COL_LABEL[f]}</th>
+                        <th key={f} className={`px-2 py-2 text-center font-semibold${childAsAdults && childField(f) ? " hidden" : ""}`}>{OP_COL_LABEL[f]}</th>
                       ))}
                     </tr>
                   </thead>
@@ -504,7 +530,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                       <tr key={r.id} className={i > 0 ? "border-t border-divider" : ""}>
                         <td className="whitespace-nowrap px-3 py-2 font-semibold text-secondary">{r.title}</td>
                         {OP_FIELDS.map((f) => (
-                          <td key={f} className="px-1.5 py-1.5">
+                          <td key={f} className={`px-1.5 py-1.5${childAsAdults && childField(f) ? " hidden" : ""}`}>
                             <input
                               name={`op:${r.id}:${f}`}
                               type="number"

@@ -1253,6 +1253,8 @@ const EL: Record<string, string> = {
   rtExtraAdult: "Τιμή ανά επιπλέον ενήλικα",
   rtPerNightHint: "(/νύχτα)",
   rtFewerAdult: "Έκπτωση ανά ενήλικα λιγότερο",
+  rtChildAsAdults: "Τα παιδιά χρεώνονται ως ενήλικες",
+  rtChildAsAdultsHint: "(κάθε παιδί πληρώνει την τιμή ενήλικα — οι ηλικιακές ζώνες δεν ισχύουν)",
   rtChildTitle: "Τιμή παιδιού ανά νύχτα",
   rtChildHint: "(ανά παιδί, κατά ηλικία)",
   rtAge0to3: "Ηλικία 0–3",

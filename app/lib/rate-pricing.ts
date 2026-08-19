@@ -16,6 +16,21 @@ export interface OccupancyPricing {
   child0to3?: number;
   child4to12?: number;
   child13plus?: number;
+  /** Children are priced exactly like adults: they count into the occupancy
+   *  used for pricing (per-occupancy row / extra-adult supplement) and the
+   *  age bands are ignored. */
+  childrenAsAdults?: boolean;
+}
+
+/** The occupancy a party is PRICED at: adults, plus children when the rate
+ *  prices children as adults. Capacity/maxAdults checks stay on the real
+ *  party split — this is for price lookups only. */
+export function pricedOccupancy(
+  op: OccupancyPricing | undefined,
+  adults: number,
+  childrenAge: number[],
+): number {
+  return adults + (op?.childrenAsAdults ? childrenAge.length : 0);
 }
 
 /** Per-night price adjustment for a party under a rate's occupancy pricing.
@@ -27,10 +42,11 @@ export function occupancyNightlyDelta(
   childrenAge: number[],
 ): number {
   if (!op) return 0;
+  const priced = pricedOccupancy(op, adults, childrenAge);
   const def = Math.max(1, Math.round(op.defaultOccupancy) || 1);
   let d = 0;
-  if (adults > def) d += (adults - def) * (op.extraAdultPrice ?? 0);
-  else if (adults < def) d -= (def - adults) * (op.lessGuestDiscount ?? 0);
+  if (priced > def) d += (priced - def) * (op.extraAdultPrice ?? 0);
+  else if (priced < def) d -= (def - priced) * (op.lessGuestDiscount ?? 0);
   return d + childrenNightlyDelta(op, childrenAge);
 }
 
@@ -38,7 +54,7 @@ export function occupancyNightlyDelta(
  *  band. This is the only part of `occupancyPricing` a PER-PERSON rate uses:
  *  adult pricing comes from the per-occupancy prices themselves. */
 export function childrenNightlyDelta(op: OccupancyPricing | undefined, childrenAge: number[]): number {
-  if (!op) return 0;
+  if (!op || op.childrenAsAdults) return 0;
   let d = 0;
   for (const age of childrenAge) {
     if (age <= 3) d += op.child0to3 ?? 0;
