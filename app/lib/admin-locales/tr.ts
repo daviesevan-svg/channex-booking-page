@@ -1414,6 +1414,8 @@ const TR: Record<string, string> = {
   rtExtraAdult: "Fazla yetişkin başına fiyat",
   rtPerNightHint: "(/gece)",
   rtFewerAdult: "Eksik yetişkin başına indirim",
+  rtChildAsAdults: "Çocuklar yetişkin fiyatıyla ücretlendirilir",
+  rtChildAsAdultsHint: "(her çocuk yetişkin fiyatını öder — yaş aralıkları uygulanmaz)",
   rtChildTitle: "Çocuk için gecelik fiyat",
   rtChildHint: "(çocuk başına, yaşa göre)",
   rtAge0to3: "0–3 yaş",

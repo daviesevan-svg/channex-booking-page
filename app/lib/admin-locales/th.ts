@@ -1360,6 +1360,8 @@ const TH: Record<string, string> = {
   rtExtraAdult: "ราคาต่อผู้ใหญ่ที่เพิ่มขึ้น",
   rtPerNightHint: "(/คืน)",
   rtFewerAdult: "ส่วนลดต่อผู้ใหญ่ที่น้อยลง",
+  rtChildAsAdults: "เด็กคิดราคาเท่าผู้ใหญ่",
+  rtChildAsAdultsHint: "(เด็กแต่ละคนจ่ายราคาผู้ใหญ่ — ไม่ใช้ช่วงอายุ)",
   rtChildTitle: "ราคาเด็กต่อคืน",
   rtChildHint: "(ต่อเด็กหนึ่งคน ตามอายุ)",
   rtAge0to3: "อายุ 0–3 ปี",
