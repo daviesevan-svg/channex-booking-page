@@ -29,7 +29,9 @@ import { resolveAppliedPromo } from "~/lib/promotions.server";
 import type { AppliedPromo } from "~/lib/promotions";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
-import { stashPending } from "~/lib/pending-bookings.server";
+import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
+import { activeGateway } from "~/lib/payments.server";
+import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { rateLimit } from "~/lib/rate-limit.server";
 import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { toStripeMinor } from "~/lib/money";
@@ -316,10 +318,12 @@ export async function action({ request }: Route.ActionArgs) {
     providerCode: config.providerCode,
   });
 
-  const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
+  // Which gateway (Stripe / Viva) this property charges through, if any.
+  const gateway = await activeGateway(pid, settings);
   // Any card policy wants a card (CardHandling is guarantee or charge_at_booking,
-  // never "none"), so nothing-due still runs setup mode. Testing only for
-  // "guarantee" let charge-at-booking with nothing due collect nothing at all.
+  // never "none"), so nothing-due still runs Stripe's setup mode. Testing only
+  // for "guarantee" let charge-at-booking with nothing due collect nothing at
+  // all. Viva has no card-on-file mode — with nothing due it books directly.
   const stripeMode: "payment" | "setup" = due > 0 ? "payment" : "setup";
 
   const respond = async (status: number, bodyOut: unknown) => {
@@ -328,12 +332,45 @@ export async function action({ request }: Route.ActionArgs) {
   };
 
   // A paid rate with no way to charge must not book unpaid.
-  if (due > 0 && !stripeConnected) {
+  if (due > 0 && !gateway) {
     return apiError(422, "payment_not_configured", "This rate requires online payment, but card payments aren't set up for this property.");
   }
 
-  if (stripeMode && stripeConnected) {
-    const account = settings.stripeAccountId as string;
+  if (gateway?.kind === "viva" && due > 0) {
+    await stashPending(reference, pending);
+    let url: string;
+    try {
+      const orderCode = await createVivaOrder(gateway.viva, {
+        amountMinor: toVivaMinor(due),
+        customerTrns: `Booking ${reference} · ${checkin} – ${checkout}`,
+        merchantTrns: reference,
+        email: body.guest.email,
+        fullName: `${body.guest.first_name} ${body.guest.last_name}`,
+        lang: "en",
+      });
+      // The guest returns to the /viva/return URL configured on the property's
+      // payment source; the order-code mapping is how it finds this checkout.
+      await stashVivaOrder(orderCode, { ref: reference, pid, channel: pid });
+      url = vivaCheckoutUrl(gateway.viva, orderCode);
+    } catch (e) {
+      console.log(`[api] viva order failed pid=${pid}: ${e instanceof Error ? e.message : e}`);
+      return apiError(502, "payment_error", "Couldn't start the payment session. Please try again.");
+    }
+    return respond(201, {
+      data: {
+        reference,
+        status: "pending_payment",
+        amount_due: due,
+        currency,
+        payment_reason: "payment_due",
+        payment_note: `The guest pays ${due} ${currency} on the payment_url to confirm this booking.`,
+      },
+      payment_url: url,
+    });
+  }
+
+  if (gateway?.kind === "stripe") {
+    const account = gateway.account;
     await stashPending(reference, pending);
     const params = buildCheckoutSessionParams({
       reference,
