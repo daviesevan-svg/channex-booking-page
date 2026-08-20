@@ -57,3 +57,38 @@ export async function deletePending(ref: string): Promise<void> {
   const kv = getConfigKV();
   if (kv) await kv.delete(key(ref));
 }
+
+// ===== Viva order-code mapping =====
+// Viva's success/failure URLs are configured statically on the payment source
+// (per property, in THEIR Viva dashboard) — unlike Stripe, the return URL can't
+// carry our reference. The guest comes back with only ?s={orderCode}&t={txId},
+// so the order code has to find its way back to the pending booking.
+
+/** What /viva/return and the Viva webhook need to resume a checkout. */
+export interface VivaOrderRef {
+  /** Booking reference — the pending-booking key. */
+  ref: string;
+  pid: string;
+  /** URL segment the checkout ran under (slug or empty on a custom domain),
+   *  so redirects rebuild the same pretty base the guest came from. */
+  channel: string;
+}
+
+const vivaOrderKey = (orderCode: string) => `viva_order:${orderCode}`;
+
+export async function stashVivaOrder(orderCode: string, value: VivaOrderRef): Promise<void> {
+  const kv = getConfigKV();
+  if (kv) await kv.put(vivaOrderKey(orderCode), JSON.stringify(value), { expirationTtl: TTL_SECONDS });
+}
+
+export async function getVivaOrder(orderCode: string): Promise<VivaOrderRef | null> {
+  const kv = getConfigKV();
+  if (!kv) return null;
+  const raw = await kv.get(vivaOrderKey(orderCode));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as VivaOrderRef;
+  } catch {
+    return null;
+  }
+}

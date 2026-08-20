@@ -34,7 +34,9 @@ import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { taxConfigFrom } from "~/lib/pricing";
 import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
-import { stashPending } from "~/lib/pending-bookings.server";
+import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
+import { activeGateway, canSaveCard } from "~/lib/payments.server";
+import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
@@ -194,16 +196,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     });
   }
 
-  // Whether a card is actually taken at checkout: only in LIVE mode, with Stripe
-  // connected, when the rate charges now or wants a guarantee card. In test mode
-  // (or with no Stripe) nothing is collected, so the payment copy mustn't promise
-  // a card — and the action likewise takes no payment (see below).
+  // Whether a card is actually taken at checkout: only in LIVE mode, with a
+  // payment gateway (Stripe or Viva) connected, when the rate charges now — or
+  // wants a guarantee card, which only Stripe can hold. In test mode (or with
+  // no gateway) nothing is collected, so the payment copy mustn't promise a
+  // card — and the action likewise takes no payment (see below).
   const live =
     (settings.liveBooking ?? getConfig().allowLiveBooking) && settings.connectedSystem === "channex";
+  const gateway = await activeGateway(pid, settings);
   const collectsCard =
     live &&
-    Boolean(settings.stripeAccountId && getConfig().stripeSecretKey) &&
-    (dueNow(policy, grandTotal, nights) > 0 || policy.payment.card === "guarantee");
+    Boolean(gateway) &&
+    (dueNow(policy, grandTotal, nights) > 0 || (canSaveCard(gateway) && policy.payment.card === "guarantee"));
   const jsonLd = await reservationHotelJsonLd(
     pid,
     lang,
@@ -366,13 +370,15 @@ export async function action({ params, request }: Route.ActionArgs) {
     voucherHold = { code: gv.code, amount: Math.min(balance, Math.round(due * 100) / 100) };
   }
   const dueAfterVoucher = Math.round((due - (voucherHold?.amount ?? 0)) * 100) / 100;
+  // Which gateway (Stripe / Viva) this property charges through, if any.
+  const gateway = await activeGateway(stay.channelId, settings);
   // The same gate the form rendered its checkboxes from — see consentGate.
   const { needAck } = consentGate({
     policy,
     checkin: stay.checkin,
     anchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
     dueNow: dueAfterVoucher,
-    collectsCard: live && Boolean(settings.stripeAccountId && config.stripeSecretKey),
+    collectsCard: live && Boolean(gateway) && (dueAfterVoucher > 0 || canSaveCard(gateway)),
   });
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
@@ -440,37 +446,38 @@ export async function action({ params, request }: Route.ActionArgs) {
     voucherPayment: voucherHold,
   });
 
-  // Stripe is needed to charge a deposit/prepay (mode=payment) or to save a
-  // guarantee card for a pay-at-hotel rate that asks for one (mode=setup).
-  // Every card policy wants a card — CardHandling is guarantee or
-  // charge_at_booking, never "none". So when nothing is due today we still run
-  // Stripe in setup mode to put a card on file. Testing only for "guarantee"
-  // meant a rate set to charge-at-booking with nothing due today collected
-  // NOTHING, so its non-refundable and no-show terms were unenforceable.
-  const stripeConnected = Boolean(settings.stripeAccountId && config.stripeSecretKey);
+  // A gateway is needed to charge a deposit/prepay (mode=payment) or — Stripe
+  // only — to save a guarantee card for a pay-at-hotel rate that asks for one
+  // (mode=setup). Every card policy wants a card — CardHandling is guarantee or
+  // charge_at_booking, never "none". So when nothing is due today a Stripe
+  // property still runs setup mode to put a card on file. Testing only for
+  // "guarantee" meant a rate set to charge-at-booking with nothing due today
+  // collected NOTHING, so its non-refundable and no-show terms were
+  // unenforceable. Viva has no card-on-file mode: with nothing due today a Viva
+  // property books directly, like a property with no gateway.
   // A due fully covered by the voucher needs no charge (and no guarantee card —
-  // the stay is paid); the remainder, if any, goes through Stripe as usual.
+  // the stay is paid); the remainder, if any, goes through the gateway as usual.
   const stripeMode: "payment" | "setup" = dueAfterVoucher > 0 ? "payment" : "setup";
 
   // Only take a real payment in LIVE mode. In test mode the booking is
   // simulated and pushed nowhere, so charging would take money for a booking
-  // that isn't created — skip Stripe entirely and fall through to the simulated
-  // finalize below.
+  // that isn't created — skip the gateway entirely and fall through to the
+  // simulated finalize below.
   // A paid rate with no way to charge must not book unpaid. A guarantee-only
   // rate without Stripe just books without a card (no-show cover is optional).
-  if (live && dueAfterVoucher > 0 && !stripeConnected) return { paymentError: "not_connected" as const };
+  if (live && dueAfterVoucher > 0 && !gateway) return { paymentError: "not_connected" as const };
+  const goesToGateway = Boolean(live && gateway && (dueAfterVoucher > 0 || gateway.kind === "stripe"));
 
   // Reserve the voucher amount before any payment/booking side effects: a hold
   // that counts against the balance (so a shared code can't double-spend), with
   // a TTL matching the payment window. finalizeBooking settles or releases it.
   if (voucherHold) {
-    const ttl = live && stripeMode && stripeConnected ? 3 * 3600 * 1000 : 15 * 60 * 1000;
+    const ttl = goesToGateway ? 3 * 3600 * 1000 : 15 * 60 * 1000;
     const held = await holdGiftAmount(stay.channelId, voucherHold.code, reference, voucherHold.amount, ttl);
     if (!held.ok) return { voucherError: true as const, voucherCode: voucherHold.code };
   }
 
-  if (live && stripeMode && stripeConnected) {
-    const account = settings.stripeAccountId as string;
+  if (gateway && goesToGateway) {
     await stashPending(reference, pending);
     // The language the guest actually chose, as stored on the pending booking.
     // Optional there, so pin the fallback once rather than at three call sites.
@@ -502,6 +509,42 @@ export async function action({ params, request }: Route.ActionArgs) {
       : "";
     const balanceNote =
       (balance > 0 ? tr.t("stripeDepositNote", { balance: money(balance) }) : tr.t("stripePaidInFull")) + voucherNote;
+
+    if (gateway.kind === "viva") {
+      // Viva's hosted Smart Checkout: create a payment order and send the guest
+      // to Viva's page. The success/failure URLs are configured statically on
+      // the property's Viva payment source (/viva/return, /viva/failure), so
+      // they can't carry the reference — the order-code mapping stashed here is
+      // how the return leg (and the webhook) finds this checkout again.
+      let payUrl: string;
+      try {
+        const orderCode = await createVivaOrder(gateway.viva, {
+          amountMinor: toVivaMinor(dueAfterVoucher),
+          customerTrns: `${hotelName} — ${roomName} · ${stayLine}. ${balanceNote}`,
+          merchantTrns: reference,
+          email: g.email,
+          fullName: `${g.firstName} ${g.lastName}`,
+          lang: guestLang,
+        });
+        await stashVivaOrder(orderCode, {
+          ref: reference,
+          pid: stay.channelId,
+          channel: params.channelId ?? "",
+        });
+        payUrl = vivaCheckoutUrl(gateway.viva, orderCode);
+      } catch (e) {
+        // Viva is connected but rejected the order — log the real reason so
+        // this isn't mistaken for "not set up".
+        console.log(
+          `[checkout] viva order failed for pid=${stay.channelId}: ${e instanceof Error ? e.message : e}`,
+        );
+        if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+        return { paymentError: "failed" as const };
+      }
+      throw redirect(payUrl);
+    }
+
+    const account = gateway.account;
     const sessionParams = buildCheckoutSessionParams({
       reference,
       email: g.email,

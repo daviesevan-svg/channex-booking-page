@@ -13,7 +13,7 @@ import { getLastAriReceivedAt } from "./ari/ingest.server";
 import { getInventory } from "./ari/read.server";
 import { getRates, getRooms } from "./catalog.server";
 import { getGalleryFor } from "./gallery.server";
-import { getHeroImage, getOverrides, getSettings } from "./overrides.server";
+import { getHeroImage, getOverrides, getSettings, getVivaConfig } from "./overrides.server";
 import { getProperty } from "./properties.server";
 
 export interface SetupStep {
@@ -51,7 +51,7 @@ export interface SetupChecklist {
 }
 
 export async function setupChecklist(pid: string): Promise<SetupChecklist> {
-  const [settings, overrides, property, rooms, rates, hero, gallery] = await Promise.all([
+  const [settings, overrides, property, rooms, rates, hero, gallery, viva] = await Promise.all([
     getSettings(pid),
     getOverrides(pid),
     getProperty(pid),
@@ -59,6 +59,7 @@ export async function setupChecklist(pid: string): Promise<SetupChecklist> {
     getRates(pid),
     getHeroImage(pid),
     getGalleryFor(pid),
+    getVivaConfig(pid),
   ]);
   const channex = settings.connectedSystem === "channex";
 
@@ -97,7 +98,7 @@ export async function setupChecklist(pid: string): Promise<SetupChecklist> {
     { key: "rooms", done: rooms.length > 0, to: "/admin/rooms" },
     { key: "prices", done: priced, to: "/admin/rates" },
     { key: "availability", done: hasAvailability, to: channex ? "/admin/connectivity" : "/admin/inventory" },
-    { key: "payments", done: Boolean(settings.stripeAccountId), to: "/admin/payments" },
+    { key: "payments", done: Boolean(settings.stripeAccountId || viva), to: "/admin/payments" },
     { key: "website", done: Boolean(property?.slug), to: "/admin/general" },
     { key: "golive", done: settings.liveBooking === true, to: "/admin/general" },
   ];

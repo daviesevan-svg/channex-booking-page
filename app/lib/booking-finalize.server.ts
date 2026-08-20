@@ -19,6 +19,14 @@ import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { releaseGiftHold, settleGiftHold } from "./vouchers.server";
 import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
+import {
+  retrieveVivaTransaction,
+  vivaAlphaCurrency,
+  type VivaConfig,
+  type VivaTransaction,
+} from "./viva.server";
+import { getVivaConfig } from "./overrides.server";
+import { getVivaOrder } from "./pending-bookings.server";
 import { dispatchWebhook } from "./webhooks.server";
 import { queueFunnelEvent } from "./funnel-analytics.server";
 import { serializeBooking } from "./api-serialize";
@@ -58,6 +66,51 @@ export function paymentFromSession(account: string, sessionId: string, session: 
   return null;
 }
 
+/** Turn a Viva transaction lookup into the PaymentInfo we store. Returns null
+ *  unless the transaction is finished ("F") AND belongs to the given order —
+ *  the return URL's ?t= parameter is guest-controlled, so an id that doesn't
+ *  match the order it claims to pay proves nothing. */
+export function paymentFromVivaTransaction(
+  viva: VivaConfig,
+  orderCode: string,
+  transactionId: string,
+  tx: VivaTransaction,
+): PaymentInfo | null {
+  if (tx.statusId !== "F") return null;
+  if (String(tx.orderCode ?? "") !== orderCode) return null;
+  return {
+    provider: "viva",
+    mode: "payment",
+    accountId: viva.merchantId,
+    sessionId: orderCode,
+    transactionId,
+    amount: tx.amount ?? 0,
+    currency: vivaAlphaCurrency(tx.currencyCode),
+  };
+}
+
+/** Look up the pending booking behind a Viva order code, verify the transaction
+ *  against Viva's API, and finalize if it's paid. Shared by the return URL and
+ *  the webhook — idempotent, so both firing is safe. Returns null when nothing
+ *  is pending (already finalized / expired) or the payment isn't complete. */
+export async function finalizeFromVivaOrder(orderCode: string, transactionId: string): Promise<BookingRecord | null> {
+  const order = await getVivaOrder(orderCode);
+  if (!order) return null;
+  const pending = await getPending(order.ref);
+  if (!pending) return null;
+  const viva = await getVivaConfig(order.pid);
+  if (!viva) return null; // disconnected mid-checkout — the operator's problem, don't guess
+  const tx = await retrieveVivaTransaction(viva, transactionId);
+  const payment = paymentFromVivaTransaction(viva, orderCode, transactionId, tx);
+  if (!payment) return null;
+  const record = await finalizeBooking(pending, payment, pending.origin);
+  await deletePending(order.ref);
+  // The order mapping is deliberately NOT deleted: if the webhook finalized
+  // first, the guest's return URL still needs orderCode → ref/channel to land
+  // on their confirmation. It expires with its TTL.
+  return record;
+}
+
 /** Enrich an Open Channel payload with how the booking was paid, once the
  *  payment outcome is known: a plain-text `notes` line (every PMS displays
  *  guest/booking notes) plus a structured `meta.payment` block with the amounts
@@ -85,17 +138,18 @@ export function payloadWithPayment(
   const fmt = (n: number) => formatMoney(n, currency);
   // Append to any note set at prepare time (e.g. the gift-voucher line).
   const lines = typeof base.notes === "string" && base.notes ? [base.notes] : [];
-  if (payment?.provider === "stripe") {
+  const gatewayName = payment?.provider === "viva" ? "Viva" : "Stripe";
+  if (payment?.provider === "stripe" || payment?.provider === "viva") {
     if (payment.mode === "payment") {
       lines.push(
         balance > 0
-          ? `Deposit of ${fmt(charged)} collected via Stripe at booking. Balance due: ${fmt(balance)}.`
-          : `Fully prepaid — ${fmt(charged)} collected via Stripe at booking.`,
+          ? `Deposit of ${fmt(charged)} collected via ${gatewayName} at booking. Balance due: ${fmt(balance)}.`
+          : `Fully prepaid — ${fmt(charged)} collected via ${gatewayName} at booking.`,
       );
     } else {
       const card = [payment.cardBrand, payment.cardLast4 ? `**** ${payment.cardLast4}` : ""].filter(Boolean).join(" ");
       lines.push(
-        `No charge taken at booking — card on file with Stripe as guarantee${card ? ` (${card})` : ""}. Balance due: ${fmt(balance)}.`,
+        `No charge taken at booking — card on file with ${gatewayName} as guarantee${card ? ` (${card})` : ""}. Balance due: ${fmt(balance)}.`,
       );
     }
   }
@@ -122,9 +176,16 @@ export function payloadWithPayment(
               ...(payment.cardBrand ? { card_brand: payment.cardBrand } : {}),
               ...(payment.cardLast4 ? { card_last4: payment.cardLast4 } : {}),
             }
-          : payment
-            ? { provider: payment.provider }
-            : {}),
+          : payment?.provider === "viva"
+            ? {
+                provider: "viva",
+                viva_merchant: payment.accountId,
+                viva_order_code: payment.sessionId,
+                ...(payment.transactionId ? { viva_transaction: payment.transactionId } : {}),
+              }
+            : payment
+              ? { provider: payment.provider }
+              : {}),
         ...(voucherPaid && booking.voucher
           ? { gift_voucher: { code: booking.voucher.code, amount: voucherPaid } }
           : {}),

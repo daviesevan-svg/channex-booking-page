@@ -151,8 +151,8 @@ export async function action({ params, request }: Route.ActionArgs) {
         r.reason === "already_refunded"
           ? "This booking has already been refunded."
           : r.reason === "no_charge"
-            ? "There's no Stripe charge on this booking to refund."
-            : "The refund couldn't be processed — check Stripe and try again.",
+            ? "There's no charge on this booking to refund."
+            : "The refund couldn't be processed — check your payment provider and try again.",
     };
   }
   return { error: "Unknown action." };
@@ -299,9 +299,14 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           {b.payment?.mode === "payment" && (
             <Row
               label={t("bkdPaymentLabel")}
-              value={t(b.payment.provider === "voucher" ? "bkdPaidWithVoucher" : "bkdPaidViaStripe", {
-                amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency),
-              })}
+              value={t(
+                b.payment.provider === "voucher"
+                  ? "bkdPaidWithVoucher"
+                  : b.payment.provider === "viva"
+                    ? "bkdPaidViaViva"
+                    : "bkdPaidViaStripe",
+                { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) },
+              )}
             />
           )}
           {/* Checkout gift redemptions store no product title — show just the code then. */}
@@ -511,7 +516,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               <>
                 <dt className="text-muted">{t("bkdStatus")}</dt>
                 <dd className={b.payment.refund ? "font-semibold text-ink" : "font-semibold text-[#3f7a52]"}>
-                  {t("bkdPaidViaStripe", { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) })}
+                  {t(b.payment.provider === "viva" ? "bkdPaidViaViva" : "bkdPaidViaStripe", {
+                    amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency),
+                  })}
                 </dd>
                 {b.payment.refund && (
                   <>
@@ -529,6 +536,12 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                   <>
                     <dt className="text-muted">{t("bkdPaymentIntent")}</dt>
                     <dd className="font-mono text-[12px] text-ink">{b.payment.paymentIntentId}</dd>
+                  </>
+                )}
+                {b.payment.transactionId && (
+                  <>
+                    <dt className="text-muted">{t("bkdVivaTransaction")}</dt>
+                    <dd className="font-mono text-[12px] text-ink">{b.payment.transactionId}</dd>
                   </>
                 )}
               </>
@@ -550,9 +563,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 <dd className="text-secondary">{t("bkdPayAtHotel")}</dd>
               </>
             )}
-            <dt className="text-muted">{t("bkdStripeAccount")}</dt>
+            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaMerchant" : "bkdStripeAccount")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.accountId}</dd>
-            <dt className="text-muted">{t("bkdCheckoutSession")}</dt>
+            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaOrder" : "bkdCheckoutSession")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.sessionId}</dd>
           </dl>
         ) : (

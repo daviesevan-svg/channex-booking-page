@@ -84,6 +84,12 @@ export default [
   route("api/mapping_details", "routes/api.mapping_details.tsx"),
   route("api/changes", "routes/api.changes.tsx"),
   route("api/stripe-webhook", "routes/api.stripe-webhook.tsx"),
+  route("api/viva-webhook/:propertyId", "routes/api.viva-webhook.tsx"),
+  // Viva Smart Checkout return URLs — configured statically on the property's
+  // Viva payment source, so they sit at the root (they carry no property slug;
+  // the ?s= order code finds the checkout).
+  route("viva/return", "routes/viva.return.tsx"),
+  route("viva/failure", "routes/viva.failure.tsx"),
 
   // Model Context Protocol endpoint — same per-property API key as /v1, so an AI
   // agent can search availability and book without driving a browser.

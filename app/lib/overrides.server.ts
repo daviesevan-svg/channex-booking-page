@@ -19,6 +19,7 @@ import {
   type SiteSettings,
 } from "./content";
 import { withEmailDefaults } from "./email-defaults.server";
+import { vivaConfigured, type VivaConfig } from "./viva.server";
 
 // Localized content is stored per language: KV value is { [lang]: data }.
 // Guests read their language merged over the default language; the admin edits
@@ -287,6 +288,25 @@ export async function patchSettings(
 
 export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
+}
+
+// ===== Viva payments config (per property) =====
+// Its own KV key, NOT a SiteSettings field: settings objects flow into loader
+// data across the admin, and these are live credentials — one careless
+// `return { settings }` would serialize the client secret into HTML.
+const vivaKey = (pid: string) => `viva_config:${pid}`;
+
+export async function getVivaConfig(pid: string): Promise<VivaConfig | null> {
+  const v = await readJson<VivaConfig>(vivaKey(pid));
+  return vivaConfigured(v) ? v : null;
+}
+
+/** Store (or, with null, disconnect) the property's Viva credentials. */
+export async function saveVivaConfig(pid: string, config: VivaConfig | null): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  if (config) await writeJson(vivaKey(pid), config);
+  else await kv.delete(vivaKey(pid));
 }
 /** Accept only http(s) URLs; otherwise drop (so a bad value never becomes a link). */
 function safeUrl(v: FormDataEntryValue | null): string | undefined {

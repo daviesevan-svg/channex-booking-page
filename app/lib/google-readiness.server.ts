@@ -3,18 +3,20 @@
 // listings (or rejects the whole feed) when required fields are missing, so we
 // gate the feed on `requiredMissing` and surface the gaps in the admin.
 import type { SiteSettings } from "./content";
-import { getOverrides, getSettings, type PropertyOverrides } from "./overrides.server";
+import { getOverrides, getSettings, getVivaConfig, type PropertyOverrides } from "./overrides.server";
 import { getProperty } from "./properties.server";
 import { hasReceivedAri } from "./ari/ingest.server";
 
 /** Whether the property can actually take a booking — required before Google
- *  advertises it. Either an active Stripe connection (we charge the guest
- *  directly), OR a live Channex connection where bookings push to Channex for
- *  payment/reservation. "Live" means Channex has actually sent an ARI push (not
- *  just that the connection was toggled on), so we never advertise a Channex
- *  property that isn't really trading. */
+ *  advertises it. Either an active payment gateway (Stripe with charges
+ *  enabled, or Viva credentials — we charge the guest directly), OR a live
+ *  Channex connection where bookings push to Channex for payment/reservation.
+ *  "Live" means Channex has actually sent an ARI push (not just that the
+ *  connection was toggled on), so we never advertise a Channex property that
+ *  isn't really trading. */
 export async function canTakeBookings(pid: string, settings: SiteSettings): Promise<boolean> {
   if (settings.stripeAccountId && settings.stripeChargesEnabled) return true;
+  if (await getVivaConfig(pid)) return true;
   if (settings.connectedSystem === "channex" && (await hasReceivedAri(pid))) return true;
   return false;
 }

@@ -21,7 +21,7 @@ import {
 } from "~/lib/rate-policy";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
-import { getConfig } from "~/lib/config.server";
+import { activeGateway } from "~/lib/payments.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings } from "~/lib/overrides.server";
 
@@ -95,7 +95,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Whether a card can be taken at all. Penalties on a rate are only
   // enforceable if there's something on file to charge.
   const settings = await getSettings(propertyId);
-  const canTakeCard = Boolean(settings.stripeAccountId && getConfig().stripeSecretKey);
+  const canTakeCard = Boolean(await activeGateway(propertyId, settings));
   return {
     isNew,
     rate,

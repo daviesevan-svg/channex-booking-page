@@ -24,19 +24,23 @@ export function stayAvailabilityItems(
 export type BookingStatus = "confirmed" | "simulated" | "failed";
 export type BookingLifecycle = "active" | "cancelled";
 
-/** Stripe payment outcome stored on a booking. `mode:"payment"` = a charge was
- *  taken (deposit/prepay); `mode:"setup"` = a guarantee card saved on file. */
+/** Payment outcome stored on a booking. `mode:"payment"` = a charge was
+ *  taken (deposit/prepay); `mode:"setup"` = a guarantee card saved on file
+ *  (Stripe only — Viva has no card-on-file mode). */
 export interface PaymentInfo {
   /** "voucher" = the stay was prepaid by redeeming a package voucher. */
-  provider: "stripe" | "voucher";
+  provider: "stripe" | "viva" | "voucher";
   mode: "payment" | "setup";
-  /** Connected Stripe account the charge/setup ran on. */
+  /** Stripe: the connected account id. Viva: the merchant id. */
   accountId: string;
+  /** Stripe: the Checkout Session id. Viva: the payment order code. */
   sessionId: string;
   /** Amount captured in major units (mode: payment). */
   amount?: number;
   currency?: string;
   paymentIntentId?: string;
+  /** Viva transaction id (uuid) — what refunds are issued against. */
+  transactionId?: string;
   /** Guarantee card on file (mode: setup) — for charging a no-show later. */
   customerId?: string;
   paymentMethodId?: string;
