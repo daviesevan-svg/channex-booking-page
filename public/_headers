@@ -1,0 +1,7 @@
+# Everything under /assets/ is content-hashed by the Vite build, so a given
+# URL can never change content — cache it for a year and skip the per-chunk
+# revalidation round-trip (the default was max-age=0, must-revalidate).
+# Stale-deploy recovery is handled in entry.client.tsx (PR469), which depends
+# on old URLs 404ing, not on revalidation.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
