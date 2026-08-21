@@ -118,12 +118,20 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     ),
   ].filter((s) => Number(s.total_price) > 0);
 
+  // Notes reach the hotel's PMS: guest special requests, an arrival note that
+  // didn't parse into arrival_hour, and the gift-voucher payment flag.
+  const arrivalHour = normalizeArrivalHour(guest.arrival);
+  const noteLines = [
+    ...(guest.requests?.trim() ? [`Guest requests: ${guest.requests.trim()}`] : []),
+    ...(guest.arrival?.trim() && !arrivalHour ? [`Arrival: ${guest.arrival.trim()}`] : []),
+    ...(input.voucherPayment
+      ? [`Paid ${input.voucherPayment.amount.toFixed(2)} with gift voucher ${input.voucherPayment.code}`]
+      : []),
+  ];
+
   const channexPayload = {
     status: "new",
-    // Tell the PMS when part of the payment arrived as a gift voucher.
-    ...(input.voucherPayment
-      ? { notes: `Paid ${input.voucherPayment.amount.toFixed(2)} with gift voucher ${input.voucherPayment.code}` }
-      : {}),
+    ...(noteLines.length ? { notes: noteLines.join("\n") } : {}),
     provider_code: input.providerCode,
     hotel_code: pid,
     ota_name: input.providerCode || "Direct",
@@ -131,7 +139,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     currency,
     arrival_date: checkin,
     departure_date: checkout,
-    arrival_hour: normalizeArrivalHour(guest.arrival),
+    arrival_hour: arrivalHour,
     customer: { name: guest.firstName, surname: guest.lastName, mail: guest.email, phone: guest.phone },
     rooms: lines.map((l, index) => {
       const lineTotal = Math.round(l.total * ratio * 100) / 100;

@@ -156,7 +156,10 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
     customer: { name: guest.firstName, surname: guest.lastName, mail: guest.email, phone: guest.phone },
     // The package price spread across the nights (last night absorbs rounding),
     // so the PMS sees the real value — the money arrived at voucher purchase.
-    notes: `Paid with gift voucher ${v.code} — ${v.product.title}`,
+    notes: [
+      ...(guest.requests?.trim() ? [`Guest requests: ${guest.requests.trim()}`] : []),
+      `Paid with gift voucher ${v.code} — ${v.product.title}`,
+    ].join("\n"),
     rooms: [
       {
         index: 0,
