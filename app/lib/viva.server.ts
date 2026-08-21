@@ -144,8 +144,10 @@ export interface VivaOrderSpec {
   /** Our side of the description — the booking reference lives here so the
    *  webhook payload carries it even if the order-code mapping is gone. */
   merchantTrns: string;
-  email: string;
-  fullName: string;
+  /** Optional — Viva asks the customer on the hosted page when absent. The
+   *  save-time probe order omits both. */
+  email?: string;
+  fullName?: string;
   /** Guest language (our code, e.g. "de") — mapped to Viva's requestLang. */
   lang?: string;
   /** Seconds the order stays payable. Matches the Stripe session's 60 minutes
@@ -167,8 +169,8 @@ export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promi
       sourceCode: v.sourceCode,
       paymentTimeout: spec.timeoutSeconds ?? 3600,
       customer: {
-        email: spec.email,
-        fullName: spec.fullName,
+        ...(spec.email ? { email: spec.email } : {}),
+        ...(spec.fullName ? { fullName: spec.fullName } : {}),
         requestLang: vivaRequestLang(spec.lang),
       },
     }),
@@ -264,9 +266,10 @@ export async function retrieveVivaWebhookKey(v: VivaConfig): Promise<string> {
   return json.Key;
 }
 
-/** Validate a pasted config by exercising BOTH credential pairs against Viva:
- *  the OAuth pair (token) and the Basic pair (webhook key). Returns the error
- *  message to show the operator, or null when both check out. */
+/** Validate a pasted config by exercising all three legs against Viva: the
+ *  OAuth pair (token), the Basic pair (webhook key), and the sourceCode (a
+ *  probe payment order that is never paid). Returns the error message to show
+ *  the operator, or null when everything checks out. */
 export async function verifyVivaConfig(v: VivaConfig): Promise<string | null> {
   try {
     await vivaToken(v);
@@ -277,6 +280,26 @@ export async function verifyVivaConfig(v: VivaConfig): Promise<string | null> {
     await retrieveVivaWebhookKey(v);
   } catch (e) {
     return e instanceof Error ? e.message : "The Merchant ID / API key pair was rejected.";
+  }
+  // Neither credential call touches the sourceCode — a wrong or
+  // wrong-environment code only surfaces when an order is created (Viva
+  // answers 500 with an empty body). Probe it now with a minimal order, so the
+  // operator hears about it here instead of a guest at checkout. The order is
+  // never paid and simply expires; the description says so in case the
+  // operator spots it in their Viva sales list.
+  try {
+    await createVivaOrder(v, {
+      amountMinor: 100,
+      customerTrns: "Connection check from your booking engine — safe to ignore",
+      merchantTrns: "Connection check — safe to ignore",
+    });
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return (
+      `Both credential pairs are valid, but Viva refused a test payment order for source code ${v.sourceCode} ` +
+      `(${detail}). Check that this payment source exists in the ${v.demo ? "demo" : "live"} environment, ` +
+      `that the 4-digit code is right, and that your Viva account's verification is complete.`
+    );
   }
   return null;
 }
