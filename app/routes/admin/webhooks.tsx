@@ -4,7 +4,7 @@ import type { Route } from "./+types/webhooks";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { requirePageAllowed } from "~/lib/page-access.server";
-import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
 import { addWebhook, isSafeWebhookUrl, listWebhooks, removeWebhook } from "~/lib/webhooks.server";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "~/lib/webhook-events";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -14,7 +14,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requirePageAllowed(request, "webhooks");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const canManage = await isOwnerOrSuper(request, propertyId);
+  const canManage = await canManageProperty(request, propertyId);
   return { configured: true as const, canManage, endpoints: canManage ? await listWebhooks(propertyId) : [] };
 }
 
@@ -23,7 +23,7 @@ export async function action({ request }: Route.ActionArgs) {
   await requirePageAllowed(request, "webhooks");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
-  if (!(await isOwnerOrSuper(request, propertyId))) return { error: "Only an owner or manager can manage webhooks." };
+  if (!(await canManageProperty(request, propertyId))) return { error: "Only an owner or manager can manage webhooks." };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
 

@@ -4,7 +4,7 @@ import type { Route } from "./+types/portal";
 import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings, savePortalSettings } from "~/lib/overrides.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -13,14 +13,21 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  return { configured: true as const, settings: await getSettings(propertyId) };
+  return {
+    configured: true as const,
+    settings: await getSettings(propertyId),
+    canOwn: await isOwnerOrSuper(request, propertyId),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
-  await savePortalSettings(propertyId, await request.formData());
+  const canOwn = await isOwnerOrSuper(request, propertyId);
+  // Auto-refund is owner-only. Cancel/modify windows and copy stay teammate-ok;
+  // a teammate POST that includes autoRefund must not persist that field.
+  await savePortalSettings(propertyId, await request.formData(), { persistAutoRefund: canOwn });
   return { ok: true };
 }
 
@@ -89,6 +96,7 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
   }
 
   const s = loaderData.settings;
+  const canOwn = loaderData.canOwn;
   const checkbox =
     "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
 
@@ -131,12 +139,17 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
           </span>
         </label>
         <label className="flex items-start gap-2.5 text-[14px] font-semibold">
-          <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
+          {canOwn ? (
+            <input type="checkbox" name="autoRefund" defaultChecked={s.autoRefund} className={checkbox} />
+          ) : (
+            <input type="checkbox" checked={Boolean(s.autoRefund)} disabled className={checkbox} />
+          )}
           <span>
             {t("poAutoRefund")}
             <span className="mt-0.5 block text-[12px] font-normal text-muted">
               {t("poAutoRefundHint")}
             </span>
+            {!canOwn && <span className="mt-0.5 block text-[12px] font-normal text-faint">{t("ownerOnlyHint")}</span>}
           </span>
         </label>
 

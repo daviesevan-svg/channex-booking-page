@@ -2,7 +2,7 @@ import { redirect } from "react-router";
 
 import type { Route } from "./+types/payments.callback";
 import { consumeStripeConnectState, requireAdmin } from "~/lib/auth.server";
-import { canAccess } from "~/lib/properties.server";
+import { canAccess, isOwnerOrSuper } from "~/lib/properties.server";
 import { savePaymentSettings } from "~/lib/overrides.server";
 import { oauthToken, retrieveAccount } from "~/lib/stripe.server";
 
@@ -35,6 +35,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!(await canAccess(request, propertyId))) {
     console.log(`[stripe] oauth state property not accessible: ${propertyId}`);
     return paymentsRedirect("mismatch", cookie);
+  }
+  // Connect is owner/superadmin only — a teammate session must not persist
+  // a Stripe account even if they present a leftover nonce.
+  if (!(await isOwnerOrSuper(request, propertyId))) {
+    console.log(`[stripe] oauth state property not owned: ${propertyId}`);
+    return paymentsRedirect("denied", cookie);
   }
 
   try {

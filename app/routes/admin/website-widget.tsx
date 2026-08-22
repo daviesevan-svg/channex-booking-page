@@ -5,7 +5,7 @@ import type { Route } from "./+types/website-widget";
 import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId, getProperty } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, saveThemeTokens } from "~/lib/overrides.server";
 import { guestHostForProperty } from "~/lib/partners.server";
@@ -15,7 +15,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const canManage = await isOwnerOrSuper(request, propertyId);
+  const canManage = await canManageProperty(request, propertyId);
   const settings = await getSettings(propertyId);
   // Prefer the shortcode in the snippet/links when one is set (it resolves to the
   // same property); fall back to the id.
@@ -50,7 +50,7 @@ export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
-  if (!(await isOwnerOrSuper(request, propertyId))) {
+  if (!(await canManageProperty(request, propertyId))) {
     return { error: "Only an owner or manager can theme the widget." };
   }
   const form = await request.formData();

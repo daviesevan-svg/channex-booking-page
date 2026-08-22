@@ -10,6 +10,14 @@ import { getUser, isSuperadmin } from "./users.server";
 import { areaForPathname, type MemberArea } from "./member-areas";
 import { releaseDomain } from "./domains.server";
 import { deleteCustomHostname } from "./custom-hostnames.server";
+import {
+  canManageProperty as actorCanManageProperty,
+  canOwnProperty,
+  type AccessActor,
+} from "./property-access";
+
+export { canOwnProperty, canManageProperty as actorCanManageProperty } from "./property-access";
+export type { AccessActor, AccessProperty } from "./property-access";
 
 export interface PropertyRef {
   id: string;
@@ -248,14 +256,30 @@ export async function setPropertySlug(
   return { ok: true };
 }
 
-/** Whether the user may MANAGE a property — manage its team, rename, toggle
- *  public, delete, transfer. Owner or superadmin only (teammates can edit
- *  content but not destroy/transfer/re-team the property). */
-export async function isOwnerOrSuper(request: Request, id: string): Promise<boolean> {
+/** Signed-in actor for the pure access helpers. Null when there is no session. */
+export async function accessActor(request: Request): Promise<AccessActor | null> {
   const email = await getAdminEmail(request);
-  if (!email) return false;
-  if (await isSuperadmin(email)) return true;
-  return (await getProperty(id))?.owner === email;
+  if (!email) return null;
+  const [superadmin, user] = await Promise.all([isSuperadmin(email), getUser(email)]);
+  return { email, role: user?.role, partnerId: user?.partnerId, superadmin };
+}
+
+/** Whether the user may OWN a property — money, listing, slug, live booking.
+ *  Owner email or superadmin only. partner_admin is not included unless they
+ *  personally own the hotel. */
+export async function isOwnerOrSuper(request: Request, id: string): Promise<boolean> {
+  const actor = await accessActor(request);
+  if (!actor) return false;
+  return canOwnProperty(actor, await getProperty(id));
+}
+
+/** Whether the user may operate owner-class ops on a hotel they do not
+ *  personally own: team, API keys, webhooks, refunds, Google save, widget
+ *  theme. Owner, partner_admin of that hotel's partner, or superadmin. */
+export async function canManageProperty(request: Request, id: string): Promise<boolean> {
+  const actor = await accessActor(request);
+  if (!actor) return false;
+  return actorCanManageProperty(actor, await getProperty(id));
 }
 
 /** Adds a teammate email to a property's team (dedup, lowercase; skips the owner). */

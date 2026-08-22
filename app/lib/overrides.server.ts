@@ -20,6 +20,7 @@ import {
 } from "./content";
 import { withEmailDefaults } from "./email-defaults.server";
 import { vivaConfigured, type VivaConfig } from "./viva.server";
+import { ownerOnlyValue } from "./property-access";
 
 // Localized content is stored per language: KV value is { [lang]: data }.
 // Guests read their language merged over the default language; the admin edits
@@ -345,8 +346,13 @@ export async function saveBrand(pid: string, form: FormData): Promise<SiteSettin
   return next;
 }
 
-export async function saveSettings(pid: string, form: FormData): Promise<SiteSettings> {
+export async function saveSettings(
+  pid: string,
+  form: FormData,
+  opts?: { persistLive?: boolean },
+): Promise<SiteSettings> {
   const existing = await getSettings(pid);
+  const persistLive = opts?.persistLive !== false;
   const next: SiteSettings = {
     ...existing,
     currency: cleanCurrency(form.get("currency"), existing.currency),
@@ -354,7 +360,7 @@ export async function saveSettings(pid: string, form: FormData): Promise<SiteSet
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),
     languages: form.getAll("languages").map(String),
-    liveBooking: form.get("liveBooking") === "on",
+    liveBooking: ownerOnlyValue(existing.liveBooking, form.get("liveBooking") === "on", persistLive),
     singleUnit: form.get("singleUnit") === "on",
     timezone: cleanTimezone(form.get("timezone")),
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
@@ -641,8 +647,13 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
   return next;
 }
 
-export async function savePortalSettings(pid: string, form: FormData): Promise<SiteSettings> {
+export async function savePortalSettings(
+  pid: string,
+  form: FormData,
+  opts?: { persistAutoRefund?: boolean },
+): Promise<SiteSettings> {
   const existing = await getSettings(pid);
+  const persistAutoRefund = opts?.persistAutoRefund !== false;
   const unit = (k: string) => {
     const u = String(form.get(k) ?? "");
     return isDeadlineUnit(u) ? u : undefined;
@@ -651,7 +662,7 @@ export async function savePortalSettings(pid: string, form: FormData): Promise<S
     ...existing,
     allowCancel: form.get("allowCancel") === "on",
     allowModify: form.get("allowModify") === "on",
-    autoRefund: form.get("autoRefund") === "on",
+    autoRefund: ownerOnlyValue(existing.autoRefund, form.get("autoRefund") === "on", persistAutoRefund),
     // 0 is a REAL value here, not "unset": with the 18:00 anchor it means free
     // cancellation until 6pm on the day of arrival. posInt would silently turn it
     // into "no deadline at all", which is a refund promise nobody made.

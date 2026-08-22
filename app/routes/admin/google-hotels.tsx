@@ -6,7 +6,7 @@ import { useAdminT } from "~/lib/admin-i18n";
 import type { GoogleMatchStatus } from "~/lib/google-ari/status.server";
 import { requireAdmin } from "~/lib/auth.server";
 import { requirePageAllowed } from "~/lib/page-access.server";
-import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
 import { isSuperadmin } from "~/lib/users.server";
 import { getConfig } from "~/lib/config.server";
 import { getGoogleAriSync, getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
@@ -28,7 +28,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requirePageAllowed(request, "google-hotels");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const [canManage, superadmin] = await Promise.all([isOwnerOrSuper(request, propertyId), isSuperadmin(email)]);
+  const [canManage, superadmin] = await Promise.all([canManageProperty(request, propertyId), isSuperadmin(email)]);
   const matchConfigured = Boolean(
     getConfig().googleTravelPartnerAccountId &&
       getConfig().googleTravelPartnerSaEmail &&
@@ -87,7 +87,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
-  if (!(await isOwnerOrSuper(request, propertyId))) {
+  if (!(await canManageProperty(request, propertyId))) {
     return { error: "Only an owner or manager can manage Google Hotels." };
   }
 
