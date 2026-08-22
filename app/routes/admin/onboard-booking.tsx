@@ -13,7 +13,7 @@ import {
   type BookingImportRate,
 } from "~/lib/booking-import.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
-import { isAllowedImportImageUrl } from "~/lib/images.server";
+import { isAllowedImportImageUrl } from "~/lib/image-import-url";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 
 export async function loader({ request }: Route.LoaderArgs) {

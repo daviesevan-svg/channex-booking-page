@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 
 import { getImagesBucket } from "./config.server";
+import { isAllowedImportImageParsed } from "./image-import-url";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 
@@ -76,28 +77,6 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
     httpMetadata: { contentType: file.type },
   });
   return `/images/${key}`;
-}
-
-/** Booking.com CDN only. The onboarding wizard used to filter this at the
- *  caller; the fetch itself must refuse anything else so a future caller
- *  cannot turn import into an SSRF proxy. Matches `*.bstatic.com`. */
-const BSTATIC_HOST = /(^|\.)bstatic\.com$/i;
-
-/** True when `url` is an https Booking.com CDN image URL (no credentials,
- *  no odd ports). Shared with the onboard form filter so the two cannot drift. */
-export function isAllowedImportImageUrl(url: string): boolean {
-  try {
-    return isAllowedImportImageParsed(new URL(url));
-  } catch {
-    return false;
-  }
-}
-
-function isAllowedImportImageParsed(u: URL): boolean {
-  if (u.protocol !== "https:") return false;
-  if (u.username || u.password) return false;
-  if (u.port && u.port !== "443") return false;
-  return BSTATIC_HOST.test(u.hostname);
 }
 
 /** Fetch one hop at a time so a 3xx cannot land on an internal host. Each
