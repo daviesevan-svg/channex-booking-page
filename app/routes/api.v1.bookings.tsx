@@ -33,6 +33,7 @@ import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { activeGateway } from "~/lib/payments.server";
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { claimWindow, rateLimit } from "~/lib/rate-limit.server";
+import { apiBookingChargePath } from "~/lib/api-booking-charge";
 import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { toStripeMinor } from "~/lib/money";
 
@@ -337,12 +338,18 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json(bodyOut, { status });
   };
 
-  // A paid rate with no way to charge must not book unpaid.
-  if (due > 0 && !gateway) {
+  // Only take a real payment when this booking will be pushed live. Test keys
+  // (and properties with live bookings off) finalize as simulated with no
+  // Channex push — charging would take money for a stay that isn't created.
+  // Same rule as the hosted checkout (`goesToGateway`). See api-booking-charge.ts.
+  const chargePath = apiBookingChargePath({ live, due, gatewayKind: gateway?.kind });
+
+  // A paid live rate with no way to charge must not book unpaid.
+  if (chargePath === "not_configured") {
     return apiError(422, "payment_not_configured", "This rate requires online payment, but card payments aren't set up for this property.");
   }
 
-  if (gateway?.kind === "viva" && due > 0) {
+  if (chargePath === "viva" && gateway?.kind === "viva") {
     await stashPending(reference, pending);
     let url: string;
     try {
@@ -375,7 +382,7 @@ export async function action({ request }: Route.ActionArgs) {
     });
   }
 
-  if (gateway?.kind === "stripe") {
+  if (chargePath === "stripe" && gateway?.kind === "stripe") {
     const account = gateway.account;
     await stashPending(reference, pending);
     const params = buildCheckoutSessionParams({
