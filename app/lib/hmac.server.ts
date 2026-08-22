@@ -1,5 +1,5 @@
 // Shared Web Crypto HMAC-SHA256 helpers, used for Stripe webhook verification
-// (inbound) and Roompanda webhook signing (outbound).
+// (inbound), Roompanda webhook signing (outbound), and magic-link tokens.
 
 /** HMAC-SHA256(payload, secret) as a lowercase hex string. */
 export async function hmacSha256Hex(secret: string, payload: string): Promise<string> {

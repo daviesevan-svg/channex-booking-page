@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 
 import { getImagesBucket } from "./config.server";
+import { isAllowedImportImageParsed } from "./image-import-url";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 
@@ -78,18 +79,40 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
   return `/images/${key}`;
 }
 
+/** Fetch one hop at a time so a 3xx cannot land on an internal host. Each
+ *  Location is re-checked against the same allowlist (webhooks do this too). */
+async function fetchAllowlistedImage(start: URL): Promise<Response> {
+  let current = start;
+  for (let hop = 0; hop < 3; hop++) {
+    if (!isAllowedImportImageParsed(current)) {
+      throw new Error("Only Booking.com CDN image URLs can be imported.");
+    }
+    const res = await fetch(current.toString(), { redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (!loc) throw new Error(`Image fetch failed (${res.status}).`);
+      current = new URL(loc, current);
+      continue;
+    }
+    return res;
+  }
+  throw new Error("Image fetch failed (too many redirects).");
+}
+
 /** Fetch an image by URL (the Booking.com onboarding import) and store it in R2
- *  like an upload. Same guards as uploadImage — type, size, uuid key — plus one
- *  more: only https URLs, so a crafted payload can't make the Worker fetch
- *  internal endpoints. Content type comes from the response, extension from the
- *  type (CDN URLs carry query-string tokens that would pollute a name-derived
- *  extension). */
+ *  like an upload. Same guards as uploadImage — type, size, uuid key — plus a
+ *  host allowlist inside this function (https + `*.bstatic.com`) so a crafted
+ *  payload can't make the Worker fetch internal endpoints. Content type comes
+ *  from the response, extension from the type (CDN URLs carry query-string
+ *  tokens that would pollute a name-derived extension). */
 export async function importImageFromUrl(prefix: string, url: string): Promise<string> {
   const parsed = new URL(url);
-  if (parsed.protocol !== "https:") throw new Error("Only https image URLs can be imported.");
+  if (!isAllowedImportImageParsed(parsed)) {
+    throw new Error("Only Booking.com CDN image URLs can be imported.");
+  }
   const bucket = getImagesBucket();
   if (!bucket) throw new Error("Image storage (R2) is not configured.");
-  const res = await fetch(parsed.toString());
+  const res = await fetchAllowlistedImage(parsed);
   if (!res.ok) throw new Error(`Image fetch failed (${res.status}).`);
   const type = res.headers.get("content-type")?.split(";")[0].trim() ?? "";
   if (!type.startsWith("image/")) throw new Error("URL did not return an image.");
