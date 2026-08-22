@@ -2,13 +2,17 @@
  *  the response — unknown and allowed emails both get the check-email success
  *  so the form cannot be used to enumerate operators. */
 
-export type AdminLoginPublicResult = { ok: true } | { error: string };
+/** Optional fields (not a discriminant union) so the login page can keep
+ *  reading `actionData?.ok` / `actionData?.error` the way it already does. */
+export type AdminLoginPublicResult = { ok?: true; error?: string };
 
-export const ADMIN_LOGIN_CHECK_EMAIL = { ok: true } as const;
-export const ADMIN_LOGIN_MISSING_EMAIL = { error: "Enter your email address." } as const;
-export const ADMIN_LOGIN_THROTTLED = {
+export const ADMIN_LOGIN_CHECK_EMAIL: AdminLoginPublicResult = { ok: true };
+export const ADMIN_LOGIN_MISSING_EMAIL: AdminLoginPublicResult = {
+  error: "Enter your email address.",
+};
+export const ADMIN_LOGIN_THROTTLED: AdminLoginPublicResult = {
   error: "Too many sign-in attempts. Try again in a few minutes.",
-} as const;
+};
 
 /** 3 attempts / 15 minutes, per IP and per email. Same blunt KV limiter as
  *  web checkout — fail-open and racy is acceptable here. */
