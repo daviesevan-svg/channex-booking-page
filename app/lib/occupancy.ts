@@ -60,9 +60,16 @@ export function ratePlansForParty(room: RoomWithRates, party: number): RatePlan[
   });
 }
 
+/** Product ceiling for URL-supplied adults. Guest UI tops out at 12; this is
+ *  the server clamp so a crafted `?adults=` can't self-DoS or mint absurd
+ *  Stripe amounts. Underpay is already blocked by cartCovers + capacity.
+ *  Clamp — do not 500. Children ages are left uncapped: no matching product
+ *  ceiling on this reader (guest-selector MAX_CHILDREN is UI-only). */
+const MAX_ADULTS = 25;
+
 /** Read occupancy from URL search params (adults + comma-separated childrenAge). */
 export function readOccupancy(sp: URLSearchParams): Occupancy {
-  const adults = Math.max(1, Number(sp.get("adults")) || 2);
+  const adults = Math.min(MAX_ADULTS, Math.max(1, Number(sp.get("adults")) || 2));
   const raw = sp.get("childrenAge") || "";
   const childrenAge = raw
     .split(",")

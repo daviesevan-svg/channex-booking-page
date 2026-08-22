@@ -13,6 +13,7 @@ import {
   type BookingImportRate,
 } from "~/lib/booking-import.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
+import { isAllowedImportImageUrl } from "~/lib/image-import-url";
 import { isScrapflyConfigured } from "~/lib/scrapfly.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -20,18 +21,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { configured: isScrapflyConfigured() };
 }
 
-/** Only Booking's own CDN may be fetched during the photo import. The payload
- *  round-trips through the form, so URLs in it are caller-controlled — this
- *  filter (plus the https guard in importImageFromUrl) keeps a tampered form
- *  from turning the import into a proxy. */
+/** Drop non-CDN URLs before the import so a tampered review form doesn't even
+ *  attempt the fetch. The authoritative allowlist lives in importImageFromUrl
+ *  (`isAllowedImportImageUrl`) — this is the same check, not a second policy. */
 function onlyBookingCdn(urls: string[]): string[] {
-  return urls.filter((u) => {
-    try {
-      return /(^|\.)bstatic\.com$/.test(new URL(u).hostname);
-    } catch {
-      return false;
-    }
-  });
+  return urls.filter(isAllowedImportImageUrl);
 }
 
 /** "Free cancellation up to 2 days before arrival" / "Non-refundable" — the
