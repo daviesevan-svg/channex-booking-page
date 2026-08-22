@@ -31,6 +31,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm test
+
       # Full production build — also surfaces client/server bundle breaks
       # (e.g. a server-only import leaking into the client bundle).
       - name: Build

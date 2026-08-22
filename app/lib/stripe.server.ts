@@ -143,6 +143,10 @@ export interface CheckoutSession {
   mode?: string;
   amount_total?: number;
   currency?: string;
+  /** Booking/voucher reference we stamped at session create. */
+  client_reference_id?: string | null;
+  /** Stamped at session create: `{ reference, pid }` and voucher `{ kind }`. */
+  metadata?: Record<string, string> | null;
   payment_intent?: string | { id: string };
   setup_intent?: string | { id: string; payment_method?: string | StripePaymentMethod };
   customer?: string | { id: string };

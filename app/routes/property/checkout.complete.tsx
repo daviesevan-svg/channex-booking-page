@@ -3,9 +3,9 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/checkout.complete";
 import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
-import { finalizeBooking, paymentFromSession } from "~/lib/booking-finalize.server";
+import { finalizeFromStripeSession } from "~/lib/booking-finalize.server";
+import { SessionBindError } from "~/lib/stripe-session-bind";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
-import { retrieveCheckoutSession } from "~/lib/stripe.server";
 import { basePath, homePath } from "~/lib/base";
 
 // Stripe sends the guest here after paying. We retrieve the session to confirm
@@ -49,17 +49,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const pending = await getPending(ref);
   if (!pending) throw redirect(homePath(channel)); // expired / unknown
 
-  let payment;
+  let record;
   try {
-    const session = await retrieveCheckoutSession(pending.account, sessionId);
-    payment = paymentFromSession(pending.account, sessionId, session);
-  } catch {
+    record = await finalizeFromStripeSession(ref, sessionId);
+  } catch (e) {
+    // Unbound / mismatched session: fail closed (no inventory, no Channex).
+    // Retrieve failures (guest backed out, Stripe blip) land here too.
+    if (e instanceof SessionBindError) console.error(`[checkout.complete] ${e.message}`);
     throw redirect(checkoutUrl);
   }
-
-  if (!payment) throw redirect(checkoutUrl); // not completed (guest backed out)
-  const record = await finalizeBooking(pending, payment, pending.origin);
-  await deletePending(ref);
+  if (!record) throw redirect(checkoutUrl); // not completed (guest backed out)
   throw redirect(outcomeUrl(record));
 }
 

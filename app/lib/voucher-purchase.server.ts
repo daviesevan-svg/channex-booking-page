@@ -4,8 +4,15 @@
 import type { VoucherRecord } from "./vouchers";
 import { claimVoucher } from "./vouchers.server";
 import { deletePendingVoucher, getPendingVoucher, type PendingVoucher } from "./pending-vouchers.server";
-import { paymentFromSession } from "./booking-finalize.server";
+import { paymentFromSession, refundRejectedStripeSession } from "./booking-finalize.server";
 import { retrieveCheckoutSession } from "./stripe.server";
+import {
+  SessionBindError,
+  assertCollectedPayment,
+  assertSessionMatchesPending,
+  shouldRefundMismatchedSession,
+  voucherSessionTarget,
+} from "./stripe-session-bind";
 import { getOverrides, getSettings } from "./overrides.server";
 import { sendEmail, senderFor } from "./email.server";
 import { accentHex, emailBrand, renderSimpleEmail } from "./email-render.server";
@@ -21,6 +28,14 @@ export async function finalizeVoucher(
   pending: PendingVoucher,
   payment: PaymentInfo | undefined,
 ): Promise<VoucherRecord> {
+  if (payment) {
+    const currency = (await getSettings(pending.pid)).currency || "GBP";
+    assertCollectedPayment(
+      payment,
+      { mode: "payment", amount: pending.record.product.price, currency },
+      pending.record.code,
+    );
+  }
   const record: VoucherRecord = {
     ...pending.record,
     payment: payment
@@ -86,6 +101,20 @@ export async function finalizeVoucherFromStripeSession(ref: string, sessionId: s
   const pending = await getPendingVoucher(ref);
   if (!pending) return null;
   const session = await retrieveCheckoutSession(pending.account, sessionId);
+  const currency = (await getSettings(pending.pid)).currency || "GBP";
+  try {
+    assertSessionMatchesPending(session, voucherSessionTarget(pending, ref, currency));
+  } catch (e) {
+    if (e instanceof SessionBindError) {
+      if (shouldRefundMismatchedSession(e.reason)) {
+        await refundRejectedStripeSession(pending.account, session, ref);
+        await deletePendingVoucher(ref);
+      }
+      console.error(`[vouchers] reject ${ref}: ${e.message}`);
+      throw e;
+    }
+    throw e;
+  }
   const payment = paymentFromSession(pending.account, sessionId, session);
   if (!payment || payment.mode !== "payment") return null;
   const record = await finalizeVoucher(pending, payment);

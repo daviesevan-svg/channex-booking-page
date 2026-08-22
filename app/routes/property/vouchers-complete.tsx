@@ -7,9 +7,8 @@ import type { Route } from "./+types/vouchers-complete";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { deletePendingVoucher, getPendingVoucher } from "~/lib/pending-vouchers.server";
 import { getVoucherByCode } from "~/lib/vouchers.server";
-import { finalizeVoucher } from "~/lib/voucher-purchase.server";
-import { paymentFromSession } from "~/lib/booking-finalize.server";
-import { retrieveCheckoutSession } from "~/lib/stripe.server";
+import { finalizeVoucherFromStripeSession } from "~/lib/voucher-purchase.server";
+import { SessionBindError } from "~/lib/stripe-session-bind";
 import { basePath } from "~/lib/base";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -33,20 +32,14 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(voucherUrl);
   }
 
-  let payment;
+  let issued;
   try {
-    const session = await retrieveCheckoutSession(pending.account, sessionId);
-    payment = paymentFromSession(pending.account, sessionId, session);
-  } catch {
+    issued = await finalizeVoucherFromStripeSession(ref, sessionId);
+  } catch (e) {
+    if (e instanceof SessionBindError) console.error(`[vouchers.complete] ${e.message}`);
     throw redirect(`${basePath(channel)}/vouchers/${pending.record.productId}`);
   }
-  if (!payment || payment.mode !== "payment") {
-    // Not completed (buyer backed out) — back to the product page.
-    throw redirect(`${basePath(channel)}/vouchers/${pending.record.productId}`);
-  }
-
-  await finalizeVoucher(pending, payment);
-  await deletePendingVoucher(ref);
+  if (!issued) throw redirect(`${basePath(channel)}/vouchers/${pending.record.productId}`);
   throw redirect(voucherUrl);
 }
 
