@@ -4,7 +4,7 @@ import type { Route } from "./+types/payments";
 import { adminMeta } from "~/lib/admin-meta";
 import { SavedPill } from "~/components/admin-page-header";
 import { requireAdmin, stampStripeConnectState } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, getVivaConfig, savePaymentSettings, saveVivaConfig } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
@@ -67,6 +67,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     },
     currency,
     vivaCurrencyOk: VIVA_CURRENCIES.has(currency),
+    canOwn: await isOwnerOrSuper(request, propertyId),
   };
 }
 
@@ -76,6 +77,16 @@ export async function action({ request }: Route.ActionArgs) {
   if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  if (
+    intent === "connect" ||
+    intent === "disconnect" ||
+    intent === "viva-connect" ||
+    intent === "viva-disconnect"
+  ) {
+    if (!(await isOwnerOrSuper(request, propertyId))) {
+      return { error: "Only an owner or manager can connect or disconnect payments." };
+    }
+  }
 
   if (intent === "disconnect") {
     const settings = await getSettings(propertyId);
@@ -174,7 +185,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk } = loaderData;
+  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, canOwn } = loaderData;
   const connected = Boolean(accountId);
   const vivaConnected = Boolean(viva);
 
@@ -285,6 +296,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
             </p>
           )}
 
+          {canOwn && (
           <div className="mt-5">
             {connected ? (
               <Form method="post">
@@ -311,6 +323,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </Form>
             )}
           </div>
+          )}
         </div>
 
         {/* ---- Viva ---- */}
@@ -356,6 +369,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
 
               <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
 
+              {canOwn && (
               <Form method="post" className="mt-5">
                 <input type="hidden" name="intent" value="viva-disconnect" />
                 <button
@@ -366,8 +380,9 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                   {t("payDisconnect")}
                 </button>
               </Form>
+              )}
             </>
-          ) : (
+          ) : canOwn ? (
             <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
               <input type="hidden" name="intent" value="viva-connect" />
               <p className="text-[12px] leading-[1.5] text-muted">{t("payVivaSetupHelp")}</p>
@@ -391,7 +406,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 {connected && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
               </div>
             </Form>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

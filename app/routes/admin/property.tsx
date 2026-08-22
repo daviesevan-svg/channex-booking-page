@@ -8,7 +8,7 @@ import { getConfig } from "~/lib/config.server";
 import { Field, FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getProperty, renameProperty, setPropertyPublic } from "~/lib/properties.server";
+import { currentPropertyId, getProperty, isOwnerOrSuper, renameProperty, setPropertyPublic } from "~/lib/properties.server";
 import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_ENUMS, VR_AMENITY_KEYS } from "~/lib/content";
 import { getOverridesRaw, getSettings, patchSettings, savePropertyMeta, saveOverrides } from "~/lib/overrides.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
@@ -46,6 +46,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     googleReadiness,
     checklist,
     isPublic: Boolean(property?.public),
+    canOwn: await isOwnerOrSuper(request, propertyId),
     host: new URL(request.url).host,
     // Enables the "Find coordinates" geocode button (unset = button hidden).
     mapKey: getConfig().googleMapKey ?? null,
@@ -135,8 +136,10 @@ export async function action({ request }: Route.ActionArgs) {
   const hotelName = String(form.get("hotelName") ?? "").trim();
   if (lang === DEFAULT_LANG && hotelName) await renameProperty(propertyId, hotelName);
   // Public listing (registry flag): shown on the home directory + required for
-  // the Google feed. Mirrors the toggle on the Properties page.
-  await setPropertyPublic(propertyId, form.get("public") === "on");
+  // the Google feed. Same owner-only gate as the Properties list toggle.
+  if (await isOwnerOrSuper(request, propertyId)) {
+    await setPropertyPublic(propertyId, form.get("public") === "on");
+  }
   return { ok: true };
 }
 
@@ -164,7 +167,7 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { overrides, settings, googleReadiness, isPublic, host, lang, mapKey } = loaderData;
+  const { overrides, settings, googleReadiness, isPublic, canOwn, host, lang, mapKey } = loaderData;
 
   // "Find coordinates" — geocodes the address fields (reading their CURRENT
   // values from the form, unsaved edits included) and fills lat/long in place.
@@ -310,12 +313,17 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
         {/* Public listing (registry flag, global — not per-language). Same
             control as the Properties page, surfaced here where it's edited. */}
         <label className="flex items-start gap-2.5 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
-          <input type="checkbox" name="public" defaultChecked={isPublic} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+          {canOwn ? (
+            <input type="checkbox" name="public" defaultChecked={isPublic} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+          ) : (
+            <input type="checkbox" checked={isPublic} disabled className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+          )}
           <span className="text-[13px]">
             <span className="font-semibold text-ink">{t("propListedPublicly")}</span>
             <span className="mt-0.5 block text-[12px] text-muted">
               {t("propListedPubliclyHint")}
             </span>
+            {!canOwn && <span className="mt-0.5 block text-[12px] text-faint">{t("ownerOnlyHint")}</span>}
           </span>
         </label>
 

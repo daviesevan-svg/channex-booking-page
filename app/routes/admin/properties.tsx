@@ -17,7 +17,7 @@ import {
   setPropertyPublic,
 } from "~/lib/properties.server";
 import { cloneProperty } from "~/lib/clone-property.server";
-import { getUsers, isSuperadmin } from "~/lib/users.server";
+import { getUser, getUsers, isSuperadmin } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
@@ -42,8 +42,11 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "add") {
     const name = String(form.get("name") || "").trim();
     const id = String(form.get("id") || "").trim() || crypto.randomUUID();
-    // New properties are owned by the user who created them.
-    await addProperty(id, name, email);
+    // New properties are owned by the user who created them. Stamp partnerId
+    // from the user (same as Channex / Booking.com onboard) so a partner_admin
+    // hotel is not left as an unpartnered direct Roompanda property.
+    const partnerId = (await getUser(email))?.partnerId;
+    await addProperty(id, name, email, partnerId);
     // Switch to the new property so editing continues there.
     return redirect("/admin", { headers: { "Set-Cookie": await setSessionProperty(request, id) } });
   }

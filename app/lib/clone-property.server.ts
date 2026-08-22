@@ -4,6 +4,7 @@
 // path to the "one single-unit property per Google VR listing" model.
 import { getConfigKV } from "./config.server";
 import { addProperty, getProperty } from "./properties.server";
+import { getUser } from "./users.server";
 import type { SiteSettings } from "./content";
 
 /** Content-like stores that make sense on a copy. Room/rate ids are kept as-is
@@ -61,6 +62,9 @@ export async function cloneProperty(sourceId: string, owner?: string): Promise<s
   }
 
   // Registry entry: fresh id, "(copy)" name, same owner, NOT public, no slug.
-  await addProperty(id, `${source.name} (copy)`, owner ?? source.owner);
+  // Stamp partnerId from the creating user (same as Channex / Booking.com
+  // onboard) so a partner_admin clone is not left as an unpartnered hotel.
+  const partnerId = (owner ? (await getUser(owner))?.partnerId : undefined) ?? source.partnerId;
+  await addProperty(id, `${source.name} (copy)`, owner ?? source.owner, partnerId);
   return id;
 }

@@ -7,28 +7,32 @@ import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { sendTeamInviteEmail } from "~/lib/email.server";
 import {
+  accessActor,
+  actorCanManageProperty,
   addPropertyMember,
   currentPropertyId,
   getProperties,
   getProperty,
-  isOwnerOrSuper,
   removePropertyMember,
   setMemberHiddenAreas,
 } from "~/lib/properties.server";
 import { isMemberArea, MEMBER_AREAS, type MemberArea } from "~/lib/member-areas";
-import { getUser, isSuperadmin, setUserPartner, upsertUser } from "~/lib/users.server";
+import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const email = await requireAdmin(request);
+  await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
-  // Only the owner (or a superadmin) manages a property's team.
-  if (!propertyId || !(await isOwnerOrSuper(request, propertyId))) throw redirect("/admin");
-  const [properties, su] = await Promise.all([getProperties(), isSuperadmin(email)]);
+  const actor = await accessActor(request);
+  // Owner, partner_admin of this hotel's partner, or superadmin.
+  if (!propertyId || !actor || !actorCanManageProperty(actor, await getProperty(propertyId))) {
+    throw redirect("/admin");
+  }
+  const properties = await getProperties();
   const property = properties.find((p) => p.id === propertyId);
-  // Every property this user could invite to — their own (or all, for a
-  // superadmin). Membership is per property; the invite form offers these
-  // as checkboxes so one invite can cover several.
-  const manageable = properties.filter((p) => su || p.owner === email);
+  // Every property this user could invite to — their own, their partner's
+  // hotels (partner_admin), or all (superadmin). Membership is per property;
+  // the invite form offers these as checkboxes so one invite can cover several.
+  const manageable = properties.filter((p) => actorCanManageProperty(actor, p));
   const members = property?.members ?? [];
   return {
     propertyId,
@@ -51,7 +55,10 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
   const inviter = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
-  if (!propertyId || !(await isOwnerOrSuper(request, propertyId))) throw redirect("/admin");
+  const actor = await accessActor(request);
+  if (!propertyId || !actor || !actorCanManageProperty(actor, await getProperty(propertyId))) {
+    throw redirect("/admin");
+  }
   const form = await request.formData();
   const intent = String(form.get("intent"));
   const email = String(form.get("email") || "").trim().toLowerCase();
@@ -59,11 +66,11 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "invite" && email) {
     // Add to every ticked property the inviter can manage. No boxes rendered
     // (single-property owner) or none ticked = just the current property; ids
-    // are re-checked against ownership so a forged POST can't reach further.
-    const [all, su] = await Promise.all([getProperties(), isSuperadmin(inviter)]);
+    // are re-checked so a forged POST can't reach further.
+    const all = await getProperties();
     const requested = form.getAll("propertyIds").map(String);
     const targets = all
-      .filter((p) => (su || p.owner === inviter) && requested.includes(p.id))
+      .filter((p) => actorCanManageProperty(actor, p) && requested.includes(p.id))
       .map((p) => p.id);
     if (!targets.length) targets.push(propertyId);
     for (const id of targets) await addPropertyMember(id, email);

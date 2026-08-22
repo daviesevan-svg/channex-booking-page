@@ -11,7 +11,7 @@ import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { fmtDate } from "~/lib/dates";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId, getProperty } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getBooking } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
@@ -33,7 +33,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const v = await getVoucherByCode(propertyId, normalizeVoucherCode(params.code));
   if (!v) throw redirect("/admin/vouchers?tab=sold");
   const [canManage, settings, prop] = await Promise.all([
-    isOwnerOrSuper(request, propertyId),
+    canManageProperty(request, propertyId),
     getSettings(propertyId),
     getProperty(propertyId),
   ]);
@@ -122,7 +122,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   const form = await request.formData();
   const intent = form.get("intent");
   const ownerGate = async () =>
-    (await isOwnerOrSuper(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
+    (await canManageProperty(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
 
   if (intent === "resend") {
     const prop = await getProperty(propertyId);

@@ -5,7 +5,7 @@ import type { Route } from "./+types/general";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
-import { currentPropertyId, getProperty, setPropertySlug } from "~/lib/properties.server";
+import { currentPropertyId, getProperty, isOwnerOrSuper, setPropertySlug } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { getConfig } from "~/lib/config.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
@@ -67,6 +67,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     host: guestHost ?? new URL(request.url).host,
     envLive: getConfig().allowLiveBooking,
     timezones: supportedTimezones(),
+    canOwn: await isOwnerOrSuper(request, propertyId),
   };
 }
 
@@ -75,9 +76,14 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   const form = await request.formData();
-  await saveSettings(propertyId, form);
+  const canOwn = await isOwnerOrSuper(request, propertyId);
+  // Live booking is owner-only. Teammates still save the rest of General;
+  // a POST that includes liveBooking must not persist that field.
+  await saveSettings(propertyId, form, { persistLive: canOwn });
   // The shortcode lives on the property registry (globally unique), not the
   // per-property settings blob — save it separately and surface any clash.
+  // Slug is the same owner-only identity gate as live.
+  if (!canOwn) return { ok: true as const };
   const slugRes = await setPropertySlug(propertyId, String(form.get("slug") ?? ""));
   if ("error" in slugRes) return { ok: true as const, slugError: slugRes.error };
   return { ok: true as const };
@@ -105,7 +111,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { settings, slug, host, envLive, timezones, pricingMode } = loaderData;
+  const { settings, slug, host, envLive, timezones, pricingMode, canOwn } = loaderData;
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
   // "1".."7" = require that many days before arrival.
@@ -137,16 +143,23 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             <span className="rounded-[10px] bg-chip px-3 py-[11px] font-mono text-[13px] text-secondary">
               {host}/
             </span>
-            <input
-              name="slug"
-              defaultValue={slug}
-              placeholder="yourhotel"
-              autoCapitalize="off"
-              autoCorrect="off"
-              spellCheck={false}
-              className="min-w-[200px] flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] font-mono text-[15px] text-ink outline-none focus:border-accent"
-            />
+            {canOwn ? (
+              <input
+                name="slug"
+                defaultValue={slug}
+                placeholder="yourhotel"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className="min-w-[200px] flex-1 rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] font-mono text-[15px] text-ink outline-none focus:border-accent"
+              />
+            ) : (
+              <span className="min-w-[200px] flex-1 rounded-[10px] border border-line-alt bg-chip px-3.5 py-[11px] font-mono text-[15px] text-secondary">
+                {slug || "—"}
+              </span>
+            )}
           </div>
+          {!canOwn && <p className="mt-2 text-[12px] text-faint">{t("ownerOnlyHint")}</p>}
           {actionData?.slugError ? (
             <p className="mt-2 text-[13px] text-red-600">{actionData.slugError}</p>
           ) : (
@@ -345,22 +358,27 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
             {t("genBookingModeIn")} <strong>{t("genTestMode")}</strong> {t("genBookingModeHintMid")}{" "}
             <strong>{t("genLiveMode")}</strong> {t("genBookingModeHintEnd")}
           </p>
-          <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
-            <input
-              type="checkbox"
-              name="liveBooking"
-              checked={live}
-              onChange={(e) => setLive(e.target.checked)}
-              className="mt-1"
-            />
+          <label className={`flex items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3 ${canOwn ? "cursor-pointer" : ""}`}>
+            {canOwn ? (
+              <input
+                type="checkbox"
+                name="liveBooking"
+                checked={live}
+                onChange={(e) => setLive(e.target.checked)}
+                className="mt-1"
+              />
+            ) : (
+              <input type="checkbox" checked={live} disabled className="mt-1" />
+            )}
             <span>
               <span className="block text-[14px] font-semibold text-ink">{t("genEnableLiveBookings")}</span>
               <span className="block text-[12px] text-muted">
                 {live ? t("genLiveDesc") : t("genTestDesc")}
               </span>
+              {!canOwn && <span className="mt-1 block text-[12px] text-faint">{t("ownerOnlyHint")}</span>}
             </span>
           </label>
-          {live && (
+          {canOwn && live && (
             <div className="mt-3 rounded-[10px] border border-[#e7c9a3] bg-[#fbf2e6] px-4 py-3 text-[12px] leading-[1.6] text-[#8a5a23]">
               <strong>{t("genLiveWarningTitle")}</strong> {t("genLiveWarningBody")}
             </div>

@@ -8,7 +8,7 @@ import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
 import { useAdminLang, useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
 import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking, payloadWithGuest, pushGuestModification, retryChannexPush } from "~/lib/booking-finalize.server";
 import { FIELD_INPUT } from "~/components/admin-form";
@@ -27,7 +27,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const booking = await getBooking(propertyId, params.id);
   if (!booking) throw redirect("/admin/bookings");
   // Only owners/superadmins may issue refunds; controls whether the button shows.
-  const canRefund = await isOwnerOrSuper(request, propertyId);
+  const canRefund = await canManageProperty(request, propertyId);
   return { booking, canRefund };
 }
 
@@ -140,7 +140,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   if (intent === "refund") {
     // Server-side gate — never trust the hidden button being absent.
-    if (!(await isOwnerOrSuper(request, propertyId))) {
+    if (!(await canManageProperty(request, propertyId))) {
       return { error: "Only an owner or manager can issue refunds." };
     }
     const by = (await getAdminEmail(request)) ?? undefined;

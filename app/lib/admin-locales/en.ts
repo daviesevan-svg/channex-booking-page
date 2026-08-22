@@ -394,6 +394,7 @@ const EN: Record<string, string> = {
   propHotelNameHint: "Shown to guests across the booking pages and in every email we send them.",
   propListedPublicly: "Listed publicly",
   propListedPubliclyHint: "Shows on the home directory and makes the property eligible for Google Hotels. Turn off to keep it bookable by direct link only.",
+  ownerOnlyHint: "Only the property owner can change this.",
   propLogoLabel: "Logo",
   propLogoAlt: "Property logo",
   propRemove: "Remove",

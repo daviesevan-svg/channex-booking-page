@@ -11,7 +11,7 @@ import {
 
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getVisibleProperties, hiddenMemberAreasFor, isOwnerOrSuper } from "~/lib/properties.server";
+import { accessActor, actorCanManageProperty, currentPropertyId, getVisibleProperties, hiddenMemberAreasFor } from "~/lib/properties.server";
 import type { MemberArea } from "~/lib/member-areas";
 import { isSuperadmin } from "~/lib/users.server";
 import { brandForUser, guestHostForProperty } from "~/lib/partners.server";
@@ -52,7 +52,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     isSuperadmin(email),
   ]);
   const settings = propertyId ? await getSettings(propertyId) : {};
-  const canManageCurrent = propertyId ? await isOwnerOrSuper(request, propertyId) : false;
+  const actor = await accessActor(request);
+  const canManageCurrent = actor && propertyId
+    ? actorCanManageProperty(actor, properties.find((p) => p.id === propertyId))
+    : false;
   // Test mode = live bookings not enabled → checkout simulates and takes no
   // payment. Surfaced as a persistent banner so it's never a surprise. Only
   // meaningful once a property is selected.

@@ -10,7 +10,7 @@ import { FIELD_INPUT, FilePicker } from "~/components/admin-form";
 import { BlockedRangesEditor } from "~/components/blocked-ranges";
 import { useAdminDateLocale, useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId, getProperty, isOwnerOrSuper } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId, getProperty } from "~/lib/properties.server";
 import { getOverrides, getSettings, patchSettings } from "~/lib/overrides.server";
 import { accentHex } from "~/lib/email-render.server";
 import { formatMoney } from "~/lib/money";
@@ -140,11 +140,12 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  const [products, settings, rooms, ov] = await Promise.all([
+  const [products, settings, rooms, ov, canManage] = await Promise.all([
     getVoucherProducts(propertyId),
     getSettings(propertyId),
     getRooms(propertyId),
     getOverrides(propertyId),
+    canManageProperty(request, propertyId),
   ]);
   const url = new URL(request.url);
   const editId = url.searchParams.get("edit");
@@ -178,6 +179,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     rooms: rooms.map((r) => ({ id: r.id, title: r.title })),
     editing: products.find((p) => p.id === editId) ?? null,
     creating: url.searchParams.get("new") != null,
+    canManage,
   };
 }
 
@@ -215,7 +217,7 @@ export async function action({ request }: Route.ActionArgs) {
   // ---- sold-voucher management (per-voucher actions live on /admin/vouchers/:code) ----
   const soldTab = "/admin/vouchers?tab=sold";
   const ownerGate = async () =>
-    (await isOwnerOrSuper(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
+    (await canManageProperty(request, propertyId)) ? null : { error: "Only an owner or manager can do that." };
 
   if (intent === "voucherComp") {
     const gate = await ownerGate();
@@ -410,7 +412,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { products, sold, tab, compIssued, currency, hotelName, brandAccent, brandBg, coolingOffDays, rooms, editing, creating } = loaderData;
+  const { products, sold, tab, compIssued, currency, hotelName, brandAccent, brandBg, coolingOffDays, rooms, editing, creating, canManage } = loaderData;
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
   const showForm = tab === "products" && (!!editing || creating || products.length === 0);
   // The kind selector swaps the form's second half; live client state, seeded
@@ -459,7 +461,7 @@ export default function AdminVouchers({ loaderData, actionData }: Route.Componen
             {t("voCompIssuedSuffix")}
           </p>
         )}
-        {products.length > 0 && (
+        {products.length > 0 && canManage && (
           <details key={compIssued ?? "comp"} className="mb-5 rounded-[14px] border border-line bg-surface p-5">
             <summary className="cursor-pointer text-[14px] font-semibold text-secondary hover:text-accent">
               {t("voIssueComp")}
