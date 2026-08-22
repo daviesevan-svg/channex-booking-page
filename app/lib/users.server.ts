@@ -8,7 +8,8 @@
 // user when two people sign in at once. Per-key writes never touch the same key,
 // so concurrent sign-ins are safe. The old single-blob `users` key is migrated
 // into per-key records on read (see getUsers) and then removed.
-import { getConfig, getConfigKV } from "./config.server";
+import { getConfig, getConfigKV, getDB } from "./config.server";
+import { schemaOnce } from "./d1.server";
 
 export type Role = "member" | "partner_admin" | "superadmin";
 
@@ -160,19 +161,53 @@ export async function isSuperadmin(email: string): Promise<boolean> {
   return u?.role === "superadmin";
 }
 
+// Singleton row: INSERT OR IGNORE so two empty-allowlist first logins cannot
+// both win. KV has no compare-and-swap (and getConfigKV caches our own put,
+// so a read-write-reread on a claim key cannot see another isolate's write).
+const CLAIM_SLOT = "platform";
+const ensureClaimSchema = schemaOnce((d) => [
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS superadmin_claim (
+        slot TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+  ),
+]);
+
 /** Lockout-safe bootstrap: if no superadmin exists yet (none in SUPERADMIN_EMAILS
  *  and none stored), the FIRST person to sign in claims the role. Previously
  *  isSuperadmin() returned true for *everyone* during that window — on an
  *  open-signup deploy that made any visitor a superadmin. Now exactly one account
- *  is bootstrapped and everyone after is a member. Called on sign-in. */
+ *  is bootstrapped and everyone after is a member. Called on sign-in.
+ *
+ *  The unique put is D1 `ON CONFLICT DO NOTHING` on a singleton slot (same
+ *  shape as claimBooking). A configured SUPERADMIN_EMAILS allowlist still owns
+ *  bootstrap and is never locked out. Empty ADMIN_EMAILS (open self-signup) is
+ *  unchanged — only the dual-claim race is closed. */
 export async function claimSuperadminIfUnclaimed(email: string): Promise<void> {
   const { superadminEmails } = getConfig();
   if (superadminEmails.length > 0) return; // an env superadmin owns bootstrap
   if (await hasStoredSuperadmin()) return; // already claimed
   const kv = getConfigKV();
   if (!kv) return;
+  const d = getDB();
+  // No D1 → fail closed. A check-then-put on KV would let two first logins
+  // both write role=superadmin; better nobody claims than two do.
+  if (!d) return;
+  const e = norm(email);
+  await ensureClaimSchema();
+  const inserted = await d
+    .prepare(`INSERT INTO superadmin_claim (slot, email, created_at) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`)
+    .bind(CLAIM_SLOT, e, Date.now())
+    .run();
+  if (inserted.meta.changes !== 1) {
+    const row = await d.prepare(`SELECT email FROM superadmin_claim WHERE slot = ?`).bind(CLAIM_SLOT).first<{ email: string }>();
+    if (row?.email !== e) return; // someone else holds the slot
+  }
+  if (await hasStoredSuperadmin()) return;
   const existing = await getUser(email);
-  const user: User = { email: norm(email), role: "superadmin", createdAt: existing?.createdAt ?? Date.now() };
+  const user: User = { email: e, role: "superadmin", createdAt: existing?.createdAt ?? Date.now() };
   await kv.put(userKey(email), JSON.stringify(user));
 }
 
