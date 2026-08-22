@@ -334,7 +334,7 @@ export const openApiSpec = {
         tags: ["Bookings"],
         summary: "Create a booking",
         description:
-          "Pay-at-hotel rates confirm immediately and return the booking. Rates requiring an online deposit/prepayment return `status: \"pending_payment\"` plus a `payment_url` (Stripe hosted Checkout); the booking finalizes once payment completes. Add-ons ride along via `rooms[].extras` (per-room) and the top-level `extras` (whole stay) — VAT-applicable extras are folded into the taxed total, exempt ones added on top, identically to the hosted checkout.",
+          "Pay-at-hotel rates confirm immediately and return the booking. Rates requiring an online deposit/prepayment return `status: \"pending_payment\"` plus a `payment_url` (Stripe hosted Checkout); the booking finalizes once payment completes. Add-ons ride along via `rooms[].extras` (per-room) and the top-level `extras` (whole stay) — VAT-applicable extras are folded into the taxed total, exempt ones added on top, identically to the hosted checkout.\n\nRate limits: 60 bookings per 10 minutes per key. A booking that takes no card at all — no payment due and no guarantee card, which requires the property to have no Stripe account — is additionally limited to **1 per hour per key**, since nothing secures the reservation. Rates with a deposit or a guarantee card are not subject to it, and an `Idempotency-Key` replay never counts against either limit. Test-mode keys are exempt.",
         parameters: [
           { name: "Idempotency-Key", in: "header", schema: { type: "string" }, description: "Safe-retry key; a repeat returns the original response." },
         ],
@@ -372,6 +372,7 @@ export const openApiSpec = {
           },
           "401": { $ref: "#/components/responses/Error" },
           "422": { $ref: "#/components/responses/Error" },
+          "429": { $ref: "#/components/responses/Error" },
           "502": { $ref: "#/components/responses/Error" },
         },
       },
