@@ -134,9 +134,13 @@ export const TOOLS: McpTool[] = [
             arrival: {
               type: "string",
               description:
-                'Expected arrival time (optional) — prefer 24h "HH:MM", e.g. "15:00". Recognisable free text ("3pm", "16h30") is normalized; unparseable text is kept on the record but not forwarded to the property\'s PMS.',
+                'Expected arrival time (optional) — prefer 24h "HH:MM", e.g. "15:00". Recognisable free text ("3pm", "16h30") is normalized into the PMS arrival-hour field; text saying more than a bare HH:MM is also forwarded to the property\'s PMS as a booking note.',
             },
-            requests: { type: "string", description: "Special requests, free text (optional)" },
+            requests: {
+              type: "string",
+              description:
+                "Special requests, free text (optional). Forwarded to the property's PMS as a booking note (whitespace collapsed, first 500 characters).",
+            },
           },
           required: ["first_name", "last_name", "email", "phone"],
         },

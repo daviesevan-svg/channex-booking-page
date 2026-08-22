@@ -30,6 +30,16 @@ export function normalizeArrivalHour(raw: string | undefined): string | undefine
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+/** One PMS note line of guest-authored text, shared by both booking paths.
+ *  Newlines are collapsed so guest input can never pose as one of our
+ *  machine-generated lines (each system line owns its own line of `notes`),
+ *  and the length is capped so free text can't grow the payload past what the
+ *  channel manager accepts — the push happens after the guest has paid. */
+export function guestNoteLine(label: string, raw: string | undefined): string[] {
+  const text = raw?.replace(/\s+/g, " ").trim().slice(0, 500);
+  return text ? [`${label}: ${text}`] : [];
+}
+
 export interface PreparePendingInput {
   pid: string;
   reference: string;
@@ -118,15 +128,19 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     ),
   ].filter((s) => Number(s.total_price) > 0);
 
-  // Notes reach the hotel's PMS: guest special requests, an arrival note that
-  // didn't parse into arrival_hour, and the gift-voucher payment flag.
+  // Notes reach the hotel's PMS. System lines come first so guest text (whose
+  // newlines guestNoteLine collapses) can never pose as one of them.
   const arrivalHour = normalizeArrivalHour(guest.arrival);
   const noteLines = [
-    ...(guest.requests?.trim() ? [`Guest requests: ${guest.requests.trim()}`] : []),
-    ...(guest.arrival?.trim() && !arrivalHour ? [`Arrival: ${guest.arrival.trim()}`] : []),
     ...(input.voucherPayment
       ? [`Paid ${input.voucherPayment.amount.toFixed(2)} with gift voucher ${input.voucherPayment.code}`]
       : []),
+    ...guestNoteLine("Guest requests", guest.requests),
+    // The raw arrival note rides along whenever it says more than the parsed
+    // HH:MM — normalizeArrivalHour latches onto any bare digit ("party of
+    // 2 arriving after dinner" parses as 02:00), so the hotel must always
+    // see the guest's own words next to the time we derived.
+    ...(guest.arrival?.trim() !== arrivalHour ? guestNoteLine("Arrival", guest.arrival) : []),
   ];
 
   const channexPayload = {
@@ -186,8 +200,10 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
       lastName: guest.lastName,
       email: guest.email,
       phone: guest.phone,
-      arrival: guest.arrival || undefined,
-      requests: guest.requests || undefined,
+      // Trimmed like the PMS note above, so a whitespace-only field doesn't
+      // render an empty section in the confirmation PDF/email and admin.
+      arrival: guest.arrival?.trim() || undefined,
+      requests: guest.requests?.trim() || undefined,
     },
     rooms: lines.map((l) => ({
       roomId: l.roomId,

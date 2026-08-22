@@ -19,6 +19,7 @@ import {
   type BookingRecord,
 } from "./bookings.server";
 import { availabilityShortfall, decrementAvailability } from "./ari/admin.server";
+import { guestNoteLine } from "./booking-create.server";
 import { getInventory } from "./ari/read.server";
 import { getRates, getRooms, rateChannexId } from "./catalog.server";
 import { getSettings } from "./overrides.server";
@@ -156,9 +157,10 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
     customer: { name: guest.firstName, surname: guest.lastName, mail: guest.email, phone: guest.phone },
     // The package price spread across the nights (last night absorbs rounding),
     // so the PMS sees the real value — the money arrived at voucher purchase.
+    // Voucher line first: guest text (newlines collapsed) can't pose as it.
     notes: [
-      ...(guest.requests?.trim() ? [`Guest requests: ${guest.requests.trim()}`] : []),
       `Paid with gift voucher ${v.code} — ${v.product.title}`,
+      ...guestNoteLine("Guest requests", guest.requests),
     ].join("\n"),
     rooms: [
       {
