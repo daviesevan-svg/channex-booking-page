@@ -5,6 +5,7 @@ import { sendEmail } from "./email.server";
 import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
 import { brandForUser, getPartner, partnerIdForAdminHost } from "./partners.server";
 import { isOwnHost } from "./domains.server";
+import { timingSafeEqual } from "./hmac.server";
 import {
   generateConnectNonce,
   matchConnectState,
@@ -53,7 +54,7 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
   const { sessionSecret } = getConfig();
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
-  if ((await sign(payload, sessionSecret)) !== sig) return null;
+  if (!timingSafeEqual(await sign(payload, sessionSecret), sig)) return null;
   try {
     const { email, exp, jti } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
     if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
@@ -252,11 +253,9 @@ export async function logout(request: Request) {
 }
 
 // ---------- email delivery ----------
-/** Emails the magic link. Never returns it for on-screen display. Logs it to the
- *  server console only in a dev BUILD (import.meta.env.DEV — baked in at build
- *  time, so a misconfigured prod env can't turn this on), or in any build when
- *  the send actually failed so ops can recover a lockout via logs. A production
- *  build with working email never logs the link. */
+/** Emails the magic link. Never returns it for on-screen display, and never
+ *  logs the URL — Worker logs are treated as secret. A failed send is logged
+ *  generically so ops can see delivery broke without leaking the token. */
 export async function sendMagicLink(email: string, link: string): Promise<{ sent: boolean }> {
   // Sign-in is pre-property, so the brand comes from the USER: a hotel under a
   // white-label partner gets the partner's name, never ours; unknown emails
@@ -269,8 +268,8 @@ export async function sendMagicLink(email: string, link: string): Promise<{ sent
     from: brand.emailFrom,
     replyTo: brand.supportEmail,
   });
-  if (!sent || import.meta.env.DEV) {
-    console.log(`[admin] magic link for ${email}: ${link}`);
+  if (!sent) {
+    console.log(`[admin] magic link email failed for ${email}`);
   }
   return { sent };
 }

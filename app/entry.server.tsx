@@ -3,6 +3,8 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 
+import { applyHtmlSecurityHeaders } from "./lib/html-security-headers";
+
 export default async function handleRequest(
   request: Request,
   responseStatusCode: number,
@@ -35,6 +37,10 @@ export default async function handleRequest(
   }
 
   responseHeaders.set("Content-Type", "text/html");
+  // Document-only (this file is the HTML renderer). See html-security-headers.ts
+  // for the path-scoped frame policy and the CSP exceptions that keep Maps,
+  // fonts, and hosted Stripe/Viva checkout working.
+  applyHtmlSecurityHeaders(responseHeaders, request);
   return new Response(body, {
     headers: responseHeaders,
     status: responseStatusCode,
