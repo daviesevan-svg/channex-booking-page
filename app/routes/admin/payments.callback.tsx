@@ -1,28 +1,40 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/payments.callback";
-import { requireAdmin } from "~/lib/auth.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { consumeStripeConnectState, requireAdmin } from "~/lib/auth.server";
+import { canAccess } from "~/lib/properties.server";
 import { savePaymentSettings } from "~/lib/overrides.server";
 import { oauthToken, retrieveAccount } from "~/lib/stripe.server";
+
+function paymentsRedirect(notice: string, cookie?: string) {
+  return redirect(`/admin/payments?stripe=${notice}`, cookie ? { headers: { "Set-Cookie": cookie } } : undefined);
+}
 
 // Stripe redirects here after the operator authorises the Connect OAuth flow.
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const url = new URL(request.url);
-  const propertyId = await currentPropertyId(request);
+  const state = url.searchParams.get("state");
 
   if (url.searchParams.get("error")) {
-    return redirect("/admin/payments?stripe=denied");
+    // Burn a matching nonce so a denied round-trip can't be replayed.
+    const consumed = await consumeStripeConnectState(request, state);
+    return paymentsRedirect("denied", consumed?.cookie);
   }
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
-  if (!code) return redirect("/admin/payments?stripe=error");
-  // `state` is the property the connect flow started for — it must match the
-  // admin's currently-selected property (both come from their session/flow).
-  if (!propertyId || state !== propertyId) {
-    console.log(`[stripe] oauth state mismatch: state=${state} current=${propertyId}`);
-    return redirect("/admin/payments?stripe=mismatch");
+  if (!code) return paymentsRedirect("error");
+
+  // `state` must be the session nonce stamped when this admin clicked Connect.
+  // Attach to that stored propertyId — never a client-supplied UUID.
+  const consumed = await consumeStripeConnectState(request, state);
+  if (!consumed) {
+    console.log("[stripe] oauth state rejected: missing, unknown, or already used");
+    return paymentsRedirect("mismatch");
+  }
+  const { propertyId, cookie } = consumed;
+  if (!(await canAccess(request, propertyId))) {
+    console.log(`[stripe] oauth state property not accessible: ${propertyId}`);
+    return paymentsRedirect("mismatch", cookie);
   }
 
   try {
@@ -34,7 +46,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     });
   } catch (e) {
     console.log(`[stripe] oauth callback failed: ${e instanceof Error ? e.message : e}`);
-    return redirect("/admin/payments?stripe=error");
+    return paymentsRedirect("error", cookie);
   }
-  return redirect("/admin/payments?stripe=connected");
+  return paymentsRedirect("connected", cookie);
 }
