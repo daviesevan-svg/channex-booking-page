@@ -18,7 +18,14 @@ import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { releaseGiftHold, settleGiftHold } from "./vouchers.server";
-import { retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
+import { createRefund, retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
+import {
+  SessionBindError,
+  assertCollectedPayment,
+  assertSessionMatchesPending,
+  bookingSessionTarget,
+  shouldRefundMismatchedSession,
+} from "./stripe-session-bind";
 import {
   retrieveVivaTransaction,
   vivaAlphaCurrency,
@@ -194,12 +201,57 @@ export function payloadWithPayment(
   };
 }
 
-/** Look up the pending booking, retrieve its Stripe session, and finalize if it
- *  completed. Used by the webhook backstop. No-op if nothing pending or unpaid. */
+/** Refund a bound-but-mismatched Stripe charge so we don't keep money we
+ *  refuse to fulfil. Best-effort: a failed refund is logged for the operator. */
+export async function refundRejectedStripeSession(
+  account: string,
+  session: CheckoutSession,
+  ref: string,
+): Promise<void> {
+  const pi =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent && typeof session.payment_intent === "object"
+        ? session.payment_intent.id
+        : undefined;
+  if (!pi) return;
+  try {
+    await createRefund(account, pi, undefined, `mismatch_${ref}`);
+  } catch (e) {
+    console.error(
+      `[finalize] mismatch refund failed for ${ref} pi=${pi}: ${e instanceof Error ? e.message : e}`,
+    );
+  }
+}
+
+export async function rejectUnboundStripeSession(
+  account: string,
+  session: CheckoutSession,
+  ref: string,
+  err: SessionBindError,
+): Promise<never> {
+  if (shouldRefundMismatchedSession(err.reason)) {
+    await refundRejectedStripeSession(account, session, ref);
+    await deletePending(ref);
+  }
+  console.error(`[finalize] reject ${ref}: ${err.message}`);
+  throw err;
+}
+
+/** Look up the pending booking, retrieve its Stripe session, bind it to that
+ *  pending, and finalize if it completed. Used by the return URL and the
+ *  webhook backstop. No-op if nothing pending (already finalized / expired)
+ *  or unpaid. Throws SessionBindError if the session is not this pending's. */
 export async function finalizeFromStripeSession(ref: string, sessionId: string): Promise<BookingRecord | null> {
   const pending = await getPending(ref);
   if (!pending) return null;
   const session = await retrieveCheckoutSession(pending.account, sessionId);
+  try {
+    assertSessionMatchesPending(session, bookingSessionTarget(pending));
+  } catch (e) {
+    if (e instanceof SessionBindError) await rejectUnboundStripeSession(pending.account, session, ref, e);
+    throw e;
+  }
   const payment = paymentFromSession(pending.account, sessionId, session);
   if (!payment) return null;
   const record = await finalizeBooking(pending, payment, pending.origin);
@@ -215,6 +267,16 @@ export async function finalizeBooking(
   origin: string,
 ): Promise<BookingRecord> {
   const { pid, record: draft, live } = pending;
+  // Fail closed BEFORE claiming the reference / pushing to Channex. A swapped
+  // cheap session (or a setup session on a deposit pending) must not confirm
+  // the stay. Missing `payment` is the test-mode / no-gateway path.
+  const expected = bookingSessionTarget(pending);
+  assertCollectedPayment(
+    payment,
+    { mode: expected.expectedMode, amount: expected.expectedAmount, currency: expected.expectedCurrency },
+    draft.reference,
+  );
+
   // The payload was assembled before payment; now the outcome is known, stamp
   // how the guest paid onto it (notes + meta) so the PMS sees the split.
   const channexPayload = payloadWithPayment(pending.channexPayload, {
@@ -230,26 +292,6 @@ export async function finalizeBooking(
   const provisional: BookingRecord = { ...draft, status: "simulated", inventoryHeld: false, payment };
   const claim = await claimBooking(pid, provisional);
   if (!claim.won) return claim.existing ?? provisional;
-
-  // Defensive tripwire: the charge is server-authored (we created the Stripe
-  // session with our own amount/currency and re-fetch it by id), so what the
-  // guest paid must equal what we intended. If it ever doesn't, a bug or a
-  // session mix-up let a wrong amount through — record what they actually paid
-  // (below) but shout loudly so it's caught in logs/tests rather than silently.
-  if (payment?.mode === "payment") {
-    const expCur = (draft.currency || "").toUpperCase();
-    const gotCur = (payment.currency || "").toUpperCase();
-    // Compared (and logged) in Stripe's own minor units for the currency, so a
-    // zero-decimal booking reads as the ¥20000 Stripe saw, not ¥2000000.
-    const minorCur = expCur || gotCur;
-    const expectedMinor = toStripeMinor(draft.consent?.dueNow ?? 0, minorCur);
-    const gotMinor = toStripeMinor(payment.amount ?? 0, minorCur);
-    if (expectedMinor !== gotMinor || (expCur && gotCur && expCur !== gotCur)) {
-      console.error(
-        `[finalize] CHARGE MISMATCH for ${draft.reference}: expected ${expectedMinor} ${expCur}, Stripe reported ${gotMinor} ${gotCur}`,
-      );
-    }
-  }
 
   let status: BookingStatus = "simulated";
   let channexId: string | undefined;

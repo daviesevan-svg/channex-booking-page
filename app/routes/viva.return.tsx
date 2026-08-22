@@ -4,6 +4,7 @@ import type { Route } from "./+types/viva.return";
 import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending, getVivaOrder } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromVivaTransaction } from "~/lib/booking-finalize.server";
+import { SessionBindError } from "~/lib/stripe-session-bind";
 import { getVivaConfig } from "~/lib/overrides.server";
 import { retrieveVivaTransaction } from "~/lib/viva.server";
 import { basePath, homePath } from "~/lib/base";
@@ -64,7 +65,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   if (!payment) throw redirect(checkoutUrl); // not completed
 
-  const record = await finalizeBooking(pending, payment, pending.origin);
+  let record;
+  try {
+    record = await finalizeBooking(pending, payment, pending.origin);
+  } catch (e) {
+    if (e instanceof SessionBindError) throw redirect(checkoutUrl);
+    throw e;
+  }
   await deletePending(order.ref);
   throw redirect(outcomeUrl(record));
 }
