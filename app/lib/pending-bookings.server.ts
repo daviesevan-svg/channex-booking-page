@@ -28,6 +28,9 @@ export interface PendingBooking {
    *  guest request to derive it from. Computed once here, it also stays stable
    *  across the visit key's midnight salt rotation. Absent on API bookings. */
   funnel?: { visitKey: string; country: string | null; device: string | null };
+  /** Hosted payment URL (Stripe or Viva). Stashed after the session is created
+   *  so a double-submit of the same stay can reuse it instead of minting another. */
+  paymentUrl?: string;
 }
 
 // 3 hours. Must exceed the Checkout Session's expires_at (60 min, set in

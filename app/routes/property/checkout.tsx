@@ -16,10 +16,16 @@ import {
   cartCoverage,
   cartCovers,
   parseCart,
+  serializeCart,
   withinAvailability,
   type ResolvedLine,
 } from "~/lib/cart";
-import { generateReference } from "~/lib/bookings.server";
+import { canonicalCheckoutIntent, hashCheckoutIntent } from "~/lib/checkout-idem";
+import {
+  releaseCheckoutIntent,
+  resolveWebCheckoutIntent,
+  writeWebCheckoutIdem,
+} from "~/lib/checkout-idem.server";
 import { cancellationVaries, resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
@@ -28,7 +34,7 @@ import { consentGate, stayTotals } from "~/lib/checkout-totals";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
-import { parseExtrasState, resolveAllExtras, type ExtraContextLine } from "~/lib/extras";
+import { parseExtrasState, resolveAllExtras, serializeExtrasState, type ExtraContextLine } from "~/lib/extras";
 import { PriceBreakdown } from "~/components/price-breakdown";
 import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
@@ -308,16 +314,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
   const g = parsed.data;
 
-  // Throttle booking creation per client. Nothing else guards this: the endpoint
-  // is deliberately anonymous (a guest has no account), and every booking
-  // decrements availability and pushes to Channex — so an unthrottled loop could
-  // empty a hotel's calendar across every channel it sells on. Generous enough
-  // that a real guest fumbling the form never notices.
-  if (!(await rateLimit(`book:${pid}:${clientKey(request)}`, 10, 600))) {
-    console.log(`[checkout] booking rate limit hit pid=${pid} client=${clientKey(request)}`);
-    return { rateLimited: true as const };
-  }
-
   const config = getConfig();
   // Live vs test booking is controlled from admin General settings; an unsaved
   // setting falls back to the ALLOW_LIVE_BOOKING env var. (settings loaded above.)
@@ -325,8 +321,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   // otherwise simulate, even in live mode (there's nothing to push to).
   const live =
     (settings.liveBooking ?? config.allowLiveBooking) && settings.connectedSystem === "channex";
-  // Random, unguessable reference — also the guest's manage-booking credential.
-  const reference = generateReference();
 
   // Extras re-priced server-side. VAT-applicable extras fold into the room's VAT
   // base; the rest are added on top untaxed.
@@ -405,6 +399,43 @@ export async function action({ params, request }: Route.ActionArgs) {
   const next = new URLSearchParams(url.searchParams);
   next.set("sim", live ? "0" : "1");
   if (applied?.code) next.set("promo", applied.code);
+
+  // One book intent per stay+guest. The API takes Idempotency-Key; the hosted
+  // form derives the same kind of key from the stay so a double-click reuses
+  // one reference (and therefore one Stripe session / one uncarded finalize).
+  const fingerprint = await hashCheckoutIntent(
+    canonicalCheckoutIntent({
+      pid: stay.channelId,
+      checkin: stay.checkin,
+      checkout: stay.checkout,
+      currency: stay.currency,
+      adults: stay.occ.adults,
+      childrenAge: stay.occ.childrenAge ?? [],
+      cart: serializeCart(parseCart(url.searchParams)),
+      extras: serializeExtrasState(parseExtrasState(url.searchParams)),
+      promo: applied?.code ?? "",
+      voucher: voucherHold?.code ?? "",
+      email: g.email,
+      firstName: g.firstName,
+      lastName: g.lastName,
+      phone: g.phone,
+    }),
+  );
+  const resolved = await resolveWebCheckoutIntent(
+    stay.channelId,
+    fingerprint,
+    (ref) => `${base}/confirmation/${ref}?${next.toString()}`,
+  );
+  if (resolved.kind === "redirect") throw redirect(resolved.url);
+  const reference = resolved.reference;
+
+  // Throttle new booking creation per client — not replays of a stay we
+  // already accepted. The endpoint is anonymous, and every new booking
+  // decrements availability and pushes to Channex.
+  if (!(await rateLimit(`book:${pid}:${clientKey(request)}`, 10, 600))) {
+    console.log(`[checkout] booking rate limit hit pid=${pid} client=${clientKey(request)}`);
+    return { rateLimited: true as const };
+  }
 
   // Build the booking (Open Channel payload + draft record), shared with the API.
   // Funnel context rides on the pending booking: finalize may run from the
@@ -539,8 +570,11 @@ export async function action({ params, request }: Route.ActionArgs) {
           `[checkout] viva order failed for pid=${stay.channelId}: ${e instanceof Error ? e.message : e}`,
         );
         if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+        await releaseCheckoutIntent(stay.channelId, fingerprint);
         return { paymentError: "failed" as const };
       }
+      await stashPending(reference, { ...pending, paymentUrl: payUrl });
+      await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "payment", reference, url: payUrl });
       throw redirect(payUrl);
     }
 
@@ -580,18 +614,26 @@ export async function action({ params, request }: Route.ActionArgs) {
         `[checkout] stripe session failed for pid=${stay.channelId} acct=${account}: ${e instanceof Error ? e.message : e}`,
       );
       if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+      await releaseCheckoutIntent(stay.channelId, fingerprint);
       return { paymentError: "failed" as const };
     }
     if (!sessionUrl) {
       if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+      await releaseCheckoutIntent(stay.channelId, fingerprint);
       return { paymentError: "failed" as const };
     }
+    await stashPending(reference, { ...pending, paymentUrl: sessionUrl });
+    await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "payment", reference, url: sessionUrl });
     throw redirect(sessionUrl);
   }
 
   // No card needed (or a guarantee rate with Stripe not connected): book now.
   const record = await finalizeBooking(pending, undefined, url.origin);
-  if (record.status === "failed") return { bookingError: record.error };
+  if (record.status === "failed") {
+    await releaseCheckoutIntent(stay.channelId, fingerprint);
+    return { bookingError: record.error };
+  }
+  await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference });
   return redirect(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 

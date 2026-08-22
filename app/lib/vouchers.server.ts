@@ -257,6 +257,8 @@ export async function holdGiftAmount(
 ): Promise<{ ok: boolean }> {
   const r = await casMutate(pid, code, (v) => {
     if (v.kind !== "gift" || displayStatus(v) !== "active") return null;
+    // Same checkout retrying — already reserved against this reference.
+    if (v.redemptions.some((x) => x.ref === ref && !x.bookingId)) return v;
     if (giftBalance(v) < amount) return null;
     return {
       ...v,
@@ -266,7 +268,11 @@ export async function holdGiftAmount(
       ],
     };
   });
-  return { ok: r.ok };
+  if (r.ok) return { ok: true };
+  // Identical-JSON CAS can report 0 changes; an existing hold is still success.
+  const v = await getVoucherByCode(pid, code);
+  if (v?.redemptions.some((x) => x.ref === ref && !x.bookingId)) return { ok: true };
+  return { ok: false };
 }
 
 /** Convert a hold into a real spend once its booking finalized. */
