@@ -32,9 +32,15 @@ import { finalizeBooking } from "~/lib/booking-finalize.server";
 import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { activeGateway } from "~/lib/payments.server";
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
-import { rateLimit } from "~/lib/rate-limit.server";
+import { claimWindow, rateLimit } from "~/lib/rate-limit.server";
 import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { toStripeMinor } from "~/lib/money";
+
+// A booking that takes no card at all holds real inventory with nothing
+// securing it and nothing to refund, so it gets its own much tighter ceiling on
+// top of the general per-key throttle. See the call site for when this path is
+// reached — it is narrower than it sounds.
+const NO_CARD_WINDOW_SEC = 3600;
 
 // GET /v1/bookings?limit=&offset= — the property's bookings, newest first.
 export async function loader({ request }: Route.LoaderArgs) {
@@ -413,6 +419,34 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // No online payment needed — create the booking now.
+  //
+  // This is the only path where an agent gets a confirmed booking without a card
+  // ever being involved. It is reached when nothing is due AND the property
+  // cannot take a card on file: no gateway at all, or Viva (which has no setup
+  // mode). A Stripe-connected property always reaches Checkout above, even at
+  // zero, in setup mode. A paid rate with no gateway is already refused. So
+  // everything else either charges or takes a guarantee card — friction for an
+  // abusive caller, and a hold the hotel can act on. Here there is neither:
+  // the reservation is real, the room comes off sale, and nothing was staked.
+  //
+  // Hence one an hour, against the 60-per-10-minutes every other booking gets.
+  // Checked here rather than beside that one because whether a card is involved
+  // isn't known until the rate's policy has been priced. The latch is a D1
+  // unique claim (same INSERT ON CONFLICT as booking refs / voucher codes), not
+  // the KV counter — two concurrent live requests cannot both win a 1/hour slot.
+  //
+  // Test keys are exempt on purpose. They never reach the channel manager, so
+  // they can't consume the inventory this protects, and a 1/hour ceiling would
+  // make the agent API impractical to develop against — which would push
+  // integrators onto live keys, the opposite of what this is for.
+  if (mode === "live" && !(await claimWindow(`apibook_nocard:${pid}:${auth.keyId}`, NO_CARD_WINDOW_SEC))) {
+    return apiError(
+      429,
+      "rate_limited",
+      "This rate takes no card, and unpaid bookings are limited to 1 per hour per API key. " +
+        "Wait and retry, or book a rate that takes a deposit or a card guarantee — those aren't limited.",
+    );
+  }
   const record = await finalizeBooking(pending, undefined, origin);
   return respond(201, { data: serializeBooking(record) });
 }
