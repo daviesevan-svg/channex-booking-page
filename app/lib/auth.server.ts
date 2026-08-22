@@ -5,6 +5,12 @@ import { sendEmail } from "./email.server";
 import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from "./users.server";
 import { brandForUser, getPartner, partnerIdForAdminHost } from "./partners.server";
 import { isOwnHost } from "./domains.server";
+import {
+  generateConnectNonce,
+  matchConnectState,
+  parseConnectPending,
+  STRIPE_CONNECT_SESSION_KEY,
+} from "./stripe-connect-state";
 
 const TOKEN_TTL_MS = 15 * 60 * 1000; // magic links valid for 15 minutes
 
@@ -206,6 +212,35 @@ export async function setSessionProperty(request: Request, propertyId: string): 
   const session = await storage.getSession(request.headers.get("Cookie"));
   session.set("property", propertyId);
   return storage.commitSession(session);
+}
+
+/** Stamp a one-time Stripe Connect OAuth nonce on the admin session, bound to
+ *  the property the operator started Connect for. Send `nonce` as OAuth `state`. */
+export async function stampStripeConnectState(
+  request: Request,
+  propertyId: string,
+): Promise<{ nonce: string; cookie: string }> {
+  const nonce = generateConnectNonce();
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  session.set(STRIPE_CONNECT_SESSION_KEY, { nonce, propertyId });
+  return { nonce, cookie: await storage.commitSession(session) };
+}
+
+/** Consume Connect OAuth `state` against the session. Matching nonce is deleted
+ *  (one-time) and the bound propertyId is returned. Missing, unknown, or reused
+ *  state returns null and leaves the session unchanged. */
+export async function consumeStripeConnectState(
+  request: Request,
+  state: string | null,
+): Promise<{ propertyId: string; cookie: string } | null> {
+  const storage = sessionStorage();
+  const session = await storage.getSession(request.headers.get("Cookie"));
+  const pending = parseConnectPending(session.get(STRIPE_CONNECT_SESSION_KEY));
+  const propertyId = matchConnectState(pending, state);
+  if (!propertyId) return null;
+  session.unset(STRIPE_CONNECT_SESSION_KEY);
+  return { propertyId, cookie: await storage.commitSession(session) };
 }
 
 export async function logout(request: Request) {

@@ -3,7 +3,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/payments";
 import { adminMeta } from "~/lib/admin-meta";
 import { SavedPill } from "~/components/admin-page-header";
-import { requireAdmin } from "~/lib/auth.server";
+import { requireAdmin, stampStripeConnectState } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getSettings, getVivaConfig, savePaymentSettings, saveVivaConfig } from "~/lib/overrides.server";
@@ -89,10 +89,14 @@ export async function action({ request }: Route.ActionArgs) {
     // One gateway per property: a Viva connection must be removed explicitly
     // before Stripe takes over, so charges never silently switch rails.
     if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
-    // State ties the OAuth round-trip to the admin's currently-selected property
-    // (it comes from their own session), so a callback can't target another one.
+    // One-time nonce in the admin session, bound to this property. The raw
+    // property id is not secret and must not be OAuth `state` — SameSite=Lax
+    // sends the session cookie on the top-level GET callback.
     const redirectUri = `${new URL(request.url).origin}/admin/payments/callback`;
-    throw redirect(oauthAuthorizeUrl(propertyId, redirectUri));
+    const { nonce, cookie } = await stampStripeConnectState(request, propertyId);
+    throw redirect(oauthAuthorizeUrl(nonce, redirectUri), {
+      headers: { "Set-Cookie": cookie },
+    });
   }
 
   if (intent === "viva-connect") {
