@@ -3,6 +3,12 @@ import { Form, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/login";
 import { adminMeta } from "~/lib/admin-meta";
 import {
+  ADMIN_LOGIN_LIMIT,
+  ADMIN_LOGIN_WINDOW_SEC,
+  adminLoginPublicResult,
+  shouldSendAdminMagicLink,
+} from "~/lib/admin-login";
+import {
   adminHostPartnerId,
   canSignInOnHost,
   createMagicToken,
@@ -11,6 +17,7 @@ import {
 } from "~/lib/auth.server";
 import { adminLangFromRequest, adminT } from "~/lib/admin-i18n";
 import { getPartner } from "~/lib/partners.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Our hosts and registered partner admin hosts only — anything else 404s. A
@@ -35,18 +42,27 @@ export async function action({ request }: Route.ActionArgs) {
   const hostPartnerId = await adminHostPartnerId(request);
   const form = await request.formData();
   const email = String(form.get("email") ?? "").trim().toLowerCase();
-  if (!email) return { error: "Enter your email address." };
+  if (!email) return adminLoginPublicResult({ hasEmail: false, allowed: false, throttled: false });
+
+  // Count every attempt — unknown emails included — so the per-email bucket
+  // cannot confirm who is on the allowlist, and a single IP cannot spray
+  // operators. Fail-open/racy KV is the same blunt throttle as web checkout.
+  const ipOk = await rateLimit(`adminlogin:ip:${clientKey(request)}`, ADMIN_LOGIN_LIMIT, ADMIN_LOGIN_WINDOW_SEC);
+  const emailOk = await rateLimit(`adminlogin:email:${email}`, ADMIN_LOGIN_LIMIT, ADMIN_LOGIN_WINDOW_SEC);
+  const throttled = !ipOk || !emailOk;
+
   // Host-scoped in both directions: partner hosts are invite-only for that
   // partner's users; a partner's users don't get OUR door once theirs exists.
-  if (!(await canSignInOnHost(email, hostPartnerId))) {
-    return { error: "That email can't sign in here." };
+  // Unknown emails still get the check-email copy; we just don't send.
+  const allowed = !throttled && (await canSignInOnHost(email, hostPartnerId));
+  if (shouldSendAdminMagicLink(allowed, throttled)) {
+    const token = await createMagicToken(email);
+    // Build the link from this request's own origin so it works on any host.
+    const origin = new URL(request.url).origin;
+    const link = `${origin}/admin/verify?token=${encodeURIComponent(token)}`;
+    await sendMagicLink(email, link);
   }
-  const token = await createMagicToken(email);
-  // Build the link from this request's own origin so it works on any host.
-  const origin = new URL(request.url).origin;
-  const link = `${origin}/admin/verify?token=${encodeURIComponent(token)}`;
-  await sendMagicLink(email, link);
-  return { ok: true };
+  return adminLoginPublicResult({ hasEmail: true, allowed, throttled });
 }
 
 export function meta({ matches }: Route.MetaArgs) {

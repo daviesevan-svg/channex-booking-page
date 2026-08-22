@@ -25,6 +25,7 @@ import { finalizeVoucher } from "~/lib/voucher-purchase.server";
 import { buildCheckoutSessionParams, createCheckoutSession } from "~/lib/stripe.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -162,6 +163,13 @@ export async function action({ params, request }: Route.ActionArgs) {
     // Test mode: issue a simulated voucher directly — same as simulated bookings.
     const issued = await finalizeVoucher(pending, undefined);
     return redirect(`${base}/voucher/${issued.code}?issued=1`);
+  }
+
+  // Same blunt IP throttle as web checkout (`book:${pid}:${ip}` = 10/10 min)
+  // before we mint a Stripe session. Fail-open/racy KV is acceptable here.
+  if (!(await rateLimit(`vbuy:${pid}:${clientKey(request)}`, 10, 600))) {
+    console.log(`[vouchers] purchase rate limit hit pid=${pid} client=${clientKey(request)}`);
+    return { error: "That's several purchase attempts in a short time. Please wait a few minutes and try again." };
   }
 
   const reference = generateReference();
