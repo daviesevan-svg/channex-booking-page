@@ -11,21 +11,18 @@ import { getLastAriReceivedAt } from "~/lib/ari/ingest.server";
 import { useAdminT } from "~/lib/admin-i18n";
 import { AdminPageHeader } from "~/components/admin-page-header";
 
-/** Systems a property can connect to. Only `available` ones can be selected;
- *  the rest are shown as upcoming so the list reads as a roadmap. */
+/** Systems a property can connect to. The channel manager is the only
+ *  integration — a property is either connected to it or standalone. */
 const SYSTEMS = [
   {
     id: "channex",
     name: "Channel manager",
     taglineKey: "cnTaglineChannex",
     blurbKey: "cnBlurbChannex",
-    available: true,
   },
-  { id: "apaleo", name: "Apaleo", taglineKey: "cnTaglinePms", blurbKey: "", available: false },
-  { id: "mews", name: "Mews", taglineKey: "cnTaglinePms", blurbKey: "", available: false },
 ] as const;
 
-const AVAILABLE = new Set<string>(SYSTEMS.filter((s) => s.available).map((s) => s.id));
+const AVAILABLE = new Set<string>(SYSTEMS.map((s) => s.id));
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -161,8 +158,8 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                   <div className="font-serif text-[18px] font-semibold">{sys.name}</div>
                   <div className="text-[12px] text-muted">{t(sys.taglineKey)}</div>
                 </div>
-                {isConnected ? (
-                  pending ? (
+                {isConnected &&
+                  (pending ? (
                     <span className="flex-none rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
                       {t("cnPending")}
                     </span>
@@ -170,53 +167,36 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                     <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
                       {t("cnConnected")}
                     </span>
-                  )
-                ) : (
-                  !sys.available && (
-                    <span className="flex-none rounded-full bg-chip px-2.5 py-1 text-[11px] font-semibold text-muted">
-                      {t("cnComingSoon")}
-                    </span>
-                  )
-                )}
+                  ))}
               </div>
 
               {sys.blurbKey && <p className="mt-3 text-[13px] text-secondary">{t(sys.blurbKey)}</p>}
 
               <div className="mt-4 flex-1" />
 
-              {sys.available ? (
-                isConnected ? (
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="disconnect" />
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="w-full rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                    >
-                      {pending ? t("cnCancelConnection") : t("cnDisconnect")}
-                    </button>
-                  </Form>
-                ) : (
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="connect" />
-                    <input type="hidden" name="provider" value={sys.id} />
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="w-full rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-                    >
-                      {t("cnConnect")}
-                    </button>
-                  </Form>
-                )
+              {isConnected ? (
+                <Form method="post">
+                  <input type="hidden" name="intent" value="disconnect" />
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {pending ? t("cnCancelConnection") : t("cnDisconnect")}
+                  </button>
+                </Form>
               ) : (
-                <button
-                  type="button"
-                  disabled
-                  className="w-full cursor-not-allowed rounded-[10px] border border-line-alt bg-surface-alt px-4 py-2.5 text-[14px] font-semibold text-faint"
-                >
-                  {t("cnConnect")}
-                </button>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="connect" />
+                  <input type="hidden" name="provider" value={sys.id} />
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="w-full rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                  >
+                    {t("cnConnect")}
+                  </button>
+                </Form>
               )}
             </div>
           );

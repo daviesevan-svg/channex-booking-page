@@ -835,11 +835,9 @@ const TR: Record<string, string> = {
   cnIntro:
     "Bu tesisin bağlanacağı sistemi seçin. Karşı tarafta bağlantıyı kurmak için gereken bilgileri size gösteririz.",
   cnTaglineChannex: "Rezervasyon ağ geçidi ve çift yönlü senkronizasyon",
-  cnTaglinePms: "Tesis yönetim sistemi",
   cnBlurbChannex:
     "Müsaitlik, fiyat ve rezervasyonları kanal yöneticisi hesabınız üzerinden senkronize edin.",
   cnConnected: "Bağlı",
-  cnComingSoon: "Yakında",
   cnConnect: "Bağlan",
   cnDisconnect: "Bağlantıyı kes",
   cnCancelConnection: "Bağlantıyı iptal et",
