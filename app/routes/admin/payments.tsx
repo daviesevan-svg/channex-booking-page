@@ -139,9 +139,12 @@ export async function action({ request }: Route.ActionArgs) {
       return { error: "All five Viva credentials are required." };
     }
     // Exercise both credential pairs against Viva before storing anything — a
-    // typo'd secret must fail HERE, not at a guest's first checkout.
+    // typo'd secret must fail HERE, not at a guest's first checkout. On failure,
+    // attach the full diagnostics report: this is the state Viva support tickets
+    // are written from, and the connected card's diagnostics button doesn't
+    // exist yet because the connect never succeeded.
     const problem = await verifyVivaConfig(config);
-    if (problem) return { error: problem };
+    if (problem) return { error: problem, vivaDiag: await runVivaDiagnostics(config) };
     await saveVivaConfig(propertyId, config);
     return { ok: true };
   }
@@ -404,17 +407,6 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </div>
               )}
 
-              {actionData && "vivaDiag" in actionData && actionData.vivaDiag && (
-                <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
-                  <p className="mb-2 text-[12px] leading-[1.5] text-muted">{t("payVivaDiagHelp")}</p>
-                  {/* Raw JSON on purpose: this block is pasted verbatim into a
-                      Viva support ticket, so it must not be translated or
-                      reformatted. It carries no secrets (no access token). */}
-                  <pre className="overflow-x-auto rounded-[8px] border border-line-alt bg-surface p-3 font-mono text-[11px] leading-[1.6] text-ink">
-                    {JSON.stringify(actionData.vivaDiag, null, 2)}
-                  </pre>
-                </div>
-              )}
             </>
           ) : canOwn ? (
             <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
@@ -441,6 +433,20 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </div>
             </Form>
           ) : null}
+
+          {/* Rendered for BOTH the connected card's diagnostics button and a
+              failed connect attempt — the ticket-worthy state is usually the
+              failure, where no connected card exists yet. Raw JSON on purpose:
+              this block is pasted verbatim into a Viva support ticket, so it
+              must not be translated or reformatted. No secrets (no access token). */}
+          {actionData && "vivaDiag" in actionData && actionData.vivaDiag && (
+            <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
+              <p className="mb-2 text-[12px] leading-[1.5] text-muted">{t("payVivaDiagHelp")}</p>
+              <pre className="overflow-x-auto rounded-[8px] border border-line-alt bg-surface p-3 font-mono text-[11px] leading-[1.6] text-ink">
+                {JSON.stringify(actionData.vivaDiag, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     </div>
