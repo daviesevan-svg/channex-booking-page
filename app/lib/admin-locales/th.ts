@@ -932,6 +932,8 @@ const TH: Record<string, string> = {
   payVivaFailureUrl: "Failure URL",
   payVivaWebhookUrl: "URL ของ webhook",
   payVivaNoGuarantee: "Viva เรียกเก็บเงินตอนจอง แต่ไม่สามารถเก็บบัตรไว้เป็นหลักประกันการเข้าพักได้ เรตที่ขอเพียงบัตรค้ำประกันจะถูกจองโดยไม่มีบัตร",
+  payVivaDiagRun: "รันการวินิจฉัยการเชื่อมต่อ",
+  payVivaDiagHelp: "ข้อมูลการแลกเปลี่ยนดิบกับ Viva — scope ของโทเคน คำขอสร้างออเดอร์แบบตรงตัว และคำตอบจาก Viva วางลงในทิกเก็ตฝ่ายสนับสนุนของ Viva เมื่อถูกขอข้อมูลเหล่านี้ ไม่มีข้อมูลลับ",
   akTitle: "คีย์ API",
   akNotConfigured: "เพิ่มที่พักก่อนเพื่อสร้างคีย์ API",
   akOnlyOwner: "เฉพาะเจ้าของหรือผู้จัดการเท่านั้นที่จัดการคีย์ API ของที่พักนี้ได้",

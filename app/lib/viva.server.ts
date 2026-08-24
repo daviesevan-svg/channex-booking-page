@@ -155,6 +155,23 @@ export interface VivaOrderSpec {
   timeoutSeconds?: number;
 }
 
+/** The exact JSON body an order-creation call sends. One builder, so the
+ *  diagnostics report below shows byte-for-byte what production sends. */
+function orderRequestBody(v: VivaConfig, spec: VivaOrderSpec): string {
+  return JSON.stringify({
+    amount: spec.amountMinor,
+    customerTrns: spec.customerTrns,
+    merchantTrns: spec.merchantTrns,
+    sourceCode: v.sourceCode,
+    paymentTimeout: spec.timeoutSeconds ?? 3600,
+    customer: {
+      ...(spec.email ? { email: spec.email } : {}),
+      ...(spec.fullName ? { fullName: spec.fullName } : {}),
+      requestLang: vivaRequestLang(spec.lang),
+    },
+  });
+}
+
 /** Create a payment order. Returns the order code (a 16-digit id) as a STRING —
  *  it exceeds MAX_SAFE_INTEGER territory, so it must never live as a JS number. */
 export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promise<string> {
@@ -162,18 +179,7 @@ export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promi
   const res = await fetch(`${hosts(v.demo).api}/checkout/v2/orders`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      amount: spec.amountMinor,
-      customerTrns: spec.customerTrns,
-      merchantTrns: spec.merchantTrns,
-      sourceCode: v.sourceCode,
-      paymentTimeout: spec.timeoutSeconds ?? 3600,
-      customer: {
-        ...(spec.email ? { email: spec.email } : {}),
-        ...(spec.fullName ? { fullName: spec.fullName } : {}),
-        requestLang: vivaRequestLang(spec.lang),
-      },
-    }),
+    body: orderRequestBody(v, spec),
   });
   // The raw text, not res.json(): a JSON parse would turn the 16-digit
   // orderCode into a lossy float. Pull the digits out of the body as text.
@@ -302,6 +308,70 @@ export async function verifyVivaConfig(v: VivaConfig): Promise<string | null> {
     );
   }
   return null;
+}
+
+/** Everything Viva support asks for when an order creation misbehaves: the
+ *  exact endpoints called, the token response's scope, the byte-for-byte order
+ *  request body, and Viva's raw answer. Contains no secrets — the access token
+ *  is deliberately not part of the report. */
+export interface VivaDiagnostics {
+  environment: "live" | "demo";
+  merchantId: string;
+  sourceCode: string;
+  tokenUrl: string;
+  tokenStatus: number;
+  /** The `scope` field of the token response — support checks it grants Smart Checkout. */
+  tokenScope: string | null;
+  orderUrl: string;
+  orderRequestBody: string;
+  orderStatus: number | null;
+  orderResponseBody: string | null;
+}
+
+/** Run the same two calls a real checkout makes — token, then a minimal unpaid
+ *  probe order — and report the raw exchange, for pasting into a Viva support
+ *  ticket. Never throws: whatever Viva answers IS the result. */
+export async function runVivaDiagnostics(v: VivaConfig): Promise<VivaDiagnostics> {
+  const h = hosts(v.demo);
+  const report: VivaDiagnostics = {
+    environment: v.demo ? "demo" : "live",
+    merchantId: v.merchantId,
+    sourceCode: v.sourceCode,
+    tokenUrl: `${h.accounts}/connect/token`,
+    tokenStatus: 0,
+    tokenScope: null,
+    orderUrl: `${h.api}/checkout/v2/orders`,
+    orderRequestBody: orderRequestBody(v, {
+      amountMinor: 100,
+      customerTrns: "Connection check from your booking engine — safe to ignore",
+      merchantTrns: "Connection check — safe to ignore",
+    }),
+    orderStatus: null,
+    orderResponseBody: null,
+  };
+  const tokenRes = await fetch(report.tokenUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${btoa(`${v.clientId}:${v.clientSecret}`)}`,
+    },
+    body: "grant_type=client_credentials",
+  }).catch(() => null);
+  if (!tokenRes) return report;
+  report.tokenStatus = tokenRes.status;
+  const tokenJson = (await tokenRes.json().catch(() => ({}))) as { access_token?: string; scope?: string };
+  report.tokenScope = tokenJson.scope ?? null;
+  if (!tokenRes.ok || !tokenJson.access_token) return report;
+  const orderRes = await fetch(report.orderUrl, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${tokenJson.access_token}`, "Content-Type": "application/json" },
+    body: report.orderRequestBody,
+  }).catch(() => null);
+  if (!orderRes) return report;
+  report.orderStatus = orderRes.status;
+  const text = await orderRes.text().catch(() => "");
+  report.orderResponseBody = text.slice(0, 1000) || "(empty body)";
+  return report;
 }
 
 /** EventTypeId of the "Transaction Payment Created" webhook. */

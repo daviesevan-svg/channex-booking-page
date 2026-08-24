@@ -10,7 +10,7 @@ import { getSettings, getVivaConfig, savePaymentSettings, saveVivaConfig } from 
 import { getProperty } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
-import { verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
+import { runVivaDiagnostics, verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
 import { redirect } from "react-router";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -81,11 +81,21 @@ export async function action({ request }: Route.ActionArgs) {
     intent === "connect" ||
     intent === "disconnect" ||
     intent === "viva-connect" ||
-    intent === "viva-disconnect"
+    intent === "viva-disconnect" ||
+    intent === "viva-diagnostics"
   ) {
     if (!(await isOwnerOrSuper(request, propertyId))) {
       return { error: "Only an owner or manager can connect or disconnect payments." };
     }
+  }
+
+  // Re-run the real token + probe-order exchange against Viva and show the raw
+  // result — exactly what Viva support asks for (endpoints, token scope, order
+  // payload, their response) when an order creation misbehaves.
+  if (intent === "viva-diagnostics") {
+    const viva = await getVivaConfig(propertyId);
+    if (!viva) return { error: "Viva isn't connected on this property." };
+    return { vivaDiag: await runVivaDiagnostics(viva) };
   }
 
   if (intent === "disconnect") {
@@ -370,16 +380,40 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
 
               {canOwn && (
-              <Form method="post" className="mt-5">
-                <input type="hidden" name="intent" value="viva-disconnect" />
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                >
-                  {t("payDisconnect")}
-                </button>
-              </Form>
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Form method="post">
+                  <input type="hidden" name="intent" value="viva-disconnect" />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {t("payDisconnect")}
+                  </button>
+                </Form>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="viva-diagnostics" />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {t("payVivaDiagRun")}
+                  </button>
+                </Form>
+              </div>
+              )}
+
+              {actionData && "vivaDiag" in actionData && actionData.vivaDiag && (
+                <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
+                  <p className="mb-2 text-[12px] leading-[1.5] text-muted">{t("payVivaDiagHelp")}</p>
+                  {/* Raw JSON on purpose: this block is pasted verbatim into a
+                      Viva support ticket, so it must not be translated or
+                      reformatted. It carries no secrets (no access token). */}
+                  <pre className="overflow-x-auto rounded-[8px] border border-line-alt bg-surface p-3 font-mono text-[11px] leading-[1.6] text-ink">
+                    {JSON.stringify(actionData.vivaDiag, null, 2)}
+                  </pre>
+                </div>
               )}
             </>
           ) : canOwn ? (

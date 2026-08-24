@@ -938,6 +938,8 @@ const DE: Record<string, string> = {
   payVivaFailureUrl: "Failure-URL",
   payVivaWebhookUrl: "Webhook-URL",
   payVivaNoGuarantee: "Viva belastet bei der Buchung, kann aber keine Karte als Aufenthaltsgarantie hinterlegen. Raten, die nur eine Garantiekarte verlangen, werden ohne Karte gebucht.",
+  payVivaDiagRun: "Verbindungsdiagnose ausführen",
+  payVivaDiagHelp: "Der Roh-Austausch mit Viva — Token-Scope, die exakte Bestellanfrage und Vivas Antwort. Bei Rückfragen des Viva-Supports einfach in das Ticket einfügen. Enthält keine Geheimnisse.",
   akTitle: "API-Schlüssel",
   akNotConfigured: "Legen Sie zuerst eine Unterkunft an, um API-Schlüssel zu erstellen.",
   akOnlyOwner: "Nur ein Inhaber oder Manager kann die API-Schlüssel dieser Unterkunft verwalten.",
