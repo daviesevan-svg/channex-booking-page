@@ -949,6 +949,8 @@ const TR: Record<string, string> = {
   payVivaFailureUrl: "Başarısızlık URL'si",
   payVivaWebhookUrl: "Webhook URL'si",
   payVivaNoGuarantee: "Viva rezervasyon anında tahsilat yapar ancak kartı konaklama güvencesi olarak saklayamaz. Yalnızca güvence kartı isteyen tarifeler kartsız rezerve edilir.",
+  payVivaDiagRun: "Bağlantı tanılamasını çalıştır",
+  payVivaDiagHelp: "Viva ile ham alışveriş — token scope'u, birebir sipariş isteği ve Viva'nın yanıtı. Viva destek bu ayrıntıları istediğinde bileti içine yapıştırın. Gizli bilgi içermez.",
   akTitle: "API anahtarları",
   akNotConfigured: "API anahtarı oluşturmak için önce bir tesis ekleyin.",
   akOnlyOwner: "Bu tesisin API anahtarlarını yalnızca bir sahip veya yönetici yönetebilir.",

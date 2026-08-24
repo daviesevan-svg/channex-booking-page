@@ -934,6 +934,8 @@ const EN: Record<string, string> = {
   payVivaFailureUrl: "Failure URL",
   payVivaWebhookUrl: "Webhook URL",
   payVivaNoGuarantee: "Viva charges at booking, but can't store a card as a stay guarantee. Rates that only ask for a guarantee card will book without one.",
+  payVivaDiagRun: "Run connection diagnostics",
+  payVivaDiagHelp: "The raw exchange with Viva — the token scope, the exact order request, and Viva's response. Paste it into a Viva support ticket when they ask for these details. It contains no secrets.",
   akTitle: "API keys",
   akNotConfigured: "Add a property first to create API keys.",
   akOnlyOwner: "Only an owner or manager can manage API keys for this property.",
