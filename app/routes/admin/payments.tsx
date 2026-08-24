@@ -11,6 +11,7 @@ import { getProperty } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { runVivaDiagnostics, verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
+import { saveVivaDiagnostics } from "~/lib/viva-diag.server";
 import { redirect } from "react-router";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -95,7 +96,9 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "viva-diagnostics") {
     const viva = await getVivaConfig(propertyId);
     if (!viva) return { error: "Viva isn't connected on this property." };
-    return { vivaDiag: await runVivaDiagnostics(viva) };
+    const report = await runVivaDiagnostics(viva);
+    await saveVivaDiagnostics(propertyId, report);
+    return { vivaDiag: report };
   }
 
   if (intent === "disconnect") {
@@ -144,7 +147,13 @@ export async function action({ request }: Route.ActionArgs) {
     // are written from, and the connected card's diagnostics button doesn't
     // exist yet because the connect never succeeded.
     const problem = await verifyVivaConfig(config);
-    if (problem) return { error: problem, vivaDiag: await runVivaDiagnostics(config) };
+    if (problem) {
+      // Persist the report too: the failed attempt is usually made by the
+      // hotel, and the support ticket gets written later without their screen.
+      const report = await runVivaDiagnostics(config);
+      await saveVivaDiagnostics(propertyId, report);
+      return { error: problem, vivaDiag: report };
+    }
     await saveVivaConfig(propertyId, config);
     return { ok: true };
   }
