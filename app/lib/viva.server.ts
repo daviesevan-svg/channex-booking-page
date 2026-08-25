@@ -33,6 +33,14 @@ export interface VivaConfig {
   sourceCode: string;
   /** true = Viva's demo (sandbox) environment. */
   demo?: boolean;
+  /** true = the client ID/secret are ISV PARTNER credentials, not the
+   *  merchant's own Smart Checkout pair. Orders and transaction lookups then go
+   *  through Viva's ISV endpoints (/checkout/v2/isv/...?merchantId=...) — an
+   *  ISV token against the merchant endpoints gets a bare 500 from Viva before
+   *  order processing. merchantId/apiKey stay the MERCHANT's pair either way
+   *  (refunds and the webhook verification key are merchant-level; ISV-level
+   *  refunds would need a separate Viva-issued reseller credential). */
+  isv?: boolean;
 }
 
 /** A config is usable only when every credential is present. */
@@ -164,6 +172,9 @@ function orderRequestBody(v: VivaConfig, spec: VivaOrderSpec): string {
     merchantTrns: spec.merchantTrns,
     sourceCode: v.sourceCode,
     paymentTimeout: spec.timeoutSeconds ?? 3600,
+    // ISV orders carry the partner's cut, counted INSIDE amount (the merchant
+    // receives amount − isvAmount). We charge nothing on the Viva rail.
+    ...(v.isv ? { isvAmount: 0 } : {}),
     customer: {
       ...(spec.email ? { email: spec.email } : {}),
       ...(spec.fullName ? { fullName: spec.fullName } : {}),
@@ -172,11 +183,20 @@ function orderRequestBody(v: VivaConfig, spec: VivaOrderSpec): string {
   });
 }
 
+/** Order-creation endpoint for the config's model. The ISV variant scopes the
+ *  order to the merchant via the query string. */
+function orderCreationUrl(v: VivaConfig): string {
+  const api = hosts(v.demo).api;
+  return v.isv
+    ? `${api}/checkout/v2/isv/orders?merchantId=${encodeURIComponent(v.merchantId)}`
+    : `${api}/checkout/v2/orders`;
+}
+
 /** Create a payment order. Returns the order code (a 16-digit id) as a STRING —
  *  it exceeds MAX_SAFE_INTEGER territory, so it must never live as a JS number. */
 export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promise<string> {
   const token = await vivaToken(v);
-  const res = await fetch(`${hosts(v.demo).api}/checkout/v2/orders`, {
+  const res = await fetch(orderCreationUrl(v), {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: orderRequestBody(v, spec),
@@ -208,7 +228,11 @@ export interface VivaTransaction {
  *  return URL and the webhook. */
 export async function retrieveVivaTransaction(v: VivaConfig, transactionId: string): Promise<VivaTransaction> {
   const token = await vivaToken(v);
-  const res = await fetch(`${hosts(v.demo).api}/checkout/v2/transactions/${encodeURIComponent(transactionId)}`, {
+  const api = hosts(v.demo).api;
+  const url = v.isv
+    ? `${api}/checkout/v2/isv/transactions/${encodeURIComponent(transactionId)}?merchantId=${encodeURIComponent(v.merchantId)}`
+    : `${api}/checkout/v2/transactions/${encodeURIComponent(transactionId)}`;
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   });
   const text = await res.text();
@@ -303,8 +327,9 @@ export async function verifyVivaConfig(v: VivaConfig): Promise<string | null> {
     const detail = e instanceof Error ? e.message : String(e);
     return (
       `Both credential pairs are valid, but Viva refused a test payment order for source code ${v.sourceCode} ` +
-      `(${detail}). Check that this payment source exists in the ${v.demo ? "demo" : "live"} environment, ` +
-      `that the 4-digit code is right, and that your Viva account's verification is complete.`
+      `under the ${v.isv ? "ISV" : "merchant"} model (${detail}). Check that this payment source exists in the ` +
+      `${v.demo ? "demo" : "live"} environment, that the 4-digit code is right, and that the model matches the ` +
+      `credentials: a merchant's own Smart Checkout pair needs the merchant model, an ISV partner's pair needs ISV.`
     );
   }
   return null;
@@ -316,6 +341,8 @@ export async function verifyVivaConfig(v: VivaConfig): Promise<string | null> {
  *  is deliberately not part of the report. */
 export interface VivaDiagnostics {
   environment: "live" | "demo";
+  /** Which integration model the credentials were used under. */
+  model: "merchant" | "isv";
   merchantId: string;
   sourceCode: string;
   tokenUrl: string;
@@ -335,12 +362,13 @@ export async function runVivaDiagnostics(v: VivaConfig): Promise<VivaDiagnostics
   const h = hosts(v.demo);
   const report: VivaDiagnostics = {
     environment: v.demo ? "demo" : "live",
+    model: v.isv ? "isv" : "merchant",
     merchantId: v.merchantId,
     sourceCode: v.sourceCode,
     tokenUrl: `${h.accounts}/connect/token`,
     tokenStatus: 0,
     tokenScope: null,
-    orderUrl: `${h.api}/checkout/v2/orders`,
+    orderUrl: orderCreationUrl(v),
     orderRequestBody: orderRequestBody(v, {
       amountMinor: 100,
       customerTrns: "Connection check from your booking engine — safe to ignore",

@@ -59,7 +59,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     account,
     notice: new URL(request.url).searchParams.get("stripe") || undefined,
     viva: viva
-      ? { merchantId: viva.merchantId, sourceCode: viva.sourceCode, demo: Boolean(viva.demo) }
+      ? { merchantId: viva.merchantId, sourceCode: viva.sourceCode, demo: Boolean(viva.demo), isv: Boolean(viva.isv) }
       : null,
     vivaUrls: {
       success: `${guestOrigin}/viva/return`,
@@ -137,6 +137,7 @@ export async function action({ request }: Route.ActionArgs) {
       clientSecret: String(form.get("clientSecret") ?? "").trim(),
       sourceCode: String(form.get("sourceCode") ?? "").trim(),
       demo: form.get("demo") === "on",
+      isv: form.get("isv") === "on",
     };
     if (!config.merchantId || !config.apiKey || !config.clientId || !config.clientSecret || !config.sourceCode) {
       return { error: "All five Viva credentials are required." };
@@ -377,6 +378,8 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 <dd className="font-mono text-[12px] text-ink">{viva.sourceCode}</dd>
                 <dt className="text-muted">{t("payVivaEnvironment")}</dt>
                 <dd className="text-ink">{viva.demo ? t("payVivaEnvDemo") : t("payVivaEnvLive")}</dd>
+                <dt className="text-muted">{t("payVivaModel")}</dt>
+                <dd className="text-ink">{viva.isv ? t("payVivaModelIsv") : t("payVivaModelMerchant")}</dd>
               </dl>
 
               <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
@@ -426,6 +429,11 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               <VivaField name="clientId" label={t("payVivaClientId")} placeholder="…apps.vivapayments.com" />
               <VivaField name="clientSecret" label={t("payVivaClientSecret")} />
               <VivaField name="sourceCode" label={t("payVivaSourceCode")} placeholder="1234" />
+              <label className="flex items-center gap-2 text-[13px] text-secondary">
+                <input type="checkbox" name="isv" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                {t("payVivaIsvToggle")}
+              </label>
+              <p className="-mt-2 text-[12px] leading-[1.5] text-muted">{t("payVivaIsvHelp")}</p>
               <label className="flex items-center gap-2 text-[13px] text-secondary">
                 <input type="checkbox" name="demo" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
                 {t("payVivaDemoToggle")}
