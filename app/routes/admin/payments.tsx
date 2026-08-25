@@ -390,6 +390,10 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                   <UrlRow label={t("payVivaFailureUrl")} value={vivaUrls.failure} />
                   <UrlRow label={t("payVivaWebhookUrl")} value={vivaUrls.webhook} />
                 </dl>
+                <p className="mt-3 text-[12px] leading-[1.5] text-muted">{t("payVivaWebhookSteps")}</p>
+                <p className="mt-2 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-[1.5] text-amber-900">
+                  {t("payVivaWebhookVerifyNote")}
+                </p>
               </div>
 
               <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
