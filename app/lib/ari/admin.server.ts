@@ -78,11 +78,16 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
     `INSERT INTO availability (hotel_code,room_type_id,date,avail) VALUES (?,?,?,?)
      ON CONFLICT(hotel_code,room_type_id,date) DO UPDATE SET avail=excluded.avail`,
   );
+  // The DO UPDATE must also set fraction_size: a manual edit writes price_minor
+  // ×100 (fraction 2), and landing on a Channex-written zero-decimal row
+  // (fraction_size 0) without updating it leaves a row whose value and exponent
+  // disagree — read.server decodes by the stored fraction_size, so that row
+  // would show 100× the edited price.
   const rateStmt = D.prepare(
     `INSERT INTO rate (hotel_code,room_type_id,rate_plan_id,date,occupancy,price_minor,currency,fraction_size)
      VALUES (?,?,?,?,?,?,?,2)
      ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date,occupancy)
-     DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency`,
+     DO UPDATE SET price_minor=excluded.price_minor,currency=excluded.currency,fraction_size=excluded.fraction_size`,
   );
   const rateDelStmt = D.prepare(
     `DELETE FROM rate WHERE hotel_code=? AND room_type_id=? AND rate_plan_id=? AND date=? AND occupancy=?`,
