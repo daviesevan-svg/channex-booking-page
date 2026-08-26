@@ -2,6 +2,7 @@
 // and the write paths' before/after snapshots).
 import { chunkForBinds, placeholders } from "../d1-limits";
 import { db } from "../d1.server";
+import { fromMinor } from "./fraction";
 import { ensureSchema, type InventoryData } from "./schema.server";
 
 /** Read the ARI for a [from, to] inclusive window, as lookup maps. */
@@ -115,7 +116,7 @@ async function readInventory(hotelCode: string, parts: DatePart[]): Promise<Inve
   const priceOcc: Record<string, number> = {};
   for (const r of rt) {
     const key = `${r.room_type_id}|${r.rate_plan_id}|${r.date}`;
-    const price = r.price_minor / 10 ** (r.fraction_size || 2);
+    const price = fromMinor(r.price_minor, r.fraction_size);
     // Every row also lands in the per-occupancy map (per-person rates price each
     // party size from its own row rather than the collapsed value below).
     (data.pricesByOcc[key] ??= {})[r.occupancy] = price;

@@ -4,6 +4,7 @@
 import { getConfig, getConfigKV } from "../config.server";
 import { db } from "../d1.server";
 import { timingSafeEqual } from "../hmac.server";
+import { toMinor } from "./fraction";
 import { CHANNEX_ACTOR } from "./log.server";
 import { getInventoryOn } from "./read.server";
 import { ensureSchema, type InventoryData } from "./schema.server";
@@ -34,7 +35,6 @@ function eachDate(from: string, to: string): string[] {
   return out;
 }
 
-const toMinor = (rate: string, fraction = 2) => Math.round(Number(rate) * 10 ** fraction);
 // Bindings for partial restriction changes: absent (or null) means "field not
 // in this change", carried as the -1 sentinel so the upsert keeps the stored
 // value (see RESTR_UPSERT in write.server.ts).
