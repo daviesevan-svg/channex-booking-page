@@ -113,4 +113,50 @@ describe("Channex ARI push round trip", () => {
     const inv = await getInventoryOn("h1", ["2026-09-03"]);
     expect(inv.prices["room|plan|2026-09-03"]).toBe(500_000);
   });
+
+  // The change from the field report that surfaced the bug, verbatim: one
+  // restriction_changes fanning out to a 486-day window. Exercises the wide
+  // path — eachDate expansion, packUpserts chunking under the 100-parameter
+  // cap, and the chunked before/after snapshot reads — with fraction 0.
+  it("handles the real 486-day VND push from the field report", async () => {
+    const { applyChanges } = await import("./ingest.server");
+    const { getInventoryOn } = await import("./read.server");
+
+    const room = "5bbcc52f-5f59-4242-bdca-93e0eee291f9";
+    const plan = "480324cb-e07a-4374-a943-4e9fbf5dd576";
+    const counts = await applyChanges({
+      data: [
+        {
+          type: "changes_notification",
+          attributes: {
+            request_id: "field-report",
+            hotel_code: "h2",
+            changes: [
+              {
+                type: "restriction_changes",
+                attributes: {
+                  rate_plan_id: plan,
+                  room_type_id: room,
+                  date_from: "2026-09-09",
+                  date_to: "2028-01-07",
+                  rates: [{ currency: "VND", occupancy: 2, rate: "500000", fraction_size: 0 }],
+                },
+              },
+            ],
+          },
+        },
+      ],
+    });
+    const days = (Date.UTC(2028, 0, 7) - Date.UTC(2026, 8, 9)) / 86_400_000 + 1;
+    expect(counts.rates).toBe(days);
+
+    const edges = ["2026-09-09", "2027-03-15", "2028-01-07"];
+    const inv = await getInventoryOn("h2", edges);
+    for (const d of edges) expect(inv.prices[`${room}|${plan}|${d}`]).toBe(500_000);
+
+    const bad = sqlite
+      .prepare("SELECT COUNT(*) AS n FROM rate WHERE hotel_code='h2' AND (price_minor<>500000 OR fraction_size<>0)")
+      .get() as { n: number };
+    expect(bad.n).toBe(0);
+  });
 });
