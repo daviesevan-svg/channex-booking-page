@@ -114,6 +114,7 @@ radius. So:
 | Funnel copy + search/hero | `PATCH /v1/manage/content/:pageId?lang=`, `PATCH /v1/manage/content/search?lang=` | `content` store savers | `EDITABLE_PAGES` ids; `heroImage` rides the default language (existing rule). |
 | Voucher catalog | CRUD `/v1/manage/voucher-products` | `vouchers.server.ts` product fns | Config only. Sold vouchers are excluded (§1). |
 | Branding/theme | `PATCH /v1/manage/brand` | `saveBrand` / `saveThemeTokens` | `themeFont` restricted to `FONT_PAIRS` ids; invalid values are 422, not silently ignored. `GET /v1/manage/brand-kit` returns the derived kit (prompt + tokens.json) — pure read, useful to agents building a matching site. |
+| Reviews | `GET /v1/manage/reviews`, `POST …/reviews/:bookingId/response`, `PATCH …/reviews/:bookingId` (hide/unhide) | `reviews.server.ts` (`setReviewResponse`) | Responding to guest reviews is a natural AI task; the guest's review text itself is never writable. |
 
 ### Phase C — accounts, provisioning, partner API
 
@@ -124,6 +125,7 @@ radius. So:
 | Google Hotels | `GET/PATCH /v1/manage/google` | The OFF→ON / ON→OFF transition side effects (full resync / block) computed from the pre-write value, exactly like the fixed UI path. |
 | Partner API | `pk_partner_` keys; `POST /partner/v1/properties` (Channex-import driven — the onboard flow takes a pasted `user-api-key` and property id today, same inputs as the endpoint), `…/invites`, `GET …/properties` + usage | whitelabel.md §8; the property-create path can also accept a structured payload (the `importBookingListing` split — parse vs import — was built so the import half takes a payload from anywhere). |
 | Viva credentials | `PUT /v1/manage/payments/viva` (write-only) + the PR467 probe | Candidate, decide when a partner asks. |
+| Registry fields | `PATCH /v1/manage/property/listing` (slug, public, directoryListed) | `properties.server.ts` slug rules (`slugError`, `RESERVED_SLUGS`) apply; ownership/transfer/create/delete stay off the property-scoped key (partner API territory). |
 
 Superadmin/global resources (properties registry admin, users/roles, partners,
 collections, domains) have **no key story in this spec** — they stay
