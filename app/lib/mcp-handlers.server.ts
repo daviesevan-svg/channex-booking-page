@@ -50,6 +50,12 @@ import { loader as manageBrandKitLoader } from "../routes/api.v1.manage.brand-ki
 import { loader as manageReviewsLoader } from "../routes/api.v1.manage.reviews";
 import { action as manageReviewResponseAction } from "../routes/api.v1.manage.reviews.$id.response";
 
+import { loader as manageTeamLoader, action as manageTeamAction } from "../routes/api.v1.manage.team";
+import { action as manageTeamMemberAction } from "../routes/api.v1.manage.team.$id";
+import { loader as manageWebhooksLoader, action as manageWebhooksAction } from "../routes/api.v1.manage.webhooks";
+import { action as manageWebhookAction } from "../routes/api.v1.manage.webhooks.$id";
+import { loader as manageGoogleLoader, action as manageGoogleAction } from "../routes/api.v1.manage.google";
+
 /** The shape every /v1 handler actually uses. Their generated arg types carry
  *  router context we neither have nor need, so dispatch through this. */
 type Handler = (args: { request: Request; params: Record<string, string> }) => Promise<Response>;
@@ -124,6 +130,15 @@ export const HANDLERS: Record<string, Handler> = {
   "GET /v1/manage/brand-kit": manageBrandKitLoader as unknown as Handler,
   "GET /v1/manage/reviews": manageReviewsLoader as unknown as Handler,
   "POST /v1/manage/reviews/:id/response": manageReviewResponseAction as unknown as Handler,
+  "GET /v1/manage/team": manageTeamLoader as unknown as Handler,
+  "POST /v1/manage/team": manageTeamAction as unknown as Handler,
+  "PATCH /v1/manage/team/:id": manageTeamMemberAction as unknown as Handler,
+  "DELETE /v1/manage/team/:id": manageTeamMemberAction as unknown as Handler,
+  "GET /v1/manage/webhooks": manageWebhooksLoader as unknown as Handler,
+  "POST /v1/manage/webhooks": manageWebhooksAction as unknown as Handler,
+  "DELETE /v1/manage/webhooks/:id": manageWebhookAction as unknown as Handler,
+  "GET /v1/manage/google": manageGoogleLoader as unknown as Handler,
+  "PATCH /v1/manage/google": manageGoogleAction as unknown as Handler,
   "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
   "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
   "GET /v1/manage/ari": manageAriLoader as unknown as Handler,

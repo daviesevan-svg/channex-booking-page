@@ -212,6 +212,28 @@ export const manageSchemas = {
       blurb: { type: ["string", "null"] },
     },
   },
+  ManageTeamInvite: { type: "object", required: ["email"], properties: { email: { type: "string", format: "email" } } },
+  ManageTeamAreas: {
+    type: "object",
+    required: ["areas"],
+    properties: { areas: { type: "array", items: { type: "string", enum: ["operations", "pricing", "website", "emails", "payments"] }, description: "What the member CAN see." } },
+  },
+  ManageWebhookCreate: {
+    type: "object",
+    required: ["url"],
+    properties: {
+      url: { type: "string", description: "Public https:// endpoint." },
+      events: { type: "array", items: { type: "string", enum: ["booking.created", "booking.cancelled"] }, description: "Empty/omitted = all." },
+    },
+  },
+  ManageGooglePatch: {
+    type: "object",
+    properties: {
+      push: { type: "boolean" },
+      window_days: { type: ["integer", "null"], minimum: 1, maximum: 500 },
+      program: { type: "string", enum: ["hotels", "vacation_rentals"] },
+    },
+  },
   ManageVoucherProductInput: {
     type: "object",
     description: "Voucher product payload. `package` is required for kind 'package' and rejected on other kinds.",
@@ -593,6 +615,56 @@ export const managePaths = {
       requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { text: { type: ["string", "null"] } } } } } },
       responses: baseResponses,
     },
+  },
+  "/v1/manage/team": {
+    ...managed("Team", "Owner + teammates with the admin areas each can see."),
+    post: {
+      ...writeOp(
+        "Invite a teammate",
+        "SENDS the invite email to that address — the only management endpoint that emails anyone. Property-scoped: no multi-property fan-out. New teammates start with full area access.",
+        "ManageTeamInvite",
+      ),
+    },
+  },
+  "/v1/manage/team/{id}": {
+    patch: {
+      ...writeOp("Set a teammate's visible areas", "Send the areas the member CAN see (all five = full access): operations, pricing, website, emails, payments.", "ManageTeamAreas"),
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "The teammate's email (URL-encoded)." }],
+    },
+    delete: {
+      summary: "Remove a teammate",
+      description: "From this property only; the user account and other properties are untouched.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" }, description: "The teammate's email (URL-encoded)." }],
+      responses: baseResponses,
+    },
+  },
+  "/v1/manage/webhooks": {
+    ...managed("Webhook endpoints", "Secrets masked — a secret is returned exactly once, by the POST that creates its endpoint."),
+    post: writeOp(
+      "Add a webhook",
+      "Public https URL + optional event list (empty = all of booking.created, booking.cancelled). Localhost/internal/private-IP targets are refused (SSRF). The response carries the signing secret ONCE.",
+      "ManageWebhookCreate",
+    ),
+  },
+  "/v1/manage/webhooks/{id}": {
+    delete: {
+      summary: "Remove a webhook",
+      description: "Deliveries stop immediately. No update verb — create a new endpoint (fresh secret) instead.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: idParam,
+      responses: baseResponses,
+    },
+  },
+  "/v1/manage/google": {
+    ...managed("Google Hotels ARI push", "Whether the direct-to-Google push is on, the window, and the program."),
+    patch: writeOp(
+      "Change the Google push",
+      "The transition carries the side effect (computed from the pre-write value): OFF→ON queues a full resync; ON→OFF queues a block (zero inventory + stop-sell) so Google stops selling immediately. vacation_rentals requires a single-unit property.",
+      "ManageGooglePatch",
+    ),
   },
   "/v1/manage/images": {
     post: {

@@ -1034,6 +1034,96 @@ export const MANAGE_MISC_TOOLS: McpTool[] = [
   },
 ];
 
+export const MANAGE_ACCOUNT_TOOLS: McpTool[] = [
+  {
+    name: "get_team",
+    description: "The property's owner and teammates, with the admin areas each teammate can see (operations, pricing, website, emails, payments).",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/team" },
+    scope: "manage",
+  },
+  {
+    name: "invite_teammate",
+    description:
+      "Invite one person to this property's admin by email. SENDS A REAL EMAIL to that address (the invite with a sign-in link) — the only management tool that emails anyone. Confirm the address with the operator before calling. New teammates start with full area access; narrow it with set_teammate_areas.",
+    inputSchema: { type: "object", properties: { email: { type: "string" } }, required: ["email"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/team" },
+    scope: "manage",
+  },
+  {
+    name: "set_teammate_areas",
+    description: "Set which admin areas a teammate can SEE (send the full list for full access): operations, pricing, website, emails, payments.",
+    inputSchema: {
+      type: "object",
+      properties: { email: { type: "string" }, areas: { type: "array", items: { type: "string", enum: ["operations", "pricing", "website", "emails", "payments"] } } },
+      required: ["email", "areas"],
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/team/:id" },
+    pathParam: "email",
+    scope: "manage",
+  },
+  {
+    name: "remove_teammate",
+    description: "Remove a teammate from THIS property (their account and other properties are untouched). Confirm with the operator first.",
+    inputSchema: { type: "object", properties: { email: { type: "string" } }, required: ["email"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/team/:id" },
+    pathParam: "email",
+    scope: "manage",
+  },
+  {
+    name: "list_webhooks",
+    description: "The property's webhook endpoints (booking.created / booking.cancelled), secrets masked — a secret is shown exactly once, when the endpoint is created.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/webhooks" },
+    scope: "manage",
+  },
+  {
+    name: "create_webhook",
+    description:
+      "Add a webhook endpoint: public https URL + optional event list (empty = all). The response carries the signing secret ONCE — relay it to the operator immediately, it is never shown again. Localhost/internal/private-IP URLs are refused.",
+    inputSchema: {
+      type: "object",
+      properties: { url: { type: "string" }, events: { type: "array", items: { type: "string", enum: ["booking.created", "booking.cancelled"] } } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+    route: { method: "POST", path: "/v1/manage/webhooks" },
+    scope: "manage",
+  },
+  {
+    name: "delete_webhook",
+    description: "Remove a webhook endpoint; deliveries stop immediately. There is no update — create a new endpoint (with a fresh secret) instead.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/webhooks/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "get_google_settings",
+    description: "The direct Google Hotels ARI push: whether it's on, the push window, and the program (hotels / vacation_rentals).",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/google" },
+    scope: "manage",
+  },
+  {
+    name: "update_google_settings",
+    description:
+      "Change the Google push. Turning it ON queues a full resync to Google; turning it OFF queues a block (zero inventory + stop-sell) so Google stops selling the property immediately — both are real outbound effects, confirm with the operator. vacation_rentals needs a single-unit property.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        push: { type: "boolean" },
+        window_days: { type: ["integer", "null"], minimum: 1, maximum: 500 },
+        program: { type: "string", enum: ["hotels", "vacation_rentals"] },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/google" },
+    scope: "manage",
+  },
+];
+
 const ALL_TOOLS = (): McpTool[] => [
   ...TOOLS,
   ...MANAGE_TOOLS,
@@ -1043,6 +1133,7 @@ const ALL_TOOLS = (): McpTool[] => [
   ...MANAGE_CONTENT_TOOLS,
   ...MANAGE_EMAIL_TOOLS,
   ...MANAGE_MISC_TOOLS,
+  ...MANAGE_ACCOUNT_TOOLS,
 ];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
