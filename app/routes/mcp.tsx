@@ -33,63 +33,9 @@ import {
   type RpcRequest,
 } from "~/lib/mcp";
 
-import { loader as propertiesLoader } from "./api.v1.properties";
-import { loader as availabilityLoader } from "./api.v1.availability";
-import { loader as calendarLoader } from "./api.v1.calendar";
-import { loader as ratesLoader } from "./api.v1.rates";
-import { loader as extrasLoader } from "./api.v1.extras";
-import { loader as bookingLoader } from "./api.v1.bookings.$id";
-import { action as bookingsAction } from "./api.v1.bookings";
-import { loader as managePropertyLoader, action as managePropertyAction } from "./api.v1.manage.property";
-import { loader as manageContentLoader, action as manageContentAction } from "./api.v1.manage.property.content";
-import { loader as manageRoomsLoader, action as manageRoomsAction } from "./api.v1.manage.rooms";
-import { loader as manageRoomLoader, action as manageRoomAction } from "./api.v1.manage.rooms.$id";
-import { loader as manageRatesLoader, action as manageRatesAction } from "./api.v1.manage.rates";
-import { loader as manageRateLoader, action as manageRateAction } from "./api.v1.manage.rates.$id";
-import { loader as manageTaxesLoader } from "./api.v1.manage.taxes";
-import { loader as manageExtrasLoader } from "./api.v1.manage.extras";
-import { loader as managePromotionsLoader } from "./api.v1.manage.promotions";
-import { loader as manageBookingsLoader } from "./api.v1.manage.bookings";
-import { loader as manageBookingLoader } from "./api.v1.manage.bookings.$id";
-import { loader as manageAriLoader } from "./api.v1.manage.ari";
+import { HANDLERS } from "~/lib/mcp-handlers.server";
 import { identifyApiKey, type ApiKeyScope } from "~/lib/api-auth.server";
 import { requireCanonicalHost } from "~/lib/domains.server";
-
-/** The shape every /v1 handler actually uses. Their generated arg types carry
- *  router context we neither have nor need, so dispatch through this. */
-type Handler = (args: { request: Request; params: Record<string, string> }) => Promise<Response>;
-
-const HANDLERS: Record<string, Handler> = {
-  "GET /v1/properties": propertiesLoader as unknown as Handler,
-  "GET /v1/availability": availabilityLoader as unknown as Handler,
-  "GET /v1/calendar": calendarLoader as unknown as Handler,
-  "GET /v1/rates": ratesLoader as unknown as Handler,
-  "GET /v1/extras": extrasLoader as unknown as Handler,
-  "GET /v1/bookings/:id": bookingLoader as unknown as Handler,
-  "POST /v1/bookings": bookingsAction as unknown as Handler,
-  "GET /v1/manage/property": managePropertyLoader as unknown as Handler,
-  "PATCH /v1/manage/property": managePropertyAction as unknown as Handler,
-  "GET /v1/manage/property/content": manageContentLoader as unknown as Handler,
-  "PATCH /v1/manage/property/content": manageContentAction as unknown as Handler,
-  "GET /v1/manage/rooms": manageRoomsLoader as unknown as Handler,
-  "POST /v1/manage/rooms": manageRoomsAction as unknown as Handler,
-  "PUT /v1/manage/rooms": manageRoomsAction as unknown as Handler,
-  "GET /v1/manage/rooms/:id": manageRoomLoader as unknown as Handler,
-  "PATCH /v1/manage/rooms/:id": manageRoomAction as unknown as Handler,
-  "DELETE /v1/manage/rooms/:id": manageRoomAction as unknown as Handler,
-  "GET /v1/manage/rates": manageRatesLoader as unknown as Handler,
-  "POST /v1/manage/rates": manageRatesAction as unknown as Handler,
-  "PUT /v1/manage/rates": manageRatesAction as unknown as Handler,
-  "GET /v1/manage/rates/:id": manageRateLoader as unknown as Handler,
-  "PATCH /v1/manage/rates/:id": manageRateAction as unknown as Handler,
-  "DELETE /v1/manage/rates/:id": manageRateAction as unknown as Handler,
-  "GET /v1/manage/taxes": manageTaxesLoader as unknown as Handler,
-  "GET /v1/manage/extras": manageExtrasLoader as unknown as Handler,
-  "GET /v1/manage/promotions": managePromotionsLoader as unknown as Handler,
-  "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
-  "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
-  "GET /v1/manage/ari": manageAriLoader as unknown as Handler,
-};
 
 /** The key's scope, for filtering what tools/list advertises. No key (or a bad
  *  one) advertises the booking set, matching the endpoint's historically
@@ -159,7 +105,7 @@ async function handleRpc(request: Request, req: RpcRequest) {
         serverInfo: SERVER_INFO,
         instructions:
           scope === "manage"
-            ? "Management tools for one hotel — read its configuration, catalog, bookings and ARI. Call get_property_settings first for the currency and languages. Everything here is currently read-only; bookings and availability/prices change in the property's channel manager, not through these tools."
+            ? "Management tools for one hotel: read and edit its configuration, rooms, rate plans, taxes, extras, promotions and content. Call get_property_settings first for the currency and languages. Bookings and the ARI grid (availability, date-level prices, restrictions) are READ-ONLY — they change in the property's channel manager, and if asked to change them, say where. Confirm destructive or price-affecting changes (deletes, currency, tax mode) with the operator before calling."
             : "Booking tools for one hotel. Call get_property first for the currency, then search_availability for a stay, then create_booking. If a booking comes back as pending_payment, give the guest the payment_url — it is not confirmed until they pay. Never handle card details yourself.",
       });
     }
