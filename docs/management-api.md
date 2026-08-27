@@ -114,7 +114,7 @@ radius. So:
 | Funnel copy + search/hero | `PATCH /v1/manage/content/:pageId?lang=`, `PATCH /v1/manage/content/search?lang=` | `content` store savers | `EDITABLE_PAGES` ids; `heroImage` rides the default language (existing rule). |
 | Voucher catalog | CRUD `/v1/manage/voucher-products` | `vouchers.server.ts` product fns | Config only. Sold vouchers are excluded (§1). |
 | Branding/theme | `PATCH /v1/manage/brand` | `saveBrand` / `saveThemeTokens` | `themeFont` restricted to `FONT_PAIRS` ids; invalid values are 422, not silently ignored. `GET /v1/manage/brand-kit` returns the derived kit (prompt + tokens.json) — pure read, useful to agents building a matching site. |
-| Reviews | `GET /v1/manage/reviews`, `POST …/reviews/:bookingId/response`, `PATCH …/reviews/:bookingId` (hide/unhide) | `reviews.server.ts` (`setReviewResponse`) | Responding to guest reviews is a natural AI task; the guest's review text itself is never writable. |
+| Reviews | `GET /v1/manage/reviews`, `POST …/reviews/:bookingId/response` | `reviews.server.ts` (`setReviewResponse`) | Responding to guest reviews is a natural AI task; the guest's review text itself is never writable. There is deliberately NO hide/delete — a property can only respond, never bury criticism (the `hidden` column is a dormant platform-level valve, not a property power), so the API exposes respond only. |
 
 ### Phase C — accounts, provisioning, partner API
 

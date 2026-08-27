@@ -43,6 +43,13 @@ import { loader as manageFacilitiesLoader, action as manageFacilitiesAction } fr
 import { loader as manageEmailsLoader } from "../routes/api.v1.manage.emails";
 import { loader as manageEmailLoader, action as manageEmailAction } from "../routes/api.v1.manage.emails.$id";
 
+import { loader as manageVouchersLoader, action as manageVouchersAction } from "../routes/api.v1.manage.voucher-products";
+import { loader as manageVoucherLoader, action as manageVoucherAction } from "../routes/api.v1.manage.voucher-products.$id";
+import { loader as manageBrandLoader, action as manageBrandAction } from "../routes/api.v1.manage.brand";
+import { loader as manageBrandKitLoader } from "../routes/api.v1.manage.brand-kit";
+import { loader as manageReviewsLoader } from "../routes/api.v1.manage.reviews";
+import { action as manageReviewResponseAction } from "../routes/api.v1.manage.reviews.$id.response";
+
 /** The shape every /v1 handler actually uses. Their generated arg types carry
  *  router context we neither have nor need, so dispatch through this. */
 type Handler = (args: { request: Request; params: Record<string, string> }) => Promise<Response>;
@@ -107,6 +114,16 @@ export const HANDLERS: Record<string, Handler> = {
   "GET /v1/manage/emails": manageEmailsLoader as unknown as Handler,
   "GET /v1/manage/emails/:id": manageEmailLoader as unknown as Handler,
   "PATCH /v1/manage/emails/:id": manageEmailAction as unknown as Handler,
+  "GET /v1/manage/voucher-products": manageVouchersLoader as unknown as Handler,
+  "POST /v1/manage/voucher-products": manageVouchersAction as unknown as Handler,
+  "GET /v1/manage/voucher-products/:id": manageVoucherLoader as unknown as Handler,
+  "PATCH /v1/manage/voucher-products/:id": manageVoucherAction as unknown as Handler,
+  "DELETE /v1/manage/voucher-products/:id": manageVoucherAction as unknown as Handler,
+  "GET /v1/manage/brand": manageBrandLoader as unknown as Handler,
+  "PATCH /v1/manage/brand": manageBrandAction as unknown as Handler,
+  "GET /v1/manage/brand-kit": manageBrandKitLoader as unknown as Handler,
+  "GET /v1/manage/reviews": manageReviewsLoader as unknown as Handler,
+  "POST /v1/manage/reviews/:id/response": manageReviewResponseAction as unknown as Handler,
   "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
   "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
   "GET /v1/manage/ari": manageAriLoader as unknown as Handler,
