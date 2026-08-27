@@ -17,6 +17,7 @@ import {
   MAX_GALLERY_IMAGES,
   resolveGallery,
   type Gallery,
+  type GalleryImage,
   type GalleryText,
   type ResolvedGalleryImage,
 } from "./gallery";
@@ -79,6 +80,30 @@ export async function removeImage(pid: string, id: string): Promise<string[]> {
   for (const lang of Object.keys(gallery.text)) delete gallery.text[lang][id];
   await write(pid, gallery);
   return gone ? [gone.url] : [];
+}
+
+/** Replace the image list in one write (the management API's PUT): array
+ *  order is display order; entries with a known id keep their image (and every
+ *  language's text); entries with only a url are appended as new images; stored
+ *  images missing from the input are removed, their text pruned in every
+ *  language. Returns the removed urls for `queueImageCleanup`. */
+export async function setGalleryImages(
+  pid: string,
+  items: { id?: string; url: string }[],
+): Promise<{ removedUrls: string[] }> {
+  const gallery = await read(pid);
+  const byId = new Map(gallery.images.map((i) => [i.id, i]));
+  const next: GalleryImage[] = items.map((item) =>
+    item.id && byId.has(item.id) ? byId.get(item.id)! : { id: crypto.randomUUID(), url: item.url },
+  );
+  const kept = new Set(next.map((i) => i.id));
+  const removed = gallery.images.filter((i) => !kept.has(i.id));
+  for (const lang of Object.keys(gallery.text)) {
+    for (const img of removed) delete gallery.text[lang][img.id];
+  }
+  gallery.images = next;
+  await write(pid, gallery);
+  return { removedUrls: removed.map((i) => i.url) };
 }
 
 /** Save order and the alt/caption for ONE language in a single write. */
