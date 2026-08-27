@@ -2,25 +2,28 @@
 
 > Decision (Evan, 2026-08-27): provide a **full management API** so a PMS — or
 > an AI agent over MCP — can create and edit properties, rooms, rates, content
-> and the rest without our UI. The only domains kept OFF the API are **ARI and
-> bookings: they stay exclusively on the Channex pipe.** This document is the
-> spec; implementation lands as separate PRs per phase.
+> and the rest without our UI. **ARI and bookings are readable through the
+> API, but their writes stay exclusively on the Channex pipe.** This document
+> is the spec; implementation lands as separate PRs per phase.
 
 ## 1. What is explicitly NOT in this API — ever
 
 These are product decisions, not deferrals:
 
-- **ARI** — availability, date-level prices, restrictions. Channex pushes them
-  to `/api/changes` and is the source of truth; a second writer would fight the
-  channel (the "channel wins" arbitration in `ari/read.server.ts` exists
-  precisely because one manual writer already causes enough trouble). No
-  management endpoint reads or writes the D1 `availability`/`rate`/`restriction`
-  tables. The manual inventory grid stays UI-only.
-- **Bookings** — bookings arrive via Channex (and the guest checkout);
+- **ARI writes** — availability, date-level prices, restrictions. Channex
+  pushes them to `/api/changes` and is the source of truth; a second writer
+  would fight the channel (the "channel wins" arbitration in
+  `ari/read.server.ts` exists precisely because one manual writer already
+  causes enough trouble). The manual inventory grid stays UI-only. **Reads are
+  in** (§4 phase A) — a PMS reconciling what our engine is selling against its
+  own inventory is the normal integration need, and a read has no second-writer
+  problem.
+- **Booking writes** — bookings arrive via Channex (and the guest checkout);
   cancel/refund/modify touch money, Channex push, Stripe/Viva and email, and
-  stay in the admin UI. The existing guest-side `POST /v1/bookings`
-  (payment-url flow, agent booking) is a **different product** and is
-  unchanged by this spec.
+  stay in the admin UI. **Reads are in** (§4 phase A): list + detail, the same
+  data the admin bookings screen shows. The existing guest-side
+  `POST /v1/bookings` (payment-url flow, agent booking) is a **different
+  product** and is unchanged by this spec.
 - **Money actions** — Stripe/Viva refunds, sold-voucher edits/comps. UI only.
 - **Payment onboarding** — Stripe Connect is an OAuth the hotelier performs;
   there is no credential to POST. (Viva credentials ARE pasted strings in
@@ -96,6 +99,8 @@ radius. So:
 | Extras | CRUD + `PUT` replace | `extras.server.ts` | `taxable` default-true documented in the schema. The demo-seed (`ensureExampleExtras`) must NOT run on API list — API callers get the real (possibly empty) list. |
 | Promotions | CRUD | `promotions.server.ts` | `publish` semantics (auto vs code) written into the field description; codes normalized server-side. |
 | Images | `POST /v1/manage/images` (multipart), `POST /v1/manage/images/import` `{url}` | `images.server.ts`, `importImageFromUrl` | Returns `{url}` to reference from any payload. 8 MB / image-\* caps as today; import is https-only. No DELETE — removal happens by dropping the reference; `queueImageCleanup` GCs unreferenced files (its `referencedBy` list already covers every store). |
+| Bookings (read-only) | `GET /v1/manage/bookings` (filters: stay/created date range, status; paginated), `GET /v1/manage/bookings/:id` | `bookings.server.ts`, extend `serializeBooking` | The same facts the admin bookings screen shows: guest, stay, rooms/rates, extras, totals, status, channel reference, payment state (charge/refund refs — never gateway internals or card data). No mutation verbs exist on this resource. |
+| ARI (read-only) | `GET /v1/manage/ari?from=&to=[&room_id=&rate_id=]` | `getInventory` (`ari/read.server.ts`) | The grid as our engine sells it: per-date availability, prices (major units, decoded per `fraction_size`), per-occupancy prices, restrictions. Window capped (start: 400 days/request) — it is a D1 read fanning out per date. This is the reconciliation surface: "what is RoomPanda selling" vs the PMS's own inventory. No write verbs exist. |
 
 ### Phase B — content & website
 
@@ -143,7 +148,11 @@ they're all the agent reads):
   the agent into the same structure/text split that keeps the UI safe.
 - `upload_image` / `import_image` return the url and say where it can be used.
 - Read tools come first in the list (agents read top-down): `get_property`,
-  `list_rooms`, `list_rates`, then writes.
+  `list_rooms`, `list_rates`, `list_bookings`, `get_booking`, `get_ari`, then
+  writes. `get_ari` and the booking tools say explicitly that they are
+  read-only and that changes flow through the property's channel manager — so
+  an agent asked to "close tomorrow" or "cancel this booking" explains where
+  that happens instead of hunting for a tool that doesn't exist.
 
 ## 6. Side-effect policy
 
