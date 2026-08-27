@@ -750,7 +750,130 @@ export const MANAGE_SITE_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS];
+export const MANAGE_CONTENT_TOOLS: McpTool[] = [
+  {
+    name: "get_gallery",
+    description: "The photo gallery: ordered images with ids, plus ONE language's stored alt/caption. Image ids key the per-language text — keep them stable.",
+    inputSchema: { type: "object", properties: { ...langArg }, additionalProperties: false },
+    route: { method: "GET", path: "/v1/manage/gallery" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "set_gallery_images",
+    description:
+      "Replace the gallery's image LIST in one call — array order is display order. Reuse ids from get_gallery to keep an image and every language's captions; url-only entries are new (upload via the REST images endpoint first); stored images you omit are permanently removed and garbage-collected. Max 40.",
+    inputSchema: {
+      type: "object",
+      properties: { images: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" } }, required: ["url"] } } },
+      required: ["images"],
+      additionalProperties: false,
+    },
+    route: { method: "PUT", path: "/v1/manage/gallery" },
+    scope: "manage",
+  },
+  {
+    name: "update_gallery_text",
+    description: "Edit alt text / captions for ONE language, sparsely: imageId → { alt?, caption? } (null clears a field; a null entry clears both). Ids come from get_gallery.",
+    inputSchema: {
+      type: "object",
+      properties: { ...langArg, text: { type: "object", description: "imageId → { alt?, caption? } | null" } },
+      required: ["text"],
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/gallery/text" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "get_search_content",
+    description:
+      "The booking page's search/hero block for one language: eyebrow, heading, intro, promo text + placeholder, search button label, highlights, hero image. `values` = stored for that language; `effective` = what guests see after fallback.",
+    inputSchema: { type: "object", properties: { ...langArg }, additionalProperties: false },
+    route: { method: "GET", path: "/v1/manage/content/search" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "update_search_content",
+    description:
+      "Edit the search/hero block for ONE language, sparsely (null clears → default-language fallback). `highlights` replaces the whole array when present ([{title, description}], usually three). `hero_image` is language-independent — only settable without lang, as an /images/… path or null.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...langArg,
+        eyebrow: { type: ["string", "null"] },
+        heading: { type: ["string", "null"] },
+        intro: { type: ["string", "null"] },
+        promo_text: { type: ["string", "null"] },
+        promo_placeholder: { type: ["string", "null"], description: "Example code shown inside the promo input." },
+        search_button: { type: ["string", "null"] },
+        highlights: { type: ["array", "null"], items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } }, required: ["title", "description"] } },
+        hero_image: { type: ["string", "null"] },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/content/search" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "get_funnel_page_copy",
+    description:
+      "One booking-funnel page's editable text (results, detail, checkout, extras, confirmation): its fields with labels, the stored values for one language, and the effective view guests see.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", enum: ["results", "detail", "checkout", "extras", "confirmation"] }, ...langArg },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/content/pages/:id" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "update_funnel_page_copy",
+    description: "Edit a funnel page's text for ONE language, sparsely: field → text (null clears → fallback). Valid fields come from get_funnel_page_copy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", enum: ["results", "detail", "checkout", "extras", "confirmation"] },
+        ...langArg,
+      },
+      required: ["id"],
+      additionalProperties: true,
+    },
+    route: { method: "PATCH", path: "/v1/manage/content/pages/:id" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "get_facility_lines",
+    description: "The FREE-TEXT facility lines for one language (curated facility keys are settings — update_property_settings). `effective` shows the whole-list fallback guests see.",
+    inputSchema: { type: "object", properties: { ...langArg }, additionalProperties: false },
+    route: { method: "GET", path: "/v1/manage/content/facilities" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "set_facility_lines",
+    description:
+      "Replace ONE language's free-text facility lines. Whole-list on purpose (guests fall back list-wise — a half-translated list reads worse than the original); an empty array clears the language.",
+    inputSchema: {
+      type: "object",
+      properties: { ...langArg, lines: { type: "array", items: { type: "string" } } },
+      required: ["lines"],
+      additionalProperties: false,
+    },
+    route: { method: "PUT", path: "/v1/manage/content/facilities" },
+    query: ["lang"],
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS, ...MANAGE_CONTENT_TOOLS];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 

@@ -212,6 +212,22 @@ export const manageSchemas = {
       blurb: { type: ["string", "null"] },
     },
   },
+  ManageGalleryImage: { type: "object", required: ["url"], properties: { id: { type: "string", description: "Keep to preserve the image + its captions." }, url: { type: "string", description: "/images/… path." } } },
+  ManageGalleryTextPatch: { type: "object", description: "imageId → { alt?, caption? } | null.", additionalProperties: { type: ["object", "null"] } },
+  ManageSearchContentPatch: {
+    type: "object",
+    properties: {
+      eyebrow: nullableStr,
+      heading: nullableStr,
+      intro: nullableStr,
+      promo_text: nullableStr,
+      promo_placeholder: nullableStr,
+      search_button: nullableStr,
+      highlights: { type: ["array", "null"], items: { type: "object", properties: { title: { type: "string" }, description: { type: "string" } }, required: ["title", "description"] } },
+      hero_image: { ...nullableStr, description: "/images/… path; language-independent (default language only)." },
+    },
+  },
+  ManageFacilityLines: { type: "string", description: "One facility line." },
   ManageExtraInput: {
     type: "object",
     description: "Add-on write payload. Sparse on PATCH; null clears optionals. `image` must be an /images/… path from POST /v1/manage/images.",
@@ -438,6 +454,59 @@ export const managePaths = {
         "Sparse over the stored footer. `links` replaces the list when present (labels are per-language; removed links lose labels in every language). `social` merges per platform (null removes). http(s) URLs only.",
         "ManageFooterPut",
       ),
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/gallery": {
+    ...managed("Photo gallery", "Ordered images + one language's stored alt/caption (`?lang=`). Image ids key the per-language text.", {
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    }),
+    put: writeOp(
+      "Replace the image list",
+      "Array order = display order (max 40). Entries with a known id keep the image and every language's text; url-only entries are new; omitted stored images are removed and garbage-collected. Accepts the bare array or { images: [...] }.",
+      "ManageGalleryImage",
+      true,
+    ),
+  },
+  "/v1/manage/gallery/text": {
+    patch: {
+      ...writeOp("Edit one language's alt/captions", "imageId → { alt?, caption? } (null clears a field; a null entry clears both). Unknown ids are 422s. Accepts the bare map or { text: {...} }.", "ManageGalleryTextPatch"),
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/content/search": {
+    ...managed("Search/hero content", "The booking page's hero block per language: stored `values` + fallback-resolved `effective` + the language-independent hero_image.", {
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    }),
+    patch: {
+      ...writeOp(
+        "Edit the search/hero block",
+        "Sparse per language; null clears. `highlights` replaces wholesale. `hero_image` (an /images/… path or null) is language-independent and only accepted without a lang override.",
+        "ManageSearchContentPatch",
+      ),
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/content/pages/{id}": {
+    get: {
+      summary: "A booking-funnel page's editable text",
+      description: "ids: results, detail, checkout, extras, confirmation. Returns the field definitions, one language's stored values, and the effective view.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+      responses: baseResponses,
+    },
+    patch: {
+      ...writeOp("Edit a funnel page's text", "Sparse per language: field → text, null clears. Field keys come from the GET.", "ManageSiteCopyPatch"),
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/content/facilities": {
+    ...managed("Free-text facility lines", "Per language; guests fall back list-wise to the default language. Curated facility keys are settings (PATCH /v1/manage/property).", {
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    }),
+    put: {
+      ...writeOp("Replace one language's facility lines", "Whole-list on purpose; an empty array clears the language. Accepts the bare array or { lines: [...] }.", "ManageFacilityLines", true),
       parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
     },
   },
