@@ -22,7 +22,7 @@ export interface McpTool {
   description: string;
   inputSchema: Record<string, unknown>;
   /** Where the call is dispatched: the REST method + path template. */
-  route: { method: "GET" | "POST"; path: string };
+  route: { method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; path: string };
   /** Argument names that go in the query string (GET) rather than the body. */
   query?: string[];
   /** Argument name that fills `:id` in the path. */
@@ -305,7 +305,153 @@ export const MANAGE_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS];
+// Room/rate write payloads — mirror manage-validate.ts exactly. Omitted fields
+// are unchanged; null clears an optional field. Unknown fields are 422s, so a
+// drifted schema here shows up as a correctable error, not a silent drop.
+const roomBodyProps = {
+  title: { type: "string", description: "Room name in the default language." },
+  description: { type: ["string", "null"] },
+  images: { type: "array", items: { type: "string" }, description: "Our /images/… paths, in display order. Upload first (phase A adds upload endpoints); replacing the list drops removed photos." },
+  max_adults: { type: "integer", minimum: 1 },
+  max_guests: { type: "integer", minimum: 1, description: "Adults + children this room sleeps; must be ≥ max_adults." },
+  cleaning_fee: { type: ["number", "null"], minimum: 0, description: "Once per room per stay; null clears it." },
+  facilities: { type: "array", items: { type: "string" }, description: "Free-text lines shown to guests (default language)." },
+  amenities: { type: "array", items: { type: "string" }, description: "Google amenity vocabulary keys only — unknown keys are rejected." },
+  position: { type: "integer", minimum: 0, description: "Sort position in the rooms list." },
+  translations: {
+    type: "object",
+    description: 'Per-language text overrides, e.g. {"de": {"title": "Doppelzimmer"}}. Never includes the default language — edit the top-level fields for that. Replaces the whole map when present.',
+  },
+} as const;
+
+const occupancyPricingSchema = {
+  type: ["object", "null"],
+  description: "Per-person pricing rules; null clears them.",
+  properties: {
+    default_occupancy: { type: "integer", minimum: 1 },
+    extra_adult_price: { type: "number", minimum: 0 },
+    less_guest_discount: { type: "number", minimum: 0 },
+    child_0_3: { type: "number", minimum: 0 },
+    child_4_12: { type: "number", minimum: 0 },
+    child_13_plus: { type: "number", minimum: 0 },
+    children_as_adults: { type: "boolean" },
+  },
+} as const;
+
+const ratePolicySchema = {
+  type: "object",
+  description: "Payment, cancellation and no-show rules. Required on create — there is no implicit default policy.",
+  properties: {
+    payment: {
+      type: "object",
+      properties: {
+        timing: { type: "string", enum: ["pay_at_hotel", "deposit", "full_prepay"] },
+        card: { type: "string", enum: ["guarantee", "charge_at_booking"] },
+        deposit: {
+          type: "object",
+          description: "Required when timing is 'deposit'.",
+          properties: { type: { type: "string", enum: ["percent", "fixed", "first_night", "first_n_nights"] }, value: { type: "number", minimum: 0 } },
+        },
+      },
+      required: ["timing", "card"],
+    },
+    cancellation: {
+      type: "object",
+      properties: {
+        refundable: { type: "boolean" },
+        tiers: {
+          type: "array",
+          description: "Free→penalty windows; empty = free cancellation with no deadline. deadline_value 0 means 'until the anchor time on arrival day'.",
+          items: {
+            type: "object",
+            properties: {
+              deadline_value: { type: "integer", minimum: 0 },
+              deadline_unit: { type: "string", enum: ["hours", "days"] },
+              penalty: { type: "string", enum: ["none", "first_night", "percent", "fixed", "full_stay"] },
+              penalty_value: { type: "number", minimum: 0 },
+            },
+            required: ["deadline_value", "deadline_unit", "penalty"],
+          },
+        },
+      },
+      required: ["refundable", "tiers"],
+    },
+    no_show: {
+      type: "object",
+      properties: { penalty: { type: "string", enum: ["none", "first_night", "percent", "fixed", "full_stay"] }, penalty_value: { type: "number", minimum: 0 } },
+      required: ["penalty"],
+    },
+    override_note: { type: ["string", "null"], description: "Replaces the auto-generated guest-facing policy text." },
+  },
+  required: ["payment", "cancellation", "no_show"],
+} as const;
+
+const rateBodyProps = {
+  title: { type: "string" },
+  meal_plan: { type: ["string", "null"] },
+  active: { type: "boolean" },
+  prices: { type: "object", description: "room_id → base nightly price (> 0). A rate is offered on a room only when it has a price here. NOT date-level ARI prices — those come from the channel manager." },
+  occupancy_pricing: occupancyPricingSchema,
+  occupancy_pricing_by_room: { type: ["object", "null"], description: "room_id → occupancy-pricing override (same shape as occupancy_pricing)." },
+  policy: ratePolicySchema,
+  inclusions: { type: "array", items: { type: "string" } },
+} as const;
+
+export const MANAGE_WRITE_TOOLS: McpTool[] = [
+  {
+    name: "create_room",
+    description:
+      "Create a room type. Required: title, max_adults, max_guests. It appears at the end of the rooms list. Newly created rooms have no prices — add the room to a rate plan's `prices` (update_rate_plan) or it cannot be sold.",
+    inputSchema: { type: "object", properties: roomBodyProps, required: ["title", "max_adults", "max_guests"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/rooms" },
+    scope: "manage",
+  },
+  {
+    name: "update_room",
+    description:
+      "Edit a room type. Sparse: omitted fields stay unchanged, null clears an optional field. `translations` replaces the whole map when present — send every language you want kept. Replacing `images` permanently deletes the photos no longer referenced anywhere.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...roomBodyProps }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/rooms/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_room",
+    description:
+      "Delete a room type. CASCADES: the room's price is removed from every rate plan, and its photos are garbage-collected. Confirm with the operator before deleting a room that has bookings history.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/rooms/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "create_rate_plan",
+    description:
+      "Create a rate plan. Required: title, prices (room_id → base nightly price — the rooms it is sold on), and the full policy (payment, cancellation, no_show). For a Channex-connected property, date-level prices from the channel override these base prices.",
+    inputSchema: { type: "object", properties: rateBodyProps, required: ["title", "prices", "policy"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/rates" },
+    scope: "manage",
+  },
+  {
+    name: "update_rate_plan",
+    description:
+      "Edit a rate plan. Sparse: omitted fields stay unchanged. `prices` replaces the whole map when present. The Channex mapping (channex_rate_ids) is server-owned and cannot be written.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...rateBodyProps }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/rates/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_rate_plan",
+    description: "Delete a rate plan. Existing bookings keep their snapshot; the rate simply stops being offered. Consider `active: false` (update_rate_plan) to pause it instead.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/rates/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 
@@ -371,15 +517,20 @@ export function mapArguments(
   args: Record<string, unknown>,
 ): { search: URLSearchParams; body?: string; pathValue?: string } {
   const search = new URLSearchParams();
+  const pathValue = tool.pathParam ? String(args[tool.pathParam] ?? "") : undefined;
   if (tool.route.method === "GET") {
     for (const key of tool.query ?? []) {
       const v = args[key];
       if (v === undefined || v === null || v === "") continue;
       search.set(key, Array.isArray(v) ? v.join(",") : String(v));
     }
-    return { search, pathValue: tool.pathParam ? String(args[tool.pathParam] ?? "") : undefined };
+    return { search, pathValue };
   }
-  // POST bodies pass through, minus the fields the transport handles itself.
-  const { idempotency_key: _ignored, ...rest } = args;
-  return { search, body: JSON.stringify(rest) };
+  if (tool.route.method === "DELETE") return { search, pathValue };
+  // Write bodies pass through, minus the fields the transport handles itself
+  // (the idempotency key travels as a header, the path param in the URL).
+  const rest = { ...args };
+  delete rest.idempotency_key;
+  if (tool.pathParam) delete rest[tool.pathParam];
+  return { search, body: JSON.stringify(rest), pathValue };
 }

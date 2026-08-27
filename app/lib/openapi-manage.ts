@@ -24,6 +24,29 @@ const managed = (summary: string, description: string, extra: Record<string, unk
   },
 });
 
+const idParam = [{ name: "id", in: "path", required: true, schema: { type: "string" } }];
+const baseResponses = {
+  "200": { description: "OK" },
+  "401": { description: "Missing or invalid key." },
+  "403": { description: "Key has the wrong scope — management endpoints need an ak_ key." },
+  "404": { description: "No such resource." },
+} as const;
+const writeOp = (summary: string, description: string, schema: string, isList = false) => ({
+  summary,
+  description,
+  security: manageAuth,
+  tags: ["Management"],
+  requestBody: {
+    required: true,
+    content: {
+      "application/json": {
+        schema: isList ? { type: "array", items: { $ref: `#/components/schemas/${schema}` } } : { $ref: `#/components/schemas/${schema}` },
+      },
+    },
+  },
+  responses: { ...baseResponses, "422": { description: "Validation failed — `error.fields` maps each invalid field to its messages. Unknown fields are rejected, not ignored." } },
+});
+
 export const manageSecuritySchemes = {
   ManageKeyAuth: {
     type: "http",
@@ -70,6 +93,43 @@ export const manageSchemas = {
       created_at: { type: "string" },
     },
   },
+  ManageRoomInput: {
+    type: "object",
+    description:
+      "Room write payload. PATCH is a sparse merge (omitted = unchanged, null clears); POST requires title, max_adults, max_guests. Unknown fields are 422s. `images` entries must be our /images/… paths; `translations` never includes the default language and replaces the whole map when present.",
+    properties: {
+      id: { type: "string", description: "PUT-list items only: keep a stable id to preserve createdAt/translations. Ignored on POST." },
+      title: { type: "string" },
+      description: nullableStr,
+      images: { type: "array", items: { type: "string" } },
+      max_adults: { type: "integer", minimum: 1 },
+      max_guests: { type: "integer", minimum: 1 },
+      cleaning_fee: { type: ["number", "null"], minimum: 0 },
+      facilities: { type: "array", items: { type: "string" } },
+      amenities: { type: "array", items: { type: "string" }, description: "Google amenity vocabulary keys — unknown keys are rejected." },
+      position: { type: "integer", minimum: 0 },
+      translations: { type: "object" },
+    },
+  },
+  ManageRateInput: {
+    type: "object",
+    description:
+      "Rate-plan write payload. POST requires title, prices and policy (no implicit default policy). `prices` maps room_id → base nightly price > 0 — NOT date-level ARI. `channex_rate_ids` is server-owned and rejected if sent.",
+    properties: {
+      id: { type: "string", description: "PUT-list items only: keep a stable id to preserve the Channex mapping. Ignored on POST." },
+      title: { type: "string" },
+      meal_plan: nullableStr,
+      active: { type: "boolean" },
+      prices: { type: "object", additionalProperties: { type: "number", exclusiveMinimum: 0 } },
+      occupancy_pricing: { type: ["object", "null"] },
+      occupancy_pricing_by_room: { type: ["object", "null"] },
+      policy: {
+        type: "object",
+        description: "payment {timing, card, deposit?} + cancellation {refundable, tiers[]} + no_show {penalty, penalty_value?} + override_note?. tier.deadline_value 0 = the anchor time on arrival day.",
+      },
+      inclusions: { type: "array", items: { type: "string" } },
+    },
+  },
   ManageBooking: {
     type: "object",
     description:
@@ -110,11 +170,46 @@ export const managePaths = {
       ],
     },
   ),
-  "/v1/manage/rooms": managed("Room types (admin view)", "Full room records including translations — see ManageRoom."),
-  "/v1/manage/rates": managed(
-    "Rate plans (admin view)",
-    "Full structural rate-plan records including inactive ones — see ManageRate. Also returns the property-wide `pricing_mode`.",
-  ),
+  "/v1/manage/rooms": {
+    ...managed("Room types (admin view)", "Full room records including translations — see ManageRoom."),
+    post: writeOp("Create a room", "Required: title, max_adults, max_guests. Appears at the end of the list; add it to a rate plan's prices before it can sell.", "ManageRoomInput"),
+    put: writeOp(
+      "Replace the room list",
+      "Re-import semantics: the array becomes the whole list in one write, order = position, retained ids keep createdAt/translations, dropped rooms' photos are garbage-collected.",
+      "ManageRoomInput",
+      true,
+    ),
+  },
+  "/v1/manage/rooms/{id}": {
+    get: { summary: "One room", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+    patch: { ...writeOp("Edit a room", "Sparse merge: omitted fields unchanged, null clears. `translations` and `images` replace their whole value when present; dropped images are garbage-collected.", "ManageRoomInput"), parameters: idParam },
+    delete: {
+      summary: "Delete a room",
+      description: "CASCADES: the room's price is removed from every rate plan; its photos are garbage-collected.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: idParam,
+      responses: baseResponses,
+    },
+  },
+  "/v1/manage/rates": {
+    ...managed(
+      "Rate plans (admin view)",
+      "Full structural rate-plan records including inactive ones — see ManageRate. Also returns the property-wide `pricing_mode`.",
+    ),
+    post: writeOp("Create a rate plan", "Required: title, prices (room_id → base nightly price) and the full policy — there is no implicit default policy.", "ManageRateInput"),
+    put: writeOp(
+      "Replace the rate-plan list",
+      "Re-import semantics. Retained ids keep their server-owned fields (channex_rate_ids, createdAt) — a full replace never severs the Channex mapping.",
+      "ManageRateInput",
+      true,
+    ),
+  },
+  "/v1/manage/rates/{id}": {
+    get: { summary: "One rate plan", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+    patch: { ...writeOp("Edit a rate plan", "Sparse merge. `prices` replaces the whole map when present. channex_rate_ids is read-only.", "ManageRateInput"), parameters: idParam },
+    delete: { summary: "Delete a rate plan", description: "Bookings keep their snapshots; consider active:false to pause instead.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
   "/v1/manage/taxes": managed("Tax configuration", "taxes_inclusive, tax rules, fee rules, and the city-tax config as one document."),
   "/v1/manage/extras": managed("Extras catalog (admin view)", "Every add-on, active or not, with options, exclusions and tax treatment."),
   "/v1/manage/promotions": managed("Promotions", "Promo codes and automatic offers with their conditions and publish state."),

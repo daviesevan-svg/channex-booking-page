@@ -42,8 +42,10 @@ import { loader as bookingLoader } from "./api.v1.bookings.$id";
 import { action as bookingsAction } from "./api.v1.bookings";
 import { loader as managePropertyLoader } from "./api.v1.manage.property";
 import { loader as manageContentLoader } from "./api.v1.manage.property.content";
-import { loader as manageRoomsLoader } from "./api.v1.manage.rooms";
-import { loader as manageRatesLoader } from "./api.v1.manage.rates";
+import { loader as manageRoomsLoader, action as manageRoomsAction } from "./api.v1.manage.rooms";
+import { loader as manageRoomLoader, action as manageRoomAction } from "./api.v1.manage.rooms.$id";
+import { loader as manageRatesLoader, action as manageRatesAction } from "./api.v1.manage.rates";
+import { loader as manageRateLoader, action as manageRateAction } from "./api.v1.manage.rates.$id";
 import { loader as manageTaxesLoader } from "./api.v1.manage.taxes";
 import { loader as manageExtrasLoader } from "./api.v1.manage.extras";
 import { loader as managePromotionsLoader } from "./api.v1.manage.promotions";
@@ -68,7 +70,17 @@ const HANDLERS: Record<string, Handler> = {
   "GET /v1/manage/property": managePropertyLoader as unknown as Handler,
   "GET /v1/manage/property/content": manageContentLoader as unknown as Handler,
   "GET /v1/manage/rooms": manageRoomsLoader as unknown as Handler,
+  "POST /v1/manage/rooms": manageRoomsAction as unknown as Handler,
+  "PUT /v1/manage/rooms": manageRoomsAction as unknown as Handler,
+  "GET /v1/manage/rooms/:id": manageRoomLoader as unknown as Handler,
+  "PATCH /v1/manage/rooms/:id": manageRoomAction as unknown as Handler,
+  "DELETE /v1/manage/rooms/:id": manageRoomAction as unknown as Handler,
   "GET /v1/manage/rates": manageRatesLoader as unknown as Handler,
+  "POST /v1/manage/rates": manageRatesAction as unknown as Handler,
+  "PUT /v1/manage/rates": manageRatesAction as unknown as Handler,
+  "GET /v1/manage/rates/:id": manageRateLoader as unknown as Handler,
+  "PATCH /v1/manage/rates/:id": manageRateAction as unknown as Handler,
+  "DELETE /v1/manage/rates/:id": manageRateAction as unknown as Handler,
   "GET /v1/manage/taxes": manageTaxesLoader as unknown as Handler,
   "GET /v1/manage/extras": manageExtrasLoader as unknown as Handler,
   "GET /v1/manage/promotions": managePromotionsLoader as unknown as Handler,
