@@ -362,7 +362,7 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 const PROPERTY_FIELDS = new Set([
   "currency", "pricing_mode", "languages", "single_unit", "facilities",
   "checkin_time", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
-  "address", "portal", "terms_url", "privacy_url",
+  "address", "portal", "terms_url", "privacy_url", "emails",
 ]);
 const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES as readonly string[]);
 
@@ -536,6 +536,32 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
   if (terms !== undefined) out.termsUrl = terms as never;
   const privacy = optHttpsUrl(ctx, body, "privacy_url");
   if (privacy !== undefined) out.privacyUrl = privacy as never;
+
+  const emails = body.emails;
+  if (emails !== undefined) {
+    if (!isObj(emails)) ctx.fail("emails", "Must be an object.");
+    else {
+      const allowed = new Set(["from_name", "reply_to", "host_notify_email", "notify_host_on_booking", "notify_host_on_cancel"]);
+      for (const k of Object.keys(emails)) if (!allowed.has(k)) ctx.fail("emails", `Unknown field "${k}".`);
+      const fromName = optStr(ctx, emails, "from_name");
+      if (fromName !== undefined) out.emailFromName = (fromName || null) as never;
+      const emailField = (f: string) => {
+        const v = emails[f];
+        if (v === undefined) return undefined;
+        if (v === null) return null;
+        if (typeof v !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.trim())) return ctx.fail(`emails.${f}`, "Must be an email address or null.");
+        return v.trim().toLowerCase();
+      };
+      const replyTo = emailField("reply_to");
+      if (replyTo !== undefined) out.emailReplyTo = replyTo as never;
+      const hostNotify = emailField("host_notify_email");
+      if (hostNotify !== undefined) out.hostNotifyEmail = hostNotify as never;
+      const onBooking = optBool(ctx, emails, "notify_host_on_booking");
+      if (onBooking !== undefined) out.notifyHostOnBooking = onBooking;
+      const onCancel = optBool(ctx, emails, "notify_host_on_cancel");
+      if (onCancel !== undefined) out.notifyHostOnCancel = onCancel;
+    }
+  }
 
   if (!ctx.failed && Object.keys(out).length === 0) ctx.fail("body", "No fields to update.");
   return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };

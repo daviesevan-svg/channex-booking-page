@@ -212,6 +212,11 @@ export const manageSchemas = {
       blurb: { type: ["string", "null"] },
     },
   },
+  ManageEmailPatch: {
+    type: "object",
+    properties: { subject: nullableStr, heading: nullableStr, intro: nullableStr, outro: nullableStr },
+    description: "Use the template's {tokens} (see the GET); they are replaced at send time and unknown ones render literally.",
+  },
   ManageGalleryImage: { type: "object", required: ["url"], properties: { id: { type: "string", description: "Keep to preserve the image + its captions." }, url: { type: "string", description: "/images/… path." } } },
   ManageGalleryTextPatch: { type: "object", description: "imageId → { alt?, caption? } | null.", additionalProperties: { type: ["object", "null"] } },
   ManageSearchContentPatch: {
@@ -508,6 +513,24 @@ export const managePaths = {
     put: {
       ...writeOp("Replace one language's facility lines", "Whole-list on purpose; an empty array clears the language. Accepts the bare array or { lines: [...] }.", "ManageFacilityLines", true),
       parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/emails": managed(
+    "Email template catalog + sender identity",
+    "The six transactional templates with their editable fields and valid {tokens}, plus the sender settings (writable via PATCH /v1/manage/property `emails`). No send-test endpoint — a real outbound email is a UI action.",
+  ),
+  "/v1/manage/emails/{id}": {
+    get: {
+      summary: "One email template (one language)",
+      description: "`values` = stored overrides for `lang`; `effective` = what sends (built-in copy → default language → this language). Unknown {tokens} render literally, never fail a send.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+      responses: baseResponses,
+    },
+    patch: {
+      ...writeOp("Edit an email template's text", "Sparse per language: subject/heading/intro/outro, null clears → fallback. Changes affect real guest email immediately.", "ManageEmailPatch"),
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
     },
   },
   "/v1/manage/images": {
