@@ -40,6 +40,17 @@ import { loader as ratesLoader } from "./api.v1.rates";
 import { loader as extrasLoader } from "./api.v1.extras";
 import { loader as bookingLoader } from "./api.v1.bookings.$id";
 import { action as bookingsAction } from "./api.v1.bookings";
+import { loader as managePropertyLoader } from "./api.v1.manage.property";
+import { loader as manageContentLoader } from "./api.v1.manage.property.content";
+import { loader as manageRoomsLoader } from "./api.v1.manage.rooms";
+import { loader as manageRatesLoader } from "./api.v1.manage.rates";
+import { loader as manageTaxesLoader } from "./api.v1.manage.taxes";
+import { loader as manageExtrasLoader } from "./api.v1.manage.extras";
+import { loader as managePromotionsLoader } from "./api.v1.manage.promotions";
+import { loader as manageBookingsLoader } from "./api.v1.manage.bookings";
+import { loader as manageBookingLoader } from "./api.v1.manage.bookings.$id";
+import { loader as manageAriLoader } from "./api.v1.manage.ari";
+import { identifyApiKey, type ApiKeyScope } from "~/lib/api-auth.server";
 import { requireCanonicalHost } from "~/lib/domains.server";
 
 /** The shape every /v1 handler actually uses. Their generated arg types carry
@@ -54,7 +65,29 @@ const HANDLERS: Record<string, Handler> = {
   "GET /v1/extras": extrasLoader as unknown as Handler,
   "GET /v1/bookings/:id": bookingLoader as unknown as Handler,
   "POST /v1/bookings": bookingsAction as unknown as Handler,
+  "GET /v1/manage/property": managePropertyLoader as unknown as Handler,
+  "GET /v1/manage/property/content": manageContentLoader as unknown as Handler,
+  "GET /v1/manage/rooms": manageRoomsLoader as unknown as Handler,
+  "GET /v1/manage/rates": manageRatesLoader as unknown as Handler,
+  "GET /v1/manage/taxes": manageTaxesLoader as unknown as Handler,
+  "GET /v1/manage/extras": manageExtrasLoader as unknown as Handler,
+  "GET /v1/manage/promotions": managePromotionsLoader as unknown as Handler,
+  "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
+  "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
+  "GET /v1/manage/ari": manageAriLoader as unknown as Handler,
 };
+
+/** The key's scope, for filtering what tools/list advertises. No key (or a bad
+ *  one) advertises the booking set, matching the endpoint's historically
+ *  unauthenticated descriptor; actual calls still authenticate in the handler. */
+async function keyScope(request: Request): Promise<ApiKeyScope> {
+  try {
+    const auth = await identifyApiKey(request);
+    return auth instanceof Response ? "book" : auth.scope;
+  } catch {
+    return "book";
+  }
+}
 
 /** Runs one tool against its /v1 handler, carrying the caller's credentials and
  *  idempotency key through unchanged. */
@@ -104,18 +137,22 @@ async function callTool(request: Request, name: string, rawArgs: unknown) {
 
 async function handleRpc(request: Request, req: RpcRequest) {
   switch (req.method) {
-    case "initialize":
+    case "initialize": {
+      const scope = await keyScope(request);
       return rpcResult(req.id, {
         protocolVersion: negotiateVersion(req.params?.protocolVersion),
         capabilities: { tools: { listChanged: false } },
         serverInfo: SERVER_INFO,
         instructions:
-          "Booking tools for one hotel. Call get_property first for the currency, then search_availability for a stay, then create_booking. If a booking comes back as pending_payment, give the guest the payment_url — it is not confirmed until they pay. Never handle card details yourself.",
+          scope === "manage"
+            ? "Management tools for one hotel — read its configuration, catalog, bookings and ARI. Call get_property_settings first for the currency and languages. Everything here is currently read-only; bookings and availability/prices change in the property's channel manager, not through these tools."
+            : "Booking tools for one hotel. Call get_property first for the currency, then search_availability for a stay, then create_booking. If a booking comes back as pending_payment, give the guest the payment_url — it is not confirmed until they pay. Never handle card details yourself.",
       });
+    }
     case "ping":
       return rpcResult(req.id, {});
     case "tools/list":
-      return rpcResult(req.id, { tools: publicToolList() });
+      return rpcResult(req.id, { tools: publicToolList(await keyScope(request)) });
     case "tools/call": {
       const name = String(req.params?.name ?? "");
       if (!name) return rpcError(req.id, RPC_ERRORS.invalidParams, "`name` is required.");

@@ -133,6 +133,20 @@ export async function revokeApiKey(pid: string, keyId: string): Promise<boolean>
  *  management key on a guest endpoint — or the reverse — is a 403 that names
  *  the right key kind rather than a mystery 401. */
 export async function authenticateApiKey(request: Request, scope: ApiKeyScope = "book"): Promise<ApiAuth | Response> {
+  const auth = await identifyApiKey(request);
+  if (auth instanceof Response) return auth;
+  if (auth.scope !== scope) {
+    return scope === "manage"
+      ? apiError(403, "wrong_key_scope", "This endpoint requires a management key (ak_…). Booking keys (sk_…) cannot manage the property.")
+      : apiError(403, "wrong_key_scope", "This endpoint requires a booking key (sk_…). Management keys (ak_…) cannot search or book.");
+  }
+  return auth;
+}
+
+/** Resolve the key WITHOUT enforcing a scope — for the one place that adapts
+ *  to whichever key it was given (the MCP endpoint filtering its advertised
+ *  tool list). Every REST endpoint uses authenticateApiKey instead. */
+export async function identifyApiKey(request: Request): Promise<ApiAuth | Response> {
   // Same reasoning as the admin gate: /v1 and /mcp are ours, not something to
   // expose on a hotel's own hostname.
   requireCanonicalHost(request);
@@ -144,11 +158,6 @@ export async function authenticateApiKey(request: Request, scope: ApiKeyScope = 
   const hash = await hashKey(raw);
   const entry = await readJson<{ pid: string; keyId: string; mode: ApiKeyMode; scope?: ApiKeyScope }>(indexKey(hash));
   if (!entry) return apiError(401, "unauthorized", "Invalid or revoked API key.");
-  if ((entry.scope ?? "book") !== scope) {
-    return scope === "manage"
-      ? apiError(403, "wrong_key_scope", "This endpoint requires a management key (ak_…). Booking keys (sk_…) cannot manage the property.")
-      : apiError(403, "wrong_key_scope", "This endpoint requires a booking key (sk_…). Management keys (ak_…) cannot search or book.");
-  }
 
   // Best-effort lastUsedAt stamp; never block the request on it.
   try {

@@ -107,6 +107,20 @@ export default [
   route("v1/bookings", "routes/api.v1.bookings.tsx"),
   route("v1/bookings/:id", "routes/api.v1.bookings.$id.tsx"),
 
+  // Management API (docs/management-api.md) — ak_ manage-scoped keys only.
+  // ARI and bookings are READ-ONLY here by decision; their writes stay on the
+  // Channex pipe and in the admin UI.
+  route("v1/manage/property", "routes/api.v1.manage.property.tsx"),
+  route("v1/manage/property/content", "routes/api.v1.manage.property.content.tsx"),
+  route("v1/manage/rooms", "routes/api.v1.manage.rooms.tsx"),
+  route("v1/manage/rates", "routes/api.v1.manage.rates.tsx"),
+  route("v1/manage/taxes", "routes/api.v1.manage.taxes.tsx"),
+  route("v1/manage/extras", "routes/api.v1.manage.extras.tsx"),
+  route("v1/manage/promotions", "routes/api.v1.manage.promotions.tsx"),
+  route("v1/manage/bookings", "routes/api.v1.manage.bookings.tsx"),
+  route("v1/manage/bookings/:id", "routes/api.v1.manage.bookings.$id.tsx"),
+  route("v1/manage/ari", "routes/api.v1.manage.ari.tsx"),
+
   // Admin (magic-link protected)
   route("admin/login", "routes/admin/login.tsx"),
   route("admin/verify", "routes/admin/verify.tsx"),
