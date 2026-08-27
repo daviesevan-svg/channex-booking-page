@@ -8,7 +8,10 @@
 // domain shape ready for the catalog savers; the wire format is snake_case
 // like the read serializers.
 import type { CatalogRate, CatalogRoom } from "./catalog.server";
-import { VR_AMENITY_KEYS, type DeadlineUnit } from "./content";
+import { PROPERTY_FACILITIES, VR_AMENITY_KEYS, isLang, DEFAULT_LANG, type DeadlineUnit, type SiteSettings } from "./content";
+import { isSupportedCurrency } from "./currencies";
+import { parseHHMM } from "./dates";
+import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import type { OccupancyPricing } from "./rate-pricing";
 import type { CancelTier, RatePolicy } from "./rate-policy";
 
@@ -350,6 +353,335 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
   if (inclusions) out.inclusions = inclusions;
 
   return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };
+}
+
+// ── Property settings (PATCH /v1/manage/property) ───────────────────────────
+
+const PROPERTY_FIELDS = new Set([
+  "currency", "pricing_mode", "languages", "single_unit", "facilities",
+  "checkin_time", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
+  "address", "portal", "terms_url", "privacy_url",
+]);
+const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES as readonly string[]);
+
+const optHHMM = (ctx: Ctx, obj: Record<string, unknown>, field: string, label = field): string | null | undefined => {
+  const v = obj[field];
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== "string" || parseHHMM(v.trim()) == null) return ctx.fail(label, 'Must be "HH:MM" (24h).');
+  return v.trim();
+};
+
+const optHttpsUrl = (ctx: Ctx, body: Record<string, unknown>, field: string): string | null | undefined => {
+  const v = body[field];
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (typeof v !== "string") return ctx.fail(field, "Must be a URL string.");
+  try {
+    const u = new URL(v.trim());
+    if (u.protocol !== "https:") return ctx.fail(field, "Must be an https:// URL.");
+    return u.toString();
+  } catch {
+    return ctx.fail(field, "Must be a valid https:// URL.");
+  }
+};
+
+/** A coordinate value: number or numeric string (stored as string, like the UI). */
+const optCoord = (ctx: Ctx, obj: Record<string, unknown>, field: string, label: string, range: number): string | null | undefined => {
+  const v = obj[field];
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.trim()) : NaN;
+  if (!Number.isFinite(n) || Math.abs(n) > range) return ctx.fail(label, `Must be a number between -${range} and ${range}.`);
+  return String(n);
+};
+
+export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSettings>> {
+  const ctx = new Ctx();
+  if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
+  rejectUnknown(ctx, body, PROPERTY_FIELDS);
+  const out: Partial<SiteSettings> = {};
+
+  const currency = body.currency;
+  if (currency !== undefined) {
+    if (typeof currency !== "string" || !isSupportedCurrency(currency.trim().toUpperCase())) ctx.fail("currency", "Not a supported ISO 4217 currency code.");
+    else out.currency = currency.trim().toUpperCase();
+  }
+  const mode = body.pricing_mode;
+  if (mode !== undefined) {
+    if (mode !== "per_room" && mode !== "per_person") ctx.fail("pricing_mode", "Must be per_room or per_person.");
+    else out.pricingMode = mode;
+  }
+  const langs = body.languages;
+  if (langs !== undefined) {
+    if (!Array.isArray(langs) || langs.some((l) => typeof l !== "string" || !isLang(l))) {
+      ctx.fail("languages", "Must be an array of supported language codes.");
+    } else if (!langs.includes(DEFAULT_LANG)) {
+      ctx.fail("languages", `Must include the default language ("${DEFAULT_LANG}").`);
+    } else out.languages = [...new Set(langs as string[])];
+  }
+  const single = optBool(ctx, body, "single_unit");
+  if (single !== undefined) out.singleUnit = single;
+
+  const facilities = strList(ctx, body, "facilities");
+  if (facilities) {
+    const unknown = facilities.filter((k) => !FACILITY_KEYS.has(k));
+    if (unknown.length) ctx.fail("facilities", `Unknown facility keys: ${unknown.join(", ")}. Free-text facilities are per-language content, not settings.`);
+    else out.facilities = facilities;
+  }
+
+  const checkin = optHHMM(ctx, body, "checkin_time");
+  if (checkin !== undefined) out.checkinTime = checkin as never;
+  const checkout = optHHMM(ctx, body, "checkout_time");
+  if (checkout !== undefined) out.checkoutTime = checkout as never;
+
+  const tz = body.timezone;
+  if (tz !== undefined) {
+    if (tz === null) out.timezone = null as never;
+    else if (typeof tz !== "string") ctx.fail("timezone", "Must be an IANA timezone string.");
+    else {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz.trim() });
+        out.timezone = tz.trim();
+      } catch {
+        ctx.fail("timezone", `"${tz}" is not a valid IANA timezone.`);
+      }
+    }
+  }
+  const cutoffDays = body.booking_cutoff_days;
+  if (cutoffDays !== undefined) {
+    if (cutoffDays === null) out.bookingCutoffDays = null as never;
+    else if (typeof cutoffDays !== "number" || !Number.isInteger(cutoffDays) || cutoffDays < 0 || cutoffDays > 7) ctx.fail("booking_cutoff_days", "Must be an integer 0–7, or null for no limit.");
+    else out.bookingCutoffDays = cutoffDays;
+  }
+  const cutoffTime = optHHMM(ctx, body, "booking_cutoff_time");
+  if (cutoffTime !== undefined) out.bookingCutoffTime = cutoffTime as never;
+
+  const address = body.address;
+  if (address !== undefined) {
+    if (!isObj(address)) ctx.fail("address", "Must be an object.");
+    else {
+      const allowed = new Set(["city", "region", "postal_code", "country", "latitude", "longitude"]);
+      for (const k of Object.keys(address)) if (!allowed.has(k)) ctx.fail("address", `Unknown field "${k}".`);
+      const sub = (f: string) => optStr(ctx, address, f);
+      const city = sub("city");
+      if (city !== undefined) out.addressCity = (city || null) as never;
+      const region = sub("region");
+      if (region !== undefined) out.addressRegion = (region || null) as never;
+      const postal = sub("postal_code");
+      if (postal !== undefined) out.addressPostalCode = (postal || null) as never;
+      const country = address.country;
+      if (country !== undefined) {
+        if (country === null) out.addressCountry = null as never;
+        else if (typeof country !== "string" || !/^[A-Za-z]{2}$/.test(country.trim())) ctx.fail("address.country", "Must be an ISO 3166-1 alpha-2 code, e.g. GB.");
+        else out.addressCountry = country.trim().toUpperCase();
+      }
+      const lat = optCoord(ctx, address, "latitude", "address.latitude", 90);
+      if (lat !== undefined) out.latitude = lat as never;
+      const lng = optCoord(ctx, address, "longitude", "address.longitude", 180);
+      if (lng !== undefined) out.longitude = lng as never;
+    }
+  }
+
+  const portal = body.portal;
+  if (portal !== undefined) {
+    if (!isObj(portal)) ctx.fail("portal", "Must be an object.");
+    else {
+      const allowed = new Set([
+        "allow_cancel", "allow_modify", "auto_refund",
+        "cancel_deadline_value", "cancel_deadline_unit", "cancel_anchor_time",
+        "modify_deadline_value", "modify_deadline_unit", "after_deadline_message",
+      ]);
+      for (const k of Object.keys(portal)) if (!allowed.has(k)) ctx.fail("portal", `Unknown field "${k}".`);
+      const b = (f: string) => optBool(ctx, portal, f);
+      const allowCancel = b("allow_cancel");
+      if (allowCancel !== undefined) out.allowCancel = allowCancel;
+      const allowModify = b("allow_modify");
+      if (allowModify !== undefined) out.allowModify = allowModify;
+      const autoRefund = b("auto_refund");
+      if (autoRefund !== undefined) out.autoRefund = autoRefund;
+      const deadline = (f: string): number | null | undefined => {
+        const v = portal[f];
+        if (v === undefined) return undefined;
+        if (v === null) return null;
+        // 0 is meaningful — "until the anchor time on arrival day" (PR389).
+        if (typeof v !== "number" || !Number.isInteger(v) || v < 0) return ctx.fail(`portal.${f}`, "Must be an integer ≥ 0 (0 = the anchor time on arrival day), or null.");
+        return v;
+      };
+      const unit = (f: string): DeadlineUnit | null | undefined => {
+        const v = portal[f];
+        if (v === undefined) return undefined;
+        if (v === null) return null;
+        if (v !== "hours" && v !== "days") return ctx.fail(`portal.${f}`, "Must be hours or days.");
+        return v;
+      };
+      const cdv = deadline("cancel_deadline_value");
+      if (cdv !== undefined) out.cancelDeadlineValue = cdv as never;
+      const cdu = unit("cancel_deadline_unit");
+      if (cdu !== undefined) out.cancelDeadlineUnit = cdu as never;
+      const anchor = optHHMM(ctx, portal, "cancel_anchor_time", "portal.cancel_anchor_time");
+      if (anchor !== undefined) out.cancelAnchorTime = anchor as never;
+      const mdv = deadline("modify_deadline_value");
+      if (mdv !== undefined) out.modifyDeadlineValue = mdv as never;
+      const mdu = unit("modify_deadline_unit");
+      if (mdu !== undefined) out.modifyDeadlineUnit = mdu as never;
+      const msg = optStr(ctx, portal, "after_deadline_message");
+      if (msg !== undefined) out.afterDeadlineMessage = (msg || null) as never;
+    }
+  }
+
+  const terms = optHttpsUrl(ctx, body, "terms_url");
+  if (terms !== undefined) out.termsUrl = terms as never;
+  const privacy = optHttpsUrl(ctx, body, "privacy_url");
+  if (privacy !== undefined) out.privacyUrl = privacy as never;
+
+  if (!ctx.failed && Object.keys(out).length === 0) ctx.fail("body", "No fields to update.");
+  return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };
+}
+
+// ── Property content (PATCH /v1/manage/property/content) ────────────────────
+
+const CONTENT_FIELDS = ["hotel_name", "property_type", "address", "description", "phone", "email"] as const;
+const CONTENT_TO_OVERRIDE: Record<(typeof CONTENT_FIELDS)[number], string> = {
+  hotel_name: "hotelName",
+  property_type: "propertyType",
+  address: "address",
+  description: "description",
+  phone: "phone",
+  email: "email",
+};
+
+/** Sparse patch of one language's stored text. Returns override-field keys;
+ *  null = clear (fall back to the default language). */
+export function validateContentPatch(body: unknown): Validated<Record<string, string | null>> {
+  const ctx = new Ctx();
+  if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
+  rejectUnknown(ctx, body, new Set(CONTENT_FIELDS));
+  const out: Record<string, string | null> = {};
+  for (const f of CONTENT_FIELDS) {
+    const v = optStr(ctx, body, f);
+    if (v !== undefined) out[CONTENT_TO_OVERRIDE[f]] = v || null;
+  }
+  if (!ctx.failed && Object.keys(out).length === 0) ctx.fail("body", "No fields to update.");
+  return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };
+}
+
+// ── Tax document (PUT /v1/manage/taxes) ──────────────────────────────────────
+
+export interface TaxDocument {
+  taxesInclusive: boolean;
+  taxes: TaxRule[];
+  fees: FeeRule[];
+  cityTax: CityTaxConfig | null;
+}
+
+const FEE_BASES = new Set(["booking", "room", "room_night", "person", "person_night"]);
+const CITY_BASES = new Set(["person_night", "room_night", "room_stay"]);
+const MMDD = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const rid = () => Math.random().toString(36).slice(2, 10);
+
+export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
+  const ctx = new Ctx();
+  if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
+  rejectUnknown(ctx, body, new Set(["taxes_inclusive", "taxes", "fees", "city_tax"]));
+
+  const inclusive = optBool(ctx, body, "taxes_inclusive");
+  if (inclusive === undefined) ctx.fail("taxes_inclusive", "Required.");
+
+  const taxes: TaxRule[] = [];
+  if (!Array.isArray(body.taxes)) ctx.fail("taxes", "Required — an array (possibly empty) of {name, rate}.");
+  else {
+    for (let i = 0; i < body.taxes.length; i++) {
+      const t = body.taxes[i];
+      // The UI silently drops a zero-rate row; here it's an error — an agent
+      // that sent it meant something by it.
+      if (!isObj(t) || typeof t.name !== "string" || !t.name.trim()) ctx.fail(`taxes[${i}]`, "Needs a non-empty name.");
+      else if (typeof t.rate !== "number" || !(t.rate > 0) || t.rate > 100) ctx.fail(`taxes[${i}]`, "rate must be a percent > 0 and ≤ 100.");
+      else taxes.push({ id: typeof t.id === "string" && t.id.trim() ? t.id.trim() : rid(), name: t.name.trim(), rate: t.rate });
+    }
+  }
+
+  const fees: FeeRule[] = [];
+  if (!Array.isArray(body.fees)) ctx.fail("fees", "Required — an array (possibly empty) of {name, kind, amount, taxable, basis?}.");
+  else {
+    for (let i = 0; i < body.fees.length; i++) {
+      const f = body.fees[i];
+      if (!isObj(f) || typeof f.name !== "string" || !f.name.trim()) {
+        ctx.fail(`fees[${i}]`, "Needs a non-empty name.");
+        continue;
+      }
+      if (f.kind !== "percent" && f.kind !== "fixed") {
+        ctx.fail(`fees[${i}]`, "kind must be percent or fixed.");
+        continue;
+      }
+      if (typeof f.amount !== "number" || !(f.amount > 0)) {
+        ctx.fail(`fees[${i}]`, "amount must be a number > 0.");
+        continue;
+      }
+      if (f.basis !== undefined && f.basis !== null) {
+        if (typeof f.basis !== "string" || !FEE_BASES.has(f.basis)) {
+          ctx.fail(`fees[${i}]`, "basis must be booking, room, room_night, person or person_night.");
+          continue;
+        }
+        if (f.kind !== "fixed" && f.basis !== "booking") {
+          ctx.fail(`fees[${i}]`, "basis only applies to fixed fees — percent fees are always % of the room total.");
+          continue;
+        }
+      }
+      const basis = f.kind === "fixed" && typeof f.basis === "string" && f.basis !== "booking" ? (f.basis as FeeRule["basis"]) : undefined;
+      fees.push({
+        id: typeof f.id === "string" && f.id.trim() ? f.id.trim() : rid(),
+        name: f.name.trim(),
+        kind: f.kind,
+        amount: f.amount,
+        taxable: f.taxable === true,
+        ...(basis ? { basis } : {}),
+      });
+    }
+  }
+
+  let cityTax: CityTaxConfig | null = null;
+  const ct = body.city_tax;
+  if (ct !== undefined && ct !== null) {
+    if (!isObj(ct)) ctx.fail("city_tax", "Must be an object or null.");
+    else {
+      const allowed = new Set(["enabled", "name", "amount", "basis", "taxable", "children_exempt", "max_nights", "seasons"]);
+      for (const k of Object.keys(ct)) if (!allowed.has(k)) ctx.fail("city_tax", `Unknown field "${k}".`);
+      if (typeof ct.enabled !== "boolean") ctx.fail("city_tax", "`enabled` (boolean) is required.");
+      const amount = typeof ct.amount === "number" && ct.amount >= 0 ? ct.amount : ctx.fail("city_tax", "`amount` must be a number ≥ 0.");
+      const basis = typeof ct.basis === "string" && CITY_BASES.has(ct.basis) ? (ct.basis as CityTaxConfig["basis"]) : ctx.fail("city_tax", "`basis` must be person_night, room_night or room_stay.");
+      let seasons: CityTaxConfig["seasons"];
+      if (ct.seasons !== undefined && ct.seasons !== null) {
+        if (!Array.isArray(ct.seasons) || ct.seasons.length < 2 || ct.seasons.length > 3) ctx.fail("city_tax", "`seasons` must have 2–3 entries (one season is just the base amount — omit it).");
+        else {
+          seasons = [];
+          for (let i = 0; i < ct.seasons.length; i++) {
+            const s = ct.seasons[i];
+            if (!isObj(s) || !MMDD.test(String(s.from)) || !MMDD.test(String(s.to)) || typeof s.amount !== "number" || s.amount < 0) {
+              ctx.fail("city_tax", `seasons[${i}] needs "MM-DD" from/to and an amount ≥ 0.`);
+            } else seasons.push({ from: String(s.from), to: String(s.to), amount: s.amount });
+          }
+        }
+      }
+      const maxNights = ct.max_nights === undefined ? 0 : typeof ct.max_nights === "number" && Number.isInteger(ct.max_nights) && ct.max_nights >= 0 ? ct.max_nights : ctx.fail("city_tax", "`max_nights` must be an integer ≥ 0 (0 = no cap).");
+      if (!ctx.failed) {
+        cityTax = {
+          enabled: ct.enabled === true,
+          name: typeof ct.name === "string" && ct.name.trim() ? ct.name.trim() : "City tax",
+          amount: amount as number,
+          basis: basis as CityTaxConfig["basis"],
+          taxable: ct.taxable === true,
+          childrenExempt: ct.children_exempt === true,
+          maxNights: (maxNights as number) ?? 0,
+          ...(seasons && seasons.length >= 2 ? { seasons } : {}),
+        };
+      }
+    }
+  }
+
+  return ctx.failed
+    ? { ok: false, errors: ctx.errors }
+    : { ok: true, value: { taxesInclusive: inclusive as boolean, taxes, fees, cityTax } };
 }
 
 /** Apply the policy's legacy mirrors exactly as the rate editor does, so the

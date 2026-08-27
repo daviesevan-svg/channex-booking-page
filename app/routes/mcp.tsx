@@ -40,8 +40,8 @@ import { loader as ratesLoader } from "./api.v1.rates";
 import { loader as extrasLoader } from "./api.v1.extras";
 import { loader as bookingLoader } from "./api.v1.bookings.$id";
 import { action as bookingsAction } from "./api.v1.bookings";
-import { loader as managePropertyLoader } from "./api.v1.manage.property";
-import { loader as manageContentLoader } from "./api.v1.manage.property.content";
+import { loader as managePropertyLoader, action as managePropertyAction } from "./api.v1.manage.property";
+import { loader as manageContentLoader, action as manageContentAction } from "./api.v1.manage.property.content";
 import { loader as manageRoomsLoader, action as manageRoomsAction } from "./api.v1.manage.rooms";
 import { loader as manageRoomLoader, action as manageRoomAction } from "./api.v1.manage.rooms.$id";
 import { loader as manageRatesLoader, action as manageRatesAction } from "./api.v1.manage.rates";
@@ -68,7 +68,9 @@ const HANDLERS: Record<string, Handler> = {
   "GET /v1/bookings/:id": bookingLoader as unknown as Handler,
   "POST /v1/bookings": bookingsAction as unknown as Handler,
   "GET /v1/manage/property": managePropertyLoader as unknown as Handler,
+  "PATCH /v1/manage/property": managePropertyAction as unknown as Handler,
   "GET /v1/manage/property/content": manageContentLoader as unknown as Handler,
+  "PATCH /v1/manage/property/content": manageContentAction as unknown as Handler,
   "GET /v1/manage/rooms": manageRoomsLoader as unknown as Handler,
   "POST /v1/manage/rooms": manageRoomsAction as unknown as Handler,
   "PUT /v1/manage/rooms": manageRoomsAction as unknown as Handler,

@@ -93,6 +93,63 @@ export const manageSchemas = {
       created_at: { type: "string" },
     },
   },
+  ManagePropertyPatch: {
+    type: "object",
+    description: "Sparse settings patch — omitted fields stay, null clears. Unknown fields are 422s.",
+    properties: {
+      currency: { type: "string", pattern: "^[A-Z]{3}$" },
+      pricing_mode: { type: "string", enum: ["per_room", "per_person"] },
+      languages: { type: "array", items: { type: "string" }, description: "Must include the default language." },
+      single_unit: { type: "boolean" },
+      facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only." },
+      checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h.' },
+      checkout_time: { type: ["string", "null"] },
+      timezone: { type: ["string", "null"], description: "IANA timezone." },
+      booking_cutoff_days: { type: ["integer", "null"], minimum: 0, maximum: 7 },
+      booking_cutoff_time: { type: ["string", "null"] },
+      address: { type: "object", description: "{city, region, postal_code, country (ISO-2), latitude, longitude} — each string or null." },
+      portal: { type: "object", description: "Guest self-service policy; deadline_value 0 = the anchor time on arrival day." },
+      terms_url: { type: ["string", "null"], description: "https:// URL." },
+      privacy_url: { type: ["string", "null"], description: "https:// URL." },
+    },
+  },
+  ManageContentPatch: {
+    type: "object",
+    description: "Per-language text patch. null clears a field so it falls back to the default language.",
+    properties: {
+      hotel_name: nullableStr,
+      property_type: nullableStr,
+      description: nullableStr,
+      address: nullableStr,
+      phone: nullableStr,
+      email: nullableStr,
+    },
+  },
+  ManageTaxDocument: {
+    type: "object",
+    description: "The full tax document (PUT replaces it wholesale).",
+    required: ["taxes_inclusive", "taxes", "fees"],
+    properties: {
+      taxes_inclusive: { type: "boolean" },
+      taxes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, rate: { type: "number", exclusiveMinimum: 0, maximum: 100 } }, required: ["name", "rate"] } },
+      fees: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            kind: { type: "string", enum: ["percent", "fixed"] },
+            amount: { type: "number", exclusiveMinimum: 0 },
+            taxable: { type: "boolean" },
+            basis: { type: "string", enum: ["booking", "room", "room_night", "person", "person_night"] },
+          },
+          required: ["name", "kind", "amount"],
+        },
+      },
+      city_tax: { type: ["object", "null"], description: "{enabled, name, amount, basis, taxable, children_exempt, max_nights, seasons? (2–3 MM-DD ranges)} or null." },
+    },
+  },
   ManageRoomInput: {
     type: "object",
     description:
@@ -157,19 +214,36 @@ export const manageSchemas = {
 } as const;
 
 export const managePaths = {
-  "/v1/manage/property": managed(
-    "Property settings",
-    "The property + settings view: identity, currency, languages, times, address, portal policy, plus read-only connectivity/payments/website state.",
-  ),
-  "/v1/manage/property/content": managed(
-    "Per-language property text",
-    "`values` = what is stored for `lang` (what a write edits); `effective` = what a guest reading `lang` sees after default-language fallback.",
-    {
-      parameters: [
-        { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" }, description: "Two-letter language code; omit for the default language." },
-      ],
+  "/v1/manage/property": {
+    ...managed(
+      "Property settings",
+      "The property + settings view: identity, currency, languages, times, address, portal policy, plus read-only connectivity/payments/website state.",
+    ),
+    patch: writeOp(
+      "Edit property settings",
+      "Sparse merge over the phase-A allowlist: currency, pricing_mode, languages, single_unit, facilities (curated keys), checkin/checkout_time, timezone, booking cutoffs, address, portal, terms/privacy URLs. null clears a field. connectedSystem, liveBooking, websiteDomain and payment fields are NOT writable.",
+      "ManagePropertyPatch",
+    ),
+  },
+  "/v1/manage/property/content": {
+    ...managed(
+      "Per-language property text",
+      "`values` = what is stored for `lang` (what a write edits); `effective` = what a guest reading `lang` sees after default-language fallback.",
+      {
+        parameters: [
+          { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" }, description: "Two-letter language code; omit for the default language." },
+        ],
+      },
+    ),
+    patch: {
+      ...writeOp(
+        "Edit one language's property text",
+        "Sparse: hotel_name, property_type, description, address, phone, email — omitted stays, null clears (falls back to the default language). Editing the default language's hotel_name also renames the property.",
+        "ManageContentPatch",
+      ),
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
     },
-  ),
+  },
   "/v1/manage/rooms": {
     ...managed("Room types (admin view)", "Full room records including translations — see ManageRoom."),
     post: writeOp("Create a room", "Required: title, max_adults, max_guests. Appears at the end of the list; add it to a rate plan's prices before it can sell.", "ManageRoomInput"),
@@ -210,7 +284,14 @@ export const managePaths = {
     patch: { ...writeOp("Edit a rate plan", "Sparse merge. `prices` replaces the whole map when present. channex_rate_ids is read-only.", "ManageRateInput"), parameters: idParam },
     delete: { summary: "Delete a rate plan", description: "Bookings keep their snapshots; consider active:false to pause instead.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
   },
-  "/v1/manage/taxes": managed("Tax configuration", "taxes_inclusive, tax rules, fee rules, and the city-tax config as one document."),
+  "/v1/manage/taxes": {
+    ...managed("Tax configuration", "taxes_inclusive, tax rules, fee rules, and the city-tax config as one document."),
+    put: writeOp(
+      "Replace the tax document",
+      "One settings write, so PUT with the full document: taxes_inclusive + taxes[] + fees[] + city_tax (or null). Invalid rows are 422s — the admin form's silent drops are not inherited.",
+      "ManageTaxDocument",
+    ),
+  },
   "/v1/manage/extras": managed("Extras catalog (admin view)", "Every add-on, active or not, with options, exclusions and tax treatment."),
   "/v1/manage/promotions": managed("Promotions", "Promo codes and automatic offers with their conditions and publish state."),
   "/v1/manage/bookings": managed(
