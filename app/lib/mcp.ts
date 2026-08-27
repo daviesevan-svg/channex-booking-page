@@ -620,7 +620,137 @@ export const MANAGE_COMMERCE_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS];
+const langArg = { lang: { type: "string", description: "Two-letter language code; omit for the default language." } } as const;
+
+export const MANAGE_SITE_TOOLS: McpTool[] = [
+  {
+    name: "get_site",
+    description:
+      "The website's state: whether it's enabled (read-only here), the layout style, available styles, and the page list with ids, slugs and default-language titles. Start here for any website task.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/site" },
+    scope: "manage",
+  },
+  {
+    name: "set_site_style",
+    description: "Switch the website's layout style. Content-safe: pages and text are untouched, so switching back restores exactly what was there.",
+    inputSchema: { type: "object", properties: { style: { type: "string", description: "One of the ids get_site lists." } }, required: ["style"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/site" },
+    scope: "manage",
+  },
+  {
+    name: "create_site_page",
+    description:
+      "Add a website page. Required: slug (URL segment under /p/) and title (written in the default language — every other language falls back to it). Starts with one rich-text section; shape it with set_page_sections and write it with update_page_copy.",
+    inputSchema: { type: "object", properties: { slug: { type: "string" }, title: { type: "string" } }, required: ["slug", "title"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/site/pages" },
+    scope: "manage",
+  },
+  {
+    name: "get_site_page",
+    description:
+      "One page's structure (sections with ids, types, settings, images) plus ONE language's stored text and the page's valid copy keys. Call this before set_page_sections or update_page_copy — the copy keys and section ids here are the only ones the write endpoints accept.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...langArg }, required: ["id"], additionalProperties: false },
+    route: { method: "GET", path: "/v1/manage/site/pages/:id" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "update_site_page",
+    description: "Change a page's slug or whether it appears in the menu (nav). The home page has neither.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, slug: { type: "string" }, nav: { type: "boolean" } }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/site/pages/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_site_page",
+    description: "Delete a page, its text in EVERY language, and garbage-collect its images. The home page cannot be deleted. Confirm with the operator first.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/site/pages/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "set_page_sections",
+    description:
+      "Replace one page's section STRUCTURE (order, types, visibility, settings, images) — text is untouched and lives in update_page_copy. CRITICAL: reuse the section ids from get_site_page; a regenerated id orphans every language's text for that section. Images must be /images/… paths; dropped ones are permanently garbage-collected.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Page id." },
+        sections: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "Keep stable across saves — it keys the translations." },
+              type: { type: "string", description: "Section type (get_site_page shows the current ones)." },
+              hidden: { type: "boolean" },
+              settings: { type: "object", description: "Layout/config only — text fields are rejected here and belong in update_page_copy." },
+              images: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" } }, required: ["url"] } },
+            },
+            required: ["type"],
+          },
+        },
+      },
+      required: ["id", "sections"],
+      additionalProperties: false,
+    },
+    route: { method: "PUT", path: "/v1/manage/site/pages/:id/sections" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "update_page_copy",
+    description:
+      "Edit ONE language's text on one page. Sparse: send only the copy keys you're changing (from get_site_page's copy_keys), null clears a key so it falls back to the default language. Keys not owned by the page are rejected — nothing can write text nowhere renders. Never copy default-language text into a translation to 'fill it in'.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Page id." },
+        ...langArg,
+        copy: { type: "object", description: "copyKey → text (or null to clear). Keys come from get_site_page." },
+      },
+      required: ["id", "copy"],
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/site/pages/:id/copy" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "get_footer",
+    description: "The website footer: contact-block toggle, social links, custom links with ONE language's labels, and that language's blurb.",
+    inputSchema: { type: "object", properties: { ...langArg }, additionalProperties: false },
+    route: { method: "GET", path: "/v1/manage/site/footer" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "set_footer",
+    description:
+      "Edit the footer. Sparse: omitted fields keep their value. `links` REPLACES the link list when present (labels ride each link for the requested language; retained ids keep other languages' labels, removed links lose theirs everywhere). `social` merges per platform (null removes one). Blurb/labels: null clears for this language.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ...langArg,
+        show_contact: { type: "boolean" },
+        social: { type: "object", description: "platform → https URL, or null to remove that platform." },
+        links: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" }, label: { type: ["string", "null"] } }, required: ["url"] } },
+        blurb: { type: ["string", "null"] },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PUT", path: "/v1/manage/site/footer" },
+    query: ["lang"],
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 

@@ -27,6 +27,13 @@ import { loader as manageBookingsLoader } from "../routes/api.v1.manage.bookings
 import { loader as manageBookingLoader } from "../routes/api.v1.manage.bookings.$id";
 import { loader as manageAriLoader } from "../routes/api.v1.manage.ari";
 
+import { loader as manageSiteLoader, action as manageSiteAction } from "../routes/api.v1.manage.site";
+import { loader as manageSitePagesLoader, action as manageSitePagesAction } from "../routes/api.v1.manage.site.pages";
+import { loader as manageSitePageLoader, action as manageSitePageAction } from "../routes/api.v1.manage.site.pages.$id";
+import { action as manageSiteSectionsAction } from "../routes/api.v1.manage.site.pages.$id.sections";
+import { loader as manageSiteCopyLoader, action as manageSiteCopyAction } from "../routes/api.v1.manage.site.pages.$id.copy";
+import { loader as manageFooterLoader, action as manageFooterAction } from "../routes/api.v1.manage.site.footer";
+
 /** The shape every /v1 handler actually uses. Their generated arg types carry
  *  router context we neither have nor need, so dispatch through this. */
 type Handler = (args: { request: Request; params: Record<string, string> }) => Promise<Response>;
@@ -67,6 +74,18 @@ export const HANDLERS: Record<string, Handler> = {
   "GET /v1/manage/promotions/:id": managePromotionLoader as unknown as Handler,
   "PATCH /v1/manage/promotions/:id": managePromotionAction as unknown as Handler,
   "DELETE /v1/manage/promotions/:id": managePromotionAction as unknown as Handler,
+  "GET /v1/manage/site": manageSiteLoader as unknown as Handler,
+  "PATCH /v1/manage/site": manageSiteAction as unknown as Handler,
+  "GET /v1/manage/site/pages": manageSitePagesLoader as unknown as Handler,
+  "POST /v1/manage/site/pages": manageSitePagesAction as unknown as Handler,
+  "GET /v1/manage/site/pages/:id": manageSitePageLoader as unknown as Handler,
+  "PATCH /v1/manage/site/pages/:id": manageSitePageAction as unknown as Handler,
+  "DELETE /v1/manage/site/pages/:id": manageSitePageAction as unknown as Handler,
+  "PUT /v1/manage/site/pages/:id/sections": manageSiteSectionsAction as unknown as Handler,
+  "GET /v1/manage/site/pages/:id/copy": manageSiteCopyLoader as unknown as Handler,
+  "PATCH /v1/manage/site/pages/:id/copy": manageSiteCopyAction as unknown as Handler,
+  "GET /v1/manage/site/footer": manageFooterLoader as unknown as Handler,
+  "PUT /v1/manage/site/footer": manageFooterAction as unknown as Handler,
   "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
   "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
   "GET /v1/manage/ari": manageAriLoader as unknown as Handler,

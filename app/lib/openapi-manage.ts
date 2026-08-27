@@ -187,6 +187,31 @@ export const manageSchemas = {
       inclusions: { type: "array", items: { type: "string" } },
     },
   },
+  ManageSiteStylePatch: { type: "object", required: ["style"], properties: { style: { type: "string", description: "One of the ids GET /v1/manage/site lists." } } },
+  ManageSitePageCreate: { type: "object", required: ["slug", "title"], properties: { slug: { type: "string" }, title: { type: "string", description: "Written in the default language." } } },
+  ManageSitePagePatch: { type: "object", properties: { slug: { type: "string" }, nav: { type: "boolean" } } },
+  ManageSiteSections: {
+    type: "object",
+    description: "A section. Keep `id` stable across saves — it keys the per-language copy.",
+    properties: {
+      id: { type: "string" },
+      type: { type: "string" },
+      hidden: { type: "boolean" },
+      settings: { type: "object", description: "Non-text config only; text fields belong to the copy endpoint and are rejected here." },
+      images: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" } }, required: ["url"] } },
+    },
+    required: ["type"],
+  },
+  ManageSiteCopyPatch: { type: "object", description: "copyKey → text, or null to clear. Valid keys come from the page GET.", additionalProperties: { type: ["string", "null"] } },
+  ManageFooterPut: {
+    type: "object",
+    properties: {
+      show_contact: { type: "boolean" },
+      social: { type: "object", description: "platform → https URL, null removes the platform." },
+      links: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" }, label: { type: ["string", "null"] } }, required: ["url"] }, description: "Replaces the list when present; max 6." },
+      blurb: { type: ["string", "null"] },
+    },
+  },
   ManageExtraInput: {
     type: "object",
     description: "Add-on write payload. Sparse on PATCH; null clears optionals. `image` must be an /images/… path from POST /v1/manage/images.",
@@ -350,6 +375,71 @@ export const managePaths = {
     get: { summary: "One promotion", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
     patch: { ...writeOp("Edit a promotion", "Sparse merge; cross-field rules re-checked on the merged record.", "ManagePromotionInput"), parameters: idParam },
     delete: { summary: "Delete a promotion", description: "Bookings that used it keep their snapshot.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
+  "/v1/manage/site": {
+    ...managed("Website state", "Enabled flag (read-only), layout style + available styles, and the page list."),
+    patch: writeOp("Switch the layout style", "One field; pages and copy untouched, so switching back restores everything.", "ManageSiteStylePatch"),
+  },
+  "/v1/manage/site/pages": {
+    ...managed("Website pages", "Page summaries with default-language titles."),
+    post: writeOp("Create a page", "slug (under /p/) + title (written in the default language). Starts with a rich-text section.", "ManageSitePageCreate"),
+  },
+  "/v1/manage/site/pages/{id}": {
+    get: {
+      summary: "One page (structure + one language's text)",
+      description: "Sections with stable ids, plus `copy_keys` — the ONLY keys the copy endpoint accepts — and what is stored for `lang` (no fallback).",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+      responses: baseResponses,
+    },
+    patch: { ...writeOp("Edit slug / nav", "Home has neither.", "ManageSitePagePatch"), parameters: idParam },
+    delete: { summary: "Delete a page", description: "Removes its copy in every language and garbage-collects its images.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
+  "/v1/manage/site/pages/{id}/sections": {
+    put: {
+      ...writeOp(
+        "Replace a page's section structure",
+        "Text is untouched (it lives on /copy). Keep section ids stable — they key every language's text; a regenerated id orphans the translations. Dropped images are garbage-collected. Accepts the bare array or { sections: [...] }.",
+        "ManageSiteSections",
+        true,
+      ),
+      parameters: idParam,
+    },
+  },
+  "/v1/manage/site/pages/{id}/copy": {
+    get: {
+      summary: "A page's copy keys + one language's stored text",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+      responses: baseResponses,
+    },
+    patch: {
+      ...writeOp(
+        "Edit one language's page text",
+        "Sparse: copyKey → text, null clears (falls back to the default language). Keys outside the page's copy_keys are 422s. Accepts the bare map or { copy: {...} }.",
+        "ManageSiteCopyPatch",
+      ),
+      parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/site/footer": {
+    get: {
+      summary: "Footer structure + one language's labels/blurb",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+      responses: baseResponses,
+    },
+    put: {
+      ...writeOp(
+        "Edit the footer",
+        "Sparse over the stored footer. `links` replaces the list when present (labels are per-language; removed links lose labels in every language). `social` merges per platform (null removes). http(s) URLs only.",
+        "ManageFooterPut",
+      ),
+      parameters: [{ name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
   },
   "/v1/manage/images": {
     post: {
