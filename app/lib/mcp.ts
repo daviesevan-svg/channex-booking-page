@@ -873,7 +873,58 @@ export const MANAGE_CONTENT_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS, ...MANAGE_CONTENT_TOOLS];
+export const MANAGE_EMAIL_TOOLS: McpTool[] = [
+  {
+    name: "list_email_templates",
+    description:
+      "The transactional email templates (booking confirmation, host notification, cancellations, failed booking, review request): each template's editable fields and the {tokens} it may use, plus the current sender identity. There is no send-test tool — sending a real email is a UI action.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/emails" },
+    scope: "manage",
+  },
+  {
+    name: "get_email_template",
+    description:
+      "One email template for one language: `values` = the hotel's stored overrides for that language; `effective` = what actually sends (built-in copy → default-language overrides → this language's). Includes the valid {tokens} — unknown tokens render literally, they never fail a send.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "review_request"] },
+        ...langArg,
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/emails/:id" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "update_email_template",
+    description:
+      "Edit one email template's text for ONE language, sparsely: subject/heading/intro/outro → text (null clears → fallback). Use the {tokens} get_email_template lists — e.g. {guest_first_name}, {reference} — and keep them intact when rewording. Changes affect real guest email immediately.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "review_request"] },
+        ...langArg,
+        subject: { type: ["string", "null"] },
+        heading: { type: ["string", "null"] },
+        intro: { type: ["string", "null"] },
+        outro: { type: ["string", "null"] },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/emails/:id" },
+    pathParam: "id",
+    query: ["lang"],
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS, ...MANAGE_CONTENT_TOOLS, ...MANAGE_EMAIL_TOOLS];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 

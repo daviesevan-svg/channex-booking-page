@@ -40,6 +40,9 @@ import { loader as manageSearchLoader, action as manageSearchAction } from "../r
 import { loader as manageFunnelLoader, action as manageFunnelAction } from "../routes/api.v1.manage.content.pages.$id";
 import { loader as manageFacilitiesLoader, action as manageFacilitiesAction } from "../routes/api.v1.manage.content.facilities";
 
+import { loader as manageEmailsLoader } from "../routes/api.v1.manage.emails";
+import { loader as manageEmailLoader, action as manageEmailAction } from "../routes/api.v1.manage.emails.$id";
+
 /** The shape every /v1 handler actually uses. Their generated arg types carry
  *  router context we neither have nor need, so dispatch through this. */
 type Handler = (args: { request: Request; params: Record<string, string> }) => Promise<Response>;
@@ -101,6 +104,9 @@ export const HANDLERS: Record<string, Handler> = {
   "PATCH /v1/manage/content/pages/:id": manageFunnelAction as unknown as Handler,
   "GET /v1/manage/content/facilities": manageFacilitiesLoader as unknown as Handler,
   "PUT /v1/manage/content/facilities": manageFacilitiesAction as unknown as Handler,
+  "GET /v1/manage/emails": manageEmailsLoader as unknown as Handler,
+  "GET /v1/manage/emails/:id": manageEmailLoader as unknown as Handler,
+  "PATCH /v1/manage/emails/:id": manageEmailAction as unknown as Handler,
   "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
   "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
   "GET /v1/manage/ari": manageAriLoader as unknown as Handler,

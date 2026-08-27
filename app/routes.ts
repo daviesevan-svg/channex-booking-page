@@ -133,6 +133,8 @@ export default [
   route("v1/manage/content/search", "routes/api.v1.manage.content.search.tsx"),
   route("v1/manage/content/pages/:id", "routes/api.v1.manage.content.pages.$id.tsx"),
   route("v1/manage/content/facilities", "routes/api.v1.manage.content.facilities.tsx"),
+  route("v1/manage/emails", "routes/api.v1.manage.emails.tsx"),
+  route("v1/manage/emails/:id", "routes/api.v1.manage.emails.$id.tsx"),
   route("v1/manage/bookings", "routes/api.v1.manage.bookings.tsx"),
   route("v1/manage/bookings/:id", "routes/api.v1.manage.bookings.$id.tsx"),
   route("v1/manage/ari", "routes/api.v1.manage.ari.tsx"),

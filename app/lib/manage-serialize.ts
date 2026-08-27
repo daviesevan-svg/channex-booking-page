@@ -136,6 +136,13 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
     },
     terms_url: s.termsUrl ?? null,
     privacy_url: s.privacyUrl ?? null,
+    emails: {
+      from_name: s.emailFromName ?? null,
+      reply_to: s.emailReplyTo ?? null,
+      host_notify_email: s.hostNotifyEmail ?? null,
+      notify_host_on_booking: s.notifyHostOnBooking ?? true,
+      notify_host_on_cancel: s.notifyHostOnCancel ?? true,
+    },
     // Read-only context (writes are UI-only or a later phase; see the spec).
     connected_system: s.connectedSystem ?? null,
     live_booking: s.liveBooking ?? null,
