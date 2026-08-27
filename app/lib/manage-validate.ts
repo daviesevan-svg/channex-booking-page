@@ -11,6 +11,8 @@ import type { CatalogRate, CatalogRoom } from "./catalog.server";
 import { PROPERTY_FACILITIES, VR_AMENITY_KEYS, isLang, DEFAULT_LANG, type DeadlineUnit, type SiteSettings } from "./content";
 import { isSupportedCurrency } from "./currencies";
 import { parseHHMM } from "./dates";
+import type { Extra, ExtraField, ExtraOption } from "./extras";
+import { normalizeCode, type PromoConditions, type Promotion } from "./promotions";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import type { OccupancyPricing } from "./rate-pricing";
 import type { CancelTier, RatePolicy } from "./rate-policy";
@@ -682,6 +684,253 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
   return ctx.failed
     ? { ok: false, errors: ctx.errors }
     : { ok: true, value: { taxesInclusive: inclusive as boolean, taxes, fees, cityTax } };
+}
+
+// ── Extras ───────────────────────────────────────────────────────────────────
+
+const EXTRA_FIELDS = new Set(["name", "description", "image", "unit", "price", "options", "fields", "info_title", "scope", "taxable", "exclude_rooms", "exclude_rates", "active", "position"]);
+const EXTRA_UNITS = new Set(["stay", "night", "person", "person_night", "trip"]);
+
+export interface ExtraInput {
+  name?: string;
+  desc?: string | null;
+  image?: string | null;
+  unit?: Extra["unit"];
+  price?: number | null;
+  options?: ExtraOption[];
+  fields?: ExtraField[];
+  infoTitle?: string | null;
+  scope?: Extra["scope"];
+  taxable?: boolean;
+  excludeRooms?: string[];
+  excludeRates?: string[];
+  active?: boolean;
+  position?: number;
+}
+
+export function validateExtraInput(body: unknown, opts: { create: boolean; roomIds: Set<string>; rateIds: Set<string> }): Validated<ExtraInput> {
+  const ctx = new Ctx();
+  if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
+  rejectUnknown(ctx, body, EXTRA_FIELDS);
+  const out: ExtraInput = {};
+
+  const name = optStr(ctx, body, "name", { required: opts.create });
+  if (typeof name === "string") out.name = name;
+  else if (name === null) ctx.fail("name", "Must not be null.");
+
+  const desc = optStr(ctx, body, "description");
+  if (desc !== undefined) out.desc = desc || null;
+  const infoTitle = optStr(ctx, body, "info_title");
+  if (infoTitle !== undefined) out.infoTitle = infoTitle || null;
+
+  const image = body.image;
+  if (image !== undefined) {
+    if (image === null) out.image = null;
+    else if (typeof image !== "string" || !image.startsWith("/images/")) ctx.fail("image", "Must be an /images/… path (upload via POST /v1/manage/images) or null.");
+    else out.image = image;
+  }
+
+  const unit = body.unit;
+  if (unit !== undefined) {
+    if (typeof unit !== "string" || !EXTRA_UNITS.has(unit)) ctx.fail("unit", "Must be stay, night, person, person_night or trip.");
+    else out.unit = unit as Extra["unit"];
+  } else if (opts.create) ctx.fail("unit", "Required.");
+
+  const price = optMoney(ctx, body, "price");
+  if (price !== undefined) out.price = price;
+
+  const options = body.options;
+  if (options !== undefined) {
+    if (!Array.isArray(options)) ctx.fail("options", "Must be an array.");
+    else {
+      const list: ExtraOption[] = [];
+      for (let i = 0; i < options.length; i++) {
+        const o = options[i];
+        if (!isObj(o) || typeof o.name !== "string" || !o.name.trim()) ctx.fail(`options[${i}]`, "Needs a non-empty name.");
+        else if (typeof o.price !== "number" || !Number.isFinite(o.price) || o.price < 0) ctx.fail(`options[${i}]`, "price must be a number ≥ 0.");
+        else if (o.unit !== undefined && (typeof o.unit !== "string" || !EXTRA_UNITS.has(o.unit))) ctx.fail(`options[${i}]`, "unit must be stay, night, person, person_night or trip.");
+        else {
+          list.push({
+            id: typeof o.id === "string" && o.id.trim() ? o.id.trim() : rid(),
+            name: o.name.trim(),
+            price: o.price,
+            ...(typeof o.desc === "string" && o.desc.trim() ? { desc: o.desc.trim() } : {}),
+            ...(typeof o.unit === "string" ? { unit: o.unit as ExtraOption["unit"] } : {}),
+          });
+        }
+      }
+      out.options = list;
+    }
+  }
+
+  const fields = body.fields;
+  if (fields !== undefined) {
+    if (!Array.isArray(fields)) ctx.fail("fields", "Must be an array.");
+    else {
+      const list: ExtraField[] = [];
+      for (let i = 0; i < fields.length; i++) {
+        const f = fields[i];
+        if (!isObj(f) || typeof f.label !== "string" || !f.label.trim()) ctx.fail(`fields[${i}]`, "Needs a non-empty label.");
+        else {
+          list.push({
+            id: typeof f.id === "string" && f.id.trim() ? f.id.trim() : rid(),
+            label: f.label.trim(),
+            ...(typeof f.short === "string" && f.short.trim() ? { short: f.short.trim() } : {}),
+            ...(typeof f.placeholder === "string" && f.placeholder.trim() ? { placeholder: f.placeholder.trim() } : {}),
+            required: f.required === true,
+          });
+        }
+      }
+      out.fields = list;
+    }
+  }
+
+  const scope = body.scope;
+  if (scope !== undefined) {
+    if (scope !== "room" && scope !== "booking") ctx.fail("scope", "Must be room or booking.");
+    else out.scope = scope;
+  }
+  const taxable = optBool(ctx, body, "taxable");
+  if (taxable !== undefined) out.taxable = taxable;
+  const active = optBool(ctx, body, "active");
+  if (active !== undefined) out.active = active;
+  const position = optInt(ctx, body, "position", 0);
+  if (position !== undefined) out.position = position;
+
+  const exRooms = strList(ctx, body, "exclude_rooms");
+  if (exRooms) {
+    const unknown = exRooms.filter((id) => !opts.roomIds.has(id));
+    if (unknown.length) ctx.fail("exclude_rooms", `Unknown room ids: ${unknown.join(", ")}.`);
+    else out.excludeRooms = exRooms;
+  }
+  const exRates = strList(ctx, body, "exclude_rates");
+  if (exRates) {
+    const unknown = exRates.filter((id) => !opts.rateIds.has(id));
+    if (unknown.length) ctx.fail("exclude_rates", `Unknown rate ids: ${unknown.join(", ")}.`);
+    else out.excludeRates = exRates;
+  }
+
+  return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };
+}
+
+// ── Promotions ───────────────────────────────────────────────────────────────
+
+const PROMO_FIELDS = new Set(["trigger", "code", "name", "kind", "type", "value", "conditions", "inclusions", "exclusive", "enabled", "published"]);
+
+export interface PromotionInput {
+  trigger?: Promotion["trigger"];
+  code?: string;
+  name?: string | null;
+  kind?: Promotion["kind"];
+  type?: Promotion["type"];
+  value?: number;
+  conditions?: PromoConditions | null;
+  inclusions?: string[];
+  exclusive?: boolean;
+  enabled?: boolean;
+  publish?: boolean;
+}
+
+export function validatePromotionInput(body: unknown, opts: { create: boolean }): Validated<PromotionInput> {
+  const ctx = new Ctx();
+  if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
+  rejectUnknown(ctx, body, PROMO_FIELDS);
+  const out: PromotionInput = {};
+
+  const trigger = body.trigger;
+  if (trigger !== undefined) {
+    if (trigger !== "code" && trigger !== "auto") ctx.fail("trigger", "Must be code or auto.");
+    else out.trigger = trigger;
+  } else if (opts.create) ctx.fail("trigger", "Required — code (guest enters it) or auto (applies by rules).");
+
+  const code = body.code;
+  if (code !== undefined) {
+    if (typeof code !== "string") ctx.fail("code", "Must be a string.");
+    else out.code = normalizeCode(code);
+  }
+
+  const name = optStr(ctx, body, "name");
+  if (name !== undefined) out.name = name || null;
+
+  const kind = body.kind;
+  if (kind !== undefined) {
+    if (kind !== "discount" && kind !== "value_add") ctx.fail("kind", "Must be discount or value_add.");
+    else out.kind = kind;
+  }
+  const type = body.type;
+  if (type !== undefined) {
+    if (type !== "percent" && type !== "fixed") ctx.fail("type", "Must be percent or fixed.");
+    else out.type = type;
+  }
+  const value = body.value;
+  if (value !== undefined) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value < 0) ctx.fail("value", "Must be a number ≥ 0.");
+    else out.value = value;
+  }
+
+  const conditions = body.conditions;
+  if (conditions !== undefined) {
+    if (conditions === null) out.conditions = null;
+    else if (!isObj(conditions)) ctx.fail("conditions", "Must be an object or null.");
+    else {
+      const allowed = new Set(["min_days_ahead", "max_days_ahead", "min_nights", "stay_from", "stay_to", "arrival_days", "departure_days"]);
+      for (const k of Object.keys(conditions)) if (!allowed.has(k)) ctx.fail("conditions", `Unknown field "${k}".`);
+      const intField = (f: string, min: number) => {
+        const v = conditions[f];
+        if (v === undefined || v === null) return undefined;
+        if (typeof v !== "number" || !Number.isInteger(v) || v < min) return ctx.fail(`conditions.${f}`, `Must be an integer ≥ ${min}.`);
+        return v;
+      };
+      const dateField = (f: string) => {
+        const v = conditions[f];
+        if (v === undefined || v === null) return undefined;
+        if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return ctx.fail(`conditions.${f}`, "Must be YYYY-MM-DD.");
+        return v;
+      };
+      const daysField = (f: string) => {
+        const v = conditions[f];
+        if (v === undefined || v === null) return undefined;
+        if (!Array.isArray(v) || v.some((d) => typeof d !== "number" || !Number.isInteger(d) || d < 0 || d > 6)) {
+          return ctx.fail(`conditions.${f}`, "Must be an array of weekday numbers 0 (Sunday) – 6 (Saturday).");
+        }
+        return v as number[];
+      };
+      out.conditions = {
+        minDaysAhead: intField("min_days_ahead", 0),
+        maxDaysAhead: intField("max_days_ahead", 0),
+        minNights: intField("min_nights", 1),
+        stayFrom: dateField("stay_from"),
+        stayTo: dateField("stay_to"),
+        arrivalDays: daysField("arrival_days"),
+        departureDays: daysField("departure_days"),
+      };
+    }
+  }
+
+  const inclusions = strList(ctx, body, "inclusions");
+  if (inclusions) out.inclusions = inclusions;
+  const exclusive = optBool(ctx, body, "exclusive");
+  if (exclusive !== undefined) out.exclusive = exclusive;
+  const enabled = optBool(ctx, body, "enabled");
+  if (enabled !== undefined) out.enabled = enabled;
+  const published = optBool(ctx, body, "published");
+  if (published !== undefined) out.publish = published;
+
+  return ctx.failed ? { ok: false, errors: ctx.errors } : { ok: true, value: out };
+}
+
+/** Cross-field promo rules, checked on the MERGED record (a sparse PATCH may
+ *  change only one side of a pair). Returns errors or null. */
+export function promotionCrossFieldErrors(p: Promotion): Errors | null {
+  const errors: Errors = {};
+  if (p.trigger === "code" && !p.code) errors.code = ["A code promotion needs a code."];
+  if (p.trigger === "auto" && p.code) errors.code = ["An automatic offer has no code — set trigger to 'code' or drop it."];
+  const kind = p.kind ?? "discount";
+  if (kind === "discount" && !(p.value > 0)) errors.value = ["A discount needs a value > 0."];
+  if (kind === "value_add" && p.value !== 0) errors.value = ["A value-add stores value 0 — the inclusions ARE the offer."];
+  if (kind === "value_add" && !(p.inclusions ?? []).length) errors.inclusions = ["A value-add needs at least one inclusion line."];
+  if (p.trigger === "auto" && kind === "discount" && !(p.name ?? "").trim()) errors.name = ["An automatic offer needs a public name (it is shown to guests)."];
+  return Object.keys(errors).length ? errors : null;
 }
 
 /** Apply the policy's legacy mirrors exactly as the rate editor does, so the

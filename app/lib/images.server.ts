@@ -160,6 +160,12 @@ export function uploadPropertyFavicon(propertyId: string, file: File): Promise<s
   return uploadImage(`favicon/${propertyId}`, file);
 }
 
+/** Management-API uploads (POST /v1/manage/images) — one prefix per property;
+ *  what the image is FOR is decided by whatever payload references the url. */
+export function uploadManageApiImage(propertyId: string, file: File): Promise<string> {
+  return uploadImage(`manage/${propertyId}`, file);
+}
+
 export function uploadCatalogRoomImage(propertyId: string, roomId: string, file: File): Promise<string> {
   return uploadImage(`catalog/${propertyId}/${roomId}`, file);
 }

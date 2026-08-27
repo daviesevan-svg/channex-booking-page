@@ -187,6 +187,43 @@ export const manageSchemas = {
       inclusions: { type: "array", items: { type: "string" } },
     },
   },
+  ManageExtraInput: {
+    type: "object",
+    description: "Add-on write payload. Sparse on PATCH; null clears optionals. `image` must be an /images/… path from POST /v1/manage/images.",
+    properties: {
+      name: { type: "string" },
+      description: nullableStr,
+      image: nullableStr,
+      unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] },
+      price: { type: ["number", "null"], minimum: 0 },
+      options: { type: "array", items: { type: "object" } },
+      fields: { type: "array", items: { type: "object" } },
+      info_title: nullableStr,
+      scope: { type: "string", enum: ["room", "booking"] },
+      taxable: { type: "boolean" },
+      exclude_rooms: { type: "array", items: { type: "string" } },
+      exclude_rates: { type: "array", items: { type: "string" } },
+      active: { type: "boolean" },
+      position: { type: "integer", minimum: 0 },
+    },
+  },
+  ManagePromotionInput: {
+    type: "object",
+    description: "Promotion write payload. Codes are normalized (uppercase, no whitespace) and must be unique per property.",
+    properties: {
+      trigger: { type: "string", enum: ["code", "auto"] },
+      code: { type: "string" },
+      name: nullableStr,
+      kind: { type: "string", enum: ["discount", "value_add"] },
+      type: { type: "string", enum: ["percent", "fixed"] },
+      value: { type: "number", minimum: 0 },
+      conditions: { type: ["object", "null"], description: "min_days_ahead, max_days_ahead, min_nights, stay_from/stay_to, arrival_days/departure_days (0=Sunday)." },
+      inclusions: { type: "array", items: { type: "string" } },
+      exclusive: { type: "boolean" },
+      enabled: { type: "boolean" },
+      published: { type: "boolean" },
+    },
+  },
   ManageBooking: {
     type: "object",
     description:
@@ -292,8 +329,39 @@ export const managePaths = {
       "ManageTaxDocument",
     ),
   },
-  "/v1/manage/extras": managed("Extras catalog (admin view)", "Every add-on, active or not, with options, exclusions and tax treatment."),
-  "/v1/manage/promotions": managed("Promotions", "Promo codes and automatic offers with their conditions and publish state."),
+  "/v1/manage/extras": {
+    ...managed("Extras catalog (admin view)", "Every add-on, active or not, with options, exclusions and tax treatment."),
+    post: writeOp("Create an extra", "Required: name, unit. Price with `price` (simple) or `options` (configurable). taxable defaults true.", "ManageExtraInput"),
+  },
+  "/v1/manage/extras/{id}": {
+    get: { summary: "One extra", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+    patch: { ...writeOp("Edit an extra", "Sparse merge; options/fields/exclusion lists replace wholesale when present; a replaced image is garbage-collected.", "ManageExtraInput"), parameters: idParam },
+    delete: { summary: "Delete an extra", description: "Bookings that include it keep their snapshot.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
+  "/v1/manage/promotions": {
+    ...managed("Promotions", "Promo codes and automatic offers with their conditions and publish state."),
+    post: writeOp(
+      "Create a promotion",
+      "trigger required. Cross-field rules: code promos need a unique code; discounts need value > 0; value-adds need inclusions and value 0; public auto offers need a name.",
+      "ManagePromotionInput",
+    ),
+  },
+  "/v1/manage/promotions/{id}": {
+    get: { summary: "One promotion", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+    patch: { ...writeOp("Edit a promotion", "Sparse merge; cross-field rules re-checked on the merged record.", "ManagePromotionInput"), parameters: idParam },
+    delete: { summary: "Delete a promotion", description: "Bookings that used it keep their snapshot.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
+  "/v1/manage/images": {
+    post: {
+      summary: "Upload an image",
+      description:
+        "Multipart form data, field `file` (image/*, max 8MB). Returns the /images/… path to reference from any payload. No import-by-URL (SSRF: the only allowlisted importer is Booking.com's CDN, used by onboarding) and no DELETE (an image dies by being unreferenced; the garbage collector owns removal).",
+      security: manageAuth,
+      tags: ["Management"],
+      requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", properties: { file: { type: "string", format: "binary" } }, required: ["file"] } } } },
+      responses: { "201": { description: "Uploaded — body carries data.url." }, "401": baseResponses["401"], "403": baseResponses["403"], "422": { description: "Not an image, too large, or missing." } },
+    },
+  },
   "/v1/manage/bookings": managed(
     "List bookings (read-only)",
     "Newest-created first. Filters: status, lifecycle, checkin_from/checkin_to, created_from/created_to; limit (max 200) + offset. There are no write verbs on bookings — changes flow through the channel manager and admin.",

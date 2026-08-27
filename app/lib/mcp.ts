@@ -535,7 +535,92 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS];
+const extraBodyProps = {
+  name: { type: "string" },
+  description: { type: ["string", "null"] },
+  image: { type: ["string", "null"], description: "An /images/… path (REST POST /v1/manage/images uploads one — files can't travel over MCP) or null." },
+  unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] },
+  price: { type: ["number", "null"], minimum: 0, description: "Simple extras. Omit when `options` price the extra." },
+  options: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, price: { type: "number", minimum: 0 }, desc: { type: "string" }, unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] } }, required: ["name", "price"] }, description: "Choices shown in a popup; each may override the unit." },
+  fields: { type: "array", items: { type: "object", properties: { id: { type: "string" }, label: { type: "string" }, short: { type: "string" }, placeholder: { type: "string" }, required: { type: "boolean" } }, required: ["label"] }, description: "Info collected from the guest (e.g. flight number)." },
+  info_title: { type: ["string", "null"] },
+  scope: { type: "string", enum: ["room", "booking"], description: "room = chosen per room; booking = once for the whole stay." },
+  taxable: { type: "boolean", description: "Default true — VAT applies like the room." },
+  exclude_rooms: { type: "array", items: { type: "string" } },
+  exclude_rates: { type: "array", items: { type: "string" } },
+  active: { type: "boolean" },
+  position: { type: "integer", minimum: 0 },
+} as const;
+
+const promoBodyProps = {
+  trigger: { type: "string", enum: ["code", "auto"], description: "code = guest types it at checkout; auto = applies by rules." },
+  code: { type: "string", description: "Code promos only — normalized (uppercase, no spaces). Must be unique." },
+  name: { type: ["string", "null"], description: "Public label for auto offers (guests see it); internal note for codes." },
+  kind: { type: "string", enum: ["discount", "value_add"], description: "value_add = no money off; the inclusions are the offer (value must be 0)." },
+  type: { type: "string", enum: ["percent", "fixed"] },
+  value: { type: "number", minimum: 0, description: "Percent (1–100) or amount in the property currency. 0 for value-adds." },
+  conditions: {
+    type: ["object", "null"],
+    description:
+      "Auto-offer rules, ALL must hold: min_days_ahead (early bird), max_days_ahead (last minute), min_nights, stay_from/stay_to (YYYY-MM-DD), arrival_days/departure_days (weekday numbers, 0=Sunday). Empty day arrays mean any day.",
+  },
+  inclusions: { type: "array", items: { type: "string" }, description: "Guest-facing 'what you get' lines (required for value-adds)." },
+  exclusive: { type: "boolean", description: "Value-adds only: suppress automatic discounts when this applies." },
+  enabled: { type: "boolean" },
+  published: { type: "boolean", description: "List on the website's offers page." },
+} as const;
+
+export const MANAGE_COMMERCE_TOOLS: McpTool[] = [
+  {
+    name: "create_extra",
+    description: "Create a bookable add-on (breakfast, transfer, late checkout…). Required: name, unit. Price it with `price` (simple) or `options` (configurable).",
+    inputSchema: { type: "object", properties: extraBodyProps, required: ["name", "unit"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/extras" },
+    scope: "manage",
+  },
+  {
+    name: "update_extra",
+    description: "Edit an add-on. Sparse: omitted fields stay, null clears. `options`/`fields`/exclusion lists replace their whole value when present.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...extraBodyProps }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/extras/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_extra",
+    description: "Delete an add-on. Bookings that already include it keep their snapshot.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/extras/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "create_promotion",
+    description:
+      "Create a promo code or automatic offer. Required: trigger. Code promos need a unique code; discounts need type + value > 0; value-adds need inclusions (and value 0); public auto offers need a name. Set published to list it on the website's offers page.",
+    inputSchema: { type: "object", properties: promoBodyProps, required: ["trigger"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/promotions" },
+    scope: "manage",
+  },
+  {
+    name: "update_promotion",
+    description: "Edit a promotion. Sparse merge; the cross-field rules (code uniqueness, value-add value 0, public-name requirement) are re-checked on the merged record.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...promoBodyProps }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/promotions/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_promotion",
+    description: "Delete a promotion. Bookings that used it keep their snapshot; consider enabled:false to pause it instead.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/promotions/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 
