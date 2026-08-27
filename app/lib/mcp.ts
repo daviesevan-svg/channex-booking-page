@@ -27,6 +27,9 @@ export interface McpTool {
   query?: string[];
   /** Argument name that fills `:id` in the path. */
   pathParam?: string;
+  /** Which key kind this tool is advertised to. Absent = "book". Advertising
+   *  only — enforcement lives in each /v1 handler's own key check. */
+  scope?: "book" | "manage";
 }
 
 const dateStr = { type: "string", description: "YYYY-MM-DD" };
@@ -173,11 +176,146 @@ export const TOOLS: McpTool[] = [
   },
 ];
 
-export const toolByName = (name: string): McpTool | undefined => TOOLS.find((t) => t.name === name);
+// ── Management tools (ak_ keys) ──────────────────────────────────────────────
+// Same thin-mapping principle as the booking tools: each dispatches to the
+// /v1/manage handler in process. All of these are READS — the write tools
+// arrive with their endpoints, phase by phase. get_ari and the booking tools
+// say they are read-only so an agent asked to "close tomorrow" or "cancel this
+// booking" explains where that happens instead of hunting for a tool that
+// doesn't exist.
 
-/** Advertised tool list, without the internal routing detail. */
-export const publicToolList = () =>
-  TOOLS.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
+const dateQ = (desc: string) => ({ type: "string", description: `${desc}, YYYY-MM-DD` });
+const noArgs = { type: "object", properties: {}, additionalProperties: false } as const;
+
+export const MANAGE_TOOLS: McpTool[] = [
+  {
+    name: "get_property_settings",
+    description:
+      "The property's configuration: name, slug, currency, languages, pricing mode, facilities, check-in/out times, address, portal (cancellation) policy, plus read-only context — which channel manager it's connected to, whether payments are enabled, website state. Call this first.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/property" },
+    scope: "manage",
+  },
+  {
+    name: "get_property_content",
+    description:
+      "Per-language property text (name, description, address line, phone, email). `values` is what is stored for that language — what an edit would change; `effective` is what a guest reading that language actually sees (missing fields fall back to the default language). Structure and settings live in get_property_settings; this is text only.",
+    inputSchema: {
+      type: "object",
+      properties: { lang: { type: "string", description: "Two-letter language code, e.g. 'de'. Omit for the default language." } },
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/property/content" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "list_room_types",
+    description:
+      "The full admin room records: capacities, cleaning fee, facilities, amenity keys, images, ordering, and every language's translations. This is the management view — the guest-facing localized view is a different surface.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/rooms" },
+    scope: "manage",
+  },
+  {
+    name: "list_rate_plans",
+    description:
+      "Full structural rate-plan records, including inactive ones: base price per room, per-occupancy pricing rules, structured payment/cancellation policy, inclusions, and the read-only Channex rate-plan mapping. Date-level prices are NOT here — they are ARI (see get_ari).",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/rates" },
+    scope: "manage",
+  },
+  {
+    name: "get_tax_config",
+    description:
+      "The property's tax document: whether prices include tax, the tax and fee rules, and the city-tax configuration.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/taxes" },
+    scope: "manage",
+  },
+  {
+    name: "get_extras_catalog",
+    description: "Every bookable add-on (active or not) with pricing, options, room/rate exclusions and tax treatment.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/extras" },
+    scope: "manage",
+  },
+  {
+    name: "get_promotions",
+    description:
+      "Promo codes and automatic offers: trigger, discount or value-add, conditions, whether enabled and whether published on the website.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/promotions" },
+    scope: "manage",
+  },
+  {
+    name: "list_bookings",
+    description:
+      "READ-ONLY booking list with filters (status, lifecycle, stay window, created window) and pagination. Bookings cannot be created, cancelled or modified through this API — that happens in the property's channel manager or admin, and if asked to change one, say so.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        status: { type: "string", enum: ["confirmed", "simulated", "failed"] },
+        lifecycle: { type: "string", enum: ["active", "cancelled"] },
+        checkin_from: dateQ("Earliest check-in"),
+        checkin_to: dateQ("Latest check-in"),
+        created_from: dateQ("Earliest creation date"),
+        created_to: dateQ("Latest creation date"),
+        limit: { type: "integer", minimum: 1, maximum: 200 },
+        offset: { type: "integer", minimum: 0 },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/bookings" },
+    query: ["status", "lifecycle", "checkin_from", "checkin_to", "created_from", "created_to", "limit", "offset"],
+    scope: "manage",
+  },
+  {
+    name: "get_booking_details",
+    description:
+      "One booking by id or reference — guest, rooms, totals, taxes snapshot, payment state (never card or gateway internals), cancellation state. READ-ONLY: changes happen in the channel manager or admin.",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "string", description: "Booking id or guest-facing reference." } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/bookings/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "get_ari",
+    description:
+      "READ-ONLY availability/rates/restrictions grid as the booking engine sells it, per date (max 400 days per call): rooms available, nightly prices (major units — zero-decimal currencies come back whole), per-occupancy prices, min-stay and closure flags. Use it to reconcile against another system's inventory. ARI cannot be changed here — updates flow from the property's channel manager; if asked to change availability or prices, say so.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: dateQ("First date"),
+        to: dateQ("Last date"),
+        room_id: { type: "string", description: "Optional: only this room type." },
+        rate_id: { type: "string", description: "Optional: only this rate plan." },
+      },
+      required: ["from", "to"],
+      additionalProperties: false,
+    },
+    route: { method: "GET", path: "/v1/manage/ari" },
+    query: ["from", "to", "room_id", "rate_id"],
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS];
+
+export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
+
+/** Advertised tool list for a key kind, without the internal routing detail.
+ *  Filtering is a courtesy to the agent (a wrong-scope call is refused by the
+ *  handler's own key check with a 403 naming the right key kind). */
+export const publicToolList = (scope: "book" | "manage" = "book") =>
+  ALL_TOOLS()
+    .filter((t) => (t.scope ?? "book") === scope)
+    .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
 
 // ── JSON-RPC 2.0 ─────────────────────────────────────────────────────────────
 
