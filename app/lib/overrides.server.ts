@@ -281,7 +281,11 @@ export async function patchSettings(
   const existing = await getSettings(pid);
   const next = { ...existing };
   for (const [k, v] of Object.entries(partial)) {
-    if (v !== undefined) (next as Record<string, unknown>)[k] = v;
+    if (v === undefined) continue;
+    // null = clear the field (the management API's explicit-clear contract);
+    // deleted rather than stored so optional-field reads stay `undefined`.
+    if (v === null) delete (next as Record<string, unknown>)[k];
+    else (next as Record<string, unknown>)[k] = v;
   }
   await writeJson(settingsKey(pid), next);
   return next;

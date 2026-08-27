@@ -399,6 +399,90 @@ const rateBodyProps = {
 
 export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
+    name: "update_property_settings",
+    description:
+      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkout_time (HH:MM), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, website domain, live-booking — say so if asked.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        currency: { type: "string", description: "ISO 4217 code, e.g. VND. Changes how every price is interpreted — confirm with the operator." },
+        pricing_mode: { type: "string", enum: ["per_room", "per_person"] },
+        languages: { type: "array", items: { type: "string" }, description: "Guest languages; must include the default language." },
+        single_unit: { type: "boolean" },
+        facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only — free-text facilities are per-language content." },
+        checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
+        checkout_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
+        timezone: { type: ["string", "null"], description: "IANA timezone, e.g. Asia/Ho_Chi_Minh" },
+        booking_cutoff_days: { type: ["integer", "null"], minimum: 0, maximum: 7 },
+        booking_cutoff_time: { type: ["string", "null"] },
+        address: { type: "object", description: "{city, region, postal_code, country (ISO-2), latitude, longitude} — each string or null." },
+        portal: {
+          type: "object",
+          description:
+            "Guest self-service policy: allow_cancel/allow_modify/auto_refund (booleans), cancel/modify deadline_value (integer ≥ 0; 0 = the anchor time on arrival day) + deadline_unit (hours|days), cancel_anchor_time (HH:MM), after_deadline_message.",
+        },
+        terms_url: { type: ["string", "null"], description: "https:// URL" },
+        privacy_url: { type: ["string", "null"], description: "https:// URL" },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/property" },
+    scope: "manage",
+  },
+  {
+    name: "update_property_content",
+    description:
+      "Edit ONE language's property text (hotel_name, property_type, description, address, phone, email). Sparse: omitted fields stay, null clears so the guest sees the default language's text. Pass lang for a translation; omit it to edit the default language — where hotel_name also renames the property. Never copy the default text into a translation to 'fill it in': a cleared field falling back is better than a stale copy.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        lang: { type: "string", description: "Two-letter language code; omit for the default language." },
+        hotel_name: { type: ["string", "null"] },
+        property_type: { type: ["string", "null"] },
+        description: { type: ["string", "null"] },
+        address: { type: ["string", "null"], description: "Street address line as shown to guests." },
+        phone: { type: ["string", "null"] },
+        email: { type: ["string", "null"] },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/property/content" },
+    query: ["lang"],
+    scope: "manage",
+  },
+  {
+    name: "set_tax_config",
+    description:
+      "Replace the property's whole tax document: taxes_inclusive (are taxes inside the room price?), taxes [{name, rate%}], fees [{name, kind: percent|fixed, amount, taxable, basis?}], city_tax ({enabled, name, amount, basis, taxable, children_exempt, max_nights, seasons?} or null). This is a REPLACE — send the full document (read get_tax_config first and modify it). Changing tax mode changes every displayed price; confirm with the operator.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        taxes_inclusive: { type: "boolean" },
+        taxes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, rate: { type: "number", exclusiveMinimum: 0, maximum: 100 } }, required: ["name", "rate"] } },
+        fees: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              kind: { type: "string", enum: ["percent", "fixed"] },
+              amount: { type: "number", exclusiveMinimum: 0 },
+              taxable: { type: "boolean" },
+              basis: { type: "string", enum: ["booking", "room", "room_night", "person", "person_night"], description: "Fixed fees only; omit for once-per-stay." },
+            },
+            required: ["name", "kind", "amount"],
+          },
+        },
+        city_tax: { type: ["object", "null"] },
+      },
+      required: ["taxes_inclusive", "taxes", "fees"],
+      additionalProperties: false,
+    },
+    route: { method: "PUT", path: "/v1/manage/taxes" },
+    scope: "manage",
+  },
+  {
     name: "create_room",
     description:
       "Create a room type. Required: title, max_adults, max_guests. It appears at the end of the rooms list. Newly created rooms have no prices — add the room to a rate plan's `prices` (update_rate_plan) or it cannot be sold.",
@@ -518,19 +602,19 @@ export function mapArguments(
 ): { search: URLSearchParams; body?: string; pathValue?: string } {
   const search = new URLSearchParams();
   const pathValue = tool.pathParam ? String(args[tool.pathParam] ?? "") : undefined;
-  if (tool.route.method === "GET") {
-    for (const key of tool.query ?? []) {
-      const v = args[key];
-      if (v === undefined || v === null || v === "") continue;
-      search.set(key, Array.isArray(v) ? v.join(",") : String(v));
-    }
-    return { search, pathValue };
+  // Declared query args travel in the URL for every method — a PATCH with
+  // ?lang= routes it there, never into the JSON body.
+  for (const key of tool.query ?? []) {
+    const v = args[key];
+    if (v === undefined || v === null || v === "") continue;
+    search.set(key, Array.isArray(v) ? v.join(",") : String(v));
   }
-  if (tool.route.method === "DELETE") return { search, pathValue };
+  if (tool.route.method === "GET" || tool.route.method === "DELETE") return { search, pathValue };
   // Write bodies pass through, minus the fields the transport handles itself
-  // (the idempotency key travels as a header, the path param in the URL).
+  // (the idempotency key travels as a header, path/query params in the URL).
   const rest = { ...args };
   delete rest.idempotency_key;
   if (tool.pathParam) delete rest[tool.pathParam];
+  for (const key of tool.query ?? []) delete rest[key];
   return { search, body: JSON.stringify(rest), pathValue };
 }
