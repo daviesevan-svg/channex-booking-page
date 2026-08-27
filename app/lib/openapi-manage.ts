@@ -212,6 +212,35 @@ export const manageSchemas = {
       blurb: { type: ["string", "null"] },
     },
   },
+  ManageVoucherProductInput: {
+    type: "object",
+    description: "Voucher product payload. `package` is required for kind 'package' and rejected on other kinds.",
+    properties: {
+      kind: { type: "string", enum: ["gift", "package", "experience"] },
+      title: { type: "string" },
+      description: nullableStr,
+      image: nullableStr,
+      price: { type: "number", exclusiveMinimum: 0 },
+      value: { type: ["number", "null"], description: "Gift face value; null = price." },
+      expires_months: { type: "integer", minimum: 1 },
+      cap: { type: ["integer", "null"], minimum: 1 },
+      terms: nullableStr,
+      included: { type: "array", items: { type: "string" } },
+      guests: { type: ["integer", "null"], minimum: 1 },
+      active: { type: "boolean" },
+      position: { type: "integer", minimum: 0 },
+      package: { type: ["object", "null"], description: "{nights, adults, children?, room_ids, window?, blocked_ranges, checkin_days}." },
+    },
+  },
+  ManageBrandPatch: {
+    type: "object",
+    properties: {
+      theme: { type: ["string", "null"], description: "Preset id, 'custom', or null for default." },
+      custom_color: { type: ["string", "null"], description: "#rrggbb" },
+      custom_bg: { type: ["string", "null"], description: "#rrggbb" },
+      font: { type: ["string", "null"], description: "Curated font-pairing id." },
+    },
+  },
   ManageEmailPatch: {
     type: "object",
     properties: { subject: nullableStr, heading: nullableStr, intro: nullableStr, outro: nullableStr },
@@ -531,6 +560,38 @@ export const managePaths = {
     patch: {
       ...writeOp("Edit an email template's text", "Sparse per language: subject/heading/intro/outro, null clears → fallback. Changes affect real guest email immediately.", "ManageEmailPatch"),
       parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
+    },
+  },
+  "/v1/manage/voucher-products": {
+    ...managed("Voucher catalog", "Sellable gift/experience/package vouchers. SOLD vouchers (money records) are not on the API."),
+    post: writeOp("Create a voucher product", "Required: kind, title, price, expires_months; package rules for kind 'package'. Sold vouchers snapshot the product — later edits never affect buyers.", "ManageVoucherProductInput"),
+  },
+  "/v1/manage/voucher-products/{id}": {
+    get: { summary: "One voucher product", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+    patch: { ...writeOp("Edit a voucher product", "Sparse; sold vouchers keep their purchase-time snapshot.", "ManageVoucherProductInput"), parameters: idParam },
+    delete: { summary: "Remove from sale", description: "Already-sold vouchers stay valid and redeemable.", security: manageAuth, tags: ["Management"], parameters: idParam, responses: baseResponses },
+  },
+  "/v1/manage/brand": {
+    ...managed("Theme", "Preset or custom colors + curated font pairing, with the valid vocabularies. One theme drives the booking pages and the widget."),
+    patch: writeOp("Change the theme", "Sparse: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb | null), font (curated pairing id — arbitrary families are never accepted). Invalid values are 422s, not silently kept.", "ManageBrandPatch"),
+  },
+  "/v1/manage/brand-kit": managed(
+    "Brand kit (derived)",
+    "The AI copy brief + brand.css + tokens.json built from the live theme — the same export the admin page offers, for building on-brand assets elsewhere.",
+  ),
+  "/v1/manage/reviews": managed(
+    "Guest reviews (admin view)",
+    "Every review including private notes and the hotel's responses. Reviews cannot be hidden or deleted — a property responds to criticism, it can't bury it.",
+  ),
+  "/v1/manage/reviews/{id}/response": {
+    post: {
+      summary: "Respond to a review",
+      description: "Set (or clear, with null text) the hotel's public reply. The only review write: guest text is never editable; there is no hide or delete.",
+      security: manageAuth,
+      tags: ["Management"],
+      parameters: idParam,
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", properties: { text: { type: ["string", "null"] } } } } } },
+      responses: baseResponses,
     },
   },
   "/v1/manage/images": {

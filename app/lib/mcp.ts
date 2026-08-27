@@ -924,7 +924,126 @@ export const MANAGE_EMAIL_TOOLS: McpTool[] = [
   },
 ];
 
-const ALL_TOOLS = (): McpTool[] => [...TOOLS, ...MANAGE_TOOLS, ...MANAGE_WRITE_TOOLS, ...MANAGE_COMMERCE_TOOLS, ...MANAGE_SITE_TOOLS, ...MANAGE_CONTENT_TOOLS, ...MANAGE_EMAIL_TOOLS];
+const voucherBodyProps = {
+  kind: { type: "string", enum: ["gift", "package", "experience"] },
+  title: { type: "string" },
+  description: { type: ["string", "null"] },
+  image: { type: ["string", "null"], description: "/images/… path or null." },
+  price: { type: "number", exclusiveMinimum: 0, description: "Sale price in the property currency." },
+  value: { type: ["number", "null"], description: "Gift face value; null = same as price." },
+  expires_months: { type: "integer", minimum: 1 },
+  cap: { type: ["integer", "null"], minimum: 1, description: "Max sellable; null = unlimited." },
+  terms: { type: ["string", "null"] },
+  included: { type: "array", items: { type: "string" }, description: "\"What's included\" bullet points." },
+  guests: { type: ["integer", "null"], minimum: 1, description: "Experience vouchers: how many people it covers (display only)." },
+  active: { type: "boolean" },
+  position: { type: "integer", minimum: 0 },
+  package: {
+    type: ["object", "null"],
+    description:
+      "Package vouchers only (required for kind 'package'): { nights, adults, children?, room_ids (non-empty), window {from?, to?}, blocked_ranges [{from, to}], checkin_days [0=Sunday…6] }.",
+  },
+} as const;
+
+export const MANAGE_MISC_TOOLS: McpTool[] = [
+  {
+    name: "list_voucher_products",
+    description:
+      "The sellable voucher catalog: gift vouchers, experiences, packages — prices, validity, caps, package rules. SOLD vouchers are money records and are not on this API; refunds and edits to sold vouchers happen in the admin.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/voucher-products" },
+    scope: "manage",
+  },
+  {
+    name: "create_voucher_product",
+    description:
+      "Create a sellable voucher. Required: kind, title, price, expires_months — and package rules when kind is 'package'. Buyers of existing vouchers are never affected by later edits (sold vouchers snapshot the product).",
+    inputSchema: { type: "object", properties: voucherBodyProps, required: ["kind", "title", "price", "expires_months"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/voucher-products" },
+    scope: "manage",
+  },
+  {
+    name: "update_voucher_product",
+    description: "Edit a voucher product, sparsely. Already-sold vouchers keep their purchase-time snapshot — price or terms changes only affect future sales.",
+    inputSchema: { type: "object", properties: { id: { type: "string" }, ...voucherBodyProps }, required: ["id"], additionalProperties: false },
+    route: { method: "PATCH", path: "/v1/manage/voucher-products/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "delete_voucher_product",
+    description: "Remove a voucher product from sale. Already-sold vouchers stay valid and redeemable.",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"], additionalProperties: false },
+    route: { method: "DELETE", path: "/v1/manage/voucher-products/:id" },
+    pathParam: "id",
+    scope: "manage",
+  },
+  {
+    name: "get_brand",
+    description: "The theme: preset or custom accent/background colors, the font pairing, and the curated vocabularies (theme presets, font pairing ids). One theme drives the booking pages AND the embeddable widget.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/brand" },
+    scope: "manage",
+  },
+  {
+    name: "update_brand",
+    description:
+      "Change the theme, sparsely: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb hex, null clears), font (a curated pairing id — arbitrary font families are never accepted, nobody has loaded them). Restyles every guest page immediately; confirm with the operator.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        theme: { type: ["string", "null"] },
+        custom_color: { type: ["string", "null"], description: "#rrggbb" },
+        custom_bg: { type: ["string", "null"], description: "#rrggbb" },
+        font: { type: ["string", "null"], description: "A font pairing id from get_brand." },
+      },
+      additionalProperties: false,
+    },
+    route: { method: "PATCH", path: "/v1/manage/brand" },
+    scope: "manage",
+  },
+  {
+    name: "get_brand_kit",
+    description:
+      "The derived brand kit: an AI copy brief describing the property's look and voice, brand.css, and tokens.json — the same tokens the booking pages use. Start here when building a matching marketing site or any on-brand asset.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/brand-kit" },
+    scope: "manage",
+  },
+  {
+    name: "list_reviews",
+    description:
+      "Guest reviews — the admin view: stars, category ratings, public text, the guest's PRIVATE note to the hotel, and the hotel's response. Reviews cannot be hidden or deleted, by design: a property responds to criticism, it can't bury it.",
+    inputSchema: noArgs,
+    route: { method: "GET", path: "/v1/manage/reviews" },
+    scope: "manage",
+  },
+  {
+    name: "respond_to_review",
+    description:
+      "Set (or clear, with null) the hotel's PUBLIC reply to one review — shown under the review on the property page. This is the only review write: the guest's text is never editable, and there is no hide or delete. Draft in the property's voice; get the operator's sign-off for sensitive replies.",
+    inputSchema: {
+      type: "object",
+      properties: { booking_id: { type: "string" }, text: { type: ["string", "null"] } },
+      required: ["booking_id"],
+      additionalProperties: false,
+    },
+    route: { method: "POST", path: "/v1/manage/reviews/:id/response" },
+    pathParam: "booking_id",
+    scope: "manage",
+  },
+];
+
+const ALL_TOOLS = (): McpTool[] => [
+  ...TOOLS,
+  ...MANAGE_TOOLS,
+  ...MANAGE_WRITE_TOOLS,
+  ...MANAGE_COMMERCE_TOOLS,
+  ...MANAGE_SITE_TOOLS,
+  ...MANAGE_CONTENT_TOOLS,
+  ...MANAGE_EMAIL_TOOLS,
+  ...MANAGE_MISC_TOOLS,
+];
 
 export const toolByName = (name: string): McpTool | undefined => ALL_TOOLS().find((t) => t.name === name);
 
