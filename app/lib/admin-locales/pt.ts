@@ -960,6 +960,8 @@ const PT: Record<string, string> = {
   akMode: "Modo",
   akModeTest: "Teste",
   akModeLive: "Real",
+  akModeManage: "Gestão",
+  akManageHint: "As chaves de gestão (ak_…) editam a propriedade através da API de gestão e do MCP; as chaves de reserva (sk_…) pesquisam e reservam.",
   akCreate: "Criar chave",
   akEmpty: "Ainda não há chaves de API.",
   akKey: "Chave",

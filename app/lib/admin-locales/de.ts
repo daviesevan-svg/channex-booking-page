@@ -962,6 +962,8 @@ const DE: Record<string, string> = {
   akMode: "Modus",
   akModeTest: "Test",
   akModeLive: "Live",
+  akModeManage: "Verwaltung",
+  akManageHint: "Verwaltungsschlüssel (ak_…) bearbeiten die Unterkunft über die Management-API und MCP; Buchungsschlüssel (sk_…) suchen und buchen.",
   akCreate: "Schlüssel erstellen",
   akEmpty: "Noch keine API-Schlüssel.",
   akKey: "Schlüssel",
