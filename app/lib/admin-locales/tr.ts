@@ -973,6 +973,8 @@ const TR: Record<string, string> = {
   akMode: "Mod",
   akModeTest: "Test",
   akModeLive: "Canlı",
+  akModeManage: "Yönetim",
+  akManageHint: "Yönetim anahtarları (ak_…) tesisi yönetim API’si ve MCP üzerinden düzenler; rezervasyon anahtarları (sk_…) arama ve rezervasyon yapar.",
   akCreate: "Anahtar oluştur",
   akEmpty: "Henüz API anahtarı yok.",
   akKey: "Anahtar",

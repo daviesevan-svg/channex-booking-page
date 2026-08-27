@@ -958,6 +958,8 @@ const EN: Record<string, string> = {
   akMode: "Mode",
   akModeTest: "Test",
   akModeLive: "Live",
+  akModeManage: "Management",
+  akManageHint: "Management keys (ak_…) edit the property via the management API and MCP; booking keys (sk_…) search and book.",
   akCreate: "Create key",
   akEmpty: "No API keys yet.",
   akKey: "Key",

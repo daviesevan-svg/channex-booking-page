@@ -1,11 +1,19 @@
 // Public REST API authentication: per-property API keys (Stripe-style
-// sk_live_/sk_test_). Keys are shown once at creation and stored only as an
+// sk_live_/sk_test_ for the guest/booking surface, ak_live_ for the
+// management surface). Keys are shown once at creation and stored only as an
 // HMAC-SHA256 hash. A global reverse index maps hash → { pid, keyId } for O(1)
 // auth lookup. test-mode keys force simulated bookings (no Channex push).
+//
+// The two SCOPES are disjoint on purpose (docs/management-api.md §2): a
+// booking key must not be able to rewrite the property, and a management key
+// must not be able to create bookings — a hotel that needs both holds two
+// keys, and a leaked key's blast radius is readable from its prefix. There is
+// no test variant of a management key: a management write is a write.
 import { getConfig, getConfigKV } from "./config.server";
 import { requireCanonicalHost } from "./domains.server";
 
 export type ApiKeyMode = "live" | "test";
+export type ApiKeyScope = "book" | "manage";
 
 /** Stored per-property (never returned raw). `hash` enables revocation; only
  *  `last4` is shown to the operator. */
@@ -13,6 +21,8 @@ export interface ApiKeyRecord {
   id: string;
   label: string;
   mode: ApiKeyMode;
+  /** Absent on records issued before scopes existed — those are all "book". */
+  scope?: ApiKeyScope;
   hash: string;
   last4: string;
   createdAt: string;
@@ -27,6 +37,7 @@ export interface ApiAuth {
   pid: string;
   keyId: string;
   mode: ApiKeyMode;
+  scope: ApiKeyScope;
 }
 
 const keysKey = (pid: string) => `api_keys:${pid}`;
@@ -76,14 +87,22 @@ export async function listApiKeys(pid: string): Promise<ApiKeyView[]> {
   return recs.filter((r) => !r.revokedAt).map(view);
 }
 
-/** Create a key. Returns the raw key ONCE (never retrievable again). */
-export async function issueApiKey(pid: string, opts: { label: string; mode: ApiKeyMode }): Promise<{ key: ApiKeyView; raw: string }> {
-  const raw = `sk_${opts.mode}_${randomToken()}`;
+/** Create a key. Returns the raw key ONCE (never retrievable again).
+ *  Management keys are always live — there is nothing for a test mode to
+ *  simulate on a write, so `mode` is ignored when scope is "manage". */
+export async function issueApiKey(
+  pid: string,
+  opts: { label: string; mode: ApiKeyMode; scope?: ApiKeyScope },
+): Promise<{ key: ApiKeyView; raw: string }> {
+  const scope: ApiKeyScope = opts.scope ?? "book";
+  const mode: ApiKeyMode = scope === "manage" ? "live" : opts.mode;
+  const raw = `${scope === "manage" ? "ak" : "sk"}_${mode}_${randomToken()}`;
   const hash = await hashKey(raw);
   const rec: ApiKeyRecord = {
     id: randomToken(8),
     label: opts.label.trim() || "API key",
-    mode: opts.mode,
+    mode,
+    scope,
     hash,
     last4: raw.slice(-4),
     createdAt: new Date().toISOString(),
@@ -91,7 +110,7 @@ export async function issueApiKey(pid: string, opts: { label: string; mode: ApiK
   const recs = (await readJson<ApiKeyRecord[]>(keysKey(pid))) ?? [];
   recs.push(rec);
   await writeJson(keysKey(pid), recs);
-  await writeJson(indexKey(hash), { pid, keyId: rec.id, mode: rec.mode });
+  await writeJson(indexKey(hash), { pid, keyId: rec.id, mode: rec.mode, scope });
   return { key: view(rec), raw };
 }
 
@@ -106,20 +125,30 @@ export async function revokeApiKey(pid: string, keyId: string): Promise<boolean>
   return true;
 }
 
-/** Resolve the API key on a request. Returns the auth context, or a ready-to-
- *  return JSON error Response (401). */
-export async function authenticateApiKey(request: Request): Promise<ApiAuth | Response> {
+/** Resolve the API key on a request and require it to carry `scope`. Returns
+ *  the auth context, or a ready-to-return JSON error Response (401/403).
+ *
+ *  Every existing guest endpoint calls this with the default scope, so legacy
+ *  records (which predate scopes and are all booking keys) keep working, and a
+ *  management key on a guest endpoint — or the reverse — is a 403 that names
+ *  the right key kind rather than a mystery 401. */
+export async function authenticateApiKey(request: Request, scope: ApiKeyScope = "book"): Promise<ApiAuth | Response> {
   // Same reasoning as the admin gate: /v1 and /mcp are ours, not something to
   // expose on a hotel's own hostname.
   requireCanonicalHost(request);
   const header = request.headers.get("Authorization") || "";
   const raw = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  if (!raw || !/^sk_(live|test)_/.test(raw)) {
-    return apiError(401, "unauthorized", "Missing or malformed API key. Pass `Authorization: Bearer sk_…`.");
+  if (!raw || !/^(sk|ak)_(live|test)_/.test(raw)) {
+    return apiError(401, "unauthorized", "Missing or malformed API key. Pass `Authorization: Bearer sk_…` (or ak_… for management endpoints).");
   }
   const hash = await hashKey(raw);
-  const entry = await readJson<{ pid: string; keyId: string; mode: ApiKeyMode }>(indexKey(hash));
+  const entry = await readJson<{ pid: string; keyId: string; mode: ApiKeyMode; scope?: ApiKeyScope }>(indexKey(hash));
   if (!entry) return apiError(401, "unauthorized", "Invalid or revoked API key.");
+  if ((entry.scope ?? "book") !== scope) {
+    return scope === "manage"
+      ? apiError(403, "wrong_key_scope", "This endpoint requires a management key (ak_…). Booking keys (sk_…) cannot manage the property.")
+      : apiError(403, "wrong_key_scope", "This endpoint requires a booking key (sk_…). Management keys (ak_…) cannot search or book.");
+  }
 
   // Best-effort lastUsedAt stamp; never block the request on it.
   try {
@@ -134,5 +163,5 @@ export async function authenticateApiKey(request: Request): Promise<ApiAuth | Re
   } catch {
     /* stamping is best-effort */
   }
-  return { pid: entry.pid, keyId: entry.keyId, mode: entry.mode };
+  return { pid: entry.pid, keyId: entry.keyId, mode: entry.mode, scope: entry.scope ?? "book" };
 }

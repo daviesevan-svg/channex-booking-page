@@ -30,8 +30,9 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "create") {
     const label = String(form.get("label") ?? "").trim();
-    const mode: ApiKeyMode = form.get("mode") === "live" ? "live" : "test";
-    const { raw } = await issueApiKey(propertyId, { label, mode });
+    const type = String(form.get("mode") ?? "test");
+    const mode: ApiKeyMode = type === "live" ? "live" : "test";
+    const { raw } = await issueApiKey(propertyId, { label, mode, scope: type === "manage" ? "manage" : "book" });
     return { created: raw };
   }
   if (intent === "revoke") {
@@ -78,6 +79,7 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
         {t("akIntro1")}<code className="rounded bg-line/40 px-1">Authorization: Bearer sk_…</code>{t("akIntro2")}{" "}
         <strong>{t("akIntroTest")}</strong> {t("akIntro3")} <strong>{t("akIntroLive")}</strong> {t("akIntro4")}
       </p>
+      <p className="-mt-3 mb-5 max-w-2xl text-[13px] text-muted">{t("akManageHint")}</p>
 
       {actionData?.created && (
         <div className="mb-5 rounded-[12px] border border-[#cfe3d0] bg-[#eef5ec] p-4">
@@ -102,6 +104,7 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
           <select name="mode" defaultValue="test" className={input}>
             <option value="test">{t("akModeTest")}</option>
             <option value="live">{t("akModeLive")}</option>
+            <option value="manage">{t("akModeManage")}</option>
           </select>
         </label>
         <button
@@ -135,13 +138,19 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
                   <td className="px-5 py-3">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                        k.mode === "live" ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-[#fbeede] text-[#9a6a1e]"
+                        k.scope === "manage"
+                          ? "bg-[#e8ecf5] text-[#3d5a9a]"
+                          : k.mode === "live"
+                            ? "bg-[#e8f0e6] text-[#3f7a52]"
+                            : "bg-[#fbeede] text-[#9a6a1e]"
                       }`}
                     >
-                      {k.mode}
+                      {k.scope === "manage" ? t("akModeManage").toLowerCase() : k.mode}
                     </span>
                   </td>
-                  <td className="px-5 py-3 font-mono text-[12px] text-muted">sk_{k.mode}_…{k.last4}</td>
+                  <td className="px-5 py-3 font-mono text-[12px] text-muted">
+                    {k.scope === "manage" ? "ak" : "sk"}_{k.mode}_…{k.last4}
+                  </td>
                   <td className="px-5 py-3 text-secondary">{new Date(k.createdAt).toLocaleDateString()}</td>
                   <td className="px-5 py-3 text-secondary">{k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : "—"}</td>
                   <td className="px-5 py-3 text-right">

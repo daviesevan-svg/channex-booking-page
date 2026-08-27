@@ -956,6 +956,8 @@ const TH: Record<string, string> = {
   akMode: "โหมด",
   akModeTest: "ทดสอบ",
   akModeLive: "ใช้งานจริง",
+  akModeManage: "การจัดการ",
+  akManageHint: "คีย์การจัดการ (ak_…) ใช้แก้ไขที่พักผ่าน Management API และ MCP ส่วนคีย์การจอง (sk_…) ใช้ค้นหาและจอง",
   akCreate: "สร้างคีย์",
   akEmpty: "ยังไม่มีคีย์ API",
   akKey: "คีย์",
