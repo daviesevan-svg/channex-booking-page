@@ -260,6 +260,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     // Legacy flag, no longer edited here — preserved so a property that never
     // saved General still derives its mode from it (see pricingModeOf).
     perPerson: existing?.perPerson,
+    // Not edited here either, but ARI/mapping/booking pushes key by these
+    // per-room Channex ids (see rateChannexId) — dropping them on save would
+    // orphan an imported rate's ARI rows.
+    channexRateIds: existing?.channexRateIds,
     occupancyPricing,
     occupancyPricingByRoom,
     policy,
