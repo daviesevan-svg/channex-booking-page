@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 import { getImagesBucket } from "./config.server";
 import { isAllowedImportImageParsed } from "./image-import-url";
+import { isSafeWebhookUrl } from "./webhooks.server";
 
 const MAX_BYTES = 8 * 1024 * 1024; // 8MB
 
@@ -80,12 +81,13 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
 }
 
 /** Fetch one hop at a time so a 3xx cannot land on an internal host. Each
- *  Location is re-checked against the same allowlist (webhooks do this too). */
-async function fetchAllowlistedImage(start: URL): Promise<Response> {
+ *  Location is re-checked against the same `allow` gate (webhooks do this
+ *  too); `refusal` is the error a refused hop throws. */
+async function fetchAllowlistedImage(start: URL, allow: (u: URL) => boolean, refusal: string): Promise<Response> {
   let current = start;
   for (let hop = 0; hop < 3; hop++) {
-    if (!isAllowedImportImageParsed(current)) {
-      throw new Error("Only Booking.com CDN image URLs can be imported.");
+    if (!allow(current)) {
+      throw new Error(refusal);
     }
     const res = await fetch(current.toString(), { redirect: "manual" });
     if (res.status >= 300 && res.status < 400) {
@@ -106,13 +108,32 @@ async function fetchAllowlistedImage(start: URL): Promise<Response> {
  *  from the response, extension from the type (CDN URLs carry query-string
  *  tokens that would pollute a name-derived extension). */
 export async function importImageFromUrl(prefix: string, url: string): Promise<string> {
+  return importImageGated(prefix, url, isAllowedImportImageParsed, "Only Booking.com CDN image URLs can be imported.");
+}
+
+/** Management-API import (POST /v1/manage/images/import): any PUBLIC https
+ *  image URL — the webhook SSRF gate (no localhost, no .internal/.local
+ *  names, no private/loopback/link-local/CGNAT IPs), re-checked per redirect
+ *  hop. Same residual caveat as webhooks: DNS rebinding to a private IP is not
+ *  fully preventable from a Worker; the gate plus per-hop re-checks are the
+ *  practical ceiling. */
+export function importManageImage(propertyId: string, url: string): Promise<string> {
+  return importImageGated(
+    `manage/${propertyId}`,
+    url,
+    (u) => isSafeWebhookUrl(u.toString()),
+    "Only public https:// image URLs can be imported (localhost, internal names and private IPs are refused).",
+  );
+}
+
+async function importImageGated(prefix: string, url: string, allow: (u: URL) => boolean, refusal: string): Promise<string> {
   const parsed = new URL(url);
-  if (!isAllowedImportImageParsed(parsed)) {
-    throw new Error("Only Booking.com CDN image URLs can be imported.");
+  if (!allow(parsed)) {
+    throw new Error(refusal);
   }
   const bucket = getImagesBucket();
   if (!bucket) throw new Error("Image storage (R2) is not configured.");
-  const res = await fetchAllowlistedImage(parsed);
+  const res = await fetchAllowlistedImage(parsed, allow, refusal);
   if (!res.ok) throw new Error(`Image fetch failed (${res.status}).`);
   const type = res.headers.get("content-type")?.split(";")[0].trim() ?? "";
   if (!type.startsWith("image/")) throw new Error("URL did not return an image.");

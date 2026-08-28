@@ -101,6 +101,7 @@ export const manageSchemas = {
       pricing_mode: { type: "string", enum: ["per_room", "per_person"] },
       languages: { type: "array", items: { type: "string" }, description: "Must include the default language." },
       single_unit: { type: "boolean" },
+      website_enabled: { type: "boolean", description: "Content-safe website-layer toggle." },
       facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only." },
       checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h.' },
       checkout_time: { type: ["string", "null"] },
@@ -666,11 +667,22 @@ export const managePaths = {
       "ManageGooglePatch",
     ),
   },
+  "/v1/manage/images/import": {
+    post: {
+      summary: "Import an image by URL",
+      description:
+        "Fetches a PUBLIC https image and stores it like an upload, returning the /images/… path. SSRF-gated like webhooks (no localhost/internal names/private IPs), re-checked per redirect hop; image/* only, max 8MB. This is the MCP-compatible way to add photos.",
+      security: manageAuth,
+      tags: ["Management"],
+      requestBody: { required: true, content: { "application/json": { schema: { type: "object", required: ["url"], properties: { url: { type: "string" } } } } } },
+      responses: { "201": { description: "Imported — body carries data.url." }, "401": baseResponses["401"], "403": baseResponses["403"], "422": { description: "Refused URL, not an image, or too large." } },
+    },
+  },
   "/v1/manage/images": {
     post: {
       summary: "Upload an image",
       description:
-        "Multipart form data, field `file` (image/*, max 8MB). Returns the /images/… path to reference from any payload. No import-by-URL (SSRF: the only allowlisted importer is Booking.com's CDN, used by onboarding) and no DELETE (an image dies by being unreferenced; the garbage collector owns removal).",
+        "Multipart form data, field `file` (image/*, max 8MB). Returns the /images/… path to reference from any payload. Import-by-URL exists at /v1/manage/images/import; there is no DELETE (an image dies by being unreferenced; the garbage collector owns removal).",
       security: manageAuth,
       tags: ["Management"],
       requestBody: { required: true, content: { "multipart/form-data": { schema: { type: "object", properties: { file: { type: "string", format: "binary" } }, required: ["file"] } } } },

@@ -362,7 +362,7 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 const PROPERTY_FIELDS = new Set([
   "currency", "pricing_mode", "languages", "single_unit", "facilities",
   "checkin_time", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
-  "address", "portal", "terms_url", "privacy_url", "emails",
+  "address", "portal", "terms_url", "privacy_url", "emails", "website_enabled",
 ]);
 const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES as readonly string[]);
 
@@ -424,6 +424,12 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
   }
   const single = optBool(ctx, body, "single_unit");
   if (single !== undefined) out.singleUnit = single;
+
+  // Side-effect-free by construction (saveSiteStyle-style: the website layer
+  // renders or not; nothing is destroyed either way), so it graduated from
+  // the read-only block once the MCP dogfood hit it (PR500 follow-up).
+  const websiteEnabled = optBool(ctx, body, "website_enabled");
+  if (websiteEnabled !== undefined) out.websiteEnabled = websiteEnabled;
 
   const facilities = strList(ctx, body, "facilities");
   if (facilities) {

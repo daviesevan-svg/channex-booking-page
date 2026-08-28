@@ -311,7 +311,7 @@ export const MANAGE_TOOLS: McpTool[] = [
 const roomBodyProps = {
   title: { type: "string", description: "Room name in the default language." },
   description: { type: ["string", "null"] },
-  images: { type: "array", items: { type: "string" }, description: "Our /images/… paths, in display order. Upload first (phase A adds upload endpoints); replacing the list drops removed photos." },
+  images: { type: "array", items: { type: "string" }, description: "Our /images/… paths, in display order — get one from import_image (public URL) or the REST upload. Replacing the list drops removed photos." },
   max_adults: { type: "integer", minimum: 1 },
   max_guests: { type: "integer", minimum: 1, description: "Adults + children this room sleeps; must be ≥ max_adults." },
   cleaning_fee: { type: ["number", "null"], minimum: 0, description: "Once per room per stay; null clears it." },
@@ -401,7 +401,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
     name: "update_property_settings",
     description:
-      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkout_time (HH:MM), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, website domain, live-booking — say so if asked.",
+      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkout_time (HH:MM), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle).",
     inputSchema: {
       type: "object",
       properties: {
@@ -409,6 +409,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
         pricing_mode: { type: "string", enum: ["per_room", "per_person"] },
         languages: { type: "array", items: { type: "string" }, description: "Guest languages; must include the default language." },
         single_unit: { type: "boolean" },
+        website_enabled: { type: "boolean", description: "Turn the website layer on/off. Content-safe: pages and text are kept either way." },
         facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only — free-text facilities are per-language content." },
         checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
         checkout_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
@@ -440,7 +441,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
         hotel_name: { type: ["string", "null"] },
         property_type: { type: ["string", "null"] },
         description: { type: ["string", "null"] },
-        address: { type: ["string", "null"], description: "Street address line as shown to guests." },
+        address: { type: ["string", "null"], description: "STREET LINE ONLY (e.g. \"36 Spilman Street\") — city, region, postcode and country are structured settings (update_property_settings address), and the guest page prints both, so a full address here renders doubled." },
         phone: { type: ["string", "null"] },
         email: { type: ["string", "null"] },
       },
@@ -538,7 +539,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
 const extraBodyProps = {
   name: { type: "string" },
   description: { type: ["string", "null"] },
-  image: { type: ["string", "null"], description: "An /images/… path (REST POST /v1/manage/images uploads one — files can't travel over MCP) or null." },
+  image: { type: ["string", "null"], description: "An /images/… path — get one from import_image (public URL) or the REST upload — or null." },
   unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] },
   price: { type: ["number", "null"], minimum: 0, description: "Simple extras. Omit when `options` price the extra." },
   options: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, price: { type: "number", minimum: 0 }, desc: { type: "string" }, unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] } }, required: ["name", "price"] }, description: "Choices shown in a popup; each may override the unit." },
@@ -762,7 +763,7 @@ export const MANAGE_CONTENT_TOOLS: McpTool[] = [
   {
     name: "set_gallery_images",
     description:
-      "Replace the gallery's image LIST in one call — array order is display order. Reuse ids from get_gallery to keep an image and every language's captions; url-only entries are new (upload via the REST images endpoint first); stored images you omit are permanently removed and garbage-collected. Max 40.",
+      "Replace the gallery's image LIST in one call — array order is display order. Reuse ids from get_gallery to keep an image and every language's captions; url-only entries are new (get paths from import_image or the REST upload); stored images you omit are permanently removed and garbage-collected. Max 40.",
     inputSchema: {
       type: "object",
       properties: { images: { type: "array", items: { type: "object", properties: { id: { type: "string" }, url: { type: "string" } }, required: ["url"] } } },
@@ -1120,6 +1121,15 @@ export const MANAGE_ACCOUNT_TOOLS: McpTool[] = [
       additionalProperties: false,
     },
     route: { method: "PATCH", path: "/v1/manage/google" },
+    scope: "manage",
+  },
+
+  {
+    name: "import_image",
+    description:
+      "Fetch a PUBLIC https image URL and store it as a property photo, returning the /images/… path to use in rooms, gallery, extras, hero or site sections. This is how photos work over MCP (files can't travel over JSON-RPC). The URL must be publicly reachable — localhost, internal hostnames and private IPs are refused — an image/* response, and at most 8MB. Only import images the property has the right to use.",
+    inputSchema: { type: "object", properties: { url: { type: "string", description: "Public https:// image URL." } }, required: ["url"], additionalProperties: false },
+    route: { method: "POST", path: "/v1/manage/images/import" },
     scope: "manage",
   },
 ];

@@ -143,11 +143,11 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
       notify_host_on_booking: s.notifyHostOnBooking ?? true,
       notify_host_on_cancel: s.notifyHostOnCancel ?? true,
     },
+    website_enabled: s.websiteEnabled ?? false,
     // Read-only context (writes are UI-only or a later phase; see the spec).
     connected_system: s.connectedSystem ?? null,
     live_booking: s.liveBooking ?? null,
     payments_charges_enabled: s.stripeChargesEnabled ?? false,
-    website_enabled: s.websiteEnabled ?? false,
     website_domain: s.websiteDomain ?? null,
   };
 }
