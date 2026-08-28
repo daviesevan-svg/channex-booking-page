@@ -122,6 +122,7 @@ export default [
   route("v1/manage/promotions", "routes/api.v1.manage.promotions.tsx"),
   route("v1/manage/promotions/:id", "routes/api.v1.manage.promotions.$id.tsx"),
   route("v1/manage/images", "routes/api.v1.manage.images.tsx"),
+  route("v1/manage/images/import", "routes/api.v1.manage.images.import.tsx"),
   route("v1/manage/site", "routes/api.v1.manage.site.tsx"),
   route("v1/manage/site/pages", "routes/api.v1.manage.site.pages.tsx"),
   route("v1/manage/site/pages/:id", "routes/api.v1.manage.site.pages.$id.tsx"),

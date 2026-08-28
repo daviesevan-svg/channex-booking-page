@@ -36,6 +36,7 @@ import { loader as manageFooterLoader, action as manageFooterAction } from "../r
 
 import { loader as manageGalleryLoader, action as manageGalleryAction } from "../routes/api.v1.manage.gallery";
 import { action as manageGalleryTextAction } from "../routes/api.v1.manage.gallery.text";
+import { action as manageImageImportAction } from "../routes/api.v1.manage.images.import";
 import { loader as manageSearchLoader, action as manageSearchAction } from "../routes/api.v1.manage.content.search";
 import { loader as manageFunnelLoader, action as manageFunnelAction } from "../routes/api.v1.manage.content.pages.$id";
 import { loader as manageFacilitiesLoader, action as manageFacilitiesAction } from "../routes/api.v1.manage.content.facilities";
@@ -139,6 +140,7 @@ export const HANDLERS: Record<string, Handler> = {
   "DELETE /v1/manage/webhooks/:id": manageWebhookAction as unknown as Handler,
   "GET /v1/manage/google": manageGoogleLoader as unknown as Handler,
   "PATCH /v1/manage/google": manageGoogleAction as unknown as Handler,
+  "POST /v1/manage/images/import": manageImageImportAction as unknown as Handler,
   "GET /v1/manage/bookings": manageBookingsLoader as unknown as Handler,
   "GET /v1/manage/bookings/:id": manageBookingLoader as unknown as Handler,
   "GET /v1/manage/ari": manageAriLoader as unknown as Handler,

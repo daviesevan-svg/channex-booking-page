@@ -5,11 +5,9 @@ import { uploadManageApiImage } from "~/lib/images.server";
 // POST /v1/manage/images — multipart upload, field name "file". Returns the
 // /images/… path to reference from any payload (rooms, extras, …).
 //
-// There is deliberately NO import-by-URL here: the existing URL importer is
-// allowlisted to the Booking.com CDN for SSRF reasons, and widening that
-// allowlist is a security decision, not an endpoint parameter
-// (docs/management-api.md §4). There is also no DELETE — an image dies by
-// being unreferenced; the GC owns removal.
+// Import-by-URL lives at POST /v1/manage/images/import (public https only,
+// webhook-grade SSRF gate) — that's the MCP-compatible path for photos. There
+// is no DELETE — an image dies by being unreferenced; the GC owns removal.
 export async function action({ request }: Route.ActionArgs) {
   const auth = await authenticateApiKey(request, "manage");
   if (auth instanceof Response) return auth;
