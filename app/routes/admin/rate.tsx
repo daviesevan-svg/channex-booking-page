@@ -6,8 +6,8 @@ import { adminMeta } from "~/lib/admin-meta";
 import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { isDeadlineUnit } from "~/lib/content";
-import { deleteRate, getPricingMode, getRate, getRates, getRooms, pricingModeOf, saveRate, type CatalogRate, type OccupancyPricing } from "~/lib/catalog.server";
+import { DEFAULT_LANG, isDeadlineUnit, langParam, pickLang } from "~/lib/content";
+import { deleteRate, getPricingMode, getRate, getRates, getRooms, pricingModeOf, saveRate, type CatalogRate, type OccupancyPricing, type RateTranslation } from "~/lib/catalog.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import {
   CARD_HANDLINGS,
@@ -19,7 +19,7 @@ import {
   type CancelTier,
   type RatePolicy,
 } from "~/lib/rate-policy";
-import { FIELD_INPUT } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { activeGateway } from "~/lib/payments.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
@@ -96,9 +96,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // enforceable if there's something on file to charge.
   const settings = await getSettings(propertyId);
   const canTakeCard = Boolean(await activeGateway(propertyId, settings));
+  // A new rate is always created in the default language — there is no default
+  // text to translate yet — so the editor ignores the language tab until saved.
+  const lang = isNew ? DEFAULT_LANG : langParam(request);
+  // RAW per-language text, empty until translated (see TranslationNote) — the
+  // default-language content must never appear editable on a translation tab,
+  // or saving it writes the default text into the translation (or worse).
+  const tr: RateTranslation = lang === DEFAULT_LANG ? {} : (rate?.translations?.[lang] ?? {});
   return {
     isNew,
     rate,
+    lang,
+    tr,
     canTakeCard,
     // Property-wide (set on General): every rate prices per room or per person.
     perPerson: pricingModeOf(settings, await getRates(propertyId)) === "per_person",
@@ -124,8 +133,16 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   const existing = isNew ? undefined : await getRate(propertyId, params.rateId);
+
+  // The language tab the form was rendered under. New rates always save the
+  // default: there is no default text to translate yet.
+  const lang = isNew ? DEFAULT_LANG : pickLang(String(form.get("lang") ?? ""));
+  const onDefault = lang === DEFAULT_LANG;
+
   const title = String(form.get("title") ?? "").trim();
-  if (!title) return { error: "Enter a rate name." };
+  // A translation tab may leave any text blank (= fall back to the default),
+  // but the default name is what everything falls back TO, so it must exist.
+  if (onDefault && !title) return { error: "Enter a rate name." };
 
   // One price per room — a room is offered this rate only when it has a price.
   const prices: Record<string, number> = {};
@@ -151,6 +168,11 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   // Payment + cancellation + no-show policy (same builder the live preview uses).
   const policy = buildPolicy((n) => String(form.get(n) ?? ""));
+  // On a translation tab the override-note field holds THAT language's text, so
+  // it goes into translations[lang] below — the default-language note isn't in
+  // the form and must be carried over onto the policy untouched.
+  const noteTr = policy.overrideNote;
+  if (!onDefault) policy.overrideNote = existing ? ratePolicyOf(existing).overrideNote : undefined;
   const tier0 = policy.cancellation.tiers[0];
 
   // Per-person pricing is property-wide (settings.pricingMode, set on General):
@@ -205,10 +227,35 @@ export async function action({ params, request }: Route.ActionArgs) {
     if (Object.keys(map).length > 0) occupancyPricingByRoom = map;
   }
 
+  const mealPlan = String(form.get("mealPlan") ?? "").trim();
+  const inclusions = String(form.get("inclusions") ?? "")
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // On a translation tab the four text fields hold THAT language's raw text
+  // (empty = untranslated), so they update only translations[lang] — the
+  // default text isn't even in the form and must be carried over untouched.
+  // Everything else (prices, policy, occupancy) is language-independent and
+  // saves the same whichever tab is open.
+  let translations = existing?.translations;
+  if (!onDefault) {
+    const entry: RateTranslation = {
+      ...(title ? { title } : {}),
+      ...(mealPlan ? { mealPlan } : {}),
+      ...(inclusions.length ? { inclusions } : {}),
+      ...(noteTr ? { cancellationNote: noteTr } : {}),
+    };
+    const next = { ...translations };
+    if (Object.keys(entry).length) next[lang] = entry;
+    else delete next[lang];
+    translations = Object.keys(next).length ? next : undefined;
+  }
+
   const rate: CatalogRate = {
     id: existing?.id ?? crypto.randomUUID(),
-    title,
-    mealPlan: String(form.get("mealPlan") ?? "").trim() || undefined,
+    title: onDefault ? title : (existing?.title ?? title),
+    mealPlan: onDefault ? mealPlan || undefined : existing?.mealPlan,
     prices,
     // Legacy flag, no longer edited here — preserved so a property that never
     // saved General still derives its mode from it (see pricingModeOf).
@@ -221,12 +268,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     cancelDeadlineValue: tier0?.deadlineValue,
     cancelDeadlineUnit: tier0?.deadlineUnit,
     cancellationNote: policy.overrideNote,
-    inclusions: String(form.get("inclusions") ?? "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean),
+    inclusions: onDefault ? inclusions : (existing?.inclusions ?? []),
     active: form.get("active") != null,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    translations,
   };
   await saveRate(propertyId, rate);
   await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
@@ -239,7 +284,8 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function AdminRate({ loaderData, actionData }: Route.ComponentProps) {
   const t = useAdminT();
-  const { isNew, rate, rooms, canTakeCard, cancelAnchor, perPerson } = loaderData;
+  const { isNew, rate, lang, tr, rooms, canTakeCard, cancelAnchor, perPerson } = loaderData;
+  const onDefault = lang === DEFAULT_LANG;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
@@ -329,15 +375,18 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
       </Link>
       <AdminPageHeader title={isNew ? t("rtNewTitle") : rate?.title} saved={Boolean(actionData && "ok" in actionData && actionData.ok)} />
 
-      <Form ref={formRef} onChange={refreshPreview} method="post" className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+      <TranslationNote lang={lang} />
+
+      <Form ref={formRef} onChange={refreshPreview} method="post" key={lang} className="flex flex-col gap-5 rounded-[14px] border border-line bg-surface p-6">
+        <input type="hidden" name="lang" value={lang} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <label className="block text-[13px] font-semibold text-secondary">
             {t("rtNameLabel")}
-            <input name="title" defaultValue={rate?.title} placeholder={t("rtNamePlaceholder")} className={FIELD_INPUT} />
+            <input name="title" defaultValue={onDefault ? rate?.title : tr.title} placeholder={onDefault ? t("rtNamePlaceholder") : undefined} className={FIELD_INPUT} />
           </label>
           <label className="block text-[13px] font-semibold text-secondary">
             {t("rtMealPlan")} <span className="font-normal text-faint">{t("rtOptional")}</span>
-            <input name="mealPlan" defaultValue={rate?.mealPlan} placeholder={t("rtMealPlanPlaceholder")} className={FIELD_INPUT} />
+            <input name="mealPlan" defaultValue={onDefault ? rate?.mealPlan : tr.mealPlan} placeholder={onDefault ? t("rtMealPlanPlaceholder") : undefined} className={FIELD_INPUT} />
           </label>
         </div>
 
@@ -559,8 +608,8 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <textarea
             name="inclusions"
             rows={3}
-            defaultValue={rate?.inclusions.join("\n")}
-            placeholder={t("rtInclusionsPlaceholder")}
+            defaultValue={onDefault ? rate?.inclusions.join("\n") : tr.inclusions?.join("\n")}
+            placeholder={onDefault ? t("rtInclusionsPlaceholder") : undefined}
             className={`${FIELD_INPUT} resize-y`}
           />
         </label>
@@ -661,7 +710,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           </div>
           <label className="mt-4 block text-[13px] font-semibold text-secondary">
             {t("rtOverrideNote")} <span className="font-normal text-faint">{t("rtOverrideNoteHint")}</span>
-            <input name="cancellationNote" defaultValue={pol.overrideNote} placeholder={t("rtOverrideNotePlaceholder")} className={FIELD_INPUT} />
+            <input name="cancellationNote" defaultValue={onDefault ? pol.overrideNote : tr.cancellationNote} placeholder={onDefault ? t("rtOverrideNotePlaceholder") : undefined} className={FIELD_INPUT} />
           </label>
         </div>
 

@@ -70,6 +70,16 @@ export function localizeRoom(room: CatalogRoom, lang: string): CatalogRoom {
   };
 }
 
+/** Per-language overrides of a rate plan's guest-facing free text. Same
+ *  contract as RoomTranslation: a missing field falls back to the rate's own
+ *  (default-language) value. */
+export interface RateTranslation {
+  title?: string;
+  mealPlan?: string;
+  inclusions?: string[];
+  cancellationNote?: string;
+}
+
 export interface CatalogRate {
   id: string;
   title: string;
@@ -106,6 +116,34 @@ export interface CatalogRate {
   inclusions: string[];
   active: boolean;
   createdAt: string;
+  /** Guest-language text overrides, keyed by language code. Edited on the rate
+   *  editor's non-default language tabs; never contains DEFAULT_LANG. */
+  translations?: Record<string, RateTranslation>;
+}
+
+/** The rate as a guest reading `lang` should see it: translated title / meal
+ *  plan / inclusions / cancellation note where present, the default text
+ *  otherwise. The translations map itself is stripped so loaders don't
+ *  serialize every language's text into the page. */
+export function localizeRate(rate: CatalogRate, lang: string): CatalogRate {
+  const { translations, ...base } = rate;
+  const tr = translations?.[lang];
+  if (!tr) return base;
+  // Guest copy reads the note via ratePolicyOf → policy.overrideNote, so the
+  // translation must land on the policy too, not just the legacy mirror.
+  const note = tr.cancellationNote?.trim();
+  return {
+    ...base,
+    title: tr.title?.trim() || base.title,
+    mealPlan: tr.mealPlan?.trim() || base.mealPlan,
+    inclusions: tr.inclusions?.length ? tr.inclusions : base.inclusions,
+    ...(note
+      ? {
+          cancellationNote: note,
+          policy: base.policy ? { ...base.policy, overrideNote: note } : undefined,
+        }
+      : {}),
+  };
 }
 
 /** Legacy rates were single-room (`roomId` + one `nightlyPrice`, plus `adults`/
@@ -289,7 +327,7 @@ export async function getCatalogRooms(
     // Guest pages pass their language so room text arrives translated; callers
     // that feed machines (v1 API, Google pushes) omit it and get the defaults.
     getRooms(pid).then((rs) => (opts.lang ? rs.map((r) => localizeRoom(r, opts.lang!)) : rs)),
-    getRates(pid),
+    getRates(pid).then((rs) => (opts.lang ? rs.map((r) => localizeRate(r, opts.lang!)) : rs)),
     getPromotions(pid),
     // For the cancellation anchor: a rate card's free-until date has to be the
     // same moment the booking will snapshot, and that needs the hotel's cut-off
