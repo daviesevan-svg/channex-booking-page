@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/api-keys";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { getConfig } from "~/lib/config.server";
 import { requirePageAllowed } from "~/lib/page-access.server";
 import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
 import { issueApiKey, listApiKeys, revokeApiKey, type ApiKeyMode } from "~/lib/api-auth.server";
@@ -14,7 +16,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
   const canManage = await canManageProperty(request, propertyId);
-  return { configured: true as const, canManage, keys: canManage ? await listApiKeys(propertyId) : [] };
+  // /mcp and /v1 live ONLY on the canonical host (requireCanonicalHost), so
+  // the connect snippets must print the canonical origin — this page may be
+  // open on a partner's admin host, where those endpoints 404.
+  let apiOrigin = "https://book.roompanda.com";
+  try {
+    apiOrigin = new URL(getConfig().appUrl).origin;
+  } catch {
+    /* keep the fallback */
+  }
+  return { configured: true as const, canManage, apiOrigin, keys: canManage ? await listApiKeys(propertyId) : [] };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -68,7 +79,7 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { keys } = loaderData;
+  const { keys, apiOrigin } = loaderData;
   const input =
     "rounded-[10px] border border-line-alt bg-surface px-3 py-2 text-[14px] outline-none focus:border-accent";
 
@@ -172,6 +183,86 @@ export default function AdminApiKeys({ loaderData, actionData }: Route.Component
             </tbody>
           </table>
         )}
+      </div>
+
+      <ConnectSection apiOrigin={apiOrigin} />
+    </div>
+  );
+}
+
+/** Copy-paste connection instructions for MCP clients and the REST API —
+ *  static snippets with placeholder keys (real keys are shown exactly once,
+ *  at creation, and never re-rendered). */
+function ConnectSection({ apiOrigin }: { apiOrigin: string }) {
+  const t = useAdminT();
+  const mcpUrl = `${apiOrigin}/mcp`;
+  const TOOLS = ["Claude Code", "Claude / ChatGPT", "Cursor", "Other"] as const;
+  const [tool, setTool] = useState<(typeof TOOLS)[number]>("Claude Code");
+
+  const snippet: Record<(typeof TOOLS)[number], string> = {
+    "Claude Code": `claude mcp add roompanda --transport http ${mcpUrl} \\
+  --header "Authorization: Bearer ak_live_…"`,
+    "Claude / ChatGPT": `${t("akConnectCustomHint")}
+
+URL:    ${mcpUrl}
+Header: Authorization: Bearer ak_live_…`,
+    Cursor: `// .cursor/mcp.json
+{
+  "mcpServers": {
+    "roompanda": {
+      "url": "${mcpUrl}",
+      "headers": { "Authorization": "Bearer ak_live_…" }
+    }
+  }
+}`,
+    Other: `${t("akConnectOtherHint")}
+
+POST ${mcpUrl}
+Authorization: Bearer ak_live_…
+Content-Type: application/json
+
+{"jsonrpc":"2.0","id":1,"method":"tools/list"}`,
+  };
+
+  const code = "block overflow-x-auto whitespace-pre rounded-[10px] border border-line bg-chip px-3.5 py-2.5 font-mono text-[12.5px] leading-relaxed text-secondary";
+
+  return (
+    <div className="mt-8">
+      <h2 className="mb-1 font-serif text-[20px] font-semibold">{t("akConnectTitle")}</h2>
+      <p className="mb-4 max-w-2xl text-[14px] text-secondary">{t("akConnectIntro")}</p>
+
+      <div className="rounded-[14px] border border-line bg-surface p-5">
+        <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted">{t("akConnectMcpUrl")}</div>
+        <code className={`${code} mb-3`}>{mcpUrl}</code>
+        <p className="mb-4 max-w-2xl text-[13px] text-muted">{t("akConnectScopes")}</p>
+
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {TOOLS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => setTool(name)}
+              className={`rounded-full border px-3.5 py-1.5 text-[13px] font-semibold ${
+                tool === name ? "border-accent bg-accent text-white" : "border-line-alt bg-surface text-secondary hover:border-accent"
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <code className={code}>{snippet[tool]}</code>
+      </div>
+
+      <div className="mt-4 rounded-[14px] border border-line bg-surface p-5">
+        <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-muted">{t("akConnectRestTitle")}</div>
+        <p className="mb-3 max-w-2xl text-[13px] text-muted">
+          {t("akConnectRestIntro")}{" "}
+          <a href={`${apiOrigin}/v1/openapi.json`} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">
+            {apiOrigin.replace(/^https?:\/\//, "")}/v1/openapi.json
+          </a>
+        </p>
+        <code className={code}>{`curl ${apiOrigin}/v1/manage/property \\
+  -H "Authorization: Bearer ak_live_…"`}</code>
       </div>
     </div>
   );
