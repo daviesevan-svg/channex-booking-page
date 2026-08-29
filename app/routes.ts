@@ -110,6 +110,7 @@ export default [
   // Management API (docs/management-api.md) — ak_ manage-scoped keys only.
   // ARI and bookings are READ-ONLY here by decision; their writes stay on the
   // Channex pipe and in the admin UI.
+  route("v1/manage/properties", "routes/api.v1.manage.properties.tsx"),
   route("v1/manage/property", "routes/api.v1.manage.property.tsx"),
   route("v1/manage/property/content", "routes/api.v1.manage.property.content.tsx"),
   route("v1/manage/rooms", "routes/api.v1.manage.rooms.tsx"),

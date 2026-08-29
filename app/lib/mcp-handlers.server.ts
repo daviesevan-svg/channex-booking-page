@@ -12,6 +12,7 @@ import { loader as ratesLoader } from "../routes/api.v1.rates";
 import { loader as extrasLoader } from "../routes/api.v1.extras";
 import { loader as bookingLoader } from "../routes/api.v1.bookings.$id";
 import { action as bookingsAction } from "../routes/api.v1.bookings";
+import { action as managePropertiesAction } from "../routes/api.v1.manage.properties";
 import { loader as managePropertyLoader, action as managePropertyAction } from "../routes/api.v1.manage.property";
 import { loader as manageContentLoader, action as manageContentAction } from "../routes/api.v1.manage.property.content";
 import { loader as manageRoomsLoader, action as manageRoomsAction } from "../routes/api.v1.manage.rooms";
@@ -69,6 +70,7 @@ export const HANDLERS: Record<string, Handler> = {
   "GET /v1/extras": extrasLoader as unknown as Handler,
   "GET /v1/bookings/:id": bookingLoader as unknown as Handler,
   "POST /v1/bookings": bookingsAction as unknown as Handler,
+  "POST /v1/manage/properties": managePropertiesAction as unknown as Handler,
   "GET /v1/manage/property": managePropertyLoader as unknown as Handler,
   "PATCH /v1/manage/property": managePropertyAction as unknown as Handler,
   "GET /v1/manage/property/content": manageContentLoader as unknown as Handler,

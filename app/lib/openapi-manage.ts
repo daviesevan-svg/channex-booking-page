@@ -93,6 +93,15 @@ export const manageSchemas = {
       created_at: { type: "string" },
     },
   },
+  ManagePropertyCreate: {
+    type: "object",
+    description: "Create a new property. Everything else (rooms, rates, content, settings) is set afterwards with the returned key.",
+    properties: {
+      name: { type: "string", maxLength: 120, description: "Property name shown in the admin. The guest-facing hotel name is separate per-language content." },
+    },
+    required: ["name"],
+    additionalProperties: false,
+  },
   ManagePropertyPatch: {
     type: "object",
     description: "Sparse settings patch — omitted fields stay, null clears. Unknown fields are 422s.",
@@ -349,6 +358,45 @@ export const manageSchemas = {
 } as const;
 
 export const managePaths = {
+  "/v1/manage/properties": {
+    post: {
+      summary: "Create a property",
+      description:
+        "Creates a NEW, blank property under the same owner account as this key's property (UI parity with the admin's Add property). The response includes a management API key for the new property — shown ONCE, stored only as a hash — because the calling key stays scoped to its own property. Owner and white-label partner are copied from the key's property; refused when that property has no owner, and capped at 50 properties per account.",
+      security: manageAuth,
+      tags: ["Management"],
+      requestBody: {
+        required: true,
+        content: { "application/json": { schema: { $ref: "#/components/schemas/ManagePropertyCreate" } } },
+      },
+      responses: {
+        "201": {
+          description: "Created. `data.api_key` is the new property's management key — shown once, never retrievable again.",
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  data: {
+                    type: "object",
+                    properties: {
+                      id: { type: "string", description: "The new property id — the `pid` every data layer keys by." },
+                      name: { type: "string" },
+                      api_key: { type: "string", description: "ak_live_… management key for the NEW property. Shown once." },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        "401": { description: "Missing or invalid key." },
+        "403": { description: "Key has the wrong scope — management endpoints need an ak_ key." },
+        "409": { description: "The key's property has no owner account, or the account is at its property limit." },
+        "422": { description: "Validation failed — `error.fields` maps each invalid field to its messages." },
+      },
+    },
+  },
   "/v1/manage/property": {
     ...managed(
       "Property settings",
