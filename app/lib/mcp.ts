@@ -399,6 +399,21 @@ const rateBodyProps = {
 
 export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
+    name: "create_property",
+    description:
+      "Create a NEW, blank property under the same owner account as this key's property. Returns the new property's id AND a fresh management API key for it — shown ONCE, so relay it to the operator to store safely. IMPORTANT: this MCP session's key still targets the ORIGINAL property; every other tool here keeps editing that one. To set up the new property, use the returned key — over the REST API (/v1/manage/*), or by configuring a new MCP connection with it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Property name shown in the admin. The guest-facing hotel name is separate content — set it on the new property (with its returned key) the way update_property_content does here." },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    route: { method: "POST", path: "/v1/manage/properties" },
+    scope: "manage",
+  },
+  {
     name: "update_property_settings",
     description:
       "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkout_time (HH:MM), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle).",
