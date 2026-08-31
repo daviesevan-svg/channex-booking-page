@@ -119,6 +119,16 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       // A per-person rate prices each guest count from its own per-occupancy ARI
       // row (per-adult × guests where only a manual/base price exists), exactly
       // as getCatalogRooms does; flat rates keep base + occupancy delta.
+      //
+      // POSITIVE amounts only: Google rejects the WHOLE rate message —
+      // Status="NotProcessed", every price in the push stalls — if any
+      // BaseByGuestAmt carries a 0 (OTA error 450, "`AmountBeforeTax` and
+      // `AmountAfterTax` must be positive"). A 0 can reach here two ways: a
+      // 0-price D1 row (Channex pushes rate 0 for some closeouts, and ingest
+      // stores what it's sent) or an occupancy discount at or above the base.
+      // The site already treats a non-positive night as unbookable and drops
+      // the rate; the push mirrors that — the guest count is omitted, and a
+      // date with NO priced guest count is stop-sold below.
       const amountsAt = (date: string): { guests: number; net: number; gross: number }[] => {
         const key = `${room.id}|${rid}|${date}`;
         const base = inv.prices[key] ?? catalogBase;
@@ -129,13 +139,16 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
             return { guests, ...netGross(priced, 0, vat, inclusive) };
           }
           return { guests, ...netGross(base, occupancyNightlyDelta(op, guests, []), vat, inclusive) };
-        });
+        }).filter((a) => a.net > 0 && a.gross > 0);
       };
       const sameAmounts = (
         a: { guests: number; net: number; gross: number }[],
         b: { guests: number; net: number; gross: number }[],
       ) => a.length === b.length && a.every((x, i) => x.net === b[i].net && x.gross === b[i].gross);
       for (const run of groupRuns(dates, amountsAt, sameAmounts)) {
+        // A run with no priced guest count sends no rate at all — the stop-sell
+        // below is what tells Google the dates are closed.
+        if (run.value.length === 0) continue;
         rates.push({ roomId: room.id, rateId: rid, start: run.start, end: run.end, currency, amounts: run.value });
       }
 
@@ -143,7 +156,10 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       const cellAt = (date: string) => {
         const c = inv.restrictions[`${room.id}|${rid}|${date}`];
         return {
-          stopSell: c?.stopSell ?? false,
+          // An unpriced date (see amountsAt) is unbookable on the site, so it
+          // must read closed on Google too — otherwise the date shows open
+          // with whatever stale price Google last accepted.
+          stopSell: (c?.stopSell ?? false) || amountsAt(date).length === 0,
           cta: c?.cta ?? false,
           ctd: c?.ctd ?? false,
           minStay: Math.max(1, c?.minStay || 1),
