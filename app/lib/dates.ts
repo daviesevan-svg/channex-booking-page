@@ -1,6 +1,7 @@
 import { format, parseISO, type Locale } from "date-fns";
 
 import type { BookingCutoff } from "./content";
+import type { ClosedDates } from "./channex/types";
 
 /** Format an ISO date string with a date-fns pattern, optionally localized. */
 export function fmtDate(iso: string, pattern: string, locale?: Locale): string {
@@ -182,4 +183,38 @@ export function cancelDeadline(
 export function isTooLastMinute(checkin: string, cutoff: BookingCutoff, now: Date = new Date()): boolean {
   if (cutoff.days == null) return false;
   return checkin < earliestCheckinDate(cutoff, now);
+}
+
+/**
+ * The earliest bookable stay: the first date from `minCheckin` a guest can
+ * actually arrive on, paired with its earliest valid check-out. Mirrors the
+ * calendar's own arrival test (use-date-range's `arrivalAllowed`): the arrival
+ * must be open and not closed-to-arrival, and a run of open nights at least the
+ * date's min-stay long must end on a night that isn't closed-to-departure.
+ *
+ * `null` when the availability data is missing (a pre-selection guessed off no
+ * data could sit on a sold night — worse than none) or when nothing is bookable
+ * inside the scan horizon.
+ */
+export function firstAvailableStay(
+  closedDates: ClosedDates | null,
+  minCheckin: string,
+): { checkin: string; checkout: string } | null {
+  if (!closedDates) return null;
+  const sold = new Set(closedDates.closed);
+  const cta = new Set(closedDates.closedToArrival);
+  const ctd = new Set(closedDates.closedToDeparture);
+  const SCAN_DAYS = 370; // how far out to look for an arrival at all
+  for (let a = 0; a < SCAN_DAYS; a++) {
+    const arrival = addDaysISO(minCheckin, a);
+    if (sold.has(arrival) || cta.has(arrival)) continue;
+    const need = Math.max(closedDates.minStayArrival[arrival] ?? 1, 1);
+    // Walk the open run from this arrival looking for the first valid check-out.
+    for (let nights = 1; nights <= MAX_STAY_NIGHTS; nights++) {
+      if (sold.has(addDaysISO(arrival, nights - 1))) break; // run ended before a stay fit
+      const out = addDaysISO(arrival, nights);
+      if (nights >= need && !ctd.has(out)) return { checkin: arrival, checkout: out };
+    }
+  }
+  return null;
 }

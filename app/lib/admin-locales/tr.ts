@@ -684,6 +684,10 @@ const TR: Record<string, string> = {
     "Aynı gün girişleri kapanış saatine kadar kabul edilir; sonrasında bugünün tarihi kapanır.",
   genSummaryDayBefore: "Misafirler, giriş tarihinden en az 1 gün önce rezervasyon yapmalıdır.",
   genSummaryDaysBefore: "Misafirler, giriş tarihinden en az {n} gün önce rezervasyon yapmalıdır.",
+  genPreselect: "Takvim ön seçimi",
+  genPreselectHint: "Misafir tarih seçmeden önce tarih seçicinin gösterdiği içerik.",
+  genPreselectLabel: "İlk müsait tarihleri önceden seç",
+  genPreselectDesc: "Tarih alanları, en erken müsait giriş tarihi ve rezerve edilebilir en kısa konaklama doldurulmuş olarak açılır. Misafirler bunları serbestçe değiştirebilir — Ara düğmesine basılana kadar oda araması yapılmaz.",
   genLegalLinks: "Yasal bağlantılar",
   genLegalLinksHint:
     "Ödeme adımındaki onay satırından bağlantı verilir. Bağlantısız metin göstermek için boş bırakın.",

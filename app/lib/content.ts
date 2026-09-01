@@ -363,6 +363,10 @@ export interface SiteSettings {
   bookingCutoffDays?: number;
   /** "HH:MM" local time after which same-day check-ins stop (when days === 0). */
   bookingCutoffTime?: string;
+  /** Open the search page's date picker with the earliest bookable stay (first
+   *  available check-in + its shortest valid stay) already selected. Pre-fills
+   *  the fields only — no search runs until the guest asks for one. */
+  preselectFirstAvailable?: boolean;
   // ----- Check-in / check-out times -----
   /** "HH:MM" local check-in-from and check-out-by times. Shown to guests and
    *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
