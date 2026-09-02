@@ -1450,6 +1450,11 @@ const EN: Record<string, string> = {
   rtDelete: "Delete rate",
 
   // -- team + users + properties + onboard --
+  tmPendingTitle: "Waiting for your approval",
+  tmPendingHint: "An integration using this property's management API key asked to add these people. Nobody is added, and no sign-in link is sent, until you approve. If you don't recognise the request, decline it — and revoke the API key if you don't recognise the integration either.",
+  tmPendingRequested: "Requested {date} via the management API",
+  tmApprove: "Approve & invite",
+  tmDecline: "Decline",
   tmTitle: "Team",
   tmIntroPre: "People who can manage",
   tmThisProperty: "this property",

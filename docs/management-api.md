@@ -120,7 +120,7 @@ radius. So:
 
 | Resource | Endpoints | Notes |
 |---|---|---|
-| Team | `GET /v1/manage/team`, `POST …/invites`, `DELETE …/members/:email`, `PATCH …/members/:email/areas` | The ONE manage endpoint that sends email, and its description says so. `MEMBER_AREAS` complement-storage handled server-side. |
+| Team | `GET /v1/manage/team`, `POST …/invites`, `DELETE …/members/:email`, `PATCH …/members/:email/areas` | **Invites are requests (since the 2026-09-02 security pass):** `POST` parks the email in `pending` and emails the OWNER; the person is added — and emailed a sign-in link — only when the owner approves on the admin Team page. A key is not a person, and the account it used to mint outright outlived the key and reached owner-class UI actions. Still the ONE manage endpoint that sends email (to the owner). `MEMBER_AREAS` complement-storage handled server-side. |
 | Webhooks | CRUD | Secret returned once at creation, like keys. SSRF gate (`isSafeWebhookUrl`) already exists. |
 | Google Hotels | `GET/PATCH /v1/manage/google` | The OFF→ON / ON→OFF transition side effects (full resync / block) computed from the pre-write value, exactly like the fixed UI path. |
 | Partner API | `pk_partner_` keys; `POST /partner/v1/properties` (Channex-import driven — the onboard flow takes a pasted `user-api-key` and property id today, same inputs as the endpoint), `…/invites`, `GET …/properties` + usage | whitelabel.md §8; the property-create path can also accept a structured payload (the `importBookingListing` split — parse vs import — was built so the import half takes a payload from anywhere). |

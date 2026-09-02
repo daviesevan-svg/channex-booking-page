@@ -5,7 +5,7 @@ import type { Route } from "./+types/connectivity";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { requirePageAllowed } from "~/lib/page-access.server";
-import { currentPropertyId } from "~/lib/properties.server";
+import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveConnectivity } from "~/lib/overrides.server";
 import { getLastAriReceivedAt } from "~/lib/ari/ingest.server";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -32,7 +32,13 @@ export async function loader({ request }: Route.LoaderArgs) {
   const settings = await getSettings(propertyId);
   const connected = settings.connectedSystem;
   const lastAriAt = connected === "channex" ? await getLastAriReceivedAt(propertyId) : null;
-  return { configured: true as const, propertyId, connected, lastAriAt };
+  return {
+    configured: true as const,
+    propertyId,
+    connected,
+    lastAriAt,
+    canManage: await canManageProperty(request, propertyId),
+  };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -40,6 +46,10 @@ export async function action({ request }: Route.ActionArgs) {
   await requirePageAllowed(request, "connectivity");
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "Add a property first." };
+  // The live-traffic switch: connecting hands inventory control to the channel
+  // manager, disconnecting stops every ARI push. Owner-class, like payments and
+  // go-live — not something a teammate (or an account an API key invited) flips.
+  if (!(await canManageProperty(request, propertyId))) return { error: "Only the property owner can change the connection." };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   if (intent === "disconnect") {
@@ -124,7 +134,7 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { propertyId, connected, lastAriAt } = loaderData;
+  const { propertyId, connected, lastAriAt, canManage } = loaderData;
   // Connecting here is only our half of the job — the mapping still has to be
   // finished in the channel manager. Until the first push lands, nothing has
   // arrived and the Inventory grid is read-only for no benefit, so say so and
@@ -179,7 +189,8 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                   <input type="hidden" name="intent" value="disconnect" />
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || !canManage}
+                    title={canManage ? undefined : t("ownerOnlyHint")}
                     className="w-full rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
                   >
                     {pending ? t("cnCancelConnection") : t("cnDisconnect")}
@@ -191,7 +202,8 @@ export default function AdminConnectivity({ loaderData, actionData }: Route.Comp
                   <input type="hidden" name="provider" value={sys.id} />
                   <button
                     type="submit"
-                    disabled={saving}
+                    disabled={saving || !canManage}
+                    title={canManage ? undefined : t("ownerOnlyHint")}
                     className="w-full rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
                   >
                     {t("cnConnect")}

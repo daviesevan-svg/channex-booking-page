@@ -17,6 +17,15 @@ vi.mock("cloudflare:workers", () => ({
   waitUntil: () => {},
 }));
 
+// A key only authenticates for a property that still exists in the registry.
+store.set(
+  "properties",
+  JSON.stringify([
+    { id: "p1", name: "One", owner: "o@example.com" },
+    { id: "p2", name: "Two", owner: "o@example.com" },
+  ]),
+);
+
 const req = (key?: string) =>
   new Request("http://localhost/v1/anything", {
     headers: key ? { Authorization: `Bearer ${key}` } : {},

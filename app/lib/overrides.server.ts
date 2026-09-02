@@ -295,6 +295,14 @@ export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
 
+/** Removes the named fields from a property's settings, leaving the rest. */
+export async function clearSettingsFields(pid: string, keys: (keyof SiteSettings)[]): Promise<void> {
+  const existing = await getSettings(pid);
+  const next = { ...existing };
+  for (const k of keys) delete next[k];
+  await writeJson(settingsKey(pid), next);
+}
+
 // ===== Viva payments config (per property) =====
 // Its own KV key, NOT a SiteSettings field: settings objects flow into loader
 // data across the admin, and these are live credentials — one careless

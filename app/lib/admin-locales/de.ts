@@ -1456,6 +1456,11 @@ const DE: Record<string, string> = {
   rtDelete: "Rate löschen",
 
   // -- team + users + properties + onboard --
+  tmPendingTitle: "Wartet auf Ihre Freigabe",
+  tmPendingHint: "Eine Integration mit dem Management-API-Schlüssel dieser Unterkunft hat darum gebeten, diese Personen hinzuzufügen. Niemand wird hinzugefügt und kein Anmeldelink verschickt, bis Sie freigeben. Wenn Sie die Anfrage nicht kennen, lehnen Sie sie ab — und widerrufen Sie den API-Schlüssel, wenn Sie auch die Integration nicht kennen.",
+  tmPendingRequested: "Angefragt am {date} über die Management-API",
+  tmApprove: "Freigeben & einladen",
+  tmDecline: "Ablehnen",
   tmTitle: "Team",
   tmIntroPre: "Personen, die",
   tmThisProperty: "diese Unterkunft",

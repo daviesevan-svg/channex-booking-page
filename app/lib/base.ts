@@ -30,7 +30,21 @@ import { useParams } from "react-router";
  * empty and links sit at the root.
  */
 export function basePath(channelId: string | undefined): string {
-  return channelId ? `/${channelId}` : "";
+  return isPathSegment(channelId) ? `/${channelId}` : "";
+}
+
+/**
+ * A `:channelId` a link may be built from: a slug or an id, nothing else.
+ *
+ * The router decodes the segment before it reaches us, so `%2F%2Fevil.com` and
+ * `%5C%5Cevil.com` arrive as `//evil.com` and `\\evil.com` — and `/${that}` is
+ * `///evil.com`, which every browser reads as an absolute URL. A `redirect()`
+ * built from it would send the guest off-site from the hotel's own booking
+ * origin. No real property has such a segment, so treating it as "no
+ * property" (a root link) loses nothing.
+ */
+export function isPathSegment(channelId: string | undefined): channelId is string {
+  return !!channelId && /^[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(channelId);
 }
 
 /** `basePath` for components — reads the param from the current route match. */
@@ -47,7 +61,7 @@ export function useBase(): string {
  * goes nowhere. Both are silent: nothing throws, the page just stops working.
  */
 export function homePath(channelId: string | undefined): string {
-  return channelId ? `/${channelId}` : "/";
+  return isPathSegment(channelId) ? `/${channelId}` : "/";
 }
 
 /** `homePath` for components. */

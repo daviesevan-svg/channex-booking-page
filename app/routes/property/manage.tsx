@@ -56,11 +56,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
+  // Resolve the property before any redirect is built from the segment — a
+  // logout on a bogus segment must 404, not bounce the guest somewhere.
+  const pid = await resolveRequestProperty(params.channelId, request);
   const form = await request.formData();
   if (form.get("intent") === "logout") {
     return guestLogout(request, `${base}/manage`);
   }
-  const pid = await resolveRequestProperty(params.channelId, request);
   // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
   if (!(await rateLimit(`manage:${pid}:${clientKey(request)}`, 8, 600))) {
     return { tooMany: true };

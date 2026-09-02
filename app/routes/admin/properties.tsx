@@ -11,11 +11,11 @@ import {
   currentPropertyId,
   getVisibleProperties,
   isOwnerOrSuper,
-  removeProperty,
   renameProperty,
   setPropertyOwner,
   setPropertyPublic,
 } from "~/lib/properties.server";
+import { deletePropertyForGood } from "~/lib/property-delete.server";
 import { cloneProperty } from "~/lib/clone-property.server";
 import { getUser, getUsers, isSuperadmin } from "~/lib/users.server";
 
@@ -41,12 +41,22 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "add") {
     const name = String(form.get("name") || "").trim();
-    const id = String(form.get("id") || "").trim() || crypto.randomUUID();
+    // A hand-picked id is a superadmin tool (matching a channel manager's hotel
+    // code by hand). For everyone else it was a way to register an id equal to
+    // another hotel's slug — and ids match before slugs, so that captured the
+    // hotel's booking URL. The Channex onboard flow sets ids itself; nobody
+    // else needs the field.
+    const wanted = su ? String(form.get("id") || "").trim() : "";
+    const id = wanted || crypto.randomUUID();
     // New properties are owned by the user who created them. Stamp partnerId
     // from the user (same as Channex / Booking.com onboard) so a partner_admin
     // hotel is not left as an unpartnered direct Roompanda property.
     const partnerId = (await getUser(email))?.partnerId;
-    await addProperty(id, name, email, partnerId);
+    try {
+      await addProperty(id, name, email, partnerId, { reclaim: su });
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : "That property couldn't be added." };
+    }
     // Switch to the new property so editing continues there.
     return redirect("/admin", { headers: { "Set-Cookie": await setSessionProperty(request, id) } });
   }
@@ -85,7 +95,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "rename") {
     await renameProperty(id, String(form.get("name") || ""));
   } else if (intent === "delete") {
-    await removeProperty(id);
+    await deletePropertyForGood(id);
   } else if (intent === "togglePublic") {
     await setPropertyPublic(id, form.get("public") === "on");
   }
@@ -96,8 +106,9 @@ export function meta({ matches }: Route.MetaArgs) {
   return adminMeta(matches, { key: "navProperties" });
 }
 
-export default function AdminProperties({ loaderData }: Route.ComponentProps) {
+export default function AdminProperties({ loaderData, actionData }: Route.ComponentProps) {
   const { properties, current, isSuperadmin: su, userEmails } = loaderData;
+  const addError = actionData && "error" in actionData ? actionData.error : undefined;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
   const t = useAdminT();
@@ -291,14 +302,18 @@ export default function AdminProperties({ loaderData }: Route.ComponentProps) {
             {t("prsName")}
             <input name="name" placeholder={t("prsNamePlaceholder")} className={FIELD_INPUT} />
           </label>
-          <label className="block text-[13px] font-semibold text-secondary">
-            {t("prsId")} <span className="font-normal text-faint">{t("prsOptional")}</span>
-            <input name="id" placeholder={t("prsIdPlaceholder")} className={`${FIELD_INPUT} font-mono`} />
-            <span className="mt-1 block text-[11px] font-normal text-faint">
-              {t("prsIdHint")}
-            </span>
-          </label>
+          {/* Custom ids are superadmin-only — see the action. */}
+          {su && (
+            <label className="block text-[13px] font-semibold text-secondary">
+              {t("prsId")} <span className="font-normal text-faint">{t("prsOptional")}</span>
+              <input name="id" placeholder={t("prsIdPlaceholder")} className={`${FIELD_INPUT} font-mono`} />
+              <span className="mt-1 block text-[11px] font-normal text-faint">
+                {t("prsIdHint")}
+              </span>
+            </label>
+          )}
         </div>
+        {addError && <p className="text-[13px] text-red-600">{addError}</p>}
         <div>
           <button
             type="submit"
