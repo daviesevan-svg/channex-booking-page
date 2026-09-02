@@ -11,7 +11,8 @@ import { sendCancellationEmails } from "~/lib/email.server";
 import { refundBookingCharge } from "~/lib/refunds.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
-import { getSettings } from "~/lib/overrides.server";
+import { getPortalMessage, getSettings } from "~/lib/overrides.server";
+import { langFromRequest } from "~/lib/content";
 
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
@@ -63,7 +64,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     booking,
     canCancel,
     cancelReason: reason,
-    afterDeadlineMessage: settings.afterDeadlineMessage,
+    // In the guest's own language, falling back to the hotel's default-language
+    // text (and, if they never wrote one, to our built-in string at render).
+    afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request)),
   };
 }
 
