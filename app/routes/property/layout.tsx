@@ -37,7 +37,7 @@ import { propertyIdForHost } from "~/lib/domains.server";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 import { basePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
-import { getAdminEmail } from "~/lib/auth.server";
+import { verifyPreviewToken } from "~/lib/site-preview.server";
 
 /** The booking funnel carries its state in search params (dates, occupancy,
  *  cart, extras), so by default this layout's loader re-ran on EVERY funnel
@@ -98,14 +98,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     ? await getSiteChrome(pid, lang).catch(() => null)
     : null;
 
-  // Preview: the design screen renders this page in an iframe with the template
-  // and typeface the operator is CONSIDERING, before anything is saved.
-  //
-  // Gated on a signed-in admin, so a link with `?style=` on it shows a guest
-  // exactly what the property stored. Presentation-only either way — every value
-  // comes from our own tables — but a hotel's shared link should never render as
-  // a design they didn't choose. The session is only read when a param is
-  // present, so ordinary traffic pays nothing.
   // Auto-discovery for two header links, one KV read each and neither waiting on
   // the other: "Gift vouchers" whenever the property has something on sale, and
   // "Offers" whenever it has a published promotion. Both fail open to hidden — a
@@ -135,10 +127,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       ? `${url.protocol}//${partner.adminHost}${url.port ? `:${url.port}` : ""}/admin`
       : null
     : "/admin";
+  // Preview: the design screen renders this page in an iframe with the template
+  // and typeface the operator is CONSIDERING, before anything is saved.
+  //
+  // Gated on a signed token rather than a signed-in admin, because the preview
+  // crosses a host boundary the admin session cannot (site-preview.server). A
+  // bare `?style=` link shows a guest exactly what the property stored:
+  // presentation-only either way — every value comes from our own tables — but a
+  // hotel's shared link should never render as a design they didn't choose. The
+  // token is only verified when a param is present, so ordinary traffic pays
+  // nothing.
   const wantStyle = url.searchParams.get("style");
   const wantFont = url.searchParams.get("font");
+  const token = url.searchParams.get("preview");
   const preview =
-    (wantStyle || wantFont) && (await getAdminEmail(request))
+    (wantStyle || wantFont) && token && (await verifyPreviewToken(token, pid))
       ? {
           style: wantStyle && isSiteStyleId(wantStyle) ? wantStyle : null,
           font: wantFont && isFontPairId(wantFont) ? wantFont : null,
