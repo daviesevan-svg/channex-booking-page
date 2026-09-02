@@ -10,6 +10,8 @@ import {
 
 import type { Route } from "./+types/layout";
 import { accentColors, mixWithWhite } from "~/lib/accessible-accent";
+import { darkAccentTints, darkNeutrals, darkStatus } from "~/lib/theme-neutrals";
+import { parseHex } from "~/lib/color";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import {
   DEFAULT_LANG,
@@ -240,8 +242,11 @@ function Stepper({ step, tr, singleUnit }: { step: Step; tr: Translator; singleU
               <span
                 className="flex h-6 w-6 flex-none items-center justify-center rounded-full text-caption"
                 style={{
-                  background: s.on ? "var(--accent)" : "#efe7db",
-                  color: s.on ? "#fff" : "var(--color-faint)",
+                  // Was a literal #efe7db with `faint` on it, which is 4.13:1 —
+                  // an AA failure that predates this change and is easiest to
+                  // fix while the values are being named anyway.
+                  background: s.on ? "var(--accent)" : "var(--color-chip)",
+                  color: s.on ? "var(--on-accent)" : "var(--color-muted)",
                 }}
               >
                 {s.n}
@@ -348,11 +353,22 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
   const isCustom = theme === "custom" && !!customColor;
   const themeStyle = { background: "var(--page)" } as React.CSSProperties;
+  // The page colour has to be known FIRST, because everything else is measured
+  // against it: whether the neutrals go dark, and which colours the accent has
+  // to be legible on. Read off the style as well as the setting — `welcoming`
+  // forces the page white, and deciding from `customBg` alone would paint a dark
+  // palette onto a white page.
+  const resolvedPage = String(
+    style.vars?.["--page"] ?? (isCustom ? customBg || mixWithWhite(customColor!, 7) : ""),
+  );
+  const dark = darkNeutrals(resolvedPage);
+  // Cards, where `text-accent` links actually sit. White in the light theme.
+  const cardColor = dark?.["--color-surface"] ?? "#ffffff";
   if (isCustom) {
     // The chosen colour, moved only as far as legibility needs — and the colour
     // to write ON it, which is picked rather than assumed to be white. See
     // accessible-accent.ts.
-    const { accent, onAccent, deep } = accentColors(customColor!, customBg || mixWithWhite(customColor!, 7));
+    const { accent, onAccent, deep } = accentColors(customColor!, resolvedPage, cardColor);
     Object.assign(themeStyle, {
       "--accent": accent,
       "--accent-deep": deep,
@@ -373,12 +389,40 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // manage pages included. They draw their corners and type sizes from these
   // tokens, so this needs no change at any of those call sites.
   //
-  // Last, so a style could override a theme value; nothing does today, and a
-  // style fighting the theme's accent would be a bug rather than a feature.
+  // Last, so a style could override a theme value; `welcoming` does exactly that
+  // with `--page`, and a style fighting the theme's accent would be a bug rather
+  // than a feature.
   Object.assign(themeStyle, style.vars ?? {}, style.headings ?? {});
+
+  // A dark page needs a dark palette, or it is dark text on a dark background —
+  // the light neutrals score 1.50:1 on #3d405b. Applied as token overrides, so
+  // every guest surface follows without a call site changing
+  // (theme-neutrals.ts). After the style vars, because a style can move the page.
+  if (dark) {
+    Object.assign(themeStyle, dark, darkStatus(resolvedPage, dark["--color-ink"], dark["--color-surface"]) ?? {});
+    const accent = String(themeStyle["--accent" as keyof React.CSSProperties] ?? "");
+    const tints = isCustom
+      ? darkAccentTints(resolvedPage, accent, [
+          dark["--color-ink"],
+          String(themeStyle["--accent-deep" as keyof React.CSSProperties] ?? ""),
+        ])
+      : null;
+    if (tints) {
+      Object.assign(themeStyle, {
+        "--accent-soft": tints.soft,
+        "--accent-soft-strong": tints.softStrong,
+      });
+    }
+  }
 
   return (
     <SiteStyleProvider id={siteStyleId ?? undefined}>
+    {/* The wrapper covers the viewport, but `body` keeps the default cream from
+        app.css — which shows as a pale band the moment a dark page is rubber-
+        banded on iOS, and behind the address bar. The page colour is a validated
+        hex (normalizeHex on save, our own literals in site-style), so it is safe
+        to write into a rule. */}
+    {parseHex(resolvedPage) && <style>{`body{background:${resolvedPage}}`}</style>}
     <div
       className="flex min-h-screen flex-col font-sans text-ink"
       data-theme={isCustom ? undefined : theme}

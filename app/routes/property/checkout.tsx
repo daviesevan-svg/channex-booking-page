@@ -679,7 +679,7 @@ function Field({
         className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
       />
       {error?.[0] && (
-        <span className="mt-1 block text-label font-normal text-red-600">{error[0]}</span>
+        <span className="mt-1 block text-label font-normal text-danger">{error[0]}</span>
       )}
     </label>
   );
@@ -836,25 +836,25 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       <h1 className="mb-7 font-serif text-display-lg font-medium tracking-[-0.02em]">{text.heading}</h1>
 
       {bookingError && (
-        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {bookingError}
         </div>
       )}
 
       {actionData?.rateLimited && (
-        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
           {tr.t("bookingThrottled")}
         </div>
       )}
 
       {notice === "refunded" && (
-        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
           {tr.t("paymentRefundedNotice")}
         </div>
       )}
 
       {actionData?.paymentError && (
-        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {actionData.paymentError === "failed"
             ? tr.t("paymentStartFailed")
             : tr.t("paymentNotConfigured")}
@@ -916,7 +916,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             {collectsCard && (
               <div className="mb-3 flex flex-col gap-1.5 text-body">
                 {voucherApplied > 0 && appliedVoucher && (
-                  <div className="flex justify-between text-[#3f7a52]">
+                  <div className="flex justify-between text-success">
                     <span>
                       {tr.t("voucherAppliedLabel")} ({appliedVoucher.code})
                     </span>
@@ -999,7 +999,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
               <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
-                <div className="flex justify-between text-[#3f7a52]">
+                <div className="flex justify-between text-success">
                   <span>
                     {offer.name} (−{offer.value}%)
                   </span>
@@ -1007,7 +1007,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 </div>
               )}
               {discount > 0 && appliedPromo && (
-                <div className="flex justify-between text-[#3f7a52]">
+                <div className="flex justify-between text-success">
                   <span>
                     {tr.t("discount")} ({appliedPromo.code})
                   </span>
@@ -1048,9 +1048,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {tr.t("applyCode")}
               </button>
             </div>
-            {promoError && <p className="mt-1.5 text-label text-red-600">{tr.t("promoInvalid")}</p>}
+            {promoError && <p className="mt-1.5 text-label text-danger">{tr.t("promoInvalid")}</p>}
             {appliedPromo && discount > 0 && (
-              <p className="mt-1.5 text-label text-[#3f7a52]">{tr.t("promoApplied")}</p>
+              <p className="mt-1.5 text-label text-success">{tr.t("promoApplied")}</p>
             )}
           </div>
 
@@ -1082,12 +1082,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {tr.t("applyCode")}
               </button>
             </div>
-            {voucherError === true && <p className="mt-1.5 text-label text-red-600">{tr.t("voucherInvalid")}</p>}
+            {voucherError === true && <p className="mt-1.5 text-label text-danger">{tr.t("voucherInvalid")}</p>}
             {voucherError === "payAtHotel" && (
-              <p className="mt-1.5 text-label text-amber-700">{tr.t("voucherPayAtHotel")}</p>
+              <p className="mt-1.5 text-label text-notice">{tr.t("voucherPayAtHotel")}</p>
             )}
             {appliedVoucher && voucherApplied > 0 && (
-              <p className="mt-1.5 text-label text-[#3f7a52]">
+              <p className="mt-1.5 text-label text-success">
                 {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
               </p>
             )}
@@ -1156,7 +1156,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </label>
 
             {showConsentError && (
-              <p className="text-label font-medium text-red-600">
+              <p className="text-label font-medium text-danger">
                 {tr.t("consentRequired")}
               </p>
             )}

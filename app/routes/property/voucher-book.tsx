@@ -237,7 +237,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
         )}
 
         {actionData?.error && (
-          <p className="rounded-control border border-red-200 bg-red-50 px-4 py-2.5 text-caption text-red-700">
+          <p className="rounded-control border border-danger-line bg-danger-soft px-4 py-2.5 text-caption text-danger">
             {actionData.error}
           </p>
         )}

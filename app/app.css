@@ -120,7 +120,16 @@
   --radius-well: 20px; /* ×4 — modals and the largest surfaces */
 }
 
-@theme inline {
+/* The neutral palette is NOT in the `@theme inline` block below, for exactly the
+   reason the fonts aren't: `inline` bakes the value into the utility —
+     .text-ink { color: #2a2521 }
+   — so a runtime override does nothing at all. A plain @theme emits
+     .text-ink { color: var(--color-ink) }
+   which is what lets a hotel on a dark page colour get a whole dark palette from
+   one set of custom properties on the guest wrapper (theme-neutrals.ts), without
+   a single call site changing. The admin is unaffected: it never sets them, so
+   it reads the :root values below. */
+@theme {
   /* Warm neutral palette. Every step below `secondary` used to fail WCAG AA on
      the page background — muted 3.78, muted-2 2.85, faint 2.13, faint-2 2.03,
      against a 4.5 requirement. Solved in OKLCH so hue and chroma are unchanged
@@ -145,6 +154,28 @@
   --color-field-hover: #faf5ee;
   --color-nav-border: #ece4d8;
 
+  /* Status families. These were 23 different literal hexes spread over 16 guest
+     files — near-duplicates of each other, and invisible to theming: a hotel on
+     a dark page got pale pastel blocks in the middle of their design, and the
+     warm greys among them (#5a5145 on a dark card, 1.07:1) simply vanished.
+     Collapsed onto one pair per meaning, and overridable like every other
+     neutral, so theme-neutrals.ts can restate them for a dark page. */
+  --color-success: #3f7a52;
+  --color-success-soft: #e8f0e6;
+  --color-success-line: #cfe3d0;
+  --color-danger: #c0392b;
+  --color-danger-soft: #fbe9e7;
+  --color-danger-line: #f3d0ca;
+  /* Warm, for "this needs your attention" rather than "this went wrong". */
+  --color-notice: #8a4a2f;
+  --color-notice-soft: #f9ede6;
+  --color-notice-line: #e8cdb8;
+  --color-caution: #b08968;
+  --color-info: #6b4f8a;
+  --color-info-soft: #ece6f0;
+}
+
+@theme inline {
   /* Accent (maps to runtime CSS vars so theming cascades) */
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);

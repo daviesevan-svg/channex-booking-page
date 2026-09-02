@@ -167,10 +167,10 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-[#e8f0e6] text-[#3f7a52]",
+  active: "bg-success-soft text-success",
   redeemed: "bg-chip text-muted",
-  cancelled: "bg-[#fbe9e7] text-[#c0392b]",
-  expired: "bg-[#fbe9e7] text-[#c0392b]",
+  cancelled: "bg-danger-soft text-danger",
+  expired: "bg-danger-soft text-danger",
 };
 
 export default function ManageVoucher({ loaderData, actionData, params }: Route.ComponentProps) {
@@ -277,9 +277,9 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
                   <input name="recipientEmail" type="email" required className={inputCls} />
                 </label>
               )}
-              {reminded && <p className="m-0 text-caption font-semibold text-[#3f7a52]">{tr.t("voucherRemindSent", { email: reminded })}</p>}
+              {reminded && <p className="m-0 text-caption font-semibold text-success">{tr.t("voucherRemindSent", { email: reminded })}</p>}
               {remindError && (
-                <p className="m-0 text-caption text-red-600">
+                <p className="m-0 text-caption text-danger">
                   {remindError === "tooMany"
                     ? tr.t("voucherRemindTooMany")
                     : remindError === "noEmail" || remindError === "invalidEmail"
@@ -325,14 +325,14 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
                   : tr.t("voucherCancelWindowFree", { date: date(cancelBy) })}
               </p>
               {cancelError && (
-                <p className="m-0 text-caption text-red-600">
+                <p className="m-0 text-caption text-danger">
                   {cancelError === "conflict" ? tr.t("voucherCancelFailed") : tr.t(`voucherCancelReason_${cancelError}`)}
                 </p>
               )}
               <button
                 type="submit"
                 disabled={busy}
-                className="self-start rounded-control border border-[#e5c4bd] px-5 py-2.5 text-body font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:opacity-60"
+                className="self-start rounded-control border border-danger-line px-5 py-2.5 text-body font-semibold text-danger transition-colors hover:bg-danger-soft disabled:opacity-60"
               >
                 {busy ? "…" : tr.t("voucherCancelButton")}
               </button>

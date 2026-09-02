@@ -369,7 +369,7 @@ function ExtraCard({
               {line?.infoLine && <div className="mt-0.5 text-label text-muted-2">{line.infoLine}</div>}
               <div className="mt-2 flex items-center gap-3 text-caption font-semibold">
                 <button type="button" onClick={onConfigure} className="text-accent hover:underline">{tr.t("editExtra")}</button>
-                <button type="button" onClick={onRemove} className="text-[#c0392b] hover:underline">{tr.t("removeExtra")}</button>
+                <button type="button" onClick={onRemove} className="text-danger hover:underline">{tr.t("removeExtra")}</button>
               </div>
             </div>
           ) : configurable || extra.fields?.length ? (
@@ -468,7 +468,7 @@ function ConfigureModal({
                     type="button"
                     onClick={() => setOptionId(o.id)}
                     className="flex items-start gap-3 rounded-card border-[1.5px] p-3.5 text-left"
-                    style={{ borderColor: active ? "var(--accent)" : "#e8e0d5", background: active ? "var(--accent-soft)" : "#fff" }}
+                    style={{ borderColor: active ? "var(--accent)" : "var(--color-line-alt)", background: active ? "var(--accent-soft)" : "var(--color-surface)" }}
                   >
                     <span
                       className="mt-0.5 h-[18px] w-[18px] flex-none rounded-full border-2"
@@ -521,12 +521,12 @@ function ConfigureModal({
         </div>
 
         <div className={cx("flex-none border-t", s.rule, "p-5")}>
-          {!canAdd && <p className="mb-2.5 text-label text-[#b08968]">{tr.t("selectToContinue")}</p>}
+          {!canAdd && <p className="mb-2.5 text-label text-caution">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
             <span className="font-serif text-title-md font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
             <div className="flex items-center gap-3">
               {already && (
-                <button type="button" onClick={onRemove} className="text-caption font-semibold text-[#c0392b] hover:underline">
+                <button type="button" onClick={onRemove} className="text-caption font-semibold text-danger hover:underline">
                   {tr.t("removeExtra")}
                 </button>
               )}

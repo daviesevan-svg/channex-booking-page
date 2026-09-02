@@ -180,14 +180,14 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           {tr.t("reference")} {b.reference}
         </span>
         {cancelled && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-3 py-1.5 text-caption font-semibold text-[#c0392b]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-3 py-1.5 text-caption font-semibold text-danger">
             ✕ {tr.t("statusCancelled")}
           </span>
         )}
       </div>
 
       {cancelled && (
-        <div className="mb-6 rounded-card border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-body text-[#c0392b]">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {tr.t("bookingCancelled")}
         </div>
       )}
@@ -273,7 +273,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.offer && (
-          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-success">
             <span>
               {b.offer.name || "Offer"} (−{b.offer.value}%)
             </span>
@@ -281,7 +281,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.promo && (
-          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-success">
             <span>
               {tr.t("discount")} ({b.promo.code})
             </span>
@@ -321,7 +321,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             disabled={!canCancel || cancelling}
             title={!canCancel ? cancelTip : undefined}
             aria-disabled={!canCancel}
-            className="rounded-card border border-[#e0b4ac] bg-surface px-6 py-3 text-body-lg font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
+            className="rounded-card border border-danger-line bg-surface px-6 py-3 text-body-lg font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
           >
             {cancelling ? tr.t("cancelling") : tr.t("cancelBooking")}
           </button>

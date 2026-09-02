@@ -184,7 +184,7 @@ export function ReviewsSection({
               >
                 <span aria-hidden>
                   {"★".repeat(r.stars)}
-                  <span style={{ color: "#ddd5c8" }}>{"★".repeat(5 - r.stars)}</span>
+                  <span style={{ color: "var(--color-line-alt)" }}>{"★".repeat(5 - r.stars)}</span>
                 </span>
               </span>
             </div>

@@ -89,7 +89,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
                     {p.kind === "gift" ? tr.t("voucherKindGift") : p.kind === "package" ? tr.t("voucherKindPackage") : tr.t("voucherKindExperience")}
                   </span>
                   {p.soldOut && (
-                    <span className="rounded-full bg-[#fbe9e7] px-2.5 py-0.5 text-micro font-semibold text-[#c0392b]">
+                    <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-micro font-semibold text-danger">
                       {tr.t("voucherSoldOut")}
                     </span>
                   )}
