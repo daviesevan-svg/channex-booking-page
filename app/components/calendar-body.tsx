@@ -16,7 +16,7 @@ export function cellStyle(cell: DayCell): CSSProperties {
   // A selected day always looks selected — even a sold-out night chosen as the
   // check-out (which is otherwise un-clickable).
   if (cell.isCheckin || cell.isCheckout) {
-    return { background: "var(--accent)", color: "#fff", fontWeight: 600 };
+    return { background: "var(--accent)", color: "var(--on-accent)", fontWeight: 600 };
   }
   if (cell.inRange) {
     return { background: "var(--accent-soft)", color: "var(--color-ink)", fontWeight: 600 };

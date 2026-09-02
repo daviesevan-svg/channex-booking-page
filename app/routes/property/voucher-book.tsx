@@ -152,7 +152,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                         setRoomId(null);
                       }}
                       className={`rounded-card border px-4 py-2.5 text-center text-caption font-semibold transition-colors ${
-                        active ? "border-accent bg-accent text-white" : "border-line-alt bg-surface text-secondary hover:border-accent"
+                        active ? "border-accent bg-accent text-on-accent" : "border-line-alt bg-surface text-secondary hover:border-accent"
                       }`}
                     >
                       <span className="block text-micro font-medium uppercase opacity-80">

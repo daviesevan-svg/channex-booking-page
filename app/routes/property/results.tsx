@@ -292,7 +292,7 @@ function RoomCard({
           />
         )}
         {isBestMatch && (
-          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-label font-semibold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-label font-semibold text-on-accent">
             {tr.t("bestMatch")}
           </span>
         )}
@@ -374,7 +374,7 @@ function RoomCard({
           <Link
             to={detailHref}
             prefetch="intent"
-            className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-white transition-colors hover:bg-accent-deep"
+            className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-on-accent transition-colors hover:bg-accent-deep"
           >
             {tr.t("chooseRate")}
           </Link>

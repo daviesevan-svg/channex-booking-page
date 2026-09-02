@@ -138,7 +138,7 @@ export function GuestSelector({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="mt-4 w-full rounded-control bg-accent py-2.5 text-sm font-semibold text-white hover:bg-accent-deep"
+              className="mt-4 w-full rounded-control bg-accent py-2.5 text-sm font-semibold text-on-accent hover:bg-accent-deep"
             >
               {tr.t("done")}
             </button>

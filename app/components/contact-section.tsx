@@ -196,7 +196,7 @@ function ContactForm({ tr }: { tr: Translator }) {
       <button
         type="submit"
         disabled={sending}
-        className="mt-4 cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+        className="mt-4 cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-60"
       >
         {sending ? tr.t("contactSending") : tr.t("contactSend")}
       </button>

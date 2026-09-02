@@ -8,6 +8,11 @@
   --accent-deep: oklch(0.47 0.15 45);
   --accent-soft: color-mix(in oklab, var(--accent) 8%, #ffffff);
   --accent-soft-strong: color-mix(in oklab, var(--accent) 20%, #ffffff);
+  /* What goes ON a filled accent button. White for all five named accents,
+     which are dark enough to carry it; a custom colour picks its own, because
+     a light brand colour is legible under ink and unreadable under white, and
+     assuming white is what forced light colours to be darkened. */
+  --on-accent: #ffffff;
   --page: #f7f2ec; /* subtle theme-tinted page background */
 }
 
@@ -142,6 +147,7 @@
 
   /* Accent (maps to runtime CSS vars so theming cascades) */
   --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
   --color-accent-deep: var(--accent-deep);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-strong: var(--accent-soft-strong);

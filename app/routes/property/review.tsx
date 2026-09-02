@@ -181,7 +181,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
         <button
           type="submit"
           disabled={submitting || stars === 0}
-          className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+          className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-60"
         >
           {tr.t("submitReview")}
         </button>

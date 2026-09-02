@@ -6,7 +6,7 @@ import type { Route } from "./+types/collection.$collectionSlug";
 import { FontStylesheet } from "~/components/font-stylesheet";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
-import { accessibleAccent, darkerAccent } from "~/lib/accessible-accent";
+import { accentColors } from "~/lib/accessible-accent";
 import { getCollectionBySlug } from "~/lib/collections.server";
 import { DEFAULT_BRAND } from "~/lib/partners.server";
 import { queueCollectionEvent } from "~/lib/collection-analytics.server";
@@ -391,12 +391,13 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   const font = fontPair(themeFont);
   const themeStyle = { background: "#f7f2ec" } as React.CSSProperties;
   if (isCustom) {
-    // Darkened only if the chosen colour can't carry white text or be read as a
-    // link — see accessible-accent.ts.
-    const accent = accessibleAccent(customColor!, customBg || "#f7f2ec");
+    // Moved only as far as legibility needs, and the colour to write ON it
+    // picked rather than assumed to be white — see accessible-accent.ts.
+    const { accent, onAccent, deep } = accentColors(customColor!, customBg || "#f7f2ec");
     Object.assign(themeStyle, {
       "--accent": accent,
-      "--accent-deep": darkerAccent(accent),
+      "--accent-deep": deep,
+      "--on-accent": onAccent,
       "--page": customBg || "#f7f2ec",
     });
     if (customBg) themeStyle.background = customBg;
@@ -503,7 +504,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                 type="button"
                 onClick={applyDates}
                 disabled={!dates.checkinIso || !dates.checkoutIso}
-                className="rounded-control bg-accent px-6 py-2.5 text-body font-semibold text-white hover:bg-accent-deep disabled:opacity-50"
+                className="rounded-control bg-accent px-6 py-2.5 text-body font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-50"
               >
                 {tr.t("searchLabel")}
               </button>
@@ -604,7 +605,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
                       type="button"
                       onClick={() => goToProperty(p)}
                       disabled={p.soldOut}
-                      className="flex-none rounded-control bg-accent px-[22px] py-[11px] text-body font-semibold text-white transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex-none rounded-control bg-accent px-[22px] py-[11px] text-body font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {tr.t("viewProperty")}
                     </button>
