@@ -1448,7 +1448,7 @@ const DE: Record<string, string> = {
   rtPreviewTitle: "Was Gäste sehen werden",
   rtPreviewIntro: "Live-Vorschau des Bedingungstexts auf der Buchungsseite (der Gast sieht ihn in seiner Sprache, mit den tatsächlichen Beträgen).",
   rtOverrideNote: "Eigener Hinweis",
-  rtOverrideNoteHint: "(optional — ersetzt die Stornierungszeile oben)",
+  rtOverrideNoteHint: "(optional — ersetzt den gesamten Richtlinientext oben)",
   rtOverrideNotePlaceholder: "Leer lassen, um die aus den Feldern oben erzeugten Bedingungen anzuzeigen.",
   rtCreate: "Rate anlegen",
   rtSave: "Rate speichern",

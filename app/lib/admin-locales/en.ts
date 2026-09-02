@@ -1442,7 +1442,7 @@ const EN: Record<string, string> = {
   rtPreviewTitle: "What guests will see",
   rtPreviewIntro: "Live preview of the policy text shown on the booking page (the guest sees it in their language, with the actual amounts).",
   rtOverrideNote: "Override note",
-  rtOverrideNoteHint: "(optional — replaces the cancellation line above)",
+  rtOverrideNoteHint: "(optional — replaces all the policy text above)",
   rtOverrideNotePlaceholder: "Leave blank to show the policy generated from the fields above.",
   rtCreate: "Create rate",
   rtSave: "Save rate",

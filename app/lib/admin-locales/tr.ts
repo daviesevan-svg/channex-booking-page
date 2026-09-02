@@ -1496,7 +1496,7 @@ const TR: Record<string, string> = {
   rtPreviewIntro:
     "Rezervasyon sayfasında gösterilen koşul metninin canlı önizlemesi (misafir bunu kendi dilinde ve gerçek tutarlarla görür).",
   rtOverrideNote: "Özel not",
-  rtOverrideNoteHint: "(isteğe bağlı — yukarıdaki iptal satırının yerine geçer)",
+  rtOverrideNoteHint: "(isteğe bağlı — yukarıdaki tüm politika metninin yerine geçer)",
   rtOverrideNotePlaceholder:
     "Yukarıdaki alanlardan oluşturulan koşulları göstermek için boş bırakın.",
   rtCreate: "Fiyat planı oluştur",
