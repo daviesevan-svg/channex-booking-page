@@ -10,6 +10,7 @@
 import type { CatalogRate, CatalogRoom } from "./catalog.server";
 import { PROPERTY_FACILITIES, VR_AMENITY_KEYS, isLang, DEFAULT_LANG, type DeadlineUnit, type SiteSettings } from "./content";
 import { isSupportedCurrency } from "./currencies";
+import { IMAGE_URL_HINT, isPropertyImageUrl } from "./image-paths";
 import { parseHHMM } from "./dates";
 import type { Extra, ExtraField, ExtraOption } from "./extras";
 import { normalizeCode, type PromoConditions, type Promotion } from "./promotions";
@@ -83,13 +84,14 @@ const strList = (ctx: Ctx, body: Record<string, unknown>, field: string): string
   return (v as string[]).map((s) => s.trim()).filter(Boolean);
 };
 
-/** Image references must be our own /images/ paths: external URLs would dodge
- *  upload validation and the GC's referencedBy accounting. */
+/** Image references must be property-upload paths: external URLs would dodge
+ *  upload validation and the GC's referencedBy accounting, and a partner logo
+ *  or feed snapshot named here used to become deletable through the GC. */
 const imageList = (ctx: Ctx, body: Record<string, unknown>, field: string): string[] | undefined => {
   const list = strList(ctx, body, field);
   if (!list) return list;
   for (const url of list) {
-    if (!url.startsWith("/images/")) return ctx.fail(field, `"${url}" is not an /images/… path — upload via POST /v1/manage/images first.`);
+    if (!isPropertyImageUrl(url)) return ctx.fail(field, `"${url}" ${IMAGE_URL_HINT}.`);
   }
   return list;
 };
@@ -496,18 +498,22 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
     if (!isObj(portal)) ctx.fail("portal", "Must be an object.");
     else {
       const allowed = new Set([
-        "allow_cancel", "allow_modify", "auto_refund",
+        "allow_cancel", "allow_modify",
         "cancel_deadline_value", "cancel_deadline_unit", "cancel_anchor_time",
         "modify_deadline_value", "modify_deadline_unit", "after_deadline_message",
       ]);
-      for (const k of Object.keys(portal)) if (!allowed.has(k)) ctx.fail("portal", `Unknown field "${k}".`);
+      for (const k of Object.keys(portal)) {
+        // Automatic refunds move money on a guest's click. The admin makes that
+        // an OWNER-only switch; a key minted by a partner admin (who the UI
+        // blocks) must not reach it from here. Readable, never writable.
+        if (k === "auto_refund") ctx.fail("portal.auto_refund", "auto_refund is owner-only and can't be set through the API — change it in the admin under Guest portal.");
+        else if (!allowed.has(k)) ctx.fail("portal", `Unknown field "${k}".`);
+      }
       const b = (f: string) => optBool(ctx, portal, f);
       const allowCancel = b("allow_cancel");
       if (allowCancel !== undefined) out.allowCancel = allowCancel;
       const allowModify = b("allow_modify");
       if (allowModify !== undefined) out.allowModify = allowModify;
-      const autoRefund = b("auto_refund");
-      if (autoRefund !== undefined) out.autoRefund = autoRefund;
       const deadline = (f: string): number | null | undefined => {
         const v = portal[f];
         if (v === undefined) return undefined;
@@ -758,7 +764,7 @@ export function validateExtraInput(body: unknown, opts: { create: boolean; roomI
   const image = body.image;
   if (image !== undefined) {
     if (image === null) out.image = null;
-    else if (typeof image !== "string" || !image.startsWith("/images/")) ctx.fail("image", "Must be an /images/… path (upload via POST /v1/manage/images) or null.");
+    else if (!isPropertyImageUrl(image)) ctx.fail("image", `Image ${IMAGE_URL_HINT}, or null.`);
     else out.image = image;
   }
 

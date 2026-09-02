@@ -435,7 +435,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
         portal: {
           type: "object",
           description:
-            "Guest self-service policy: allow_cancel/allow_modify/auto_refund (booleans), cancel/modify deadline_value (integer ≥ 0; 0 = the anchor time on arrival day) + deadline_unit (hours|days), cancel_anchor_time (HH:MM), after_deadline_message.",
+            "Guest self-service policy: allow_cancel/allow_modify (booleans), cancel/modify deadline_value (integer ≥ 0; 0 = the anchor time on arrival day) + deadline_unit (hours|days), cancel_anchor_time (HH:MM), after_deadline_message. auto_refund is readable but owner-only in the admin — not settable here.",
         },
         terms_url: { type: ["string", "null"], description: "https:// URL" },
         privacy_url: { type: ["string", "null"], description: "https:// URL" },

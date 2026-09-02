@@ -21,6 +21,15 @@
 // url that was just removed, so the worst case is that a file survives this pass
 // — never that a referenced one is deleted.
 //
+//  * Only the editing property's OWN objects. Uploads are keyed
+//    `<root>/<pid>/…` (image-paths.ts); partner logos (`partners/…`) and the
+//    Google feed snapshots (`feeds/…`) share the bucket and are referenced by
+//    nothing `referencedBy` scans — so before this rule a room `images` list
+//    naming a partner's logo, saved twice, deleted that logo for every hotel
+//    under the partner. Another property's keys are never ours to delete
+//    either; the cross-property scan above protects a clone's SOURCE from the
+//    source's own edits, this protects everything from everyone else's.
+//
 // ANY new store that holds an image url must be added to `referencedBy` below.
 // Missing one there is the only way this can delete a live image.
 import { fireAndForget } from "~/lib/d1.server";
@@ -30,11 +39,12 @@ import { getImagesBucket } from "./config.server";
 import { getExtras } from "./extras.server";
 import { getGallery } from "./gallery.server";
 import { getHeroImage, getSettings } from "./overrides.server";
+import { ownsImageKey, IMAGE_PATH as IMAGE_PATH_PREFIX } from "./image-paths";
 import { getProperties } from "./properties.server";
 import { siteImageUrls } from "./site.server";
 import { getVoucherProducts, voucherSnapshotImages } from "./vouchers.server";
 
-const IMAGE_PATH = "/images/";
+const IMAGE_PATH = IMAGE_PATH_PREFIX;
 
 /** Scanning one property costs 8 reads (7 KV + 1 D1) and a Worker allows 1000
  *  subrequests per request, so 100 properties is ~810 including the save that
@@ -101,7 +111,10 @@ export async function deleteUnreferencedImages(pid: string, removed: string[]): 
   const candidates = new Map<string, string>(); // url → R2 key
   for (const url of removed) {
     const key = imageKeyOf(url);
-    if (key) candidates.set(url, key);
+    // Not ours to delete: another property's upload, a partner asset, a feed
+    // snapshot, or a legacy key without an owner. Leaking a file is a rounding
+    // error; deleting someone else's is not.
+    if (key && ownsImageKey(pid, key)) candidates.set(url, key);
   }
   if (!candidates.size) return;
 
