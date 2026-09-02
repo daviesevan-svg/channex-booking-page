@@ -42,12 +42,29 @@ describe("team", () => {
     const badEmail = (await team.action({ request: req("/v1/manage/team", ak, "POST", { email: "nope" }) } as never)) as Response;
     expect(badEmail.status).toBe(422);
 
+    // An API invite is a REQUEST: parked as pending, owner notified, nobody
+    // added and no user pre-created until the owner approves in the admin UI.
     const invited = (await team.action({ request: req("/v1/manage/team", ak, "POST", { email: "Ana@Example.com" }) } as never)) as Response;
-    expect(invited.status).toBe(201);
-    const teamJson = (await invited.json()) as { data: { members: { email: string; areas: string[] }[] } };
+    expect(invited.status).toBe(202);
+    const pendingJson = (await invited.json()) as { data: { members: unknown[]; pending: { email: string }[] } };
+    expect(pendingJson.data.members).toHaveLength(0);
+    expect(pendingJson.data.pending).toEqual([expect.objectContaining({ email: "ana@example.com" })]);
+    expect(store.has("user:ana@example.com")).toBe(false);
+    expect(JSON.parse(store.get("properties")!)[0].members ?? []).toHaveLength(0);
+    // Retrying the request doesn't duplicate the row.
+    await team.action({ request: req("/v1/manage/team", ak, "POST", { email: "ana@example.com" }) } as never);
+    expect(JSON.parse(store.get("pending_invites:p1")!)).toHaveLength(1);
+
+    // The owner approves (what the admin Team page does): now a real teammate.
+    const { removePendingInvite } = await import("./team-invites.server");
+    const { addPropertyMember } = await import("./properties.server");
+    expect(await removePendingInvite("p1", "ana@example.com")).toBe(true);
+    await addPropertyMember("p1", "ana@example.com");
+    const listed = (await team.loader({ request: req("/v1/manage/team", ak) } as never)) as Response;
+    const teamJson = (await listed.json()) as { data: { members: { email: string; areas: string[] }[]; pending: unknown[] } };
     expect(teamJson.data.members[0]).toMatchObject({ email: "ana@example.com" });
     expect(teamJson.data.members[0].areas).toHaveLength(5); // full access by default
-    expect(store.has("user:ana@example.com")).toBe(true); // pre-created
+    expect(teamJson.data.pending).toHaveLength(0);
 
     const badArea = (await member.action({
       request: req("/v1/manage/team/ana%40example.com", ak, "PATCH", { areas: ["operations", "finance"] }),

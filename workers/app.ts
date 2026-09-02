@@ -11,6 +11,7 @@ import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
+import { httpsRedirect, withHsts } from "../app/lib/https-redirect";
 import { runWithRequestCache } from "../app/lib/request-cache.server";
 
 
@@ -82,12 +83,17 @@ export default {
     // plumbing reads each key once instead of once per loader. Cron stays
     // outside the scope on purpose: its tasks are long-lived and concurrent,
     // and read-through is the safer default there.
-    return runWithRequestCache(
-      () =>
+    return runWithRequestCache(async () => {
+      const { appUrl } = getConfig();
+      // Plain HTTP never reaches the app: redirect first, before anything that
+      // could set a cookie or render a form (see https-redirect.ts).
+      const response =
+        httpsRedirect(request, appUrl) ??
         canonicalRedirect(request) ??
         stripInternalParams(request) ??
-        requestHandler(request),
-    );
+        (await requestHandler(request));
+      return withHsts(response, request, appUrl);
+    });
   },
   // Cron (see wrangler.jsonc `triggers.crons`): (1) keep Google's ARI in sync by
   // re-pushing every ARI-enabled property — a backstop to the change-driven and

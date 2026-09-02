@@ -10,8 +10,10 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const lang = String(form.get("lang") ?? "");
   const redirectTo = String(form.get("redirectTo") ?? "/admin");
-  // Only same-site paths — never redirect off-host from form input.
-  const to = redirectTo.startsWith("/") && !redirectTo.startsWith("//") ? redirectTo : "/admin";
+  // Only same-site admin paths — never redirect off-host from form input. A
+  // second slash OR a backslash is refused: browsers read `/\evil.com` as
+  // `//evil.com`, so the slash-only check let that one through.
+  const to = /^\/admin(?:[/?#]|$)/.test(redirectTo) && !/^\/[/\\]/.test(redirectTo) ? redirectTo : "/admin";
   if (!isAdminLang(lang)) return redirect(to);
   return redirect(to, {
     headers: {

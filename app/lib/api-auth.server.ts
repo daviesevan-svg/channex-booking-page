@@ -11,6 +11,7 @@
 // no test variant of a management key: a management write is a write.
 import { getConfig, getConfigKV } from "./config.server";
 import { requireCanonicalHost } from "./domains.server";
+import { getProperty } from "./properties.server";
 
 export type ApiKeyMode = "live" | "test";
 export type ApiKeyScope = "book" | "manage";
@@ -125,6 +126,23 @@ export async function revokeApiKey(pid: string, keyId: string): Promise<boolean>
   return true;
 }
 
+/** Revokes every live key of a property — for deletion, so a key issued to a
+ *  property that no longer exists can't keep driving its leftover data. */
+export async function revokeAllApiKeys(pid: string): Promise<number> {
+  const recs = (await readJson<ApiKeyRecord[]>(keysKey(pid))) ?? [];
+  const kv = getConfigKV();
+  const now = new Date().toISOString();
+  let revoked = 0;
+  for (const rec of recs) {
+    if (rec.revokedAt) continue;
+    rec.revokedAt = now;
+    revoked++;
+    if (kv) await kv.delete(indexKey(rec.hash));
+  }
+  if (revoked) await writeJson(keysKey(pid), recs);
+  return revoked;
+}
+
 /** Resolve the API key on a request and require it to carry `scope`. Returns
  *  the auth context, or a ready-to-return JSON error Response (401/403).
  *
@@ -158,6 +176,10 @@ export async function identifyApiKey(request: Request): Promise<ApiAuth | Respon
   const hash = await hashKey(raw);
   const entry = await readJson<{ pid: string; keyId: string; mode: ApiKeyMode; scope?: ApiKeyScope }>(indexKey(hash));
   if (!entry) return apiError(401, "unauthorized", "Invalid or revoked API key.");
+  // A key only opens a property that still exists. Deletion revokes keys, but
+  // the registry is the source of truth — a row removed any other way (or a
+  // revoke that lost a KV race) must not leave a working key behind.
+  if (!(await getProperty(entry.pid))) return apiError(401, "unauthorized", "Invalid or revoked API key.");
 
   // Best-effort lastUsedAt stamp; never block the request on it.
   try {

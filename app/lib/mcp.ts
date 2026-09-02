@@ -1061,7 +1061,7 @@ export const MANAGE_ACCOUNT_TOOLS: McpTool[] = [
   {
     name: "invite_teammate",
     description:
-      "Invite one person to this property's admin by email. SENDS A REAL EMAIL to that address (the invite with a sign-in link) — the only management tool that emails anyone. Confirm the address with the operator before calling. New teammates start with full area access; narrow it with set_teammate_areas.",
+      "REQUEST that one person be added to this property's admin team, by email. Nobody is added by this call: the request is parked for the property OWNER, who is emailed and must approve it on the admin Team page before the person joins or receives a sign-in link. Returns 202 with the pending list. Confirm the address with the operator before calling. Once approved, new teammates start with full area access; narrow it with set_teammate_areas.",
     inputSchema: { type: "object", properties: { email: { type: "string" } }, required: ["email"], additionalProperties: false },
     route: { method: "POST", path: "/v1/manage/team" },
     scope: "manage",

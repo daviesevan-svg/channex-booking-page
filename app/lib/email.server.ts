@@ -251,6 +251,49 @@ export async function sendTeamInviteEmail(
   }
 }
 
+/** Tells the OWNER that an integration (a management API key) asked to add
+ *  someone to the team. Nothing has happened yet — the owner approves or
+ *  declines on the Team page. The requested address is shown but not mailed. */
+export async function sendTeamInviteRequestEmail(
+  pid: string,
+  ownerEmail: string,
+  requestedEmail: string,
+  teamUrl: string,
+  partnerId?: string,
+): Promise<{ sent: boolean }> {
+  try {
+    const [settings, ov, product] = await Promise.all([
+      getSettings(pid),
+      getOverrides(pid),
+      getPartner(partnerId).then(brandOf),
+    ]);
+    const hotelName = ov.hotelName || "your property";
+    const brand = product.partnerId
+      ? emailBrandFor(product.accent ?? DEFAULT_ACCENT_HEX, undefined)
+      : await emailBrand(pid, accentHex(settings));
+    const html = renderSimpleEmail({
+      hotelName,
+      brand,
+      heading: `Approve a new teammate for ${hotelName}?`,
+      body:
+        `An integration connected to ${hotelName} through its management API key asked to add ${requestedEmail} to the team.\n\n` +
+        `Nobody has been added and no sign-in link has been sent. If you recognise this request, approve it on the Team page; ` +
+        `otherwise decline it — and if you don't recognise the integration either, revoke its API key.`,
+      cta: { label: "Review on the Team page", url: teamUrl },
+    });
+    return await sendEmail({
+      to: ownerEmail,
+      subject: `Approve a new teammate for ${hotelName}?`,
+      from: await senderFor(pid, settings),
+      replyTo: product.supportEmail || settings.emailReplyTo,
+      html,
+    });
+  } catch (e) {
+    console.log(`[email] sendTeamInviteRequestEmail failed: ${e instanceof Error ? e.message : e}`);
+    return { sent: false };
+  }
+}
+
 /** Tells a property it has been listed in someone else's collection.
  *
  *  This is what makes an immediate add fair. A `curated` collection can list a
