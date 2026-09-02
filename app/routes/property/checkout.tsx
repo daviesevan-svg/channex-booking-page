@@ -244,6 +244,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     collectsCard,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
+    // Set by the Viva return URL when a charge was refused and refunded; the
+    // only value is a fixed token, never guest text.
+    notice: url.searchParams.get("notice") === "refunded" ? ("refunded" as const) : undefined,
   };
 }
 
@@ -717,7 +720,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -836,6 +839,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       {actionData?.rateLimited && (
         <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
           {tr.t("bookingThrottled")}
+        </div>
+      )}
+
+      {notice === "refunded" && (
+        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+          {tr.t("paymentRefundedNotice")}
         </div>
       )}
 

@@ -482,6 +482,7 @@ const NL: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Verplicht",
   requestsPlaceholder: "Rustige kamer, vroeg inchecken, alles wat we moeten weten…",
+  paymentRefundedNotice: "Uw betaling kon niet aan dit verblijf worden gekoppeld, dus we hebben deze volledig terugbetaald — er is niets geboekt. Controleer uw gegevens en probeer het opnieuw, of neem contact met ons op als u hulp nodig heeft.",
   paymentStartFailed: "We konden de beveiligde betaling nu niet starten. Probeer het over een moment opnieuw — als het blijft gebeuren, neem contact met ons op en we helpen u de boeking af te ronden.",
   paymentNotConfigured: "Voor dit tarief is een online betaling nodig, maar kaartbetalingen zijn nog niet ingesteld voor deze accommodatie. Neem contact met ons op om de boeking af te ronden.",
 

@@ -9,7 +9,7 @@ import { makeTranslator } from "~/lib/i18n";
 import { useAdminLang, useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { canManageProperty, currentPropertyId } from "~/lib/properties.server";
-import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { cancelBookingIfActive, getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
 import { cancelChannexBooking, payloadWithGuest, pushGuestModification, retryChannexPush } from "~/lib/booking-finalize.server";
 import { FIELD_INPUT } from "~/components/admin-form";
 import { incrementAvailability } from "~/lib/ari/admin.server";
@@ -120,19 +120,21 @@ export async function action({ params, request }: Route.ActionArgs) {
       return { error: "This booking is already cancelled." };
     }
     const by = (await getAdminEmail(request)) ?? undefined;
-    const updated = await updateBooking(propertyId, booking.id, {
-      lifecycle: "cancelled",
+    // Atomic active→cancelled: a double-click's second request gets undefined
+    // here and must not release inventory or cancel in Channex a second time.
+    const updated = await cancelBookingIfActive(propertyId, booking.id, {
       cancelledAt: new Date().toISOString(),
       cancelledBy: by,
       inventoryHeld: false,
     });
+    if (!updated) return { error: "This booking is already cancelled." };
     // Give the nights back to inventory (only if this booking held them).
     if (booking.inventoryHeld) {
       await incrementAvailability(propertyId, stayAvailabilityItems(booking.rooms, booking.checkin, booking.nights));
     }
     // Cancel upstream in Channex too (best-effort) for a live booking.
     await cancelChannexBooking(propertyId, booking);
-    const finalBooking = updated ?? booking;
+    const finalBooking = updated;
     await sendCancellationEmails(propertyId, finalBooking, new URL(request.url).origin);
     await dispatchWebhook(propertyId, "booking.cancelled", serializeBooking(finalBooking), Date.now());
     return { cancelled: true as const };

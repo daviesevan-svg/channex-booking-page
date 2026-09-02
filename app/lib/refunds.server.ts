@@ -7,6 +7,7 @@ import { createRefund } from "./stripe.server";
 import { fromStripeMinor } from "./money";
 import { getVivaConfig } from "./overrides.server";
 import { fromVivaMinor, toVivaMinor, vivaRefund } from "./viva.server";
+import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 
 export type RefundOutcome =
   | { ok: true; booking: BookingRecord; amount: number }
@@ -24,33 +25,41 @@ export async function refundBookingCharge(
   const p = booking.payment;
   if (!p || p.mode !== "payment") return { ok: false, reason: "no_charge" };
   if (p.refund) return { ok: false, reason: "already_refunded" };
+  if (p.provider === "viva" && !p.transactionId) return { ok: false, reason: "no_charge" };
+  if (p.provider !== "viva" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
+
+  // The `p.refund` read above is not a fence: two concurrent cancels both see
+  // "not refunded". This claim is — exactly one caller reaches the gateway.
+  // Stripe would also dedupe on its idempotency key; Viva has none, and a
+  // second DELETE /transactions/{tx} there is a second refund.
+  const claimKey = `booking:${pid}:${booking.id}`;
+  if (!(await claimRefund(claimKey))) return { ok: false, reason: "already_refunded" };
 
   let refund: { id: string; amount: number; currency?: string };
   if (p.provider === "viva") {
-    if (!p.transactionId) return { ok: false, reason: "no_charge" };
     const viva = await getVivaConfig(pid);
     if (!viva) {
       console.log(`[refund] viva credentials missing for pid=${pid} booking=${booking.reference}`);
+      await releaseRefundClaim(claimKey);
       return { ok: false, reason: "error" };
     }
     try {
-      // Viva has no idempotency key; the `p.refund` guard above is the only
-      // double-refund fence, which the atomic updateBooking below makes stick.
       const amountMinor = opts.amountMinor ?? toVivaMinor(p.amount ?? 0);
-      const r = await vivaRefund(viva, p.transactionId, amountMinor);
+      const r = await vivaRefund(viva, p.transactionId!, amountMinor);
       refund = {
-        id: r.TransactionId ?? p.transactionId,
+        id: r.TransactionId ?? p.transactionId!,
         amount: r.Amount ?? fromVivaMinor(amountMinor),
         currency: p.currency,
       };
     } catch (e) {
       console.log(`[refund] failed for booking=${booking.reference} viva tx=${p.transactionId}: ${e instanceof Error ? e.message : e}`);
+      // Nothing left the account: hand the claim back so a retry can try again.
+      await releaseRefundClaim(claimKey);
       return { ok: false, reason: "error" };
     }
   } else {
-    if (!p.paymentIntentId || !p.accountId) return { ok: false, reason: "no_charge" };
     try {
-      const r = await createRefund(p.accountId, p.paymentIntentId, opts.amountMinor, `refund_${booking.reference}`);
+      const r = await createRefund(p.accountId!, p.paymentIntentId!, opts.amountMinor, `refund_${booking.reference}`);
       const refundCurrency = r.currency?.toUpperCase() || p.currency || "";
       // Stripe reports the refund in minor units; the fallback is already major.
       refund = {
@@ -60,6 +69,7 @@ export async function refundBookingCharge(
       };
     } catch (e) {
       console.log(`[refund] failed for booking=${booking.reference} pi=${p.paymentIntentId}: ${e instanceof Error ? e.message : e}`);
+      await releaseRefundClaim(claimKey);
       return { ok: false, reason: "error" };
     }
   }

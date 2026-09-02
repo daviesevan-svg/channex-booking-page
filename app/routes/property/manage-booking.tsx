@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/manage-booking";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
-import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { cancelBookingIfActive, getBooking, stayAvailabilityItems } from "~/lib/bookings.server";
 import { cancelChannexBooking } from "~/lib/booking-finalize.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari/admin.server";
@@ -20,6 +20,7 @@ import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -74,15 +75,24 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const form = await request.formData();
   if (form.get("intent") === "cancel") {
+    // A cancel fans out to inventory, Channex, a refund and two emails — not
+    // something to let a script hammer. Blunt throttle; the real double-cancel
+    // fence is the conditional transition below.
+    if (!(await rateLimit(`cancel:${pid}:${clientKey(request)}`, 5, 600))) {
+      return redirect(`${base}/manage/${params.id}`);
+    }
     const settings = await getSettings(pid);
     // Re-check server-side so a stale page can't cancel past the deadline.
     const active = (booking.lifecycle ?? "active") === "active";
     if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
-      const updated = await updateBooking(pid, booking.id, {
-        lifecycle: "cancelled",
+      // Atomic: only the ONE request whose write flips active→cancelled runs
+      // the side effects. A concurrent duplicate gets undefined and does
+      // nothing — before this, both released inventory and both refunded.
+      const updated = await cancelBookingIfActive(pid, booking.id, {
         cancelledAt: new Date().toISOString(),
         inventoryHeld: false,
       });
+      if (!updated) return redirect(`${base}/manage/${params.id}`);
       // Give the nights back to inventory (only if this booking held them).
       if (booking.inventoryHeld) {
         await incrementAvailability(
@@ -96,7 +106,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       // Auto-refund (if the property opted in): a guest cancel only succeeds inside
       // the free window, so the full charge is owed back. Otherwise the hotel
       // refunds manually. No-op for guarantee-card bookings (no charge taken).
-      let finalBooking = updated ?? booking;
+      let finalBooking = updated;
       if (settings.autoRefund) {
         const r = await refundBookingCharge(pid, finalBooking, { by: "auto (guest cancellation)" });
         if (r.ok) finalBooking = r.booking;
