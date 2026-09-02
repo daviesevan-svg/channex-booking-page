@@ -12,6 +12,14 @@
 import { getConfig, getConfigKV } from "./config.server";
 import { requireCanonicalHost } from "./domains.server";
 import { getProperty } from "./properties.server";
+import { rateLimit } from "./rate-limit.server";
+
+/** Per key, per 10 minutes (docs/management-api.md §2). Reads are generous;
+ *  writes are what an agent loop can do damage with. Route-specific buckets
+ *  (invites, image import) sit on top of these. */
+export const MANAGE_RATE_WINDOW_SEC = 600;
+export const MANAGE_READ_LIMIT = 300;
+export const MANAGE_WRITE_LIMIT = 60;
 
 export type ApiKeyMode = "live" | "test";
 export type ApiKeyScope = "book" | "manage";
@@ -157,6 +165,22 @@ export async function authenticateApiKey(request: Request, scope: ApiKeyScope = 
     return scope === "manage"
       ? apiError(403, "wrong_key_scope", "This endpoint requires a management key (ak_…). Booking keys (sk_…) cannot manage the property.")
       : apiError(403, "wrong_key_scope", "This endpoint requires a booking key (sk_…). Management keys (ak_…) cannot search or book.");
+  }
+  if (scope === "manage") {
+    // The management surface had no throttle at all — an agent loop (or a
+    // leaked key) could send unbounded invite requests, image imports and
+    // Google resyncs. Blunt KV limiter (racy at the margin, fine for this);
+    // MCP tool calls re-dispatch into these routes, so they count too.
+    const write = request.method !== "GET" && request.method !== "HEAD";
+    const limit = write ? MANAGE_WRITE_LIMIT : MANAGE_READ_LIMIT;
+    const ok = await rateLimit(`apimanage:${write ? "w" : "r"}:${auth.pid}:${auth.keyId}`, limit, MANAGE_RATE_WINDOW_SEC);
+    if (!ok) {
+      return apiError(
+        429,
+        "rate_limited",
+        `Too many management ${write ? "writes" : "reads"}: at most ${limit} per 10 minutes per key. Wait a few minutes and retry.`,
+      );
+    }
   }
   return auth;
 }

@@ -2,6 +2,7 @@
 // copy, footer, style). Same rules as manage-validate.ts: loud per-field 422s,
 // snake_case wire → domain shapes, unknown fields rejected.
 import { MAX_FOOTER_LINKS, SOCIAL_PLATFORMS, httpUrl, isSocialPlatform, type SiteFooter } from "./footer";
+import { IMAGE_URL_HINT, isPropertyImageUrl } from "./image-paths";
 import { MAX_SECTION_IMAGES, SECTION_DEFS, SECTION_TYPES, type SectionType, type SiteSection } from "./sections";
 
 export type Errors = Record<string, string[]>;
@@ -75,8 +76,8 @@ export function validateSections(body: unknown, opts: { isHome: boolean }): Vali
       else {
         images = [];
         for (const img of s.images) {
-          if (!isObj(img) || typeof img.url !== "string" || !img.url.startsWith("/images/")) {
-            fail(at, "Each image needs a url that is an /images/… path (upload via POST /v1/manage/images).");
+          if (!isObj(img) || !isPropertyImageUrl(img.url)) {
+            fail(at, `Each image needs a url that ${IMAGE_URL_HINT}.`);
             break;
           }
           images.push({ id: typeof img.id === "string" && img.id.trim() ? img.id.trim() : crypto.randomUUID(), url: img.url });

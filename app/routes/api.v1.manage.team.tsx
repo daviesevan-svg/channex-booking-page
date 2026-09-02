@@ -1,5 +1,6 @@
 import type { Route } from "./+types/api.v1.manage.team";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
+import { rateLimit } from "~/lib/rate-limit.server";
 import { sendTeamInviteRequestEmail } from "~/lib/email.server";
 import { MEMBER_AREAS } from "~/lib/member-areas";
 import { getProperty } from "~/lib/properties.server";
@@ -58,6 +59,11 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json({ data: serializeTeam(ref, await listPendingInvites(auth.pid)) });
   }
 
+  // Each distinct request emails the owner; a loop must not turn that into a
+  // flood from the hotel's own sender. Per property, not per key.
+  if (!(await rateLimit(`apiinvite:${auth.pid}`, 5, 3600))) {
+    return apiError(429, "rate_limited", "At most 5 teammate invite requests per hour per property.");
+  }
   const { created } = await addPendingInvite(auth.pid, email);
   // Tell the owner once per distinct request — a retried call must not nag.
   if (created && ref.owner) {

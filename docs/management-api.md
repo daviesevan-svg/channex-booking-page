@@ -51,8 +51,13 @@ radius. So:
   `sk_` keys only on the existing guest endpoints (+ `/mcp`). No key does both;
   a PMS that needs both holds two keys.
 - Canonical-host-only, exactly like `/v1` (`requireCanonicalHost`).
-- Rate-limited per key via the existing `rateLimit()` — generous for reads,
-  tight for writes (start: 300 reads / 60 writes per 10 min, tune later).
+- Rate-limited per key via the existing `rateLimit()`, enforced inside
+  `authenticateApiKey` for manage scope since the 2026-09-02 security pass:
+  300 reads / 60 writes per 10 min per key (429 `rate_limited`), plus tighter
+  buckets on the two things that create objects nobody may reference —
+  5 teammate-invite requests per hour per property, 20 image uploads/imports
+  per 10 min per key — and `/mcp` itself at 300 POSTs per 10 min per client
+  with batches capped at 20 entries.
 - Partner-level `pk_partner_` keys (whitelabel.md §8) are **phase C** and sit
   ON TOP of these handlers: a partner key = the same manage surface plus
   property create/list/invite, scoped to the partner's properties.
@@ -91,7 +96,7 @@ radius. So:
 
 | Resource | Endpoints | Backing code (reuse, no new logic) | Notes |
 |---|---|---|---|
-| Property settings | `GET/PATCH /v1/manage/property` | `getSettings` / `patchSettings` + the narrow savers | PATCH allowlist: identity, address+lat/lng, check-in/out times, currency, languages, facilities (curated keys), pricingMode, timezone, cutoffs, portal policy, singleUnit. NOT writable: `connectedSystem` (the Channex gate — flipping it enables live traffic; superadmin UI only for now), `stripeAccountId`/`stripeChargesEnabled`, `websiteDomain` (order-sensitive claim/release flow), `liveBooking`. `websiteEnabled` IS writable (2026-08-28, after the MCP dogfood): it is content-safe by construction — the website layer renders or not, nothing is destroyed either way. |
+| Property settings | `GET/PATCH /v1/manage/property` | `getSettings` / `patchSettings` + the narrow savers | PATCH allowlist: identity, address+lat/lng, check-in/out times, currency, languages, facilities (curated keys), pricingMode, timezone, cutoffs, portal policy (except `auto_refund` — owner-only in the admin, readable but not writable here since 2026-09-02), singleUnit. NOT writable: `connectedSystem` (the Channex gate — flipping it enables live traffic; superadmin UI only for now), `stripeAccountId`/`stripeChargesEnabled`, `websiteDomain` (order-sensitive claim/release flow), `liveBooking`. `websiteEnabled` IS writable (2026-08-28, after the MCP dogfood): it is content-safe by construction — the website layer renders or not, nothing is destroyed either way. |
 | Property content (per-lang) | `GET/PATCH /v1/manage/property/content?lang=` | `getOverrides` / `saveOverrides` | hotelName, description, address text, phone, email per language. Renames flow through the same default-lang `hotelName` rule as the UI. |
 | Rooms | `GET/POST/PATCH/DELETE /v1/manage/rooms[/:id]`, `PUT /v1/manage/rooms` | `catalog.server.ts` (`replaceRooms` for PUT) | DELETE cascades the room's price out of every rate (document in the response). Writes fire `queueGoogleAriPush` exactly like the UI. |
 | Rate plans (structural) | same shape as rooms, `PUT` via `replaceRates` | `catalog.server.ts`, `rate-policy.ts`, `rate-pricing.ts` | Exposes title, mealPlan, `prices` (base price per room — structural, NOT the ARI grid), occupancyPricing, structured `policy`, inclusions, active. **`channexRateIds` is server-owned and never writable** — every write preserves it (ARI and booking pushes key on it). |
