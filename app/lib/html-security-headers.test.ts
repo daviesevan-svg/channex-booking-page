@@ -5,16 +5,19 @@ import {
   documentContentSecurityPolicy,
   frameAncestorsForPath,
   htmlSecurityHeaders,
+  type PartnerFraming,
 } from "./html-security-headers";
 
-function cspMap(pathname: string): Record<string, string> {
+function cspMapWith(pathname: string, partner: PartnerFraming): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const part of documentContentSecurityPolicy(pathname).split("; ")) {
+  for (const part of documentContentSecurityPolicy(pathname, partner).split("; ")) {
     const i = part.indexOf(" ");
     out[part.slice(0, i)] = part.slice(i + 1);
   }
   return out;
 }
+
+const cspMap = (pathname: string) => cspMapWith(pathname, {});
 
 describe("frameAncestorsForPath", () => {
   it("denies framing on admin (Connect / team invite clickjacking)", () => {
@@ -85,6 +88,40 @@ describe("htmlSecurityHeaders", () => {
     expect(form).toContain("'self'");
     expect(form).toContain("https://*.stripe.com");
     expect(form).toContain("https://*.vivapayments.com");
+  });
+});
+
+describe("partner design preview (the one cross-origin framing pair)", () => {
+  const partner = { frames: "https://book.theirpms.com", framedBy: "https://admin.theirpms.com" };
+
+  it("lets a partner admin document embed that partner's guest host", () => {
+    const csp = documentContentSecurityPolicy("/admin/website/sections", partner);
+    expect(csp).toContain("frame-src 'self' https://book.theirpms.com");
+    // Still unframeable itself: the widening is one-directional per document.
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(htmlSecurityHeaders("/admin/website/sections", partner)["X-Frame-Options"]).toBe("DENY");
+  });
+
+  it("lets that partner's admin host frame a previewed guest document", () => {
+    const h = htmlSecurityHeaders("/spilmanhotel", partner);
+    expect(h["Content-Security-Policy"]).toContain(
+      "frame-ancestors 'self' https://admin.theirpms.com",
+    );
+    // X-Frame-Options has no allow-list value, so SAMEORIGIN would block the
+    // frame whatever CSP said — the same reason /embed omits it.
+    expect(h["X-Frame-Options"]).toBeUndefined();
+    // A guest page may still not embed anything cross-origin.
+    expect(cspMapWith("/spilmanhotel", partner)["frame-src"]).toBe("'self'");
+  });
+
+  it("changes nothing when the caller finds no partner (our own hosts)", () => {
+    expect(htmlSecurityHeaders("/spilmanhotel")).toEqual(htmlSecurityHeaders("/spilmanhotel", {}));
+    expect(cspMap("/admin/team")["frame-src"]).toBe("'self'");
+    expect(cspMap("/spilmanhotel")["frame-ancestors"]).toBe("'self'");
+  });
+
+  it("never widens the embed widget, which is already framed by anyone", () => {
+    expect(cspMapWith("/embed/spilmanhotel", partner)["frame-ancestors"]).toBe("*");
   });
 });
 
