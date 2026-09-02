@@ -802,7 +802,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     policy.cancellation.refundable && !freeWindowClosed && tier0 && tier0.penalty !== "none" && !policy.overrideNote
       ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
       : "";
-  const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
+  // Silenced by an override note for the same reason as latePhrase above: the
+  // hotel's own text already states what happens, and ours contradicted it.
+  const noShowPhrase =
+    policy.noShow.penalty !== "none" && !policy.overrideNote
+      ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue)
+      : "";
 
   // ---- consent ----
   const ackText = nonRefundable

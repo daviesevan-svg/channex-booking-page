@@ -1444,7 +1444,7 @@ const PT: Record<string, string> = {
   rtPreviewTitle: "O que os hóspedes vão ver",
   rtPreviewIntro: "Pré-visualização ao vivo do texto da política mostrado na página de reservas (o hóspede vê-o no seu idioma, com os montantes reais).",
   rtOverrideNote: "Nota de substituição",
-  rtOverrideNoteHint: "(opcional — substitui a linha de cancelamento acima)",
+  rtOverrideNoteHint: "(opcional — substitui todo o texto da política acima)",
   rtOverrideNotePlaceholder: "Deixe em branco para mostrar a política gerada a partir dos campos acima.",
   rtCreate: "Criar tarifa",
   rtSave: "Guardar tarifa",
