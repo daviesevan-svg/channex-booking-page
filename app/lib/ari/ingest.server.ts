@@ -2,7 +2,7 @@
 // changes_notification pushes, and the "have we ever / when did we last
 // receive ARI" reads that describe ingest state.
 import { getConfig, getConfigKV } from "../config.server";
-import { db } from "../d1.server";
+import { d1Retry, db } from "../d1.server";
 import { timingSafeEqual } from "../hmac.server";
 import { toMinor } from "./fraction";
 import { CHANNEX_ACTOR } from "./log.server";
@@ -22,8 +22,6 @@ export function checkApiKey(request: Request): Response | null {
   }
   return null;
 }
-
-const EMPTY_INVENTORY: InventoryData = { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
 
 /** Inclusive list of YYYY-MM-DD dates from `from` to `to`. */
 function eachDate(from: string, to: string): string[] {
@@ -68,7 +66,7 @@ export async function getLastAriReceivedAt(hotelCode: string): Promise<number | 
 
 /** Apply one or more changes_notification messages. Returns counts by type. */
 export async function applyChanges(body: unknown): Promise<{ availability: number; rates: number; restrictions: number }> {
-  await ensureSchema();
+  await d1Retry(() => ensureSchema());
   const notifications = (body as { data?: unknown })?.data;
   if (!Array.isArray(notifications)) throw new Error("Expected { data: [...] }");
 
@@ -162,19 +160,45 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
 
   // Snapshot the affected windows before applying, so we can log what actually
   // changed (Channex re-sends unchanged values; diffInventory drops those).
+  //
+  // A hotel with no usable snapshot is left OUT of the map rather than falling
+  // back to an empty one: diffing against empty would log every value in the
+  // window as newly set. The write below does not depend on this, so a D1
+  // failure here costs an audit entry, never an availability update.
   const before = new Map<string, InventoryData>();
-  for (const [h, ds] of touched) before.set(h, await getInventoryOn(h, ds));
+  for (const [h, ds] of touched) {
+    try {
+      before.set(h, await d1Retry(() => getInventoryOn(h, ds)));
+    } catch (e) {
+      console.log(`[ari] pre-change snapshot failed for ${h}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
 
   // D1 batches are atomic; chunk to stay well within limits on big ranges.
+  // Retried on a transient failure — this is the write that stops us selling
+  // inventory Channex has already closed, and Channex does not re-send a change
+  // it considers delivered. An overbooking on 2026-10-03 came from exactly this
+  // batch dying on "this D1 DB instance is no longer active" and no one asking
+  // again. Re-applying a chunk that did commit is a no-op (upsert by PK).
   for (let i = 0; i < stmts.length; i += 100) {
-    await D.batch(stmts.slice(i, i + 100));
+    const chunk = stmts.slice(i, i + 100);
+    await d1Retry(() => D.batch(chunk));
   }
 
   // Audit log: diff each hotel's window after applying, attributed to Channex.
+  // Best-effort, and deliberately after the write: the ARI is already committed
+  // by this point, so a failure here must not be reported to Channex as a failed
+  // push (which would leave us holding data we told them we had not stored).
   const ts = Date.now();
   for (const [h, ds] of touched) {
-    const after = await getInventoryOn(h, ds);
-    await insertAriLog(h, CHANNEX_ACTOR, diffInventory(before.get(h) ?? EMPTY_INVENTORY, after, ds), ts);
+    const snapshot = before.get(h);
+    if (!snapshot) continue;
+    try {
+      const after = await d1Retry(() => getInventoryOn(h, ds));
+      await d1Retry(() => insertAriLog(h, CHANNEX_ACTOR, diffInventory(snapshot, after, ds), ts));
+    } catch (e) {
+      console.log(`[ari] audit log failed for ${h}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   // Record "last received" per hotel once the writes land (best-effort — a KV
