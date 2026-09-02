@@ -329,3 +329,34 @@ export async function updateBooking(
     .run();
   return next;
 }
+
+/**
+ * Moves an ACTIVE booking to `cancelled`, atomically. Returns the cancelled
+ * record for the ONE caller whose write landed, undefined for everyone else —
+ * including a second concurrent cancel of the same booking.
+ *
+ * `updateBooking` is a plain read-then-write: two cancels arriving together
+ * (a guest double-submit with auto-refund on, an operator double-click) both
+ * read "active" and both go on to release inventory, cancel in Channex and
+ * refund. The `lifecycle` COLUMN is the fence here — `WHERE lifecycle='active'`
+ * lets exactly one UPDATE change a row — so callers key every side effect on
+ * getting a record back.
+ */
+export async function cancelBookingIfActive(
+  pid: string,
+  id: string,
+  patch: Omit<Partial<BookingRecord>, "lifecycle">,
+): Promise<BookingRecord | undefined> {
+  await ready(pid);
+  const current = await getBooking(pid, id);
+  if (!current || (current.lifecycle ?? "active") !== "active") return undefined;
+  const next: BookingRecord = { ...current, ...patch, lifecycle: "cancelled" };
+  const r = await db()
+    .prepare(
+      `UPDATE booking SET reference=?, email=?, created_at=?, lifecycle='cancelled', json=?
+       WHERE pid=? AND id=? AND lifecycle='active'`,
+    )
+    .bind(next.reference, norm(next.guest.email), next.createdAt, JSON.stringify(next), pid, id)
+    .run();
+  return r.meta.changes === 1 ? next : undefined;
+}
