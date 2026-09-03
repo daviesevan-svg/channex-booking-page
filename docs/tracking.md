@@ -212,10 +212,34 @@ It is the prerequisite for Google Ads offline conversion import later.
 
 ---
 
-## 7. Consent — deliberately not built
+## 7. Consent
 
-**Decision (Aug 2026): no consent banner.** Managing consent UI was judged not
-worth the overhead right now.
+**Decision (Aug 2026): no consent banner. Reversed Sep 2026 — it is built.**
+The first German customer needs one, and "bring your own CMP" is not an answer
+for an independent hotel with no agency. What shipped is below; the original
+reasoning is kept because the posture options came out of it.
+
+The banner asks two purposes (analytics, advertising), stores a versioned and
+timestamped first-party `rp_consent` cookie read server-side so the banner is in
+the first HTML, and is reopenable from a permanent footer entry. A property
+still chooses between our banner, its own CMP, and nothing.
+
+**It loads in BASIC consent mode, not advanced** — nothing is requested from
+Google until the guest accepts. This contradicts what the modelling paragraph
+below originally concluded, and the paragraph is what changed my mind: advanced
+mode's only benefit is feeding conversion modelling, modelling needs volume no
+single hotel has, so advanced would send every guest's IP to Google before they
+were asked in exchange for nothing measurable. The exception is the "own CMP"
+posture, where the tag must exist for their CMP to grant consent to it.
+
+Consent is enforced per DESTINATION, not per library: a `config` for the Ads ID
+makes gtag ping Google's ad servers immediately, and denied `ad_storage` strips
+the identifier from that ping without stopping it. A guest who allows analytics
+and refuses advertising must not have the Ads destination configured at all.
+
+### The original reasoning, kept
+
+Managing consent UI was judged not worth the overhead at the time.
 
 What was specced and set aside: a two-toggle banner (Analytics →
 `analytics_storage`; Advertising → `ad_storage` + `ad_user_data` +
@@ -252,13 +276,18 @@ guest who declines is **not** measurable in Google Ads. Not "degraded" —
 unattributable. Worth writing down because every plan for this feature founders
 on someone believing there is a way around it.
 
-**Implement Consent Mode in *advanced* mode, not basic.** Basic = no tag loads
-until consent, so a denial sends nothing at all. Advanced = the tag loads with
-all four signals defaulted to denied and still fires at confirmation, as a
-cookieless ping: no `_gcl_aw`, no gclid read back, no identifier of any kind.
-Google learns that a conversion of value X happened on this domain and has no
-way to join it to a click. Advanced is strictly more than basic for the same
-compliance posture, so there is no reason to build basic.
+**Consent Mode, basic or advanced.** Basic = no tag loads until consent, so a
+denial sends nothing at all. Advanced = the tag loads with all four signals
+defaulted to denied and still fires at confirmation, as a cookieless ping: no
+`_gcl_aw`, no gclid read back, no identifier of any kind. Google learns that a
+conversion of value X happened on this domain and has no way to join it to a
+click.
+
+This section first concluded that advanced was strictly better for the same
+compliance posture. **That was wrong at our customers' scale**, and the next
+paragraph is why: advanced buys modelling, modelling needs volume no single
+hotel has, and the cost is a request to Google for every guest before they are
+asked. We ship basic — see §7.
 
 **Modelling is Google's answer and it does not apply at hotel scale.** Those
 cookieless pings are meant to become modelled conversions, inferred from the
