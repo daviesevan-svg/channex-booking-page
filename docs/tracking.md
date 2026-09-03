@@ -245,6 +245,60 @@ or a CMP, EU traffic is being tracked without consent. That is the hotel's
 exposure, not ours, but it should be said out loud in the settings copy so nobody
 believes we handled it for them.
 
+### What a denial actually costs
+
+Asked by the first German customer, and the answer people assume is wrong: a
+guest who declines is **not** measurable in Google Ads. Not "degraded" —
+unattributable. Worth writing down because every plan for this feature founders
+on someone believing there is a way around it.
+
+**Implement Consent Mode in *advanced* mode, not basic.** Basic = no tag loads
+until consent, so a denial sends nothing at all. Advanced = the tag loads with
+all four signals defaulted to denied and still fires at confirmation, as a
+cookieless ping: no `_gcl_aw`, no gclid read back, no identifier of any kind.
+Google learns that a conversion of value X happened on this domain and has no
+way to join it to a click. Advanced is strictly more than basic for the same
+compliance posture, so there is no reason to build basic.
+
+**Modelling is Google's answer and it does not apply at hotel scale.** Those
+cookieless pings are meant to become modelled conversions, inferred from the
+behaviour of consented users. Modelling only switches on above a volume
+threshold — Google's documented bar has been on the order of 700 ad clicks per
+day, per country, per domain grouping, sustained over a week. One property
+bidding on its own name is nowhere near that, so a small hotel gets neither
+observed nor modelled conversions from the guests who declined. **Re-check the
+current threshold in Google's own documentation before quoting it to a
+customer**; Google moves these numbers and this one dates from Aug 2026.
+
+**Server-side does not dodge it, and this is the trap.** The gclid arrives in
+the landing URL, so we can carry it through the funnel and upload the conversion
+from the Worker without ever touching the device. That clears § 25 TDDDG, which
+governs reading and writing on the device and nothing else. It does not clear
+the second rule: a gclid is an online identifier, and sending it to Google for
+advertising needs a GDPR legal basis, which Google's own EU user consent policy
+then requires to be consent for `ad_user_data` / `ad_personalization`. Two
+separate rules; the reflex is to notice the first, satisfy it, and ship. See
+also §11 *Server-side conversions* — Measurement Protocol changes the delivery
+path, not the permission.
+
+**Capture the gclid regardless** (§6, Click-ID capture). It has to survive the
+Stripe redirect for the *granted* case to work at all, and it is unrecoverable
+if not collected at landing. Storing it against the booking for the hotel's own
+measurement is a different question from sending it to Google, with a different
+answer.
+
+**What survives a denial** is our own funnel: `funnel_event` in D1, keyed by a
+cookieless daily hash, measures every booking whether or not a tag ever fired.
+That is the hotel's source of truth for conversion rate and abandoned value. It
+cannot feed Google's bidding, which is the part that is genuinely lost.
+
+**What to tell the customer**, in these words: you will measure your consented
+traffic, which on a competent German banner is most of it, and the rest is a gap
+nobody can close for you. It is the same gap on WebHotelier, on any CMP, and on
+any other IBE — so it is not a reason to stay where they are. Said up front it
+is a known limitation; discovered in month two when our numbers disagree with
+Google Ads, it reads as a broken integration.
+
 ---
 
 ## 8. Performance
@@ -305,7 +359,9 @@ the feature.
 
 **Server-side conversions.** Client-side only means bookings where the guest
 closes the Stripe tab after paying, blocks scripts, or is cut by ITP are missing:
-the webhook finalizes them but no event fires. The fix is GA4 Measurement
+the webhook finalizes them but no event fires. It recovers those, and *only*
+those — a guest who declined consent stays unmeasurable however the event is
+delivered (§7, *What a denial actually costs*). The fix is GA4 Measurement
 Protocol off the existing `claimBooking` exactly-once path in
 `booking-finalize.server.ts` — which already guarantees single-fire for Channex
 pushes and emails, so dedupe is solved by existing code. Needs a `source` field
