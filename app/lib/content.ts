@@ -166,11 +166,14 @@ export function isThemeId(value: string): value is ThemeId {
 // injection). `heading` maps to --font-serif, `body` to --font-sans. `href` is a
 // Google Fonts CSS URL; `default` reuses the fonts already loaded in root.tsx.
 /**
- * The default pair's stylesheet. FONT_PAIRS[0] carries no href because the
- * default is loaded once by the root layout rather than per surface — but the
- * brand kit hands the same URL to hotels building their own site, so it lives
- * here rather than being written out twice. It already drifted once: root was
- * trimmed to drop the `opsz` axis and the brand kit kept serving the heavy
+ * Where the default pair's faces were mirrored FROM. Nothing loads this at
+ * runtime any more — scripts/fetch-fonts.mjs reads it, downloads the files into
+ * public/fonts/ and generates the @font-face rules we serve ourselves, because
+ * a guest's browser must never be made to contact Google (see the script).
+ *
+ * FONT_PAIRS[0] carries no href of its own, so this is the entry the script
+ * uses for the default pair. Keep the axes in step with the other pairs: root
+ * was once trimmed to drop `opsz` while the brand kit kept serving the heavy
  * two-axis version.
  */
 export const DEFAULT_FONTS_HREF =
@@ -188,6 +191,9 @@ export const FONT_PAIRS = [
 ] as const;
 
 export type FontPairId = (typeof FONT_PAIRS)[number]["id"];
+/** The pair used when a property hasn't chosen one — FONT_PAIRS[0]. Named
+ *  because the font-face components branch on it. */
+export const DEFAULT_FONT_PAIR_ID: FontPairId = FONT_PAIRS[0].id;
 export function fontPair(id: string | undefined) {
   return FONT_PAIRS.find((f) => f.id === id) ?? FONT_PAIRS[0];
 }

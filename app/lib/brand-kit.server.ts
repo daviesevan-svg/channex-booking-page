@@ -4,7 +4,7 @@
 // tokens.json. Everything here mirrors what property/layout.tsx + app.css render,
 // so the exported values ARE what guests see on the booking engine.
 import { getConfig } from "./config.server";
-import { DEFAULT_FONTS_HREF, DEFAULT_THEME, THEMES, fontPair } from "./content";
+import { DEFAULT_THEME, THEMES, fontPair } from "./content";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperty } from "./properties.server";
 
@@ -43,9 +43,22 @@ export interface BrandTokens {
   page: string;
   neutrals: Record<string, string>;
   shadowCard: string;
-  fonts: { heading: string; body: string; googleFontsHref: string };
+  /** `families` are the typeface NAMES to obtain and self-host — deliberately
+   *  not a Google Fonts URL. Handing a hotel one of those exports our own
+   *  problem to their marketing site: in Germany, loading a font from Google
+   *  sends every visitor's IP to Google before the page renders. We self-host
+   *  (scripts/fetch-fonts.mjs); they should too. */
+  fonts: { heading: string; body: string; families: string[] };
   /** Corner-radius scale the booking engine uses (px), for reference. */
   radius: { card: string; button: string; input: string; pill: string };
+}
+
+/** The typeface names in a pair, for a site that has to obtain them itself. The
+ *  CSS stacks always lead with the quoted family, and heading == body in the
+ *  single-family pairs, hence the dedupe. */
+function familiesOf(font: { heading: string; body: string }): string[] {
+  const first = (stack: string) => stack.match(/"([^"]+)"/)?.[1];
+  return [...new Set([first(font.heading), first(font.body)].filter((n): n is string => Boolean(n)))];
 }
 
 function resolveTokens(
@@ -72,7 +85,7 @@ function resolveTokens(
     page,
     neutrals: NEUTRALS,
     shadowCard: SHADOW_CARD,
-    fonts: { heading: font.heading, body: font.body, googleFontsHref: font.href || DEFAULT_FONTS_HREF },
+    fonts: { heading: font.heading, body: font.body, families: familiesOf(font) },
     radius: { card: "14px", button: "10px", input: "8px", pill: "999px" },
   };
 }
@@ -84,7 +97,13 @@ function brandCss(hotelName: string, t: BrandTokens): string {
     .map(([k, v]) => `  --${k}: ${v};`)
     .join("\n");
   return `/* ${hotelName} — brand tokens, matching the booking engine. */
-@import url("${t.fonts.googleFontsHref}");
+
+/* Typefaces: ${t.fonts.families.join(" and ")}.
+   Not imported here on purpose. Download them (they are open-licensed) and
+   serve the .woff2 files from your own domain with your own @font-face rules.
+   Do NOT @import from fonts.googleapis.com: that sends every visitor's IP and
+   user agent to Google before your page renders, which German courts have
+   already ruled on, and no cookie banner can gate it. */
 
 :root {
   --accent: ${t.accent};
@@ -134,7 +153,8 @@ function brandJson(hotelName: string, t: BrandTokens): string {
       typography: {
         headingFontFamily: t.fonts.heading,
         bodyFontFamily: t.fonts.body,
-        googleFontsHref: t.fonts.googleFontsHref,
+        /** Obtain and self-host these; see the CSS file's note. */
+        selfHostFamilies: t.fonts.families,
       },
       radius: t.radius,
       shadow: { card: t.shadowCard },
@@ -150,8 +170,11 @@ function brandPrompt(hotelName: string, t: BrandTokens, bookingUrl: string): str
   return `You are building a marketing website for "${hotelName}". It must visually match our existing hotel booking engine so the two feel like one brand. Use the exact design tokens below — do not invent new colours or fonts.
 
 ## Fonts
-Load this stylesheet in the <head>:
-<link rel="stylesheet" href="${t.fonts.googleFontsHref}">
+Use ${t.fonts.families.join(" and ")}. Self-host them: download the .woff2 files,
+serve them from this site's own domain, and write the @font-face rules yourself.
+Do NOT link or @import fonts.googleapis.com — that sends every visitor's IP to
+Google before the page renders, it is a live legal issue in Germany, and no
+cookie banner can gate it because the request goes out during head parse.
 - Headings: ${t.fonts.heading}
 - Body:     ${t.fonts.body}
 

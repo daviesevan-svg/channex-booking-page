@@ -1,0 +1,131 @@
+#!/usr/bin/env node
+/**
+ * Mirrors the Google Fonts our themes use into public/fonts/, and generates the
+ * @font-face CSS that points at them (app/lib/font-faces.ts).
+ *
+ * Run by hand, never at build time — the output is committed. That is the whole
+ * point: with the files in the repo, a guest's browser never talks to Google,
+ * and a build never depends on Google being up or on its CSS staying byte-stable.
+ *
+ * Why at all: loading a typeface from fonts.googleapis.com sends every guest's
+ * IP, user agent and referer to Google before anything else on the page runs.
+ * In Germany that is the LG München exposure (20 O 1189/21), and no consent
+ * banner can gate it — the request goes out during head parse. It is also the
+ * one thing on a German hotel's compliance list that the hotel cannot fix from
+ * their side.
+ *
+ *   node scripts/fetch-fonts.mjs
+ *
+ * Re-run it when FONT_PAIRS changes. `npm test` fails if a pair has no faces,
+ * so a forgotten run is caught rather than shipped as a page in Times New Roman.
+ *
+ * What is mirrored is exactly what Google serves, `unicode-range` included, so
+ * subsetting still works: a Latin page fetches the latin file and nothing else,
+ * and a script with no subset in that family (Greek, Thai — none of these
+ * families ship one) falls back to a system face exactly as it does today.
+ */
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+// A desktop Chrome UA. Google's css2 endpoint serves woff2 + unicode-range
+// subsets to modern browsers and heavier, unsubsetted formats to anything it
+// doesn't recognise — with no UA it would hand us ttf.
+const UA =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const ROOT = new URL("..", import.meta.url).pathname;
+const CONTENT = join(ROOT, "app/lib/content.ts");
+const FONT_DIR = join(ROOT, "public/fonts");
+const OUT = join(ROOT, "app/lib/font-faces.ts");
+
+/** The pairs, read out of content.ts rather than duplicated here. The default
+ *  pair's href lives in DEFAULT_FONTS_HREF (it is also handed to hotels), so it
+ *  is looked up separately; every other pair carries its own. */
+function pairsFromContent() {
+  const src = readFileSync(CONTENT, "utf8");
+  const defaultHref = src.match(/DEFAULT_FONTS_HREF =\s*\n?\s*"([^"]+)"/)?.[1];
+  if (!defaultHref) throw new Error("DEFAULT_FONTS_HREF not found in content.ts");
+
+  const block = src.match(/export const FONT_PAIRS = \[([\s\S]*?)\n\] as const;/)?.[1];
+  if (!block) throw new Error("FONT_PAIRS not found in content.ts");
+
+  const pairs = [...block.matchAll(/\{ id: "([^"]+)"[\s\S]*?href: "([^"]*)"/g)].map(([, id, href]) => ({
+    id,
+    href: href || defaultHref,
+  }));
+  if (pairs.length < 2) throw new Error(`parsed ${pairs.length} font pairs — the regex has drifted`);
+  return pairs;
+}
+
+async function get(url, as) {
+  const res = await fetch(url, { headers: { "User-Agent": UA } });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} for ${url}`);
+  return as === "buffer" ? Buffer.from(await res.arrayBuffer()) : res.text();
+}
+
+const pairs = pairsFromContent();
+console.log(`${pairs.length} font pairs`);
+
+// Start from empty so a retired pair's files don't linger forever. Everything
+// here is re-downloadable, and nothing else lives in this directory.
+rmSync(FONT_DIR, { recursive: true, force: true });
+mkdirSync(FONT_DIR, { recursive: true });
+
+const seen = new Map(); // basename -> url, to catch a hash collision rather than silently serving the wrong face
+const faces = {};
+let files = 0;
+let bytes = 0;
+
+for (const { id, href } of pairs) {
+  const css = await get(href, "text");
+  if (!css.includes("@font-face")) throw new Error(`no @font-face in the CSS for "${id}"`);
+
+  const urls = [...new Set([...css.matchAll(/https:\/\/fonts\.gstatic\.com[^)]+/g)].map((m) => m[0]))];
+  if (!urls.length) throw new Error(`no font files in the CSS for "${id}"`);
+
+  for (const url of urls) {
+    const name = url.split("/").pop();
+    if (seen.has(name) && seen.get(name) !== url) throw new Error(`two different files both named ${name}`);
+    if (seen.has(name)) continue;
+    seen.set(name, url);
+    const body = await get(url, "buffer");
+    writeFileSync(join(FONT_DIR, name), body);
+    files++;
+    bytes += body.length;
+  }
+
+  // Same rules, same unicode-ranges, our own origin. Comments and indentation
+  // go because this is inlined into every page's <head>; gzip does the rest.
+  faces[id] = css
+    .replace(/https:\/\/fonts\.gstatic\.com[^)]+/g, (u) => `/fonts/${u.split("/").pop()}`)
+    .replace(/\/\*[^*]*\*\//g, "")
+    .replace(/\s*\n\s*/g, "")
+    .trim();
+
+  console.log(`  ${id.padEnd(22)} ${urls.length} files`);
+}
+
+const generated = readdirSync(FONT_DIR).length;
+if (generated !== files) throw new Error(`wrote ${files} files but the directory holds ${generated}`);
+
+writeFileSync(
+  OUT,
+  `// GENERATED by scripts/fetch-fonts.mjs — do not edit.
+//
+// The @font-face rules for each theme's typeface pair, pointing at the woff2
+// files mirrored into public/fonts/. Self-hosted so that no guest's browser is
+// made to contact Google before the page renders; see the script for why, and
+// re-run it after changing FONT_PAIRS.
+//
+// Inlined into <head> rather than served as a stylesheet: it is ${Math.round(
+    Object.values(faces).reduce((n, c) => n + c.length, 0) / pairs.length / 100,
+  ) / 10} kB per pair
+// raw but well under 1 kB gzipped, and inlining removes the round trip that
+// made the Google version cost 750 ms of critical path in the first place.
+
+export const FONT_FACE_CSS: Record<string, string> = ${JSON.stringify(faces, null, 2)};
+`,
+);
+
+console.log(`\n${files} files, ${(bytes / 1024 / 1024).toFixed(2)} MB in public/fonts/`);
+console.log(`wrote ${OUT.replace(ROOT, "")}`);

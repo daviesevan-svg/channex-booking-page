@@ -5,3 +5,9 @@
 # on old URLs 404ing, not on revalidation.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# The mirrored Google Fonts (scripts/fetch-fonts.mjs). Google's own filenames
+# are content hashes, so a URL here can never change content either — same
+# reasoning as /assets/, and the same year.
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

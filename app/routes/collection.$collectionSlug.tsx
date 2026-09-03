@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
 import type { Route } from "./+types/collection.$collectionSlug";
-import { FontStylesheet } from "~/components/font-stylesheet";
+import { FontFaces } from "~/components/font-faces";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
 import { accentColors } from "~/lib/accessible-accent";
@@ -418,10 +418,10 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
       data-theme={isCustom ? undefined : theme}
       style={themeStyle}
     >
-      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
-          It's rendered here rather than in `links()` because the chosen pair only
-          becomes known from loader data. */}
-      <FontStylesheet href={font.href} />
+      {/* Inline @font-face for the chosen pair, served from our own origin —
+          see FontFaces. Rendered here rather than in `links()` because the pair
+          only becomes known from loader data. */}
+      <FontFaces pair={font.id} />
 
       {/* header */}
       <header

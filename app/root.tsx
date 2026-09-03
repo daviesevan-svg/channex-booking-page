@@ -10,8 +10,8 @@ import {
 } from "react-router";
 
 import type { Route } from "./+types/root";
-import { DEFAULT_FONTS_HREF, langFromRequest } from "./lib/content";
-import { FontStylesheet } from "./components/font-stylesheet";
+import { langFromRequest } from "./lib/content";
+import { DefaultFontFaces } from "./components/font-faces";
 import { adminLangFromRequest, registerAdminDict } from "./lib/admin-i18n";
 import { adminDictFor } from "./lib/admin-i18n-locales.server";
 import { isOwnHost } from "./lib/domains.server";
@@ -70,17 +70,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   return { lang, dict: guestDictFor(lang), adminDict: null, favicon };
 }
 
-export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-];
-// The default pair is loaded by <FontStylesheet> in the Layout below rather than
-// declared here: as a `links()` entry it was a render-blocking stylesheet, and
-// PageSpeed costed that third-party round trip at 750 ms.
+// No `links()`: the two preconnects that used to live here warmed a connection
+// to fonts.googleapis.com / fonts.gstatic.com, and nothing on the page talks to
+// either any more — the faces are inlined by <DefaultFontFaces> in the Layout
+// below and served from our own origin. A preconnect to a host we never call is
+// a DNS + TLS handshake spent on nothing.
 
 export function Layout({ children }: { children: React.ReactNode }) {
   // Registered during THIS render, so it is in place before any descendant
@@ -103,7 +97,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
         {data?.favicon && <link rel="icon" href={data.favicon} />}
-        <FontStylesheet href={DEFAULT_FONTS_HREF} />
+        <DefaultFontFaces />
       </head>
       <body>
         {children}
