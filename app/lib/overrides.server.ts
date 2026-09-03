@@ -208,6 +208,21 @@ export async function getPageText(
   const loc = m[lang]?.pages?.[pageId] ?? {};
   return withDefaults(pageId, { ...base, ...loc }, lang);
 }
+/**
+ * The stored overrides for a page with NO defaults merged in — the same
+ * default-language-then-this-language merge `getPageText` does, so a caller can
+ * tell "the hotel typed this" from "nobody typed anything and you're looking at
+ * our default". Checkout needs that distinction: it substitutes the EU order-
+ * button wording for OUR default only, never over the hotel's own words.
+ */
+export async function getPageTextRaw(
+  pid: string,
+  pageId: string,
+  lang = DEFAULT_LANG,
+): Promise<Record<string, string>> {
+  const m = await contentMap(pid);
+  return { ...(m[DEFAULT_LANG]?.pages?.[pageId] ?? {}), ...(m[lang]?.pages?.[pageId] ?? {}) };
+}
 export async function getPageOverridesRaw(
   pid: string,
   pageId: string,

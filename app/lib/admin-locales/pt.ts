@@ -699,6 +699,12 @@ const PT: Record<string, string> = {
   genPreselectDesc: "Os campos de datas abrem já preenchidos com o primeiro check-in disponível e a estadia reservável mais curta. Os hóspedes podem alterá-los livremente — nenhuma pesquisa de quartos é feita até carregarem em Pesquisar.",
   genLegalLinks: "Links legais",
   genLegalLinksHint: "Ligados a partir da linha de consentimento na finalização. Deixe em branco para mostrar o texto sem link.",
+  genEuConsumerOn:
+    "Direito do consumidor da UE: a sua propriedade fica na UE/EEE, pelo que o botão de reserva indica a obrigação de pagamento e o hóspede é informado de que não existe direito de livre resolução de 14 dias para estadias em datas determinadas. Não há nada a configurar — mas se escreveu o seu próprio texto do botão em Conteúdos → Finalização, é esse que é usado e tem de indicar que a reserva implica pagamento.",
+  genEuConsumerOff:
+    "Direito do consumidor da UE: a sua propriedade fica fora da UE/EEE, pelo que o botão de reserva e os textos da finalização não mudam.",
+  genEuConsumerUnknown:
+    "Direito do consumidor da UE: defina o seu país na página Propriedade. Sem isso não conseguimos saber se a finalização tem de mostrar o botão com obrigação de pagamento e o aviso de inexistência de direito de livre resolução exigidos na UE e no EEE.",
   genTermsUrl: "URL dos Termos e Condições",
   genPrivacyUrl: "URL da Política de Privacidade",
   genOwnLinks: "As suas próprias ligações",

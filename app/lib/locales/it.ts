@@ -349,6 +349,7 @@ const IT: Dict = {
   privacyLink: "Informativa sulla privacy",
   consentAgree: "Accetto le condizioni di prenotazione, la politica di cancellazione indicata sopra, i {terms} e l’{privacy}.",
   acceptPolicy: "Accetto quanto segue: {policy}",
+  noWithdrawalRight: "Le prenotazioni di alloggio per date determinate non danno diritto al recesso entro 14 giorni. Si applicano invece le condizioni di cancellazione indicate sopra.",
   marketingOptIn: "Inviatemi offerte e novità.",
   marketingOptInFrom: "Inviatemi offerte e novità di {hotel}.",
   consentRequired: "Seleziona le caselle obbligatorie per continuare.",

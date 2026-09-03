@@ -697,6 +697,12 @@ const EN: Record<string, string> = {
   genPreselectDesc: "The date fields open with the earliest available check-in and the shortest bookable stay already filled in. Guests can change them freely — no rooms are searched until they press Search.",
   genLegalLinks: "Legal links",
   genLegalLinksHint: "Linked from the consent line at checkout. Leave blank to show the wording without a link.",
+  genEuConsumerOn:
+    "EU consumer law: your property's country is in the EU/EEA, so checkout shows the “obligation to pay” wording on the booking button and tells the guest there is no 14-day right of withdrawal for dated stays. Nothing to set up — but if you have typed your own booking-button wording under Content → Checkout, yours is used and must say that the booking costs money.",
+  genEuConsumerOff:
+    "EU consumer law: your property is outside the EU/EEA, so the booking button and checkout wording are unchanged.",
+  genEuConsumerUnknown:
+    "EU consumer law: set your country on the Property page. Without it we can't tell whether checkout has to show the “obligation to pay” button wording and the no-withdrawal-right notice that the EU and the EEA require.",
   genTermsUrl: "Terms & Conditions URL",
   genPrivacyUrl: "Privacy Policy URL",
   genOwnLinks: "Your own links",

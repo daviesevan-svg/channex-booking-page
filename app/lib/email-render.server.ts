@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
 import { formatCancelDeadline } from "./cancellation";
-import type { EmailDef, SiteSettings } from "./content";
+import type { EmailDef, LegalLink, SiteSettings } from "./content";
 import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
 // Side effect: registers every guest dictionary so makeTranslator can serve
 // any booking.lang here on the server.
@@ -246,6 +246,40 @@ function detailsHtml(
   </table>`;
 }
 
+/**
+ * The hotel's terms, privacy notice and own legal links in the footer.
+ *
+ * § 312i(1) BGB (Art. 8(7) CRD) wants the contract terms given to the guest in
+ * a form they can keep — the confirmation email is that form, and a link the
+ * guest still has in their inbox months later is what the booking page's
+ * tick-box on its own doesn't provide. URLs are absolute by construction
+ * (safeUrl rejects anything that isn't http/https), so they need no origin.
+ */
+function legalFooter(links: LegalLink[] | undefined): string {
+  const items = (links ?? [])
+    .filter((l): l is LegalLink & { url: string } => Boolean(l.url))
+    .map(
+      (l) =>
+        `<a href="${esc(l.url)}" style="color:#a0a0a0;text-decoration:underline;">${esc(l.label)}</a>`,
+    )
+    .join(' <span style="color:#d0d0d0;">·</span> ');
+  return items ? `<div style="margin-top:8px;">${items}</div>` : "";
+}
+
+/**
+ * The links `legalFooter` renders: terms, privacy notice, and the hotel's own
+ * legal links (Impressum, house rules), labelled in the guest's language. A row
+ * the hotel gave a label but no URL is dropped — there is nothing to link to.
+ */
+export function legalLinksForEmail(settings: SiteSettings, lang: string): LegalLink[] {
+  const tr = makeTranslator(lang);
+  return [
+    ...(settings.termsUrl ? [{ label: tr.t("termsLink"), url: settings.termsUrl }] : []),
+    ...(settings.privacyUrl ? [{ label: tr.t("privacyLink"), url: settings.privacyUrl }] : []),
+    ...(settings.legalLinks ?? []).filter((l) => l.url),
+  ];
+}
+
 function shell(args: {
   hotelName: string;
   brand: EmailBrand;
@@ -253,6 +287,7 @@ function shell(args: {
   introHtml: string;
   details: string;
   outroHtml: string;
+  legal?: LegalLink[];
 }): string {
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f1ee;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f1ee;padding:24px 0;">
@@ -268,7 +303,7 @@ function shell(args: {
           ${args.outroHtml}
         </td></tr>
         <tr><td style="padding:18px 28px;border-top:1px solid #eee;color:#a0a0a0;font-size:12px;">
-          ${esc(args.hotelName)}
+          ${esc(args.hotelName)}${legalFooter(args.legal)}
         </td></tr>
       </table>
     </td></tr>
@@ -288,6 +323,9 @@ export function composeEmail(args: {
    *  booking language; HOST emails must pass DEFAULT_LANG — the recipient is
    *  the hotelier, whose language the guest's choice says nothing about. */
   lang?: string;
+  /** The hotel's legal links for the footer — see legalFooter. Ignored for host
+   *  emails: they are the hotel's own documents, sent back to the hotel. */
+  legal?: LegalLink[];
 }): { subject: string; html: string } {
   const lang = args.lang ?? args.booking.lang ?? DEFAULT_LANG;
   const tr = makeTranslator(lang);
@@ -304,7 +342,15 @@ export function composeEmail(args: {
   });
   return {
     subject,
-    html: shell({ hotelName: args.hotelName, brand: args.brand, heading, introHtml, details, outroHtml }),
+    html: shell({
+      hotelName: args.hotelName,
+      brand: args.brand,
+      heading,
+      introHtml,
+      details,
+      outroHtml,
+      legal: args.def.recipient === "guest" ? args.legal : undefined,
+    }),
   };
 }
 

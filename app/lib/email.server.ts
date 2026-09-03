@@ -24,7 +24,7 @@
 import type { BookingRecord } from "./bookings.server";
 import { DEFAULT_LANG, emailDef, type SiteSettings } from "./content";
 import { getConfig } from "./config.server";
-import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailBrand, renderSimpleEmail } from "./email-render.server";
+import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailBrand, legalLinksForEmail, renderSimpleEmail } from "./email-render.server";
 import { emailBrandFor } from "./site-style";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 import { brandOf, getPartner, partnerForProperty } from "./partners.server";
@@ -113,7 +113,10 @@ export async function sendGuestBookingEmail(pid: string, booking: BookingRecord,
     const from = await senderFor(pid, settings);
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
     const gtext = await getEmailTemplate(pid, "booking_confirmation", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, brand, manageUrl });
+    // The contract terms, in a form the guest keeps — § 312i(1) BGB. See
+    // legalLinksForEmail; host emails drop them inside composeEmail.
+    const legal = legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG);
+    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, brand, manageUrl, legal });
     const r = await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
     return r.sent;
   } catch (e) {
@@ -156,7 +159,7 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
     const hotelName = ov.hotelName || "Your hotel";
     const from = await senderFor(pid, settings);
     const text = await getEmailTemplate(pid, "booking_failed", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl: "" });
+    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl: "", legal: legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG) });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
   } catch (e) {
     console.log(`[email] sendBookingFailedEmail failed: ${e instanceof Error ? e.message : e}`);
@@ -454,7 +457,8 @@ export async function sendCancellationEmails(pid: string, booking: BookingRecord
     const manageUrl = `${origin}/${pid}/manage/${booking.id}`;
 
     const gtext = await getEmailTemplate(pid, "booking_cancellation", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking, hotelName, brand, manageUrl });
+    const legal = legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG);
+    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking, hotelName, brand, manageUrl, legal });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
 
     const hostTo = settings.hostNotifyEmail || ov.email;

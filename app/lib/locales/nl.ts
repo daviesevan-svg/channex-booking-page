@@ -349,6 +349,7 @@ const NL: Dict = {
   privacyLink: "Privacyverklaring",
   consentAgree: "Ik ga akkoord met de boekingsvoorwaarden, het hierboven vermelde annuleringsbeleid en de {terms} en {privacy}.",
   acceptPolicy: "Ik ga akkoord met het volgende: {policy}",
+  noWithdrawalRight: "Voor accommodatie op vaste data geldt geen wettelijk herroepingsrecht van 14 dagen. In plaats daarvan geldt het annuleringsbeleid hierboven.",
   marketingOptIn: "Stuur mij aanbiedingen en nieuws.",
   marketingOptInFrom: "Stuur mij aanbiedingen en nieuws van {hotel}.",
   consentRequired: "Vink de verplichte vakjes aan om door te gaan.",

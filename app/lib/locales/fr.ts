@@ -349,6 +349,7 @@ const FR: Dict = {
   privacyLink: "Politique de confidentialité",
   consentAgree: "J’accepte les conditions de réservation, la politique d’annulation indiquée ci-dessus, ainsi que les {terms} et la {privacy}.",
   acceptPolicy: "J'accepte ce qui suit : {policy}",
+  noWithdrawalRight: "Les réservations d'hébergement à dates fixes n'ouvrent pas droit au délai de rétractation de 14 jours. Ce sont les conditions d'annulation ci-dessus qui s'appliquent.",
   marketingOptIn: "Envoyez-moi des offres et des actualités.",
   marketingOptInFrom: "Envoyez-moi les offres et actualités de {hotel}.",
   consentRequired: "Veuillez cocher les cases obligatoires pour continuer.",

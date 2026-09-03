@@ -420,6 +420,9 @@ const EN: Dict = {
   // no language can be given a fixed article for it — "die Hausordnung" but "das
   // Impressum", and French/Spanish/Italian/Greek have the same problem.
   acceptPolicy: "I accept the following: {policy}",
+  // Shown only for EU/EEA properties, directly above the order button — see
+  // eu-consumer.ts. Art. 16(l) CRD / § 312g(2) Nr. 9 BGB.
+  noWithdrawalRight: "Bookings for accommodation on set dates carry no 14-day right of withdrawal. The cancellation policy above applies instead.",
   marketingOptIn: "Send me offers and news.",
   marketingOptInFrom: "Send me offers and news from {hotel}.",
   consentRequired: "Please tick the required boxes to continue.",
