@@ -56,6 +56,10 @@ import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
 import { attributionFromCookies } from "~/lib/attribution";
+import { cartTokenMap } from "~/lib/cart-tokens";
+import { beginCheckoutEvent } from "~/lib/tracking";
+import { isTagged } from "~/lib/tracking-settings";
+import { TrackCart, TrackFunnel } from "~/components/tracking-events";
 import { funnelContext, queueFunnelEvent, type FunnelContext } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -181,6 +185,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     taxConfigFrom(settings),
   );
 
+  const trackedStay = {
+    currency: stay.currency,
+    checkin: stay.checkin,
+    checkout: stay.checkout,
+    nights,
+    adults,
+    children,
+  };
+
   // Funnel step: checkout reached, with the money at stake — what the abandoned-
   // value dashboard number is made of. Non-fatal by design.
   const fc = await funnelContext(request);
@@ -246,6 +259,22 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // footer links and have no business gating a booking.
     acceptLinks: (settings.legalLinks ?? []).filter((l) => l.accept),
     collectsCard,
+    // The same grand total `purchase` will report, so checkout-to-purchase
+    // drop-off compares like with like. The cart diff runs here too: this is
+    // the last loader before the money, and a room added on the way in would
+    // otherwise go unreported until the guest went back.
+    tracking: isTagged(settings.analytics)
+      ? {
+          begin: beginCheckoutEvent(
+            lines.map((l) => ({ roomId: l.roomId, roomTitle: l.roomTitle, rateTitle: l.rateTitle, total: l.total })),
+            trackedStay,
+            grandTotal,
+          ),
+          sel: url.searchParams.get("sel") ?? "",
+          cart: cartTokenMap(lines),
+          stay: trackedStay,
+        }
+      : null,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
     // Set by the Viva return URL when a charge was refused and refunded; the
@@ -761,7 +790,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, notice } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, tracking, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -868,6 +897,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      )}
+      {tracking && (
+        <>
+          {/* Signed by the cart, so editing the stay and coming back reports a
+              second begin_checkout — which is what happened. */}
+          <TrackFunnel event={tracking.begin} signature={`checkout:${tracking.sel}`} />
+          <TrackCart sel={tracking.sel} lines={tracking.cart} stay={tracking.stay} />
+        </>
       )}
       <Link
         to={`${base}/rooms?${searchParams.toString()}`}
