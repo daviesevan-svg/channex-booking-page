@@ -69,6 +69,8 @@ export interface PreparePendingInput {
   };
   extraLines: ResolvedExtra[];
   consent: BookingRecord["consent"];
+  /** Click attribution from the landing URL, when the guest allowed ads. */
+  attribution?: BookingRecord["attribution"];
   lang: string;
   live: boolean;
   /** Connected Stripe account (empty string when none). */
@@ -195,6 +197,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     pricing: input.pricing,
     extras: input.extraLines.length ? input.extraLines : undefined,
     consent: input.consent,
+    attribution: input.attribution && Object.keys(input.attribution).length ? input.attribution : undefined,
     guest: {
       firstName: guest.firstName,
       lastName: guest.lastName,

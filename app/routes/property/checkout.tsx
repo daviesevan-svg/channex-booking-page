@@ -55,6 +55,7 @@ import { getOverrides, getPageText } from "~/lib/overrides.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
+import { attributionFromCookies } from "~/lib/attribution";
 import { funnelContext, queueFunnelEvent, type FunnelContext } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -486,6 +487,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     valueAdds,
     extraLines,
     consent,
+    // Written by the consent banner only once the guest allowed advertising,
+    // so its mere presence is the permission — nothing to check again here.
+    attribution: attributionFromCookies(request.headers.get("Cookie")),
     lang: langFromRequest(request),
     live,
     account: settings.stripeAccountId ?? "",
