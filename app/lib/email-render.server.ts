@@ -361,20 +361,33 @@ function reviewStarsHtml(reviewUrl: string, accent: string, tr: Translator): str
     <p style="text-align:center;margin:0;"><a href="${esc(reviewUrl)}" style="color:${accent};font-size:13px;">${esc(tr.t("reviewOpenPage"))}</a></p>`;
 }
 
+/** The subject for attempt N, falling back to the first whenever the operator
+ *  has left a reminder's subject blank — a template saved before the reminder
+ *  fields existed has only `subject`, and must keep sending. */
+function reviewSubject(text: Record<string, string>, attempt = 1): string {
+  const key = attempt >= 3 ? "subject3" : attempt === 2 ? "subject2" : "subject";
+  return text[key]?.trim() || text.subject || "";
+}
+
 /** Compose the review-request email (subject + HTML) from the editable template
  *  text: operator prose (subject/heading/intro/outro) surrounds the system star
  *  widget. Mirrors composeEmail, but the details slot is the stars, not the
- *  booking breakdown. */
+ *  booking breakdown, and the subject varies by attempt. */
 export function composeReviewEmail(args: {
   text: Record<string, string>;
   booking: BookingRecord;
   hotelName: string;
   brand: EmailBrand;
   reviewUrl: string;
+  /** Which of the three asks this is (1-3). The body is identical every time;
+   *  only the subject changes, so the reminders don't read as a stuck loop and
+   *  don't collapse into the first one's thread. Defaults to the first — that
+   *  is what the editor previews and what a test send is. */
+  attempt?: number;
 }): { subject: string; html: string } {
   const tr = makeTranslator(args.booking.lang ?? DEFAULT_LANG);
   const vars = reviewVars(args.booking, args.hotelName);
-  const subject = renderTemplate(args.text.subject ?? "", vars);
+  const subject = renderTemplate(reviewSubject(args.text, args.attempt), vars);
   const heading = esc(renderTemplate(args.text.heading ?? "", vars));
   const introHtml = paragraphs(renderTemplate(args.text.intro ?? "", vars));
   const outroHtml = paragraphs(renderTemplate(args.text.outro ?? "", vars));

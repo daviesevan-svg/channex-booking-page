@@ -894,16 +894,36 @@ export const EMAIL_TEMPLATES: EmailDef[] = [
   },
   {
     id: "review_request",
+    // The only template that sends more than once (checkout day, then 3 and 5
+    // days later — see review-requests.server). Same mail each time except the
+    // subject: an unchanged one three times reads as a system stuck in a loop,
+    // and the second and third land in a thread with the first. Everything
+    // after `subject` is optional — blank falls back to the first.
     label: "Review request",
     recipient: "guest",
     tokens: REVIEW_TOKENS,
-    fields: emailFields({
-      subject: "How was your stay at {hotel_name}?",
-      heading: "How was your stay, {guest_first_name}?",
-      intro:
-        "Thanks for staying at {hotel_name}. We'd love to hear how it went — your feedback helps us improve and helps future guests choose.\n\nIt only takes a minute — just tap a star below to begin.",
-      outro: "",
-    }),
+    fields: [
+      { key: "subject", label: "Subject line", default: "How was your stay at {hotel_name}?" },
+      {
+        key: "subject2",
+        label: "Subject line — 1st reminder (3 days after checkout)",
+        default: "A minute to rate your stay, {guest_first_name}?",
+      },
+      {
+        key: "subject3",
+        label: "Subject line — 2nd reminder (5 days after checkout)",
+        default: "Last chance to review your stay at {hotel_name}",
+      },
+      { key: "heading", label: "Heading", default: "How was your stay, {guest_first_name}?" },
+      {
+        key: "intro",
+        label: "Intro — shown above the booking details",
+        textarea: true,
+        default:
+          "Thanks for staying at {hotel_name}. We'd love to hear how it went — your feedback helps us improve and helps future guests choose.\n\nIt only takes a minute — just tap a star below to begin.",
+      },
+      { key: "outro", label: "Outro — shown below the booking details", textarea: true, default: "" },
+    ],
   },
 ];
 

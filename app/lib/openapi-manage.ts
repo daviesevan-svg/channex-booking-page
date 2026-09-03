@@ -275,8 +275,15 @@ export const manageSchemas = {
   },
   ManageEmailPatch: {
     type: "object",
-    properties: { subject: nullableStr, heading: nullableStr, intro: nullableStr, outro: nullableStr },
-    description: "Use the template's {tokens} (see the GET); they are replaced at send time and unknown ones render literally.",
+    properties: {
+      subject: nullableStr,
+      subject2: { ...nullableStr, description: "review_request only — subject of the 1st reminder. Blank falls back to `subject`." },
+      subject3: { ...nullableStr, description: "review_request only — subject of the 2nd reminder. Blank falls back to `subject`." },
+      heading: nullableStr,
+      intro: nullableStr,
+      outro: nullableStr,
+    },
+    description: "Use the template's {tokens} (see the GET); they are replaced at send time and unknown ones render literally. The GET's `fields` lists the keys THAT template accepts — sending one it does not is a 422.",
   },
   ManageGalleryImage: { type: "object", required: ["url"], properties: { id: { type: "string", description: "Keep to preserve the image + its captions." }, url: { type: "string", description: "/images/… path." } } },
   ManageGalleryTextPatch: { type: "object", description: "imageId → { alt?, caption? } | null.", additionalProperties: { type: ["object", "null"] } },
@@ -629,7 +636,7 @@ export const managePaths = {
       responses: baseResponses,
     },
     patch: {
-      ...writeOp("Edit an email template's text", "Sparse per language: subject/heading/intro/outro, null clears → fallback. Changes affect real guest email immediately.", "ManageEmailPatch"),
+      ...writeOp("Edit an email template's text", "Sparse per language: subject/heading/intro/outro (plus subject2/subject3 on review_request, whose reminders each get their own subject line), null clears → fallback. Changes affect real guest email immediately.", "ManageEmailPatch"),
       parameters: [...idParam, { name: "lang", in: "query", schema: { type: "string", pattern: "^[a-z]{2}$" } }],
     },
   },

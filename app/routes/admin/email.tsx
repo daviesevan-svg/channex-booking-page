@@ -154,12 +154,11 @@ export default function AdminEmail({ loaderData, actionData }: Route.ComponentPr
       `- Note: ${autoInserted} — do not recreate them.`,
       ``,
       `Current template:`,
-      `SUBJECT: ${val("subject")}`,
-      `HEADING: ${val("heading")}`,
-      `INTRO: ${val("intro")}`,
-      `OUTRO: ${val("outro")}`,
+      // Driven by the template's own fields, so a template with extra ones (the
+      // review request's reminder subjects) briefs the AI on all of them.
+      ...fields.map((f) => `${f.key.toUpperCase()}: ${val(f.key)}`),
       ``,
-      `Return the updated SUBJECT, HEADING, INTRO and OUTRO.`,
+      `Return the updated ${fields.map((f) => f.key.toUpperCase()).join(", ")}.`,
     ].join("\n");
     try {
       await navigator.clipboard.writeText(brief);
