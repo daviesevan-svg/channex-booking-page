@@ -43,7 +43,7 @@ import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from 
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { activeGateway, canSaveCard } from "~/lib/payments.server";
 import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
-import { finalizeBooking } from "~/lib/booking-finalize.server";
+import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { formatMoney, toStripeMinor } from "~/lib/money";
@@ -639,7 +639,11 @@ export async function action({ params, request }: Route.ActionArgs) {
     await releaseCheckoutIntent(stay.channelId, fingerprint);
     return { bookingError: record.error };
   }
-  await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference });
+  // Also after the commit: a KV blip recording the idempotency marker costs a
+  // duplicate-submit guard, not the guest's confirmation page.
+  await afterCommit(reference, "checkout idempotency marker", () =>
+    writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference }),
+  );
   // redirectDocument, NOT redirect: the booking is already created, pushed to
   // the PMS and emailed, so this navigation must not be able to fail.
   //
