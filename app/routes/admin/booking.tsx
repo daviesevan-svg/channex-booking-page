@@ -409,6 +409,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
           {b.consent.nonRefundableAck != null && (
             <Row label={t("bkdNonRefundableAck")} value={b.consent.nonRefundableAck ? t("bkdYes") : t("bkdNo")} />
           )}
+          {b.consent.acceptedPolicies?.length ? (
+            <Row label={t("bkdAcceptedPolicies")} value={b.consent.acceptedPolicies.join(", ")} />
+          ) : null}
           <Row label={t("bkdMarketingOptIn")} value={b.consent.marketingOptIn ? t("bkdYes") : t("bkdNo")} />
           {b.consent.ip && <Row label={t("bkdIpAddress")} value={b.consent.ip} />}
           {b.consent.userAgent && <Row label={t("bkdDevice")} value={b.consent.userAgent} />}

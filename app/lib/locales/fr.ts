@@ -347,6 +347,7 @@ const FR: Dict = {
   termsLink: "Conditions générales",
   privacyLink: "Politique de confidentialité",
   consentAgree: "J’accepte les conditions de réservation, la politique d’annulation indiquée ci-dessus, ainsi que les {terms} et la {privacy}.",
+  acceptPolicy: "J'accepte ce qui suit : {policy}",
   marketingOptIn: "Envoyez-moi des offres et des actualités.",
   marketingOptInFrom: "Envoyez-moi les offres et actualités de {hotel}.",
   consentRequired: "Veuillez cocher les cases obligatoires pour continuer.",

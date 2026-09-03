@@ -136,6 +136,14 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
     },
     terms_url: s.termsUrl ?? null,
     privacy_url: s.privacyUrl ?? null,
+    // Read-only for now: the labels are guest-facing copy in no particular
+    // language and the accept flag gates checkout, so writes stay in the UI
+    // until the PATCH allowlist review says otherwise (see docs/management-api.md).
+    legal_links: (s.legalLinks ?? []).map((l) => ({
+      label: l.label,
+      url: l.url ?? null,
+      accept: l.accept ?? false,
+    })),
     emails: {
       from_name: s.emailFromName ?? null,
       reply_to: s.emailReplyTo ?? null,

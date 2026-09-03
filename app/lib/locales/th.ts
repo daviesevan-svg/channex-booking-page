@@ -417,6 +417,7 @@ const TH: Dict = {
   termsLink: "ข้อกำหนดและเงื่อนไข",
   privacyLink: "นโยบายความเป็นส่วนตัว",
   consentAgree: "ฉันยอมรับเงื่อนไขการจอง นโยบายการยกเลิกที่แสดงด้านบน รวมถึง{terms}และ{privacy}",
+  acceptPolicy: "ฉันยอมรับสิ่งต่อไปนี้: {policy}",
   marketingOptIn: "ส่งข้อเสนอและข่าวสารถึงฉัน",
   marketingOptInFrom: "ส่งข้อเสนอและข่าวสารจาก {hotel} ถึงฉัน",
   consentRequired: "กรุณาทำเครื่องหมายในช่องที่จำเป็นเพื่อดำเนินการต่อ",

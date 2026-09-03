@@ -347,6 +347,7 @@ const DE: Dict = {
   termsLink: "AGB",
   privacyLink: "Datenschutzerklärung",
   consentAgree: "Ich stimme den Buchungsbedingungen, den oben angezeigten Stornierungsbedingungen sowie den {terms} und der {privacy} zu.",
+  acceptPolicy: "Ich akzeptiere Folgendes: {policy}",
   marketingOptIn: "Senden Sie mir Angebote und Neuigkeiten.",
   marketingOptInFrom: "Senden Sie mir Angebote und Neuigkeiten von {hotel}.",
   consentRequired: "Bitte kreuzen Sie die erforderlichen Felder an, um fortzufahren.",

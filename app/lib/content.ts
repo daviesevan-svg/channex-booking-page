@@ -24,6 +24,26 @@ export interface SearchContent {
  *  because it's an example code, not translated copy. */
 export const DEFAULT_PROMO_PLACEHOLDER = "SUMMER10";
 
+/**
+ * A legal link the hotel adds themselves: a German Impressum, house rules, a
+ * cookie policy — the ones we can't name in advance.
+ *
+ * `label` is shown VERBATIM in every language. We can't translate what we don't
+ * ship, and a hotel that types "Impressum" wants that word in front of every
+ * guest, not "Imprint" for the English ones.
+ *
+ * `accept` is the difference between a link and an obligation: house rules the
+ * guest must tick before booking, versus an Impressum that only has to be
+ * reachable. Both still sit in the footer when they have a URL — an acceptance
+ * a guest can't re-read on another page would be a worse consent record, not a
+ * better one.
+ */
+export interface LegalLink {
+  label: string;
+  url?: string;
+  accept?: boolean;
+}
+
 // ---- Editable copy for the remaining pages (flat string fields) ----
 export interface PageField {
   key: string;
@@ -314,6 +334,8 @@ export interface SiteSettings {
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;
   privacyUrl?: string;
+  /** The hotel's own legal links, beyond the two above. */
+  legalLinks?: LegalLink[];
   /** ISO currency code for all prices (e.g. GBP). Defaults to GBP when unset. */
   currency?: string;
   /** How every rate prices: flat per room (default) or per person (per adult).
