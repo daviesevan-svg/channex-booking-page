@@ -201,6 +201,12 @@ adoption.
   partner controls exposure by not issuing keys — document this; revisit if a
   partner wants area-scoped keys (the `MEMBER_AREAS` model is the natural
   shape).
+- **`legal_links` writes** (added 2026-09-03): the hotel's own legal links —
+  Impressum, house rules — are readable on `GET /property` and NOT in the PATCH
+  allowlist. Classified not-writable for now: each row's `label` is guest-facing
+  copy shown verbatim in every language, and `accept: true` puts a blocking
+  tick-box on checkout, so an API write can stop bookings with a typo. Revisit
+  with the partner API.
 - **`PATCH /property` allowlist drift:** every new settings field must be
   explicitly classified (writable / not writable / phase-C) at review time —
   add a checklist item to the settings type.

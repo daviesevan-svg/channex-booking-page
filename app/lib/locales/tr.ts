@@ -440,6 +440,7 @@ const TR: Dict = {
   privacyLink: "Gizlilik Politikası",
   consentAgree:
     "Rezervasyon koşullarını, yukarıda belirtilen iptal koşullarını, {terms} ve {privacy} metinlerini kabul ediyorum.",
+  acceptPolicy: "Aşağıdakileri kabul ediyorum: {policy}",
   marketingOptIn: "Bana kampanya ve haberler gönderin.",
   marketingOptInFrom: "Bana {hotel} tesisinden kampanya ve haberler gönderin.",
   consentRequired: "Devam etmek için lütfen zorunlu kutuları işaretleyin.",

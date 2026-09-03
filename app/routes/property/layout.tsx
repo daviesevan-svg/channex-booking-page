@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
   Link,
   Outlet,
@@ -193,6 +193,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
     termsUrl: settings.termsUrl ?? null,
     privacyUrl: settings.privacyUrl ?? null,
+    // Footer links only — a row without a URL has nothing to link to, and its
+    // label is already in front of the guest as a checkout tick-box.
+    legalLinks: (settings.legalLinks ?? []).filter((l) => l.url),
     footerBrand,
     adminHref,
   };
@@ -272,7 +275,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, footerBrand, adminHref } =
+  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -567,7 +570,21 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
       <footer className="border-t border-nav-border bg-surface-alt">
         <div className="mx-auto flex max-w-[1160px] flex-wrap items-center justify-between gap-4 px-7 py-[22px] text-caption text-muted-2">
-          <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
+          {/* The hotel's own legal links live in THIS bar, not the site footer
+              above: that block is skipped on checkout and on properties with no
+              website layer, and an Impressum a guest can't reach from the page
+              they're on is the one thing German law is asking for. */}
+          <span className="flex flex-wrap items-center gap-2">
+            <span>© 2026 {hotelName} · {tr.t("allRightsReserved")}</span>
+            {legalLinks.map((l) => (
+              <Fragment key={l.url}>
+                <span className="text-faint">·</span>
+                <a href={l.url} target="_blank" rel="noopener noreferrer" className="hover:text-accent">
+                  {l.label}
+                </a>
+              </Fragment>
+            ))}
+          </span>
           <span className="flex items-center gap-2">
             {tr.t("footerRight", { brand: footerBrand })}
             {/* Only on the shared domain. /admin is refused on a hotel's own

@@ -347,6 +347,7 @@ const NL: Dict = {
   termsLink: "Algemene voorwaarden",
   privacyLink: "Privacyverklaring",
   consentAgree: "Ik ga akkoord met de boekingsvoorwaarden, het hierboven vermelde annuleringsbeleid en de {terms} en {privacy}.",
+  acceptPolicy: "Ik ga akkoord met het volgende: {policy}",
   marketingOptIn: "Stuur mij aanbiedingen en nieuws.",
   marketingOptInFrom: "Stuur mij aanbiedingen en nieuws van {hotel}.",
   consentRequired: "Vink de verplichte vakjes aan om door te gaan.",

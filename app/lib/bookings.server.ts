@@ -151,6 +151,9 @@ export interface BookingRecord {
     dueNow?: number;
     /** Distinct acknowledgment ticked for non-refundable / charged-today rates. */
     nonRefundableAck?: boolean;
+    /** Labels of the hotel's own policies the guest ticked (house rules and the
+     *  like), worded as they were shown — the setting can be edited later. */
+    acceptedPolicies?: string[];
     marketingOptIn: boolean;
   };
 }

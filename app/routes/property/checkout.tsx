@@ -241,6 +241,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     cancelAnchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
+    // Only the rows the hotel marked as requiring acceptance — the rest are
+    // footer links and have no business gating a booking.
+    acceptLinks: (settings.legalLinks ?? []).filter((l) => l.accept),
     collectsCard,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
@@ -379,7 +382,13 @@ export async function action({ params, request }: Route.ActionArgs) {
   });
   const agreed = form.get("consent") === "on";
   const nonRefundableAck = form.get("ackNonRefundable") === "on";
-  if (!agreed || (needAck && !nonRefundableAck)) {
+  // Re-read the hotel's acceptance rows from settings rather than trusting the
+  // form: a posted list of "policies I accepted" would let a caller decide for
+  // itself which ones existed.
+  const acceptLinks = (settings.legalLinks ?? []).filter((l) => l.accept);
+  const ticked = new Set(form.getAll("acceptPolicy").map(String));
+  const allAccepted = acceptLinks.every((l) => ticked.has(l.label));
+  if (!agreed || (needAck && !nonRefundableAck) || !allAccepted) {
     return { consentError: true };
   }
   const desc = describePolicy(policy, settings.cancelAnchorTime);
@@ -395,6 +404,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     // tripwire compares this against the Stripe amount.
     dueNow: dueAfterVoucher,
     nonRefundableAck: needAck ? nonRefundableAck : undefined,
+    // What they ticked, as it was worded to them — the label can be edited
+    // later, and a consent record that changes afterwards defends nothing.
+    acceptedPolicies: acceptLinks.length ? acceptLinks.map((l) => l.label) : undefined,
     marketingOptIn: form.get("marketing") === "on",
   };
 
@@ -745,7 +757,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard, notice } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -841,6 +853,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       : tr.t("ackNonRefundable")
     : tr.t("ackCharged", { amount: formatMoney(dueShown, currency) });
   const [agree, setAgree] = useState(false);
+  const [accepted, setAccepted] = useState<string[]>([]);
   const [ack, setAck] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [consentError, setConsentError] = useState(false);
@@ -1152,6 +1165,27 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </span>
             </label>
 
+            {acceptLinks.map((l) => (
+              <label key={l.label} className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
+                <input
+                  type="checkbox"
+                  name="acceptPolicy"
+                  value={l.label}
+                  checked={accepted.includes(l.label)}
+                  onChange={(e) => {
+                    setAccepted((prev) => (e.target.checked ? [...prev, l.label] : prev.filter((x) => x !== l.label)));
+                    setConsentError(false);
+                  }}
+                  className={checkboxCls}
+                />
+                {/* The hotel's own wording, unchanged — see LegalLink. Only the
+                    sentence around it is translated. */}
+                <span>
+                  <Trans tr={tr} k="acceptPolicy" parts={{ policy: <LegalRef url={l.url} label={l.label} /> }} />
+                </span>
+              </label>
+            ))}
+
             {needAck && (
               <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
                 <input
@@ -1193,7 +1227,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             value="book"
             disabled={submitting}
             onClick={(e) => {
-              if (!agree || (needAck && !ack)) {
+              if (!agree || (needAck && !ack) || acceptLinks.some((l) => !accepted.includes(l.label))) {
                 e.preventDefault();
                 setConsentError(true);
               }

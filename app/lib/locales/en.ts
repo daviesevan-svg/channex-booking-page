@@ -415,6 +415,10 @@ const EN: Dict = {
   termsLink: "Terms & Conditions",
   privacyLink: "Privacy Policy",
   consentAgree: "I agree to the booking conditions, the cancellation policy shown above, and the {terms} and {privacy}.",
+  // A colon, not "I accept the {policy}": the label is the hotel's free text, so
+  // no language can be given a fixed article for it — "die Hausordnung" but "das
+  // Impressum", and French/Spanish/Italian/Greek have the same problem.
+  acceptPolicy: "I accept the following: {policy}",
   marketingOptIn: "Send me offers and news.",
   marketingOptInFrom: "Send me offers and news from {hotel}.",
   consentRequired: "Please tick the required boxes to continue.",

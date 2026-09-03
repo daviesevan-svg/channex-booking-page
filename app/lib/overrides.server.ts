@@ -15,6 +15,7 @@ import {
   searchDefaults,
   withDefaults,
   type BookingCutoff,
+  type LegalLink,
   type SearchContent,
   type SiteSettings,
 } from "./content";
@@ -385,6 +386,22 @@ function safeUrl(v: FormDataEntryValue | null): string | undefined {
   }
 }
 
+/** The hotel's own legal links, from the three slots on the General page.
+ *  Rows are read positionally (`getAll` returns one entry per slot, including
+ *  the empty ones), so the mode select must never be a checkbox — an unticked
+ *  box submits nothing and would shift every later row's mode onto the wrong
+ *  link. A row with no label is not a link, so it is dropped. */
+function legalLinksFrom(form: FormData): LegalLink[] | undefined {
+  const labels = form.getAll("legalLabel").map((v) => String(v).trim());
+  const urls = form.getAll("legalUrl");
+  const modes = form.getAll("legalMode").map(String);
+  const rows = labels
+    .map((label, i) => ({ label, url: safeUrl(urls[i] ?? null), accept: modes[i] === "accept" }))
+    .filter((l) => l.label)
+    .map((l) => (l.accept ? l : { label: l.label, url: l.url }));
+  return rows.length ? rows : undefined;
+}
+
 /**
  * The look: brand colour and typeface.
  *
@@ -423,6 +440,7 @@ export async function saveSettings(
     pricingMode: form.get("pricingMode") === "per_person" ? "per_person" : "per_room",
     termsUrl: safeUrl(form.get("termsUrl")),
     privacyUrl: safeUrl(form.get("privacyUrl")),
+    legalLinks: legalLinksFrom(form),
     languages: form.getAll("languages").map(String),
     liveBooking: ownerOnlyValue(existing.liveBooking, form.get("liveBooking") === "on", persistLive),
     singleUnit: form.get("singleUnit") === "on",

@@ -13,6 +13,7 @@ import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
 import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
+import { FIELD_INPUT } from "~/components/admin-form";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
 const FALLBACK_TIMEZONES = [
@@ -319,6 +320,47 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                 className="mt-1.5 block w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
               />
             </label>
+          </div>
+
+          <div className="mt-6 mb-1 text-[14px] font-semibold text-ink">{t("genOwnLinks")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("genOwnLinksHint")}</p>
+          <div className="flex flex-col gap-4 sm:max-w-2xl">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1.4fr_auto]">
+                <label className="block text-[13px] font-semibold text-secondary">
+                  {t("genOwnLinkLabel", { n: i + 1 })}
+                  <input
+                    name="legalLabel"
+                    defaultValue={settings.legalLinks?.[i]?.label}
+                    placeholder={t("genOwnLinkLabelPlaceholder")}
+                    className={FIELD_INPUT}
+                  />
+                </label>
+                <label className="block text-[13px] font-semibold text-secondary">
+                  {t("genOwnLinkUrl")}
+                  <input
+                    name="legalUrl"
+                    type="url"
+                    defaultValue={settings.legalLinks?.[i]?.url}
+                    placeholder="https://yourhotel.com/impressum"
+                    className={FIELD_INPUT}
+                  />
+                </label>
+                {/* A select, not a tick-box: an unticked box submits nothing, and
+                    the three rows are read positionally on save. */}
+                <label className="block text-[13px] font-semibold text-secondary">
+                  {t("genOwnLinkMode")}
+                  <select
+                    name="legalMode"
+                    defaultValue={settings.legalLinks?.[i]?.accept ? "accept" : "footer"}
+                    className={FIELD_INPUT}
+                  >
+                    <option value="footer">{t("genOwnLinkModeFooter")}</option>
+                    <option value="accept">{t("genOwnLinkModeAccept")}</option>
+                  </select>
+                </label>
+              </div>
+            ))}
           </div>
         </section>
 
