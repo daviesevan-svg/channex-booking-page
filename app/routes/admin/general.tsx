@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/general";
+import { isEuConsumerCountry } from "~/lib/eu-consumer";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -113,6 +114,7 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
   }
 
   const { settings, slug, host, envLive, timezones, pricingMode, canOwn } = loaderData;
+  const euConsumer = isEuConsumerCountry(settings.addressCountry);
   const [live, setLive] = useState(settings.liveBooking ?? envLive);
   // Booking lead-time cutoff: "off" = no limit, "0" = same day (with a time),
   // "1".."7" = require that many days before arrival.
@@ -362,6 +364,15 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
               </div>
             ))}
           </div>
+
+          {/* Not a setting — a statement of what the booking page is already
+              doing, and of the one field that decides it. A hotel that reads
+              "your country isn't set" here fixes it in a minute; the same hotel
+              handed a checkbox labelled "EU consumer law" would never find it,
+              and the ones who need it most are the least likely to look. */}
+          <p className="mt-4 max-w-md rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-3 text-[12px] leading-[1.5] text-muted">
+            {euConsumer ? t("genEuConsumerOn") : settings.addressCountry ? t("genEuConsumerOff") : t("genEuConsumerUnknown")}
+          </p>
         </section>
 
         {/* Languages */}

@@ -701,6 +701,12 @@ const DE: Record<string, string> = {
   genPreselectDesc: "Die Datumsfelder öffnen mit dem frühesten verfügbaren Check-in und dem kürzesten buchbaren Aufenthalt bereits ausgefüllt. Gäste können sie frei ändern — Zimmer werden erst gesucht, wenn sie auf Suchen klicken.",
   genLegalLinks: "Rechtliche Links",
   genLegalLinksHint: "Wird im Einwilligungshinweis beim Checkout verlinkt. Leer lassen, um den Text ohne Link anzuzeigen.",
+  genEuConsumerOn:
+    "EU-Verbraucherrecht: Ihre Unterkunft liegt im EU-/EWR-Raum. Der Buchungsbutton ist deshalb zahlungspflichtig beschriftet, und Gästen wird angezeigt, dass für Aufenthalte zu festen Terminen kein 14-tägiges Widerrufsrecht besteht. Es ist nichts einzurichten – haben Sie unter Inhalte → Checkout jedoch eine eigene Button-Beschriftung eingetragen, wird diese verwendet und muss die Zahlungspflicht benennen.",
+  genEuConsumerOff:
+    "EU-Verbraucherrecht: Ihre Unterkunft liegt außerhalb des EU-/EWR-Raums, Buchungsbutton und Checkout-Texte bleiben unverändert.",
+  genEuConsumerUnknown:
+    "EU-Verbraucherrecht: Hinterlegen Sie Ihr Land auf der Seite „Unterkunft“. Ohne diese Angabe können wir nicht erkennen, ob im Checkout die zahlungspflichtige Button-Beschriftung und der Hinweis zum fehlenden Widerrufsrecht erforderlich sind.",
   genTermsUrl: "URL der AGB",
   genPrivacyUrl: "URL der Datenschutzerklärung",
   genOwnLinks: "Ihre eigenen Links",

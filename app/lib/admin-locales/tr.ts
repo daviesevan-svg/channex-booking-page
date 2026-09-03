@@ -692,6 +692,12 @@ const TR: Record<string, string> = {
   genLegalLinks: "Yasal bağlantılar",
   genLegalLinksHint:
     "Ödeme adımındaki onay satırından bağlantı verilir. Bağlantısız metin göstermek için boş bırakın.",
+  genEuConsumerOn:
+    "AB tüketici hukuku: tesisiniz AB/AEA içinde olduğundan rezervasyon düğmesi ödeme yükümlülüğünü belirtir ve misafire belirli tarihli konaklamalarda 14 günlük cayma hakkı bulunmadığı bildirilir. Ayarlanacak bir şey yok — ancak İçerik → Ödeme bölümünde kendi düğme metninizi yazdıysanız sizinki kullanılır ve rezervasyonun ücretli olduğunu belirtmelidir.",
+  genEuConsumerOff:
+    "AB tüketici hukuku: tesisiniz AB/AEA dışında olduğundan rezervasyon düğmesi ve ödeme sayfası metinleri değişmez.",
+  genEuConsumerUnknown:
+    "AB tüketici hukuku: ülkenizi Tesis sayfasında belirtin. Bu olmadan, ödeme adımının AB ve AEA'nın gerektirdiği ödeme yükümlülüğü ifadesini ve cayma hakkı bulunmadığı bildirimini göstermesi gerekip gerekmediğini anlayamayız.",
   genTermsUrl: "Şartlar ve Koşullar adresi",
   genPrivacyUrl: "Gizlilik Politikası adresi",
   genOwnLinks: "Kendi bağlantılarınız",

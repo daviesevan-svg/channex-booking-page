@@ -406,6 +406,7 @@ const PT: Dict = {
   privacyLink: "Política de privacidade",
   consentAgree: "Aceito as condições da reserva, a política de cancelamento indicada acima, os {terms} e a {privacy}.",
   acceptPolicy: "Aceito o seguinte: {policy}",
+  noWithdrawalRight: "As reservas de alojamento em datas determinadas não conferem direito de livre resolução de 14 dias. Aplica-se antes a política de cancelamento indicada acima.",
   marketingOptIn: "Enviem-me ofertas e novidades.",
   marketingOptInFrom: "Enviem-me ofertas e novidades de {hotel}.",
   consentRequired: "Marque as caixas obrigatórias para continuar.",

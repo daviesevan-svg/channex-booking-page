@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_LANG, emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
-import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, sampleBooking } from "~/lib/email-render.server";
+import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, legalLinksForEmail, sampleBooking } from "~/lib/email-render.server";
 import { sendEmail, senderFor } from "~/lib/email.server";
 import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -36,7 +36,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { subject, html } =
     def.id === "review_request"
       ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-      : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang });
+      : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang, legal: legalLinksForEmail(settings, lang) });
 
   // Example value per token, for the "variables" reference table.
   const vars = bookingVars(sample, hotelName, manageUrl, lang);
@@ -82,7 +82,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     const { subject, html } =
       def.id === "review_request"
         ? composeReviewEmail({ text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), reviewUrl: `${origin}/${pid}/review/${sample.id}` })
-        : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang });
+        : composeEmail({ def, text, booking: sample, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl, lang, legal: legalLinksForEmail(settings, lang) });
     // Same sender as the real thing, so the test also proves deliverability.
     const { sent, error } = await sendEmail({ to: adminEmail, subject, html, from: await senderFor(pid, settings), replyTo: settings.emailReplyTo });
     return sent

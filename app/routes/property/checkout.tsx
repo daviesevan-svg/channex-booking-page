@@ -50,11 +50,12 @@ import { formatMoney, toStripeMinor } from "~/lib/money";
 import type { Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
-import { getOverrides, getPageText } from "~/lib/overrides.server";
+import { getOverrides, getPageText, getPageTextRaw } from "~/lib/overrides.server";
 
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
+import { isEuConsumerCountry, orderButtonLabel } from "~/lib/eu-consumer";
 import { funnelContext, queueFunnelEvent, type FunnelContext } from "~/lib/funnel-analytics.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -146,6 +147,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const text = await getPageText(pid, "checkout", lang);
+  // Art. 8(2) CRD / § 312j(3) BGB: in the EU the order button has to say that
+  // it costs money, and "Complete booking" doesn't. The hotel's OWN wording
+  // always wins — we only replace our default, which is why this reads the raw
+  // overrides rather than the merged text (see getPageTextRaw).
+  const euConsumer = isEuConsumerCountry(settings.addressCountry);
+  if (euConsumer) {
+    const raw = await getPageTextRaw(pid, "checkout", lang);
+    text.completeButton = orderButtonLabel({
+      hotelWording: raw.completeButton,
+      fallback: text.completeButton,
+      lang,
+      eu: true,
+    });
+  }
   const totals = cartCoverage(lines);
   // The automatic offer (if any) is already baked into the line totals; derive
   // it for the itemised breakdown and each line's pre-discount price.
@@ -245,6 +260,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // footer links and have no business gating a booking.
     acceptLinks: (settings.legalLinks ?? []).filter((l) => l.accept),
     collectsCard,
+    euConsumer,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
     // Set by the Viva return URL when a charge was refused and refunded; the
@@ -757,7 +773,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, notice } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, euConsumer, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -832,6 +848,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           "iso" in cancelMsg ? { date: formatCancelDeadline(cancelMsg, "EEE d MMM yyyy", tr.locale) } : undefined,
         )
       : "");
+  // The cancellation + withdrawal group above the order button. It carries the
+  // rule that separates the summary from the consent ticks, so the ticks only
+  // draw their own when the group isn't there.
+  const cancellationOnPage = mixedCancellation || Boolean(cancellationText);
+  const legalAbove = cancellationOnPage || euConsumer;
+  const consentTop = legalAbove ? "pt-3.5" : cx("border-t", s.rule, "pt-4");
   const tier0 = policy.cancellation.tiers[0];
   // The "after the deadline …" line only makes sense while the deadline is still
   // ahead — once it's passed the lead line already reads "non-refundable".
@@ -1139,8 +1161,27 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             variant="checkout"
           />
 
+          {/* § 312j(2) BGB / Art. 8(2) CRD: what the guest is agreeing to has to
+              be in front of them where they click — not further up the page and
+              not underneath the button, which is where the cancellation line
+              used to sit. The stay, the dates, the guests and the total are the
+              rows immediately above this; the withdrawal notice is EU/EEA only
+              and resolved from the property's country. */}
+          {legalAbove && (
+            <div className={cx("mt-4 border-t", s.rule, "pt-3.5 text-caption leading-[1.5] text-secondary")}>
+              {mixedCancellation
+                ? tr.t("cancellationVariesByRoom")
+                : cancellationText && <div>{cancellationText}</div>}
+              {euConsumer && (
+                <p className={cx(cancellationOnPage && "mt-2", "text-label text-muted-2")}>
+                  {tr.t("noWithdrawalRight")}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* consent — required ticks sit directly above the booking button */}
-          <div className={cx("mb-3 flex flex-col gap-2.5 border-t", s.rule, "pt-4")}>
+          <div className={cx("mb-3 flex flex-col gap-2.5", consentTop)}>
             <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-secondary">
               <input
                 type="checkbox"
@@ -1244,17 +1285,6 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </svg>
               {tr.t("walletsAccepted")}
             </div>
-          )}
-          {mixedCancellation ? (
-            <div className="mt-3 text-center text-label leading-[1.5] text-muted-2">
-              {tr.t("cancellationVariesByRoom")}
-            </div>
-          ) : (
-            cancellationText && (
-              <div className="mt-3 text-center text-label leading-[1.5] text-muted-2">
-                {cancellationText}
-              </div>
-            )
           )}
         </aside>
       </Form>
