@@ -27,8 +27,12 @@ const kv = {
 };
 
 const sqlite = new DatabaseSync(":memory:");
+/** When set, any statement matching this throws — used to fail one post-commit
+ *  step the way a real D1 wobble would. */
+let failStatementsMatching: RegExp | null = null;
 type Stmt = { sql: string; args: unknown[]; bind: (...a: unknown[]) => Stmt; all: () => Promise<unknown>; first: () => Promise<unknown>; run: () => Promise<unknown> };
 const exec = (s: Stmt) => {
+  if (failStatementsMatching?.test(s.sql)) throw new Error("D1_ERROR: Connection closed: this D1 DB instance is no longer active.");
   const p = sqlite.prepare(s.sql);
   if (/^\s*(select|with)/i.test(s.sql)) return { results: p.all(...(s.args as never[])) };
   const info = p.run(...(s.args as never[]));
@@ -109,12 +113,12 @@ function seed() {
 
 const query = `checkin=${CHECKIN}&checkout=${CHECKOUT}&adults=2&sel=${ROOM}%3A${RATE}%3A2`;
 
-function bookingRequest() {
+function bookingRequest(email: string) {
   const body = new URLSearchParams({
     intent: "book",
     firstName: "Jamie",
     lastName: "Doyle",
-    email: "jamie@example.com",
+    email,
     phone: "+351 900 000 000",
     consent: "on",
   });
@@ -125,11 +129,11 @@ function bookingRequest() {
   });
 }
 
-async function book() {
+async function book(email = "jamie@example.com") {
   const { action } = await import("~/routes/property/checkout");
   try {
     const result = await action({
-      request: bookingRequest(),
+      request: bookingRequest(email),
       params: { channelId: SLUG },
       context: {},
     } as never);
@@ -180,5 +184,41 @@ describe("the redirect that lands a guest on their confirmation", () => {
     // And still exactly one booking for the stay.
     const { getBookings } = await import("./bookings.server");
     expect(await getBookings(PID)).toHaveLength(1);
+  });
+});
+
+describe("a booking that is already created, pushed and emailed", () => {
+  it("still lands the guest on their confirmation when a post-commit step fails", async () => {
+    seed();
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, "error").mockImplementation((...a) => void errors.push(a.join(" ")));
+
+    // The inventory decrement runs after the booking row is committed. Before
+    // this was guarded, a throw here reached the action and the guest — who had
+    // a booking and a confirmation email — got the root error boundary instead.
+    failStatementsMatching = /UPDATE\s+availability|INSERT INTO availability/i;
+    let res: Response;
+    try {
+      // A different guest, so this is a new booking and not a replay of the one
+      // the tests above created.
+      res = await book("sam@example.com");
+    } finally {
+      failStatementsMatching = null;
+      spy.mockRestore();
+    }
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toContain("/confirmation/");
+
+    // The booking is real, not a swallowed half-state.
+    const { getBookings } = await import("./bookings.server");
+    const ref = (res.headers.get("Location") ?? "").split("/confirmation/")[1]?.split("?")[0];
+    const booking = (await getBookings(PID)).find((b) => b.reference === ref);
+    expect(booking).toBeDefined();
+    expect(booking?.status).not.toBe("failed");
+
+    // And the failure was reported, naming the booking so it can be chased.
+    expect(errors.join("\n")).toContain(ref);
+    expect(errors.join("\n")).toContain("inventory decrement");
   });
 });

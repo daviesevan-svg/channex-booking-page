@@ -25,7 +25,7 @@ import { getRates, getRooms, rateChannexId } from "./catalog.server";
 import { getSettings } from "./overrides.server";
 import { getConfig } from "./config.server";
 import { pushOpenChannelBooking } from "./open-channel.server";
-import { payloadWithPayment } from "./booking-finalize.server";
+import { afterCommit, payloadWithPayment } from "./booking-finalize.server";
 import { sendBookingEmails } from "./email.server";
 import { dispatchWebhook } from "./webhooks.server";
 import { serializeBooking } from "./api-serialize";
@@ -226,10 +226,16 @@ export async function redeemPackageVoucher(input: RedeemInput): Promise<RedeemRe
   };
   const booking: BookingRecord = (await updateBooking(pid, bookingId, patch)) ?? { ...provisional, ...patch };
 
+  // Guarded for the same reason as the paid finalize (see afterCommit): the
+  // voucher is spent and the booking exists, so a failure in the follow-up must
+  // be logged, not thrown at the guest redeeming it.
   if (status !== "failed") {
-    await decrementAvailability(pid, items);
-    await sendBookingEmails(pid, booking, input.origin);
-    await dispatchWebhook(pid, "booking.created", serializeBooking(booking), Date.now());
+    const ref = booking.reference;
+    await afterCommit(ref, "inventory decrement", () => decrementAvailability(pid, items));
+    await afterCommit(ref, "booking emails", () => sendBookingEmails(pid, booking, input.origin));
+    await afterCommit(ref, "booking.created webhook", () =>
+      dispatchWebhook(pid, "booking.created", serializeBooking(booking), Date.now()),
+    );
   }
   // On a failed push the voucher stays redeemed + linked: the booking exists
   // with a Retry button in admin, exactly like a failed paid booking.
