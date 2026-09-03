@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 
 import { useState } from "react";
-import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { Form, Link, redirect, redirectDocument, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
 import { z } from "zod";
 
@@ -43,7 +43,7 @@ import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from 
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { activeGateway, canSaveCard } from "~/lib/payments.server";
 import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
-import { finalizeBooking } from "~/lib/booking-finalize.server";
+import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { formatMoney, toStripeMinor } from "~/lib/money";
@@ -244,6 +244,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     collectsCard,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
+    // Set by the Viva return URL when a charge was refused and refunded; the
+    // only value is a fixed token, never guest text.
+    notice: url.searchParams.get("notice") === "refunded" ? ("refunded" as const) : undefined,
   };
 }
 
@@ -426,7 +429,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     fingerprint,
     (ref) => `${base}/confirmation/${ref}?${next.toString()}`,
   );
-  if (resolved.kind === "redirect") throw redirect(resolved.url);
+  // A replay that lands on the confirmation page goes as a DOCUMENT navigation,
+  // for the same reason as the first-time redirect below. A replay to a payment
+  // URL is cross-origin and was always a document navigation anyway.
+  if (resolved.kind === "redirect") throw (resolved.document ? redirectDocument : redirect)(resolved.url);
   const reference = resolved.reference;
 
   // Throttle new booking creation per client — not replays of a stay we
@@ -633,8 +639,30 @@ export async function action({ params, request }: Route.ActionArgs) {
     await releaseCheckoutIntent(stay.channelId, fingerprint);
     return { bookingError: record.error };
   }
-  await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference });
-  return redirect(`${base}/confirmation/${reference}?${next.toString()}`);
+  // Also after the commit: a KV blip recording the idempotency marker costs a
+  // duplicate-submit guard, not the guest's confirmation page.
+  await afterCommit(reference, "checkout idempotency marker", () =>
+    writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference }),
+  );
+  // redirectDocument, NOT redirect: the booking is already created, pushed to
+  // the PMS and emailed, so this navigation must not be able to fail.
+  //
+  // A plain redirect is followed CLIENT-side. React Router first has to
+  // discover the confirmation route, which for a tab opened before the last
+  // deploy means GET /__manifest?...&version=<stale> — and the server answers
+  // that 204 with X-Remix-Reload-Document. React Router's own recovery for it
+  // gives up silently once sessionStorage already holds that stale version
+  // (fog-of-war.js), and the vite:preloadError handler in entry.client.tsx
+  // can't stand in: a 204 from a fetch is not a module preload failure. The
+  // route is never discovered, the navigation dies, and the guest gets the
+  // root error boundary — with the booking made and the confirmation email in
+  // their inbox. A Portuguese guest lost a seven-room Christmas booking to
+  // exactly this on 2026-09-02; the Worker logged the action as a clean 202 and
+  // never saw a request for the confirmation page at all.
+  //
+  // A document redirect is a plain GET against the current deployment: no
+  // manifest lookup, no route discovery, no chunks from a build that is gone.
+  return redirectDocument(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 
 // Channex validates arrival_hour as strict HH:MM — offer a fixed list of times
@@ -676,7 +704,7 @@ function Field({
         className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
       />
       {error?.[0] && (
-        <span className="mt-1 block text-label font-normal text-red-600">{error[0]}</span>
+        <span className="mt-1 block text-label font-normal text-danger">{error[0]}</span>
       )}
     </label>
   );
@@ -717,7 +745,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, jsonLd, collectsCard, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -799,7 +827,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     policy.cancellation.refundable && !freeWindowClosed && tier0 && tier0.penalty !== "none" && !policy.overrideNote
       ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
       : "";
-  const noShowPhrase = policy.noShow.penalty !== "none" ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue) : "";
+  // Silenced by an override note for the same reason as latePhrase above: the
+  // hotel's own text already states what happens, and ours contradicted it.
+  const noShowPhrase =
+    policy.noShow.penalty !== "none" && !policy.overrideNote
+      ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue)
+      : "";
 
   // ---- consent ----
   const ackText = nonRefundable
@@ -828,19 +861,25 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       <h1 className="mb-7 font-serif text-display-lg font-medium tracking-[-0.02em]">{text.heading}</h1>
 
       {bookingError && (
-        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {bookingError}
         </div>
       )}
 
       {actionData?.rateLimited && (
-        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-800">
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
           {tr.t("bookingThrottled")}
         </div>
       )}
 
+      {notice === "refunded" && (
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
+          {tr.t("paymentRefundedNotice")}
+        </div>
+      )}
+
       {actionData?.paymentError && (
-        <div className="mb-6 rounded-card border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {actionData.paymentError === "failed"
             ? tr.t("paymentStartFailed")
             : tr.t("paymentNotConfigured")}
@@ -886,7 +925,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               <textarea
                 name="requests"
                 rows={3}
-                placeholder={tr.t("requestsPlaceholder")}
+                placeholder={text.requestsPlaceholder}
                 className={cx("mt-[7px] block w-full resize-y", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
               />
             </label>
@@ -902,7 +941,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             {collectsCard && (
               <div className="mb-3 flex flex-col gap-1.5 text-body">
                 {voucherApplied > 0 && appliedVoucher && (
-                  <div className="flex justify-between text-[#3f7a52]">
+                  <div className="flex justify-between text-success">
                     <span>
                       {tr.t("voucherAppliedLabel")} ({appliedVoucher.code})
                     </span>
@@ -985,7 +1024,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
               <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
-                <div className="flex justify-between text-[#3f7a52]">
+                <div className="flex justify-between text-success">
                   <span>
                     {offer.name} (−{offer.value}%)
                   </span>
@@ -993,7 +1032,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 </div>
               )}
               {discount > 0 && appliedPromo && (
-                <div className="flex justify-between text-[#3f7a52]">
+                <div className="flex justify-between text-success">
                   <span>
                     {tr.t("discount")} ({appliedPromo.code})
                   </span>
@@ -1034,9 +1073,9 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {tr.t("applyCode")}
               </button>
             </div>
-            {promoError && <p className="mt-1.5 text-label text-red-600">{tr.t("promoInvalid")}</p>}
+            {promoError && <p className="mt-1.5 text-label text-danger">{tr.t("promoInvalid")}</p>}
             {appliedPromo && discount > 0 && (
-              <p className="mt-1.5 text-label text-[#3f7a52]">{tr.t("promoApplied")}</p>
+              <p className="mt-1.5 text-label text-success">{tr.t("promoApplied")}</p>
             )}
           </div>
 
@@ -1068,12 +1107,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {tr.t("applyCode")}
               </button>
             </div>
-            {voucherError === true && <p className="mt-1.5 text-label text-red-600">{tr.t("voucherInvalid")}</p>}
+            {voucherError === true && <p className="mt-1.5 text-label text-danger">{tr.t("voucherInvalid")}</p>}
             {voucherError === "payAtHotel" && (
-              <p className="mt-1.5 text-label text-amber-700">{tr.t("voucherPayAtHotel")}</p>
+              <p className="mt-1.5 text-label text-notice">{tr.t("voucherPayAtHotel")}</p>
             )}
             {appliedVoucher && voucherApplied > 0 && (
-              <p className="mt-1.5 text-label text-[#3f7a52]">
+              <p className="mt-1.5 text-label text-success">
                 {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
               </p>
             )}
@@ -1142,7 +1181,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </label>
 
             {showConsentError && (
-              <p className="text-label font-medium text-red-600">
+              <p className="text-label font-medium text-danger">
                 {tr.t("consentRequired")}
               </p>
             )}

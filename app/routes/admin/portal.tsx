@@ -6,18 +6,29 @@ import { useAdminT } from "~/lib/admin-i18n";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
-import { getSettings, savePortalSettings } from "~/lib/overrides.server";
+import { DEFAULT_LANG, langParam, pickLang } from "~/lib/content";
+import {
+  getPortalMessageRaw,
+  getSettings,
+  savePortalSettings,
+  savePortalTranslation,
+} from "~/lib/overrides.server";
+import { TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  return {
-    configured: true as const,
-    settings: await getSettings(propertyId),
-    canOwn: await isOwnerOrSuper(request, propertyId),
-  };
+  // The header's "Editing: [language]" switcher sets ?lang — the message below
+  // is guest-facing copy, so it is edited per language like every other one.
+  const lang = langParam(request);
+  const [settings, message, canOwn] = await Promise.all([
+    getSettings(propertyId),
+    getPortalMessageRaw(propertyId, lang),
+    isOwnerOrSuper(request, propertyId),
+  ]);
+  return { configured: true as const, settings, lang, message: message ?? "", canOwn };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -25,9 +36,18 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
   const canOwn = await isOwnerOrSuper(request, propertyId);
+  const form = await request.formData();
+  // The toggles and deadlines are language-independent and save from any tab.
+  // The message is not: on a translation tab it belongs in that language's
+  // entry, and the original must be left exactly as it was.
+  const lang = pickLang(String(form.get("lang") ?? ""));
+  const onDefault = lang === DEFAULT_LANG;
   // Auto-refund is owner-only. Cancel/modify windows and copy stay teammate-ok;
   // a teammate POST that includes autoRefund must not persist that field.
-  await savePortalSettings(propertyId, await request.formData(), { persistAutoRefund: canOwn });
+  await savePortalSettings(propertyId, form, { persistAutoRefund: canOwn, persistMessage: onDefault });
+  if (!onDefault) {
+    await savePortalTranslation(propertyId, lang, String(form.get("afterDeadlineMessage") ?? ""));
+  }
   return { ok: true };
 }
 
@@ -97,6 +117,8 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
 
   const s = loaderData.settings;
   const canOwn = loaderData.canOwn;
+  const { lang, message } = loaderData;
+  const onDefault = lang === DEFAULT_LANG;
   const checkbox =
     "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
 
@@ -107,10 +129,16 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
         {t("poIntro")}
       </p>
 
+      <TranslationNote lang={lang} />
+
+      {/* key={lang} remounts the form on a language switch so the message field
+          picks up that language's stored text instead of keeping the last. */}
       <Form
+        key={lang}
         method="post"
         className="flex flex-col gap-6 rounded-[14px] border border-line bg-surface p-6"
       >
+        <input type="hidden" name="lang" value={lang} />
         <label className="flex items-center gap-2.5 text-[14px] font-semibold">
           <input type="checkbox" name="allowCancel" defaultChecked={s.allowCancel} className={checkbox} />
           {t("poAllowCancel")}
@@ -175,8 +203,10 @@ export default function AdminPortal({ loaderData, actionData }: Route.ComponentP
           <textarea
             name="afterDeadlineMessage"
             rows={2}
-            defaultValue={s.afterDeadlineMessage}
-            placeholder={t("poAfterDeadlinePlaceholder")}
+            defaultValue={message}
+            // Placeholders belong on the default tab only: inside an empty
+            // translation field the English example reads as untranslated copy.
+            placeholder={onDefault ? t("poAfterDeadlinePlaceholder") : undefined}
             className="mt-1.5 block w-full resize-y rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
           />
           <span className="mt-1 block text-[11px] font-normal text-faint">

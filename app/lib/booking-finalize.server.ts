@@ -28,10 +28,13 @@ import {
 } from "./stripe-session-bind";
 import {
   retrieveVivaTransaction,
+  toVivaMinor,
   vivaAlphaCurrency,
+  vivaRefund,
   type VivaConfig,
   type VivaTransaction,
 } from "./viva.server";
+import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 import { getVivaConfig } from "./overrides.server";
 import { getVivaOrder } from "./pending-bookings.server";
 import { dispatchWebhook } from "./webhooks.server";
@@ -110,12 +113,60 @@ export async function finalizeFromVivaOrder(orderCode: string, transactionId: st
   const tx = await retrieveVivaTransaction(viva, transactionId);
   const payment = paymentFromVivaTransaction(viva, orderCode, transactionId, tx);
   if (!payment) return null;
-  const record = await finalizeBooking(pending, payment, pending.origin);
+  let record: BookingRecord;
+  try {
+    record = await finalizeBooking(pending, payment, pending.origin);
+  } catch (e) {
+    if (e instanceof SessionBindError) await rejectMismatchedVivaPayment(viva, payment, order.ref, e);
+    throw e;
+  }
   await deletePending(order.ref);
   // The order mapping is deliberately NOT deleted: if the webhook finalized
   // first, the guest's return URL still needs orderCode → ref/channel to land
   // on their confirmation. It expires with its TTL.
   return record;
+}
+
+/**
+ * A Viva charge that finalize refused (amount or currency didn't match the
+ * pending) is refunded, not kept — the Viva twin of `rejectUnboundStripeSession`.
+ *
+ * Until this existed the guest was sent back to checkout with the money gone
+ * and no booking. It is reachable in practice: a Viva order carries no
+ * currency, so the guest is charged in the MERCHANT account's currency while
+ * the pending expects the PROPERTY's; a property whose currency differs from
+ * (or was changed after connecting) its Viva account trips it on every sale.
+ *
+ * The return URL and the webhook both run this for the same order, so the
+ * refund itself is behind a once-only claim — otherwise a rejected charge would
+ * be refunded twice. Best-effort like the Stripe leg: a failed refund is logged
+ * (and the claim released so a later delivery can retry), never thrown over
+ * the original bind error.
+ */
+export async function rejectMismatchedVivaPayment(
+  viva: VivaConfig,
+  payment: PaymentInfo,
+  ref: string,
+  err: SessionBindError,
+): Promise<void> {
+  if (shouldRefundMismatchedSession(err.reason) && payment.transactionId) {
+    const claimKey = `viva_mismatch:${ref}`;
+    if (await claimRefund(claimKey)) {
+      try {
+        // Refund what Viva actually took, in the transaction's own currency:
+        // `payment.amount` is tx.amount as Viva reported it.
+        await vivaRefund(viva, payment.transactionId, toVivaMinor(payment.amount ?? 0));
+        console.error(`[finalize] refunded mismatched Viva charge for ${ref} tx=${payment.transactionId}`);
+      } catch (e) {
+        await releaseRefundClaim(claimKey);
+        console.error(
+          `[finalize] mismatch refund failed for ${ref} viva tx=${payment.transactionId}: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+    await deletePending(ref);
+  }
+  console.error(`[finalize] reject ${ref}: ${err.message}`);
 }
 
 /** Enrich an Open Channel payload with how the booking was paid, once the
@@ -261,6 +312,30 @@ export async function finalizeFromStripeSession(ref: string, sessionId: string):
 
 /** Create the booking from a prepared draft. Returns the stored record. If a
  *  booking with the same reference already exists, returns it untouched. */
+/**
+ * Run a follow-up step that happens AFTER the booking row is committed.
+ *
+ * By this point the guest has a booking: the reference is claimed, the record
+ * is persisted, and on a live property the PMS already has it. Everything that
+ * remains — inventory, the voucher hold, email, the webhook — is bookkeeping,
+ * and none of it is worth failing the request the guest is waiting on. A throw
+ * here reached the checkout action and rendered the root error boundary, so a
+ * guest whose booking had been created, pushed AND emailed was shown "an
+ * unexpected error occurred" and had no way to tell whether they had booked.
+ *
+ * Loud on failure, and never rethrows: whatever went wrong, the caller has to
+ * be able to send the guest to their confirmation.
+ */
+export async function afterCommit(reference: string, step: string, work: () => Promise<unknown>): Promise<void> {
+  try {
+    await work();
+  } catch (e) {
+    console.error(
+      `[finalize] ${step} failed after booking ${reference} was committed: ${e instanceof Error ? (e.stack ?? e.message) : e}`,
+    );
+  }
+}
+
 export async function finalizeBooking(
   pending: PendingBooking,
   payment: PaymentInfo | undefined,
@@ -340,14 +415,27 @@ export async function finalizeBooking(
   // when it failed. Best-effort — the hold's TTL is the backstop either way.
   if (pending.voucherRedemption) {
     const { code } = pending.voucherRedemption;
-    if (status !== "failed") await settleGiftHold(pid, code, draft.reference, record.id);
-    else await releaseGiftHold(pid, code, draft.reference);
+    await afterCommit(draft.reference, "gift voucher hold", () =>
+      status !== "failed"
+        ? settleGiftHold(pid, code, draft.reference, record.id)
+        : releaseGiftHold(pid, code, draft.reference),
+    );
   }
 
+  // Everything below runs after the commit, so every step is guarded — see
+  // afterCommit. Inventory in particular: a failure there leaves our cached
+  // availability one room high until the channel manager pushes the correct
+  // figure back, which is worth a loud log and is NOT worth telling a guest
+  // their confirmed booking errored.
   if (status !== "failed") {
-    await decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights));
-    await sendBookingEmails(pid, record, origin);
-    await dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now());
+    const ref = draft.reference;
+    await afterCommit(ref, "inventory decrement", () =>
+      decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights)),
+    );
+    await afterCommit(ref, "booking emails", () => sendBookingEmails(pid, record, origin));
+    await afterCommit(ref, "booking.created webhook", () =>
+      dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now()),
+    );
     // Funnel analytics: the ONE place every booking passes exactly once (the
     // claim above already de-raced Stripe-return vs webhook), so this counts
     // bookings no client-side tag can see — e.g. the guest who paid and closed
@@ -372,10 +460,12 @@ export async function finalizeBooking(
   } else if (unavailable && payment?.mode === "payment") {
     // Charged, but we can't fulfil the stay — always refund (this is our failure,
     // not a discretionary cancellation). refundBookingCharge is idempotent + safe.
-    const r = await refundBookingCharge(pid, record, { by: "auto (unavailable at booking)" });
-    if (r.ok) record = r.booking;
+    await afterCommit(draft.reference, "auto-refund of an unfulfillable stay", async () => {
+      const r = await refundBookingCharge(pid, record, { by: "auto (unavailable at booking)" });
+      if (r.ok) record = r.booking;
+    });
     // Tell the guest we couldn't confirm and have refunded them.
-    await sendBookingFailedEmail(pid, record, origin);
+    await afterCommit(draft.reference, "booking-failed email", () => sendBookingFailedEmail(pid, record, origin));
   }
   return record;
 }

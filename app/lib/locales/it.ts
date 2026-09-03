@@ -481,7 +481,7 @@ const IT: Dict = {
   // Checkout field validation and payment failures (were hardcoded in the
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Obbligatorio",
-  requestsPlaceholder: "Camera silenziosa, arrivo anticipato, qualsiasi cosa dovremmo sapere…",
+  paymentRefundedNotice: "Il pagamento non è stato applicato a questo soggiorno, quindi lo abbiamo rimborsato per intero: non è stato prenotato nulla. Controlla i tuoi dati e riprova, oppure contattaci se hai bisogno di aiuto.",
   paymentStartFailed: "Non è stato possibile avviare il pagamento sicuro in questo momento. Riprovi tra un istante: se il problema persiste, ci contatti e la aiuteremo a completare la prenotazione.",
   paymentNotConfigured: "Questa tariffa richiede un pagamento online, ma i pagamenti con carta non sono ancora attivi per questa struttura. La preghiamo di contattarci per completare la prenotazione.",
 

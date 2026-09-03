@@ -133,9 +133,9 @@ function ContactForm({ tr }: { tr: Translator }) {
     // Keeps its own green border and fill — a success state reads as success in
     // every style, so only the corner treatment follows the style here.
     return (
-      <div className={cx(s.media, "border border-[#cfe3d3] bg-[#eef5ef] p-6")}>
-        <p className="text-body-lg font-semibold text-[#3f7a52]">{tr.t("contactSentTitle")}</p>
-        <p className="mt-1 text-body leading-[1.55] text-[#4a6b52]">{tr.t("contactSentBody")}</p>
+      <div className={cx(s.media, "border border-success-line bg-success-soft p-6")}>
+        <p className="text-body-lg font-semibold text-success">{tr.t("contactSentTitle")}</p>
+        <p className="mt-1 text-body leading-[1.55] text-success">{tr.t("contactSentBody")}</p>
       </div>
     );
   }
@@ -191,12 +191,12 @@ function ContactForm({ tr }: { tr: Translator }) {
         <textarea name="message" required rows={5} maxLength={2000} className={FIELD} />
       </label>
 
-      {errorText && <p className="mt-3 text-caption font-medium text-red-600">{errorText}</p>}
+      {errorText && <p className="mt-3 text-caption font-medium text-danger">{errorText}</p>}
 
       <button
         type="submit"
         disabled={sending}
-        className="mt-4 cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+        className="mt-4 cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-60"
       >
         {sending ? tr.t("contactSending") : tr.t("contactSend")}
       </button>

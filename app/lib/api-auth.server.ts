@@ -11,6 +11,15 @@
 // no test variant of a management key: a management write is a write.
 import { getConfig, getConfigKV } from "./config.server";
 import { requireCanonicalHost } from "./domains.server";
+import { getProperty } from "./properties.server";
+import { rateLimit } from "./rate-limit.server";
+
+/** Per key, per 10 minutes (docs/management-api.md §2). Reads are generous;
+ *  writes are what an agent loop can do damage with. Route-specific buckets
+ *  (invites, image import) sit on top of these. */
+export const MANAGE_RATE_WINDOW_SEC = 600;
+export const MANAGE_READ_LIMIT = 300;
+export const MANAGE_WRITE_LIMIT = 60;
 
 export type ApiKeyMode = "live" | "test";
 export type ApiKeyScope = "book" | "manage";
@@ -125,6 +134,23 @@ export async function revokeApiKey(pid: string, keyId: string): Promise<boolean>
   return true;
 }
 
+/** Revokes every live key of a property — for deletion, so a key issued to a
+ *  property that no longer exists can't keep driving its leftover data. */
+export async function revokeAllApiKeys(pid: string): Promise<number> {
+  const recs = (await readJson<ApiKeyRecord[]>(keysKey(pid))) ?? [];
+  const kv = getConfigKV();
+  const now = new Date().toISOString();
+  let revoked = 0;
+  for (const rec of recs) {
+    if (rec.revokedAt) continue;
+    rec.revokedAt = now;
+    revoked++;
+    if (kv) await kv.delete(indexKey(rec.hash));
+  }
+  if (revoked) await writeJson(keysKey(pid), recs);
+  return revoked;
+}
+
 /** Resolve the API key on a request and require it to carry `scope`. Returns
  *  the auth context, or a ready-to-return JSON error Response (401/403).
  *
@@ -139,6 +165,22 @@ export async function authenticateApiKey(request: Request, scope: ApiKeyScope = 
     return scope === "manage"
       ? apiError(403, "wrong_key_scope", "This endpoint requires a management key (ak_…). Booking keys (sk_…) cannot manage the property.")
       : apiError(403, "wrong_key_scope", "This endpoint requires a booking key (sk_…). Management keys (ak_…) cannot search or book.");
+  }
+  if (scope === "manage") {
+    // The management surface had no throttle at all — an agent loop (or a
+    // leaked key) could send unbounded invite requests, image imports and
+    // Google resyncs. Blunt KV limiter (racy at the margin, fine for this);
+    // MCP tool calls re-dispatch into these routes, so they count too.
+    const write = request.method !== "GET" && request.method !== "HEAD";
+    const limit = write ? MANAGE_WRITE_LIMIT : MANAGE_READ_LIMIT;
+    const ok = await rateLimit(`apimanage:${write ? "w" : "r"}:${auth.pid}:${auth.keyId}`, limit, MANAGE_RATE_WINDOW_SEC);
+    if (!ok) {
+      return apiError(
+        429,
+        "rate_limited",
+        `Too many management ${write ? "writes" : "reads"}: at most ${limit} per 10 minutes per key. Wait a few minutes and retry.`,
+      );
+    }
   }
   return auth;
 }
@@ -158,6 +200,10 @@ export async function identifyApiKey(request: Request): Promise<ApiAuth | Respon
   const hash = await hashKey(raw);
   const entry = await readJson<{ pid: string; keyId: string; mode: ApiKeyMode; scope?: ApiKeyScope }>(indexKey(hash));
   if (!entry) return apiError(401, "unauthorized", "Invalid or revoked API key.");
+  // A key only opens a property that still exists. Deletion revokes keys, but
+  // the registry is the source of truth — a row removed any other way (or a
+  // revoke that lost a KV race) must not leave a working key behind.
+  if (!(await getProperty(entry.pid))) return apiError(401, "unauthorized", "Invalid or revoked API key.");
 
   // Best-effort lastUsedAt stamp; never block the request on it.
   try {

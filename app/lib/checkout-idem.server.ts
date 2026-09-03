@@ -112,7 +112,7 @@ export async function resolveWebCheckoutIntent(
   pid: string,
   fingerprint: string,
   confirmUrl: (reference: string) => string,
-): Promise<{ kind: "redirect"; url: string } | { kind: "continue"; reference: string }> {
+): Promise<{ kind: "redirect"; url: string; document: boolean } | { kind: "continue"; reference: string }> {
   const cached = await readWebCheckoutIdem(pid, fingerprint);
   const firstRef = cached?.reference ?? (await claimCheckoutReference(pid, fingerprint));
   const booking = await getBookingByReference(pid, firstRef);
@@ -124,8 +124,13 @@ export async function resolveWebCheckoutIntent(
       : null,
     paymentUrl: pending?.paymentUrl ?? null,
   });
-  if (replay?.kind === "payment") return { kind: "redirect", url: replay.url };
-  if (replay?.kind === "confirmed") return { kind: "redirect", url: confirmUrl(replay.reference) };
+  // `document` marks a redirect the caller must send as a DOCUMENT navigation.
+  // The confirmation page is one: a client-side redirect there has to discover
+  // the route first, which fails outright in a tab whose build has been
+  // deployed over (see the note at the redirectDocument call in checkout.tsx).
+  // A payment URL is cross-origin, so it is a document navigation regardless.
+  if (replay?.kind === "payment") return { kind: "redirect", url: replay.url, document: false };
+  if (replay?.kind === "confirmed") return { kind: "redirect", url: confirmUrl(replay.reference), document: true };
 
   // Cancelled/failed (or a first submit): make sure we are not bound to a
   // dead reference. Releasing then claiming is a no-op when nothing was stored.

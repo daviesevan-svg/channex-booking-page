@@ -17,6 +17,7 @@ import {
   setMemberHiddenAreas,
 } from "~/lib/properties.server";
 import { isMemberArea, MEMBER_AREAS, type MemberArea } from "~/lib/member-areas";
+import { listPendingInvites, removePendingInvite } from "~/lib/team-invites.server";
 import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -39,6 +40,8 @@ export async function loader({ request }: Route.LoaderArgs) {
     name: property?.name ?? "",
     owner: property?.owner ?? null,
     members,
+    // Invites requested through the management API, waiting for approval here.
+    pending: await listPendingInvites(propertyId),
     memberHiddenAreas: property?.memberHiddenAreas ?? {},
     invitableProperties: manageable.map((p) => ({ id: p.id, name: p.name })),
     // The OTHER manageable properties each teammate is also on — display only,
@@ -73,21 +76,15 @@ export async function action({ request }: Route.ActionArgs) {
       .filter((p) => actorCanManageProperty(actor, p) && requested.includes(p.id))
       .map((p) => p.id);
     if (!targets.length) targets.push(propertyId);
-    for (const id of targets) await addPropertyMember(id, email);
-    // Pre-create the user so they can sign in (even once sign-up is locked down)
-    // and show up in the superadmin Users list. Under a white-label partner the
-    // invite carries the property's partner, so the new user is scoped (and
-    // branded) as the partner's from their very first sign-in — but an EXISTING
-    // user's affiliation is never rewritten by a mere team invite.
-    const partnerId = (await getProperty(propertyId))?.partnerId;
-    const existing = await getUser(email);
-    if (!existing && partnerId) await setUserPartner(email, partnerId);
-    else await upsertUser(email);
-    // Let them know they've been added. The link lands on the sign-in page with
-    // their email pre-filled; they request a fresh magic link there.
-    const origin = new URL(request.url).origin;
-    const signInUrl = `${origin}/admin/login?email=${encodeURIComponent(email)}`;
-    await sendTeamInviteEmail(propertyId, email, inviter, signInUrl, partnerId);
+    await inviteTeammate(propertyId, targets, email, inviter, new URL(request.url).origin);
+  } else if (intent === "approve" && email) {
+    // An invite an API key requested: the owner's click is what turns it into
+    // a real teammate — this property only, never a fan-out the key didn't ask for.
+    if (await removePendingInvite(propertyId, email)) {
+      await inviteTeammate(propertyId, [propertyId], email, inviter, new URL(request.url).origin);
+    }
+  } else if (intent === "decline" && email) {
+    await removePendingInvite(propertyId, email);
   } else if (intent === "remove" && email) {
     await removePropertyMember(propertyId, email);
   } else if (intent === "access" && email) {
@@ -100,12 +97,32 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/team");
 }
 
+/** The invite proper: membership on each target, a sign-in-capable user, and
+ *  the welcome email. Shared by the owner's direct invite and their approval of
+ *  an API-requested one — the only two paths that may create an admin account. */
+async function inviteTeammate(propertyId: string, targets: string[], email: string, inviter: string, origin: string) {
+  for (const id of targets) await addPropertyMember(id, email);
+  // Pre-create the user so they can sign in (even once sign-up is locked down)
+  // and show up in the superadmin Users list. Under a white-label partner the
+  // invite carries the property's partner, so the new user is scoped (and
+  // branded) as the partner's from their very first sign-in — but an EXISTING
+  // user's affiliation is never rewritten by a mere team invite.
+  const partnerId = (await getProperty(propertyId))?.partnerId;
+  const existing = await getUser(email);
+  if (!existing && partnerId) await setUserPartner(email, partnerId);
+  else await upsertUser(email);
+  // Let them know they've been added. The link lands on the sign-in page with
+  // their email pre-filled; they request a fresh magic link there.
+  const signInUrl = `${origin}/admin/login?email=${encodeURIComponent(email)}`;
+  await sendTeamInviteEmail(propertyId, email, inviter, signInUrl, partnerId);
+}
+
 export function meta({ matches }: Route.MetaArgs) {
   return adminMeta(matches, { key: "navTeam" });
 }
 
 export default function AdminTeam({ loaderData }: Route.ComponentProps) {
-  const { propertyId, name, owner, members, memberHiddenAreas, invitableProperties, alsoOn } = loaderData;
+  const { propertyId, name, owner, members, pending, memberHiddenAreas, invitableProperties, alsoOn } = loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
@@ -195,6 +212,50 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
           </div>
         )}
       </div>
+
+      {/* invites requested through the management API — the owner decides */}
+      {pending.length > 0 && (
+        <div className="mb-7 rounded-[14px] border border-[#e7c9a3] bg-[#fbf2e6] p-6">
+          <h2 className="font-serif text-[18px] font-semibold text-[#8a5a23]">{t("tmPendingTitle")}</h2>
+          <p className="mb-4 mt-1 text-[13px] text-[#8a5a23]">{t("tmPendingHint")}</p>
+          <div className="flex flex-col gap-3">
+            {pending.map((inv) => (
+              <div key={inv.email} className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] bg-surface px-4 py-3">
+                <div>
+                  <span className="font-semibold">{inv.email}</span>
+                  <span className="ml-2 text-[12px] text-faint">
+                    {t("tmPendingRequested", { date: inv.requestedAt.slice(0, 10) })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="decline" />
+                    <input type="hidden" name="email" value={inv.email} />
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="rounded-[8px] border border-line-alt px-3 py-1.5 text-[12px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                    >
+                      {t("tmDecline")}
+                    </button>
+                  </Form>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="approve" />
+                    <input type="hidden" name="email" value={inv.email} />
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="rounded-[8px] bg-accent px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                    >
+                      {t("tmApprove")}
+                    </button>
+                  </Form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* invite */}
       <Form method="post" className="flex flex-col gap-4 rounded-[14px] border border-line bg-surface p-6">

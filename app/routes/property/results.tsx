@@ -292,7 +292,7 @@ function RoomCard({
           />
         )}
         {isBestMatch && (
-          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-label font-semibold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-accent px-3 py-1 text-label font-semibold text-on-accent">
             {tr.t("bestMatch")}
           </span>
         )}
@@ -330,7 +330,7 @@ function RoomCard({
       </div>
       <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
         {cheapest?.offer && (
-          <div className="self-end rounded-full bg-[#ece6f0] px-2.5 py-0.5 text-micro font-semibold text-[#6b4f8a]">
+          <div className="self-end rounded-full bg-info-soft px-2.5 py-0.5 text-micro font-semibold text-info">
             {cheapest.offer.name} · −{cheapest.offer.percent}%
           </div>
         )}
@@ -374,7 +374,7 @@ function RoomCard({
           <Link
             to={detailHref}
             prefetch="intent"
-            className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-white transition-colors hover:bg-accent-deep"
+            className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-on-accent transition-colors hover:bg-accent-deep"
           >
             {tr.t("chooseRate")}
           </Link>
@@ -661,7 +661,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
           to={`${base}?${qs}`}
           className={cx(
             s.btnSecondary,
-            "px-[18px] py-[11px] text-sm font-semibold text-[#5a5145] hover:border-accent hover:text-accent",
+            "px-[18px] py-[11px] text-sm font-semibold text-secondary hover:border-accent hover:text-accent",
           )}
         >
           {text.editSearch}
@@ -669,8 +669,8 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       </div>
 
       {rooms.length > 0 && !fitsParty && (
-        <div className="mb-6 rounded-card border border-accent/40 bg-[#f9ede6] p-5">
-          <div className="mb-1 font-serif text-title-sm font-semibold text-[#8a4a2f]">
+        <div className="mb-6 rounded-card border border-accent/40 bg-notice-soft p-5">
+          <div className="mb-1 font-serif text-title-sm font-semibold text-notice">
             {tr.t("capacityTitle", { n: party })}
           </div>
           <p className="text-body text-secondary">

@@ -708,7 +708,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             {t("rtPreviewIntro")}
           </p>
           <div className="flex flex-col gap-1.5 rounded-[12px] border border-line bg-surface-alt/50 p-4 text-[14px] text-secondary">
-            <div>{preview.payment}</div>
+            {preview.payment && <div>{preview.payment}</div>}
             <div>{preview.cancellation}</div>
             {preview.noShow && <div>{preview.noShow}</div>}
           </div>

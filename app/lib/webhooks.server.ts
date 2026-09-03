@@ -99,6 +99,12 @@ export async function removeWebhook(pid: string, id: string): Promise<void> {
   await writeJson(key(pid), (await listWebhooks(pid)).filter((e) => e.id !== id));
 }
 
+/** Drops every endpoint (and its signing secret) — property deletion. */
+export async function deleteAllWebhooks(pid: string): Promise<void> {
+  const kv = getConfigKV();
+  if (kv) await kv.delete(key(pid));
+}
+
 /** Deliver an event to every enabled endpoint subscribed to it. Best-effort:
  *  failures are logged, never thrown (a webhook must not break a booking). */
 export async function dispatchWebhook(pid: string, event: WebhookEvent, data: unknown, nowMs: number): Promise<void> {

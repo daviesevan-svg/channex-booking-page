@@ -173,7 +173,11 @@ function serializeRatePlan(rp: RatePlan, room: RoomWithRates, ctx?: StayContext)
     refundable: rp.refundable ?? null,
     free_cancel_until: rp.freeCancelUntilISO ?? null,
     /** Plain sentences, the same ones the guest is shown at checkout. */
-    policy_summary: policy ? { payment: policy.payment, cancellation: policy.cancellation, no_show: policy.noShow || null } : null,
+    // payment/no_show are null when the hotel's override note replaces the
+    // generated summary — `cancellation` then carries their whole statement.
+    policy_summary: policy
+      ? { payment: policy.payment || null, cancellation: policy.cancellation, no_show: policy.noShow || null }
+      : null,
     description: rp.description ?? null,
     inclusions: rp.inclusions ?? [],
     offer: rp.offer ? { name: rp.offer.name, percent: rp.offer.percent, original_total_price: rp.offer.originalTotalPrice } : null,

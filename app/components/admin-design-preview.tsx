@@ -13,12 +13,18 @@ import { useAdminT } from "~/lib/admin-i18n";
 
 export function DesignPreview({
   path,
+  token,
   style,
   font,
   saved,
 }: {
-  /** The property's public path — the slug guests actually see. */
+  /** The property's public page — the slug guests actually see, carrying an
+   *  origin when that page is served on another host (a white-label partner's
+   *  guest host), and relative when it is this one. */
   path: string;
+  /** Signed permission to render the unsaved design. Needed because the guest
+   *  host cannot read this host's admin session — see site-preview.server. */
+  token: string;
   style: string;
   font: string;
   /** What is actually stored, so the panel can say when the two differ. */
@@ -26,7 +32,9 @@ export function DesignPreview({
 }) {
   const t = useAdminT();
   const unsaved = style !== saved.style || font !== saved.font;
-  const src = `${path}?style=${encodeURIComponent(style)}&font=${encodeURIComponent(font)}`;
+  const src =
+    `${path}?style=${encodeURIComponent(style)}&font=${encodeURIComponent(font)}` +
+    `&preview=${encodeURIComponent(token)}`;
 
   return (
     <div className="mb-6 rounded-[14px] border border-line bg-surface p-5">

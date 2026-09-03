@@ -4,6 +4,7 @@ import { isbot } from "isbot";
 import { renderToReadableStream } from "react-dom/server";
 
 import { applyHtmlSecurityHeaders } from "./lib/html-security-headers";
+import { partnerFramingFor } from "./lib/html-security-headers.server";
 
 export default async function handleRequest(
   request: Request,
@@ -39,8 +40,9 @@ export default async function handleRequest(
   responseHeaders.set("Content-Type", "text/html");
   // Document-only (this file is the HTML renderer). See html-security-headers.ts
   // for the path-scoped frame policy and the CSP exceptions that keep Maps,
-  // fonts, and hosted Stripe/Viva checkout working.
-  applyHtmlSecurityHeaders(responseHeaders, request);
+  // fonts, and hosted Stripe/Viva checkout working — and for the one partner
+  // host pair that may frame each other (the design preview).
+  applyHtmlSecurityHeaders(responseHeaders, request, await partnerFramingFor(request));
   return new Response(body, {
     headers: responseHeaders,
     status: responseStatusCode,

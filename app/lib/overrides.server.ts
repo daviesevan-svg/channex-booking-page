@@ -95,6 +95,13 @@ interface SiteContent {
   /** Free-text facility lines, one per entry. The curated facility KEYS live in
    *  settings (language-independent); only these need translating. */
   facilitiesExtra?: string[];
+  /** Guest-portal copy — TRANSLATIONS ONLY (see getPortalMessage). */
+  portal?: PortalContent;
+}
+
+/** Localized guest-portal copy. */
+export interface PortalContent {
+  afterDeadlineMessage?: string;
 }
 const contentKey = (pid: string) => `content:${pid}`;
 const contentMap = (pid: string) =>
@@ -142,6 +149,51 @@ export async function saveSearchContent(
   // heroImage rides on the same entry but is owned by saveHeroImage — carry it
   // over so a text-only save can't wipe a previously uploaded image.
   m[lang] = { ...(m[lang] ?? {}), search: { ...search, heroImage: m[lang]?.search?.heroImage } };
+  await writeJson(contentKey(pid), m);
+}
+
+// ===== guest-portal copy (localized) =====
+//
+// Storage is split on purpose. The DEFAULT language's after-deadline message
+// stays in `settings.afterDeadlineMessage`, where it has always lived: the
+// management API reads and writes it there, and no hotel's existing copy needs
+// migrating. Every OTHER language's translation lives in the content store
+// beside the rest of the site's translations.
+//
+// So each language has exactly one writer, which is the whole point: the
+// message used to be a single global field on a page that shows an "Editing:
+// [language]" switcher, so typing the German version and saving overwrote the
+// English one. Hotels reported that as "I can't translate this text".
+
+/** The after-deadline message a guest reading in `lang` should see: their
+ *  language's translation, else the default-language text, else undefined —
+ *  and then the portal falls back to its own built-in string. */
+export async function getPortalMessage(pid: string, lang = DEFAULT_LANG): Promise<string | undefined> {
+  const base = (await getSettings(pid)).afterDeadlineMessage;
+  if (lang === DEFAULT_LANG) return base;
+  const m = await contentMap(pid);
+  return m[lang]?.portal?.afterDeadlineMessage || base;
+}
+
+/** What the EDITOR shows for `lang`: the default language's stored text, or a
+ *  translation — empty until translated, never prefilled with the original
+ *  (see TranslationNote: a prefilled field reads as "already translated"). */
+export async function getPortalMessageRaw(pid: string, lang: string): Promise<string | undefined> {
+  if (lang === DEFAULT_LANG) return (await getSettings(pid)).afterDeadlineMessage;
+  return (await contentMap(pid))[lang]?.portal?.afterDeadlineMessage;
+}
+
+/** Store one language's translation (blank clears it, falling back to the
+ *  default language again). Never called for the default language — that text
+ *  belongs to savePortalSettings. */
+export async function savePortalTranslation(pid: string, lang: string, message: string): Promise<void> {
+  if (lang === DEFAULT_LANG) return;
+  const m = await contentMap(pid);
+  const entry = m[lang] ?? {};
+  const text = message.trim();
+  if (text) entry.portal = { afterDeadlineMessage: text };
+  else delete entry.portal;
+  m[lang] = entry;
   await writeJson(contentKey(pid), m);
 }
 
@@ -293,6 +345,14 @@ export async function patchSettings(
 
 export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
+}
+
+/** Removes the named fields from a property's settings, leaving the rest. */
+export async function clearSettingsFields(pid: string, keys: (keyof SiteSettings)[]): Promise<void> {
+  const existing = await getSettings(pid);
+  const next = { ...existing };
+  for (const k of keys) delete next[k];
+  await writeJson(settingsKey(pid), next);
 }
 
 // ===== Viva payments config (per property) =====
@@ -655,10 +715,13 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
 export async function savePortalSettings(
   pid: string,
   form: FormData,
-  opts?: { persistAutoRefund?: boolean },
+  opts?: { persistAutoRefund?: boolean; persistMessage?: boolean },
 ): Promise<SiteSettings> {
   const existing = await getSettings(pid);
   const persistAutoRefund = opts?.persistAutoRefund !== false;
+  // False when a TRANSLATION tab is being saved: the textarea then holds that
+  // language's text, which must not land on top of the original.
+  const persistMessage = opts?.persistMessage !== false;
   const unit = (k: string) => {
     const u = String(form.get(k) ?? "");
     return isDeadlineUnit(u) ? u : undefined;
@@ -676,7 +739,9 @@ export async function savePortalSettings(
     cancelAnchorTime: hhmm(form.get("cancelAnchorTime")),
     modifyDeadlineValue: posInt(form.get("modifyDeadlineValue")),
     modifyDeadlineUnit: unit("modifyDeadlineUnit"),
-    afterDeadlineMessage: String(form.get("afterDeadlineMessage") ?? "").trim() || undefined,
+    afterDeadlineMessage: persistMessage
+      ? String(form.get("afterDeadlineMessage") ?? "").trim() || undefined
+      : existing.afterDeadlineMessage,
   };
   await writeJson(settingsKey(pid), next);
   return next;

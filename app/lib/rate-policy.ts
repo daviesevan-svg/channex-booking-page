@@ -159,13 +159,22 @@ export function describeDeadline(tier: CancelTier, anchorTime = "18:00"): string
 }
 
 /** Plain-English summary lines for the admin preview — mirrors what the guest
- *  sees at checkout (without live £ amounts). Override note wins for cancellation. */
+ *  sees at checkout (without live £ amounts).
+ *
+ *  A hotel's override note REPLACES the whole summary, not just the
+ *  cancellation line. Their note is a complete policy statement (usually
+ *  pasted from the channel manager), so our generated sentences around it end
+ *  up restating — or contradicting — it: a note ending "no-show will be
+ *  charged the total price" sat directly above our own "No-show: the first
+ *  night charged", which is the report that prompted this. */
 export function describePolicy(
   p: RatePolicy,
   /** The property's cancellation cut-off time ("HH:MM"), which deadlines count
    *  back from. Defaults to 18:00, same as the resolver. */
   anchor?: string,
 ): { payment: string; cancellation: string; noShow: string } {
+  if (p.overrideNote) return { payment: "", cancellation: p.overrideNote, noShow: "" };
+
   let payment: string;
   if (p.payment.timing === "full_prepay") {
     payment = "Full payment due now.";
@@ -180,9 +189,7 @@ export function describePolicy(
   payment += p.payment.card === "charge_at_booking" ? " Card charged at booking." : " Card only guarantees the booking.";
 
   let cancellation: string;
-  if (p.overrideNote) {
-    cancellation = p.overrideNote;
-  } else if (!p.cancellation.refundable) {
+  if (!p.cancellation.refundable) {
     cancellation = "Non-refundable.";
   } else {
     const t = p.cancellation.tiers[0];

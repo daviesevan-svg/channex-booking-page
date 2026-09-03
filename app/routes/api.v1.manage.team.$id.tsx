@@ -2,6 +2,7 @@ import type { Route } from "./+types/api.v1.manage.team.$id";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
 import { MEMBER_AREAS, isMemberArea, type MemberArea } from "~/lib/member-areas";
 import { getProperty, removePropertyMember, setMemberHiddenAreas } from "~/lib/properties.server";
+import { listPendingInvites } from "~/lib/team-invites.server";
 import { serializeTeam } from "./api.v1.manage.team";
 
 // PATCH  /v1/manage/team/:email — { areas: [...] } sets which admin areas this
@@ -36,7 +37,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     const hidden = MEMBER_AREAS.filter((a) => !allowed.includes(a));
     await setMemberHiddenAreas(auth.pid, email, hidden);
     const after = await getProperty(auth.pid);
-    return Response.json({ data: serializeTeam(after!) });
+    return Response.json({ data: serializeTeam(after!, await listPendingInvites(auth.pid)) });
   }
 
   return apiError(405, "method_not_allowed", "Use PATCH to set areas or DELETE to remove.");

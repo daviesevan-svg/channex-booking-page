@@ -1,13 +1,17 @@
 import type { Route } from "./+types/api.v1.manage.team";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
-import { sendTeamInviteEmail } from "~/lib/email.server";
+import { rateLimit } from "~/lib/rate-limit.server";
+import { sendTeamInviteRequestEmail } from "~/lib/email.server";
 import { MEMBER_AREAS } from "~/lib/member-areas";
-import { addPropertyMember, getProperty } from "~/lib/properties.server";
-import { getUser, setUserPartner, upsertUser } from "~/lib/users.server";
+import { getProperty } from "~/lib/properties.server";
+import { addPendingInvite, listPendingInvites, type PendingInvite } from "~/lib/team-invites.server";
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-export const serializeTeam = (ref: NonNullable<Awaited<ReturnType<typeof getProperty>>>) => ({
+export const serializeTeam = (
+  ref: NonNullable<Awaited<ReturnType<typeof getProperty>>>,
+  pending: PendingInvite[] = [],
+) => ({
   owner: ref.owner ?? null,
   members: (ref.members ?? []).map((email) => ({
     email,
@@ -15,28 +19,30 @@ export const serializeTeam = (ref: NonNullable<Awaited<ReturnType<typeof getProp
     // speaks in what the member CAN see, like the UI's checkboxes.
     areas: MEMBER_AREAS.filter((a) => !(ref.memberHiddenAreas?.[email] ?? []).includes(a)),
   })),
+  // Invites requested through the API and not yet approved by the owner.
+  pending: pending.map((i) => ({ email: i.email, requested_at: i.requestedAt })),
   areas: MEMBER_AREAS,
 });
 
 // GET  /v1/manage/team — the property's owner + teammates with their visible
-//      admin areas.
-// POST /v1/manage/team/invites (this route, method POST) — invite ONE teammate
-//      to THIS property. The one management endpoint that sends email (the
-//      invite), and only to the address being invited. Unlike the admin page,
-//      no multi-property fan-out: a property-scoped key invites to its own
-//      property only.
+//      admin areas, plus invites still waiting for the owner.
+// POST /v1/manage/team — REQUEST that one person be added to THIS property.
+//      Nobody joins the team from here: the request is parked, the owner is
+//      emailed, and the person is only added (and only then emailed a sign-in
+//      link) when the owner approves it on the admin Team page. A key is not a
+//      person; an account it could mint outright would outlive the key.
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request, "manage");
   if (auth instanceof Response) return auth;
   const ref = await getProperty(auth.pid);
   if (!ref) return apiError(404, "not_found", "Property not found.");
-  return Response.json({ data: serializeTeam(ref) });
+  return Response.json({ data: serializeTeam(ref, await listPendingInvites(auth.pid)) });
 }
 
 export async function action({ request }: Route.ActionArgs) {
   const auth = await authenticateApiKey(request, "manage");
   if (auth instanceof Response) return auth;
-  if (request.method !== "POST") return apiError(405, "method_not_allowed", "Use POST with { email } to invite.");
+  if (request.method !== "POST") return apiError(405, "method_not_allowed", "Use POST with { email } to request an invite.");
   let body: { email?: unknown };
   try {
     body = (await request.json()) as typeof body;
@@ -46,17 +52,23 @@ export async function action({ request }: Route.ActionArgs) {
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   if (!EMAIL.test(email)) return apiError(422, "validation_error", "`email` must be a valid address.");
 
-  await addPropertyMember(auth.pid, email);
-  // Same user-precreation rules as the admin invite: a NEW user under a
-  // white-label partner is scoped to that partner from their first sign-in;
-  // an existing user's affiliation is never rewritten by a mere invite.
-  const partnerId = (await getProperty(auth.pid))?.partnerId;
-  const existing = await getUser(email);
-  if (!existing && partnerId) await setUserPartner(email, partnerId);
-  else await upsertUser(email);
-  const origin = new URL(request.url).origin;
-  await sendTeamInviteEmail(auth.pid, email, "the management API", `${origin}/admin/login?email=${encodeURIComponent(email)}`, partnerId);
-
   const ref = await getProperty(auth.pid);
-  return Response.json({ data: serializeTeam(ref!) }, { status: 201 });
+  if (!ref) return apiError(404, "not_found", "Property not found.");
+  // Already on the team (or the owner): nothing to request.
+  if (ref.owner?.toLowerCase() === email || (ref.members ?? []).includes(email)) {
+    return Response.json({ data: serializeTeam(ref, await listPendingInvites(auth.pid)) });
+  }
+
+  // Each distinct request emails the owner; a loop must not turn that into a
+  // flood from the hotel's own sender. Per property, not per key.
+  if (!(await rateLimit(`apiinvite:${auth.pid}`, 5, 3600))) {
+    return apiError(429, "rate_limited", "At most 5 teammate invite requests per hour per property.");
+  }
+  const { created } = await addPendingInvite(auth.pid, email);
+  // Tell the owner once per distinct request — a retried call must not nag.
+  if (created && ref.owner) {
+    const origin = new URL(request.url).origin;
+    await sendTeamInviteRequestEmail(auth.pid, ref.owner, email, `${origin}/admin/team`, ref.partnerId);
+  }
+  return Response.json({ data: serializeTeam(ref, await listPendingInvites(auth.pid)) }, { status: 202 });
 }

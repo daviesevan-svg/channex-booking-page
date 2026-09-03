@@ -1,3 +1,6 @@
+/** JSON-RPC batch ceiling — each entry is a full tool dispatch. */
+const MAX_BATCH = 20;
+
 // POST /mcp — Model Context Protocol endpoint, so an AI agent can search a
 // property's availability and make a booking without driving a browser.
 //
@@ -17,6 +20,7 @@
 // booking creation, which touches money and live inventory, has exactly one
 // implementation, and any field added to a /v1 payload appears here for free.
 import type { Route } from "./+types/mcp";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import {
   PROTOCOL_VERSION,
   RPC_ERRORS,
@@ -130,6 +134,13 @@ export async function action({ request }: Route.ActionArgs) {
     return Response.json(rpcError(null, RPC_ERRORS.invalidRequest, "Use POST."), { status: 405 });
   }
 
+  // initialize / tools/list need no key, so a per-client throttle is the only
+  // thing between an anonymous probe loop and the isolate. Authenticated tool
+  // calls are additionally limited per key inside authenticateApiKey.
+  if (!(await rateLimit(`mcp:${clientKey(request)}`, 300, 600))) {
+    return Response.json(rpcError(null, RPC_ERRORS.invalidRequest, "Too many requests — at most 300 per 10 minutes."), { status: 429 });
+  }
+
   let parsed: unknown;
   try {
     parsed = await request.json();
@@ -138,8 +149,12 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // A batch is a JSON array; notifications inside it produce no entry, and an
-  // all-notification batch gets 202 with no body.
+  // all-notification batch gets 202 with no body. Bounded: each entry is a
+  // full tool dispatch, and an unbounded array was a free amplifier.
   const batch = Array.isArray(parsed) ? (parsed as RpcRequest[]) : null;
+  if (batch && batch.length > MAX_BATCH) {
+    return Response.json(rpcError(null, RPC_ERRORS.invalidRequest, `At most ${MAX_BATCH} requests per batch.`), { status: 400 });
+  }
   const items = batch ?? [parsed as RpcRequest];
   const out: unknown[] = [];
   for (const item of items) {

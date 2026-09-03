@@ -1448,7 +1448,7 @@ const PT: Record<string, string> = {
   rtPreviewTitle: "O que os hóspedes vão ver",
   rtPreviewIntro: "Pré-visualização ao vivo do texto da política mostrado na página de reservas (o hóspede vê-o no seu idioma, com os montantes reais).",
   rtOverrideNote: "Nota de substituição",
-  rtOverrideNoteHint: "(opcional — substitui a linha de cancelamento acima)",
+  rtOverrideNoteHint: "(opcional — substitui todo o texto da política acima)",
   rtOverrideNotePlaceholder: "Deixe em branco para mostrar a política gerada a partir dos campos acima.",
   rtCreate: "Criar tarifa",
   rtSave: "Guardar tarifa",
@@ -1456,6 +1456,11 @@ const PT: Record<string, string> = {
   rtDelete: "Eliminar tarifa",
 
   // -- team + users + properties + onboard --
+  tmPendingTitle: "A aguardar a sua aprovação",
+  tmPendingHint: "Uma integração que usa a chave da API de gestão desta propriedade pediu para adicionar estas pessoas. Ninguém é adicionado, nem recebe um link de início de sessão, até aprovar. Se não reconhecer o pedido, recuse-o — e revogue a chave da API se também não reconhecer a integração.",
+  tmPendingRequested: "Pedido a {date} através da API de gestão",
+  tmApprove: "Aprovar e convidar",
+  tmDecline: "Recusar",
   tmTitle: "Equipa",
   tmIntroPre: "Pessoas que podem gerir",
   tmThisProperty: "esta propriedade",

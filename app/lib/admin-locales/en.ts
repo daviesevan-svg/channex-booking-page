@@ -1446,7 +1446,7 @@ const EN: Record<string, string> = {
   rtPreviewTitle: "What guests will see",
   rtPreviewIntro: "Live preview of the policy text shown on the booking page (the guest sees it in their language, with the actual amounts).",
   rtOverrideNote: "Override note",
-  rtOverrideNoteHint: "(optional — replaces the cancellation line above)",
+  rtOverrideNoteHint: "(optional — replaces all the policy text above)",
   rtOverrideNotePlaceholder: "Leave blank to show the policy generated from the fields above.",
   rtCreate: "Create rate",
   rtSave: "Save rate",
@@ -1454,6 +1454,11 @@ const EN: Record<string, string> = {
   rtDelete: "Delete rate",
 
   // -- team + users + properties + onboard --
+  tmPendingTitle: "Waiting for your approval",
+  tmPendingHint: "An integration using this property's management API key asked to add these people. Nobody is added, and no sign-in link is sent, until you approve. If you don't recognise the request, decline it — and revoke the API key if you don't recognise the integration either.",
+  tmPendingRequested: "Requested {date} via the management API",
+  tmApprove: "Approve & invite",
+  tmDecline: "Decline",
   tmTitle: "Team",
   tmIntroPre: "People who can manage",
   tmThisProperty: "this property",

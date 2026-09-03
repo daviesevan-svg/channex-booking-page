@@ -669,8 +669,8 @@ export const managePaths = {
     ...managed("Team", "Owner + teammates with the admin areas each can see."),
     post: {
       ...writeOp(
-        "Invite a teammate",
-        "SENDS the invite email to that address — the only management endpoint that emails anyone. Property-scoped: no multi-property fan-out. New teammates start with full area access.",
+        "Request a teammate invite",
+        "Parks an invite for the property OWNER to approve on the admin Team page; the owner is emailed, the requested address is not. Nobody joins the team until the owner approves — an API key cannot mint an admin account on its own. Responds 202 with the team including `pending`. Property-scoped: no multi-property fan-out. Approved teammates start with full area access.",
         "ManageTeamInvite",
       ),
     },

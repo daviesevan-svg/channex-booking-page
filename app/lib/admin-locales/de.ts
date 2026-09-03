@@ -1452,7 +1452,7 @@ const DE: Record<string, string> = {
   rtPreviewTitle: "Was Gäste sehen werden",
   rtPreviewIntro: "Live-Vorschau des Bedingungstexts auf der Buchungsseite (der Gast sieht ihn in seiner Sprache, mit den tatsächlichen Beträgen).",
   rtOverrideNote: "Eigener Hinweis",
-  rtOverrideNoteHint: "(optional — ersetzt die Stornierungszeile oben)",
+  rtOverrideNoteHint: "(optional — ersetzt den gesamten Richtlinientext oben)",
   rtOverrideNotePlaceholder: "Leer lassen, um die aus den Feldern oben erzeugten Bedingungen anzuzeigen.",
   rtCreate: "Rate anlegen",
   rtSave: "Rate speichern",
@@ -1460,6 +1460,11 @@ const DE: Record<string, string> = {
   rtDelete: "Rate löschen",
 
   // -- team + users + properties + onboard --
+  tmPendingTitle: "Wartet auf Ihre Freigabe",
+  tmPendingHint: "Eine Integration mit dem Management-API-Schlüssel dieser Unterkunft hat darum gebeten, diese Personen hinzuzufügen. Niemand wird hinzugefügt und kein Anmeldelink verschickt, bis Sie freigeben. Wenn Sie die Anfrage nicht kennen, lehnen Sie sie ab — und widerrufen Sie den API-Schlüssel, wenn Sie auch die Integration nicht kennen.",
+  tmPendingRequested: "Angefragt am {date} über die Management-API",
+  tmApprove: "Freigeben & einladen",
+  tmDecline: "Ablehnen",
   tmTitle: "Team",
   tmIntroPre: "Personen, die",
   tmThisProperty: "diese Unterkunft",

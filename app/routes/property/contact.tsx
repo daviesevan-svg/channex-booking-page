@@ -14,7 +14,7 @@ import { getOverrides, getSettings } from "~/lib/overrides.server";
 
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { langFromRequest } from "~/lib/content";
-import { basePath, homePath } from "~/lib/base";
+import { homePath } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 const MAX_NAME = 100;
@@ -22,11 +22,12 @@ const MAX_EMAIL = 200;
 const MAX_MESSAGE = 2000;
 
 /** Anything reaching this by GET is a stray link or a crawler — send it home
- *  rather than rendering an empty layout. */
-export async function loader({ params }: Route.LoaderArgs) {
-  const base = basePath(params.channelId);
-  const home = homePath(params.channelId);
-  return redirect(home);
+ *  rather than rendering an empty layout. The property is resolved FIRST: a
+ *  segment that isn't one 404s here like on every other guest route, instead
+ *  of being echoed into a redirect. */
+export async function loader({ params, request }: Route.LoaderArgs) {
+  await resolveRequestProperty(params.channelId, request);
+  return redirect(homePath(params.channelId));
 }
 
 export async function action({ params, request }: Route.ActionArgs) {

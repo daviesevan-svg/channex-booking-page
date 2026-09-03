@@ -239,7 +239,7 @@ export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
                 type="button"
                 onClick={seeRates}
                 disabled={!ready}
-                className="mt-3 w-full cursor-pointer rounded-card bg-accent px-6 py-3.5 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:cursor-default disabled:opacity-50"
+                className="mt-3 w-full cursor-pointer rounded-card bg-accent px-6 py-3.5 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:cursor-default disabled:opacity-50"
               >
                 {ready ? tr.t("seeRatesFor", { range: dates.rangeSummary }) : tr.t("pickYourDates")}
               </button>

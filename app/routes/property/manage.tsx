@@ -56,11 +56,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export async function action({ params, request }: Route.ActionArgs) {
   const base = basePath(params.channelId);
+  // Resolve the property before any redirect is built from the segment — a
+  // logout on a bogus segment must 404, not bounce the guest somewhere.
+  const pid = await resolveRequestProperty(params.channelId, request);
   const form = await request.formData();
   if (form.get("intent") === "logout") {
     return guestLogout(request, `${base}/manage`);
   }
-  const pid = await resolveRequestProperty(params.channelId, request);
   // Throttle guessing: 8 lookups per 10 min per client. Fails open if no KV.
   if (!(await rateLimit(`manage:${pid}:${clientKey(request)}`, 8, 600))) {
     return { tooMany: true };
@@ -107,10 +109,10 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
 
   const { bookings, vouchers } = loaderData;
   const statusChip: Record<string, string> = {
-    active: "bg-[#e8f0e6] text-[#3f7a52]",
+    active: "bg-success-soft text-success",
     redeemed: "bg-chip text-muted",
-    cancelled: "bg-[#fbe9e7] text-[#c0392b]",
-    expired: "bg-[#fbe9e7] text-[#c0392b]",
+    cancelled: "bg-danger-soft text-danger",
+    expired: "bg-danger-soft text-danger",
   };
 
   return (
@@ -238,9 +240,9 @@ function ManageLogin({
           <input name="email" type="email" placeholder="you@email.com" className={inputCls} />
         </label>
         {tooMany ? (
-          <p className="text-caption text-red-600">{tr.t("manageTooMany")}</p>
+          <p className="text-caption text-danger">{tr.t("manageTooMany")}</p>
         ) : (
-          notFound && <p className="text-caption text-red-600">{tr.t("manageNotFound")}</p>
+          notFound && <p className="text-caption text-danger">{tr.t("manageNotFound")}</p>
         )}
         <button
           type="submit"

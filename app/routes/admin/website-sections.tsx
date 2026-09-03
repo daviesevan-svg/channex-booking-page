@@ -4,6 +4,8 @@ import { Form, Link, useNavigation } from "react-router";
 import type { Route } from "./+types/website-sections";
 import { adminMeta } from "~/lib/admin-meta";
 import { requireAdmin } from "~/lib/auth.server";
+import { guestHostForProperty } from "~/lib/partners.server";
+import { createPreviewToken } from "~/lib/site-preview.server";
 import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { langParam, pickLang, type SiteSettings } from "~/lib/content";
 import { getSettings, saveBrand } from "~/lib/overrides.server";
@@ -36,8 +38,18 @@ import { DesignPreview } from "~/components/admin-design-preview";
 import { AdminPageHeader, SavedPill } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
+/** Where the property's public pages are served, as an origin to prefix the
+ *  slug with — empty (i.e. relative) when that is this very host. Same
+ *  scheme/port as this request so dev partner hosts keep working. */
+async function previewOrigin(request: Request, partnerId: string | undefined, email: string) {
+  const host = await guestHostForProperty(partnerId, email);
+  if (!host) return "";
+  const url = new URL(request.url);
+  return host === url.hostname ? "" : `${url.protocol}//${host}${url.port ? `:${url.port}` : ""}`;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
+  const email = await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
 
@@ -70,7 +82,20 @@ export async function loader({ request }: Route.LoaderArgs) {
     settings,
     // Prefer the slug — it is the address guests see, and the preview should be
     // the real page at its real URL.
-    previewPath: `/${property?.slug || propertyId}`,
+    //
+    // ORIGIN as well as path, because the page being previewed may not live on
+    // the host this screen is served from. A white-label partner's back office
+    // is on their admin host, which serves no slug paths at all
+    // (property-scope.server) — a relative iframe src there loads a 404. Same
+    // rule as every other operator-facing link since PR448: follow the
+    // PROPERTY's partner, not the viewer. Relative on our shared domain, so
+    // nothing about the ordinary case changes.
+    //
+    // The token travels with it: the guest host can't read this host's session
+    // (see site-preview.server), so without it the preview would quietly render
+    // the SAVED design while the panel said "Not saved yet".
+    previewPath: `${await previewOrigin(request, property?.partnerId, email)}/${property?.slug || propertyId}`,
+    previewToken: await createPreviewToken(propertyId),
   };
 }
 
@@ -198,7 +223,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
     );
   }
 
-  const { lang, pageId, isHome, pageTitle, sections, text, websiteEnabled, style, settings, previewPath } =
+  const { lang, pageId, isHome, pageTitle, sections, text, websiteEnabled, style, settings, previewPath, previewToken } =
     loaderData;
   const error = (actionData && "error" in actionData ? actionData.error : null) ?? null;
   return (
@@ -221,6 +246,7 @@ export default function AdminWebsiteSections({ loaderData, actionData }: Route.C
       style={style}
       settings={settings}
       previewPath={previewPath}
+      previewToken={previewToken}
       saving={saving}
       saved={Boolean(actionData && "ok" in actionData)}
       styled={Boolean(actionData && "styled" in actionData)}
@@ -318,6 +344,7 @@ function Editor({
   style,
   settings,
   previewPath,
+  previewToken,
   saving,
   saved,
   styled,
@@ -334,6 +361,7 @@ function Editor({
   style: string;
   settings: SiteSettings;
   previewPath: string;
+  previewToken: string;
   saving: boolean;
   saved: boolean;
   styled: boolean;
@@ -431,6 +459,7 @@ function Editor({
           />
           <DesignPreview
             path={previewPath}
+            token={previewToken}
             style={pickStyle}
             font={pickFont}
             saved={{ style, font: settings.themeFont ?? "default" }}

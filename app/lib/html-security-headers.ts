@@ -16,10 +16,22 @@
 //    is unknown. The admin widget preview can also be cross-origin (partner
 //    guest host ≠ admin host).
 //  * everything else (guest funnel, collections, Viva return) — `'self'`
-//    (+ X-Frame-Options: SAMEORIGIN). The design-preview iframe on the admin
-//    website screen loads `/{slug}?style=…` same-origin. Third parties cannot
-//    frame checkout. Payments themselves are not framed: Stripe Checkout and
-//    Viva Smart Checkout are top-level 302s after a same-origin form POST.
+//    (+ X-Frame-Options: SAMEORIGIN). Third parties cannot frame checkout.
+//    Payments themselves are not framed: Stripe Checkout and Viva Smart
+//    Checkout are top-level 302s after a same-origin form POST.
+//
+// ONE cross-origin framing relationship is allowed, both directions of it: a
+// white-label partner's back office (admin.theirpms.com) framing that same
+// partner's guest host (book.theirpms.com) for the design preview. Same-origin
+// was a fair assumption until partner hosts existed; on a partner it is two
+// hosts, so `frame-ancestors 'self'` on the page and `frame-src 'self'` on the
+// admin screen would each block it on their own. The widened value is always
+// the OTHER host of the SAME partner — never anything a request can name — and
+// the caller only looks it up for an admin document or a `?preview=` one, so
+// ordinary guest traffic does no extra work. X-Frame-Options is dropped where a
+// cross-origin ancestor is allowed: it has no allow-list value, and browsers
+// that honour it would block the frame whatever CSP said (same reason /embed
+// omits it).
 //
 // CSP exceptions that would break the existing app if omitted:
 //
@@ -53,9 +65,21 @@ export function frameAncestorsForPath(pathname: string): FrameAncestors {
   return "self";
 }
 
-export function documentContentSecurityPolicy(pathname: string): string {
+/** The partner host this document may frame, or be framed by — see the file
+ *  comment. Both are absent on our own hosts, which are single-origin. */
+export type PartnerFraming = {
+  /** Origin this ADMIN document may embed (the partner's guest host). */
+  frames?: string;
+  /** Origin that may embed this GUEST document (the partner's admin host). */
+  framedBy?: string;
+};
+
+export function documentContentSecurityPolicy(pathname: string, partner: PartnerFraming = {}): string {
   const ancestors = frameAncestorsForPath(pathname);
-  const frameAncestors = ancestors === "*" ? "*" : `'${ancestors}'`;
+  const framedBy = ancestors === "self" ? partner.framedBy : undefined;
+  const frameAncestors =
+    ancestors === "*" ? "*" : `'${ancestors}'${framedBy ? ` ${framedBy}` : ""}`;
+  const frames = ancestors === "none" ? partner.frames : undefined;
   return [
     "default-src 'self'",
     "base-uri 'self'",
@@ -67,31 +91,31 @@ export function documentContentSecurityPolicy(pathname: string): string {
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com",
     "worker-src 'self' blob:",
-    // Same-origin design/widget preview iframes. Email preview uses srcdoc.
-    "frame-src 'self'",
+    // Design/widget preview iframes. Email preview uses srcdoc.
+    `frame-src 'self'${frames ? ` ${frames}` : ""}`,
     // See file comment: Chrome walks the POST→302 chain against form-action.
     "form-action 'self' https://*.stripe.com https://*.vivapayments.com",
     `frame-ancestors ${frameAncestors}`,
   ].join("; ");
 }
 
-export function htmlSecurityHeaders(pathname: string): Record<string, string> {
+export function htmlSecurityHeaders(pathname: string, partner: PartnerFraming = {}): Record<string, string> {
   const ancestors = frameAncestorsForPath(pathname);
   const headers: Record<string, string> = {
-    "Content-Security-Policy": documentContentSecurityPolicy(pathname),
+    "Content-Security-Policy": documentContentSecurityPolicy(pathname, partner),
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "strict-origin-when-cross-origin",
   };
   // X-Frame-Options has no "allow all" value — omit it on /embed/* so hotel
   // sites can frame the widget. CSP frame-ancestors is the real control.
   if (ancestors === "none") headers["X-Frame-Options"] = "DENY";
-  if (ancestors === "self") headers["X-Frame-Options"] = "SAMEORIGIN";
+  if (ancestors === "self" && !partner.framedBy) headers["X-Frame-Options"] = "SAMEORIGIN";
   return headers;
 }
 
-export function applyHtmlSecurityHeaders(headers: Headers, request: Request): void {
+export function applyHtmlSecurityHeaders(headers: Headers, request: Request, partner: PartnerFraming = {}): void {
   const { pathname } = new URL(request.url);
-  for (const [name, value] of Object.entries(htmlSecurityHeaders(pathname))) {
+  for (const [name, value] of Object.entries(htmlSecurityHeaders(pathname, partner))) {
     headers.set(name, value);
   }
 }

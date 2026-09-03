@@ -92,18 +92,88 @@ export async function getPublicProperties(): Promise<PropertyRef[]> {
   return (await getProperties()).filter((p) => p.public && !p.partnerId);
 }
 
+/** Ids are opaque keys (UUIDs, a channel manager's hotel code): one segment of
+ *  URL-safe characters. Anything else could not be routed or keyed safely. */
+const PROPERTY_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+
+/**
+ * Why a proposed property id can't be registered, or null when it can.
+ *
+ * `resolvePropertyId` matches ids BEFORE slugs, so an id equal to another
+ * property's slug would silently capture that property's guest URL — every
+ * link the hotel has ever handed out would land on the newcomer. `slugError`
+ * closes the mirror case (a slug equal to an existing id); this closes the one
+ * that was open.
+ */
+export function propertyIdError(id: string, list: PropertyRef[]): string | null {
+  if (!PROPERTY_ID_RE.test(id)) return "Property ids may only contain letters, digits, hyphens and underscores.";
+  const lower = id.toLowerCase();
+  if (RESERVED_SLUGS.has(lower)) return `"${id}" is reserved — pick another.`;
+  if (list.some((p) => p.id === id)) return `A property with the id "${id}" already exists.`;
+  if (list.some((p) => p.slug === lower)) return `"${id}" is already in use as another property's booking link.`;
+  return null;
+}
+
+/** A removed property's grave marker. Re-registering that id would revive every
+ *  KV/D1 record it left behind, so only its previous owner may (see addProperty). */
+interface PropertyTombstone {
+  owner?: string;
+  deletedAt: string;
+}
+const tombstoneKey = (id: string) => `property_tombstone:${id}`;
+
+async function readTombstone(id: string): Promise<PropertyTombstone | null> {
+  const kv = getConfigKV();
+  if (!kv) return null;
+  const raw = await kv.get(tombstoneKey(id));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PropertyTombstone;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Registers a property. Throws (with a message fit to show the operator) when
+ * the id can't be used: malformed, reserved, colliding with another property's
+ * id or slug, or the id of a DELETED property that belonged to someone else.
+ *
+ * That last rule is what makes deletion safe. The data layer is keyed by id and
+ * a removal leaves content behind on purpose (a mistaken delete is undone by
+ * re-adding), so without it anyone who learned a deleted property's id — they
+ * are public, in guest URLs and webhook addresses — could re-add it and inherit
+ * its bookings and whatever settings survived. `reclaim` (superadmin) overrides.
+ */
 export async function addProperty(
   id: string,
   name: string,
   owner?: string,
   partnerId?: string,
+  opts: { reclaim?: boolean } = {},
 ): Promise<PropertyRef> {
   const list = await getProperties();
-  const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner, ...(partnerId ? { partnerId } : {}) };
-  if (!list.some((p) => p.id === id)) {
-    list.push(ref);
-    await write(list);
+  const existing = list.find((p) => p.id === id);
+  if (existing) {
+    // Re-adding your own property is a no-op (the Channex import re-runs this
+    // for an already-imported hotel); anyone else is refused — before this, a
+    // stranger holding the hotel's channel-manager key could "import" it again
+    // and overwrite its rooms, rates and settings from here on.
+    const same = !!existing.owner && existing.owner.toLowerCase() === (owner ?? "").toLowerCase();
+    if (same || opts.reclaim) return existing;
+    throw new Error(`A property with the id "${id}" already exists and belongs to another account.`);
   }
+  const problem = propertyIdError(id, list);
+  if (problem) throw new Error(problem);
+  if (!opts.reclaim) {
+    const grave = await readTombstone(id);
+    if (grave && grave.owner !== (owner ?? "").toLowerCase()) {
+      throw new Error(`"${id}" belonged to a property that was deleted by another account and can't be reused.`);
+    }
+  }
+  const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner, ...(partnerId ? { partnerId } : {}) };
+  list.push(ref);
+  await write(list);
   return ref;
 }
 
@@ -329,20 +399,29 @@ export async function setPropertyPublic(id: string, isPublic: boolean): Promise<
   }
 }
 
-/** Removes a property from the registry. Its KV/D1 data is left intact (so a
- *  mistaken removal can be undone by re-adding the same id). */
+/** Removes a property from the registry and leaves a tombstone naming its owner.
+ *  Its content (rooms, texts, bookings) stays in KV/D1 so a mistaken removal can
+ *  be undone by the same owner re-adding the id; credentials do NOT stay — see
+ *  `deletePropertyForGood` in property-delete.server.ts, the entry point routes
+ *  use, which revokes keys/webhooks/payment config before calling this. */
 export async function removeProperty(id: string): Promise<void> {
   // Release the custom hostname before dropping the registry row. The hostname
   // index is global, so a leftover entry would both keep the domain
   // unclaimable by anyone else and point guests at a property that now 404s.
-  // (The property's own KV and R2 data still survives removal — separate issue.)
   const domain = (await getSettings(id)).websiteDomain;
   const released = await releaseDomain(id, domain).catch(() => false);
   // Deregister at the edge too, but only on the index's word that the hostname
   // was ours: a stored domain can name one this property never held, and deleting
   // on that basis would take the real holder's site down.
   if (released && domain) await deleteCustomHostname(domain).catch(() => {});
-  await write((await getProperties()).filter((p) => p.id !== id));
+  const list = await getProperties();
+  const ref = list.find((p) => p.id === id);
+  const kv = getConfigKV();
+  if (kv) {
+    const grave: PropertyTombstone = { owner: ref?.owner?.toLowerCase(), deletedAt: new Date().toISOString() };
+    await kv.put(tombstoneKey(id), JSON.stringify(grave));
+  }
+  await write(list.filter((p) => p.id !== id));
 }
 
 /** The property the admin is currently editing: the session selection if it's

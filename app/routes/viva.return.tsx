@@ -3,7 +3,7 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/viva.return";
 import { getBookings, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending, getVivaOrder } from "~/lib/pending-bookings.server";
-import { finalizeBooking, paymentFromVivaTransaction } from "~/lib/booking-finalize.server";
+import { finalizeBooking, paymentFromVivaTransaction, rejectMismatchedVivaPayment } from "~/lib/booking-finalize.server";
 import { SessionBindError } from "~/lib/stripe-session-bind";
 import { getVivaConfig } from "~/lib/overrides.server";
 import { retrieveVivaTransaction } from "~/lib/viva.server";
@@ -69,7 +69,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   try {
     record = await finalizeBooking(pending, payment, pending.origin);
   } catch (e) {
-    if (e instanceof SessionBindError) throw redirect(checkoutUrl);
+    if (e instanceof SessionBindError) {
+      // The charge doesn't match the stay (amount/currency). Refund it rather
+      // than keep it, then back to checkout with a notice — the guest must not
+      // arrive at an empty form with their money silently gone.
+      await rejectMismatchedVivaPayment(viva, payment, order.ref, e);
+      back.set("notice", "refunded");
+      throw redirect(`${base}/checkout?${back.toString()}`);
+    }
     throw e;
   }
   await deletePending(order.ref);

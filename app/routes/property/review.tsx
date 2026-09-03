@@ -140,7 +140,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
           <div className={label}>{tr.t("overallRating")}</div>
           <Stars name="stars" value={stars} onChange={setStars} size={38} />
           {actionData && "error" in actionData && actionData.error === "stars" && (
-            <p className="mt-1.5 text-caption text-[#c0392b]">{tr.t("reviewStarsRequired")}</p>
+            <p className="mt-1.5 text-caption text-danger">{tr.t("reviewStarsRequired")}</p>
           )}
         </div>
 
@@ -181,7 +181,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
         <button
           type="submit"
           disabled={submitting || stars === 0}
-          className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+          className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-60"
         >
           {tr.t("submitReview")}
         </button>

@@ -63,7 +63,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
                 type="button"
                 aria-label={t("brRemove", { range: label(r) })}
                 onClick={() => setRanges(ranges.filter((_, j) => j !== i))}
-                className="text-body-lg leading-none text-muted-2 hover:text-[#c0392b]"
+                className="text-body-lg leading-none text-muted-2 hover:text-danger"
               >
                 ×
               </button>
@@ -103,7 +103,7 @@ export function BlockedRangesEditor({ name, initial }: { name: string; initial: 
           {t("brBlockDates")}
         </button>
       </div>
-      {error && <p className="mb-0 mt-1.5 text-label text-red-600">{error}</p>}
+      {error && <p className="mb-0 mt-1.5 text-label text-danger">{error}</p>}
       <p className="mb-0 mt-1.5 text-micro font-normal text-faint">{t("brHint")}</p>
     </div>
   );

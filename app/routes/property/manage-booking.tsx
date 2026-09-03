@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/manage-booking";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
-import { getBooking, stayAvailabilityItems, updateBooking } from "~/lib/bookings.server";
+import { cancelBookingIfActive, getBooking, stayAvailabilityItems } from "~/lib/bookings.server";
 import { cancelChannexBooking } from "~/lib/booking-finalize.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari/admin.server";
@@ -11,7 +11,8 @@ import { sendCancellationEmails } from "~/lib/email.server";
 import { refundBookingCharge } from "~/lib/refunds.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
-import { getSettings } from "~/lib/overrides.server";
+import { getPortalMessage, getSettings } from "~/lib/overrides.server";
+import { langFromRequest } from "~/lib/content";
 
 import { getGuestEmail } from "~/lib/guest-auth.server";
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
@@ -20,6 +21,7 @@ import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -62,7 +64,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     booking,
     canCancel,
     cancelReason: reason,
-    afterDeadlineMessage: settings.afterDeadlineMessage,
+    // In the guest's own language, falling back to the hotel's default-language
+    // text (and, if they never wrote one, to our built-in string at render).
+    afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request)),
   };
 }
 
@@ -74,15 +78,24 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const form = await request.formData();
   if (form.get("intent") === "cancel") {
+    // A cancel fans out to inventory, Channex, a refund and two emails — not
+    // something to let a script hammer. Blunt throttle; the real double-cancel
+    // fence is the conditional transition below.
+    if (!(await rateLimit(`cancel:${pid}:${clientKey(request)}`, 5, 600))) {
+      return redirect(`${base}/manage/${params.id}`);
+    }
     const settings = await getSettings(pid);
     // Re-check server-side so a stale page can't cancel past the deadline.
     const active = (booking.lifecycle ?? "active") === "active";
     if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
-      const updated = await updateBooking(pid, booking.id, {
-        lifecycle: "cancelled",
+      // Atomic: only the ONE request whose write flips active→cancelled runs
+      // the side effects. A concurrent duplicate gets undefined and does
+      // nothing — before this, both released inventory and both refunded.
+      const updated = await cancelBookingIfActive(pid, booking.id, {
         cancelledAt: new Date().toISOString(),
         inventoryHeld: false,
       });
+      if (!updated) return redirect(`${base}/manage/${params.id}`);
       // Give the nights back to inventory (only if this booking held them).
       if (booking.inventoryHeld) {
         await incrementAvailability(
@@ -96,7 +109,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       // Auto-refund (if the property opted in): a guest cancel only succeeds inside
       // the free window, so the full charge is owed back. Otherwise the hotel
       // refunds manually. No-op for guarantee-card bookings (no charge taken).
-      let finalBooking = updated ?? booking;
+      let finalBooking = updated;
       if (settings.autoRefund) {
         const r = await refundBookingCharge(pid, finalBooking, { by: "auto (guest cancellation)" });
         if (r.ok) finalBooking = r.booking;
@@ -167,14 +180,14 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           {tr.t("reference")} {b.reference}
         </span>
         {cancelled && (
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#fbe9e7] px-3 py-1.5 text-caption font-semibold text-[#c0392b]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-3 py-1.5 text-caption font-semibold text-danger">
             ✕ {tr.t("statusCancelled")}
           </span>
         )}
       </div>
 
       {cancelled && (
-        <div className="mb-6 rounded-card border border-[#f3d0ca] bg-[#fbe9e7] px-4 py-3 text-body text-[#c0392b]">
+        <div className="mb-6 rounded-card border border-danger-line bg-danger-soft px-4 py-3 text-body text-danger">
           {tr.t("bookingCancelled")}
         </div>
       )}
@@ -260,7 +273,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.offer && (
-          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-success">
             <span>
               {b.offer.name || "Offer"} (−{b.offer.value}%)
             </span>
@@ -268,7 +281,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           </div>
         )}
         {b.promo && (
-          <div className="mt-3 flex justify-between text-body text-[#3f7a52]">
+          <div className="mt-3 flex justify-between text-body text-success">
             <span>
               {tr.t("discount")} ({b.promo.code})
             </span>
@@ -308,7 +321,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             disabled={!canCancel || cancelling}
             title={!canCancel ? cancelTip : undefined}
             aria-disabled={!canCancel}
-            className="rounded-card border border-[#e0b4ac] bg-surface px-6 py-3 text-body-lg font-semibold text-[#c0392b] transition-colors hover:bg-[#fbe9e7] disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
+            className="rounded-card border border-danger-line bg-surface px-6 py-3 text-body-lg font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-not-allowed disabled:border-line-alt disabled:bg-surface-alt disabled:text-muted-2 disabled:hover:bg-surface-alt"
           >
             {cancelling ? tr.t("cancelling") : tr.t("cancelBooking")}
           </button>

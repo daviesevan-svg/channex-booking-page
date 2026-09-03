@@ -1,5 +1,6 @@
 import type { Route } from "./+types/api.v1.manage.images.import";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
+import { rateLimit } from "~/lib/rate-limit.server";
 import { importManageImage } from "~/lib/images.server";
 
 // POST /v1/manage/images/import — { url } fetches a PUBLIC https image and
@@ -10,6 +11,11 @@ import { importManageImage } from "~/lib/images.server";
 export async function action({ request }: Route.ActionArgs) {
   const auth = await authenticateApiKey(request, "manage");
   if (auth instanceof Response) return auth;
+  // Every accepted image is an R2 object nothing may ever reference (and the
+  // GC only sweeps urls a save dropped). Tighter than the general write bucket.
+  if (!(await rateLimit(`apiimage:${auth.pid}:${auth.keyId}`, 20, 600))) {
+    return apiError(429, "rate_limited", "At most 20 image uploads/imports per 10 minutes per key.");
+  }
   if (request.method !== "POST") return apiError(405, "method_not_allowed", "POST { url } of a public https image.");
   let body: { url?: unknown };
   try {

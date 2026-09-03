@@ -164,7 +164,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         <div>
           <Link
             to={`${base}`}
-            className="inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+            className="inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-secondary hover:border-accent hover:text-accent"
           >
             {text.newBooking}
           </Link>
@@ -255,7 +255,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             <span className="font-semibold">{guests}</span>
           </div>
           {total > 0 && offer && offer.discount > 0 && (
-            <div className="flex justify-between text-[#3f7a52]">
+            <div className="flex justify-between text-success">
               <span>
                 {offer.name} (−{offer.percent}%)
               </span>
@@ -263,7 +263,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
             </div>
           )}
           {total > 0 && discount > 0 && promoCode && (
-            <div className="flex justify-between text-[#3f7a52]">
+            <div className="flex justify-between text-success">
               <span>
                 {tr.t("discount")} ({promoCode})
               </span>
@@ -285,7 +285,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
 
       <Link
         to={`${base}`}
-        className="mt-7 inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-[#5a5145] hover:border-accent hover:text-accent"
+        className="mt-7 inline-block rounded-card border border-line-alt bg-surface-alt px-7 py-3.5 text-body-lg font-semibold text-secondary hover:border-accent hover:text-accent"
       >
         {text.newBooking}
       </Link>
