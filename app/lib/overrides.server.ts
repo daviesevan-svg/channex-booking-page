@@ -429,6 +429,7 @@ export async function saveSettings(
     timezone: cleanTimezone(form.get("timezone")),
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
+    preselectFirstAvailable: form.get("preselectFirstAvailable") === "on",
   };
   await writeJson(settingsKey(pid), next);
   return next;

@@ -19,7 +19,7 @@ import { getRenderSections } from "~/lib/site.server";
 import { loadSectionData } from "~/lib/section-data.server";
 import { settingOf } from "~/lib/sections";
 import { SectionList } from "~/components/section-list";
-import { earliestCheckinDate } from "~/lib/dates";
+import { earliestCheckinDate, firstAvailableStay } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
 import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
@@ -76,11 +76,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
+  const earliestCheckin = earliestCheckinDate(cutoff, now);
   return {
     mode: "property" as const,
     closedDates,
     content,
-    earliestCheckin: earliestCheckinDate(cutoff, now),
+    earliestCheckin,
+    // Opt-in: open the date picker with the earliest bookable stay filled in.
+    // Pre-fills the fields only — searching stays a click the guest makes.
+    preselect: settings.preselectFirstAvailable
+      ? firstAvailableStay(closedDates, earliestCheckin)
+      : null,
     sections,
     data,
   };
@@ -106,7 +112,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   if (loaderData.mode === "picker") return <PropertyPicker {...loaderData.picker} />;
 
   const base = useBase();
-  const { closedDates, content, earliestCheckin, sections, data } = loaderData;
+  const { closedDates, content, earliestCheckin, preselect, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const style = useSiteStyle();
@@ -114,11 +120,16 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  // The pre-selected stay fills in only when the URL brought no dates of its
+  // own — a shared deep link's dates always win, even a partial pair.
+  const urlCheckin = searchParams.get("checkin");
+  const urlCheckout = searchParams.get("checkout");
+  const hasUrlDates = Boolean(urlCheckin || urlCheckout);
   const dates = useDateRange({
     closedDates,
     minCheckin: earliestCheckin,
-    initialCheckin: searchParams.get("checkin") ?? undefined,
-    initialCheckout: searchParams.get("checkout") ?? undefined,
+    initialCheckin: urlCheckin ?? (hasUrlDates ? undefined : preselect?.checkin),
+    initialCheckout: urlCheckout ?? (hasUrlDates ? undefined : preselect?.checkout),
     tr,
   });
   const [showCal, setShowCal] = useState(false);

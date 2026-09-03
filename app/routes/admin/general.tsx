@@ -277,6 +277,24 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           <p className="mt-3 rounded-[10px] bg-chip px-4 py-2.5 text-[12px] text-secondary">{cutoffSummary}</p>
         </section>
 
+        {/* Calendar pre-selection */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("genPreselect")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("genPreselectHint")}</p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input
+              type="checkbox"
+              name="preselectFirstAvailable"
+              defaultChecked={settings.preselectFirstAvailable}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">{t("genPreselectLabel")}</span>
+              <span className="block text-[12px] text-muted">{t("genPreselectDesc")}</span>
+            </span>
+          </label>
+        </section>
+
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genLegalLinks")}</div>
           <p className="mb-3 text-[13px] text-muted">{t("genLegalLinksHint")}</p>
