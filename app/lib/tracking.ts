@@ -138,3 +138,150 @@ export function clickAttribution(search: URLSearchParams | string): ClickAttribu
   }
   return out;
 }
+
+// ---- the funnel ----
+//
+// One item shape everywhere, because GA4 joins these events by `item_id` and a
+// room that is "r1" in the list and "Garden Suite" in the cart reports as two
+// products. Price is always the stay total for that room, matching `purchase`.
+
+export interface TrackedItem {
+  item_id: string;
+  item_name: string;
+  item_variant?: string;
+  price: number;
+  quantity: 1;
+}
+
+const item = (id: string, name: string, price: number, variant?: string): TrackedItem => ({
+  item_id: id,
+  item_name: name,
+  ...(variant ? { item_variant: variant } : {}),
+  price: round2(price),
+  quantity: 1,
+});
+
+export interface StayParams {
+  currency: string;
+  checkin: string;
+  checkout: string;
+  nights: number;
+  adults: number;
+  children: number;
+}
+
+/** The stay, on every funnel event — otherwise a hotel can segment its
+ *  conversions by length of stay but not the sessions that didn't convert,
+ *  which is the comparison that actually answers anything. */
+function stayParams(stay: StayParams): Record<string, unknown> {
+  return {
+    currency: stay.currency,
+    checkin: stay.checkin,
+    checkout: stay.checkout,
+    nights: stay.nights,
+    adults: stay.adults,
+    children: stay.children,
+  };
+}
+
+/** The rooms offered for a search. `price` is each room's cheapest all-in stay
+ *  total: the number on the card, so a hotel comparing GA4 against what guests
+ *  saw is comparing the same thing. */
+export function viewItemListEvent(
+  rooms: { id: string; title: string; ratePlans: { title: string; allInTotal?: number; totalPrice: string }[] }[],
+  stay: StayParams,
+): TrackingEvent | null {
+  if (!rooms.length) return null;
+  const items = rooms.flatMap((r) => {
+    const cheapest = r.ratePlans.reduce<{ title: string; price: number } | null>((best, rp) => {
+      const price = rp.allInTotal ?? Number(rp.totalPrice);
+      if (!Number.isFinite(price)) return best;
+      return !best || price < best.price ? { title: rp.title, price } : best;
+    }, null);
+    return cheapest ? [item(r.id, r.title, cheapest.price, cheapest.title)] : [];
+  });
+  if (!items.length) return null;
+  return {
+    event: "view_item_list",
+    params: { ...stayParams(stay), item_list_name: "rooms", ecommerce: { items } },
+  };
+}
+
+/** One room's page. Every rate is an item variant: which rate a guest looked at
+ *  before choosing is the question this event exists to answer. */
+export function viewItemEvent(
+  room: { id: string; title: string; ratePlans: { title: string; allInTotal?: number; totalPrice: string }[] },
+  stay: StayParams,
+): TrackingEvent | null {
+  const items = room.ratePlans
+    .map((rp) => ({ rp, price: rp.allInTotal ?? Number(rp.totalPrice) }))
+    .filter(({ price }) => Number.isFinite(price))
+    .map(({ rp, price }) => item(room.id, room.title, price, rp.title));
+  if (!items.length) return null;
+  return { event: "view_item", params: { ...stayParams(stay), ecommerce: { items } } };
+}
+
+/** The checkout page, valued at the same grand total `purchase` will report —
+ *  so checkout-to-purchase drop-off is a comparison of like with like. */
+export function beginCheckoutEvent(
+  lines: { roomId: string; roomTitle: string; rateTitle: string; total: number }[],
+  stay: StayParams,
+  grandTotal: number,
+): TrackingEvent | null {
+  if (!lines.length) return null;
+  return {
+    event: "begin_checkout",
+    params: {
+      ...stayParams(stay),
+      ecommerce: {
+        value: round2(grandTotal),
+        currency: stay.currency,
+        items: lines.map((l) => item(l.roomId, l.roomTitle, l.total, l.rateTitle)),
+      },
+    },
+  };
+}
+
+/**
+ * What changed in the cart between two `sel` values.
+ *
+ * There is no click to hang `add_to_cart` off — the guest navigates with a
+ * changed `sel` param, and diffing catches every path into the cart including
+ * deep links and the back button, with one implementation instead of one per
+ * button.
+ *
+ * `prev` being null means this is the first `sel` we have seen this session,
+ * which is where a shared link carrying three rooms would otherwise report
+ * three adds the guest never made. No previous state, no delta.
+ */
+export function cartDelta(
+  prev: string | null,
+  next: string,
+  resolve: (token: string) => { roomId: string; roomTitle: string; rateTitle: string; total: number } | undefined,
+  stay: StayParams,
+): TrackingEvent[] {
+  if (prev === null || prev === next) return [];
+  const tokens = (sel: string) => sel.split(",").map((t) => t.trim()).filter(Boolean);
+  const before = tokens(prev);
+  const after = tokens(next);
+
+  // Multiset difference: the same room can legitimately be in the cart twice,
+  // and a Set would silently swallow the second one.
+  const remaining = [...before];
+  const added: string[] = [];
+  for (const t of after) {
+    const i = remaining.indexOf(t);
+    if (i === -1) added.push(t);
+    else remaining.splice(i, 1);
+  }
+
+  const build = (event: string, list: string[]): TrackingEvent[] => {
+    const items = list.flatMap((t) => {
+      const line = resolve(t);
+      return line ? [item(line.roomId, line.roomTitle, line.total, line.rateTitle)] : [];
+    });
+    return items.length ? [{ event, params: { ...stayParams(stay), ecommerce: { items } } }] : [];
+  };
+
+  return [...build("add_to_cart", added), ...build("remove_from_cart", remaining)];
+}

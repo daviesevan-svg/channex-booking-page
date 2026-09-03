@@ -25,6 +25,10 @@ import { getPageText } from "~/lib/overrides.server";
 
 import { queueSearchEvent } from "~/lib/search-analytics.server";
 import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
+import { cartTokenMap } from "~/lib/cart-tokens";
+import { viewItemListEvent } from "~/lib/tracking";
+import { isTagged } from "~/lib/tracking-settings";
+import { TrackCart, TrackFunnel } from "~/components/tracking-events";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -200,7 +204,19 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     })),
   );
 
+  const stayParams = {
+    currency,
+    checkin,
+    checkout,
+    nights,
+    adults: occ.adults,
+    children: occ.childrenAge?.length ?? 0,
+  };
+
   return {
+    tracking: isTagged(settings.analytics)
+      ? { view: viewItemListEvent(priced, stayParams), sel: url.searchParams.get("sel") ?? "", cart: cartTokenMap(cartLines), stay: stayParams }
+      : null,
     rooms: priced,
     nights,
     bestMatchId,
@@ -216,6 +232,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     singleUnit: settings.singleUnit ?? false,
     query: { checkin, checkout, currency, adults: occ.adults, childrenAge: occ.childrenAge },
   };
+}
+
+
+/**
+ * What makes a list view a DIFFERENT list view.
+ *
+ * The dates, the party and any promo change which rooms are shown and at what
+ * price. The cart does not — `sel` and `xt` are what the guest has picked, and
+ * signing on the whole query string reported a second `view_item_list` every
+ * time a room was added or removed, so a guest comparing two rooms inflated the
+ * hotel's list views without ever seeing a new list.
+ */
+function listSignature(params: URLSearchParams): string {
+  const sig = new URLSearchParams(params);
+  for (const key of ["sel", "xt", "line"]) sig.delete(key);
+  sig.sort();
+  return sig.toString();
 }
 
 type EnrichedRoom = RoomWithRates & { fits: boolean };
@@ -589,7 +622,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
   const s = useSlots();
   const home = useHome();
-  const { rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
+  const { tracking, rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -646,6 +679,15 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
     >
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
+      )}
+      {/* The list, and any change to the cart the guest made to get here. The
+          signature is the search itself, so re-running a search reports a
+          second list view but re-rendering does not. */}
+      {tracking && (
+        <>
+          <TrackFunnel event={tracking.view} signature={`list:${listSignature(searchParams)}`} />
+          <TrackCart sel={tracking.sel} lines={tracking.cart} stay={tracking.stay} />
+        </>
       )}
       <div className="mb-[26px] flex flex-wrap items-end justify-between gap-5">
         <div>

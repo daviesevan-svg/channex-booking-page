@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { BookingRecord } from "./bookings.server";
 import { attributionFromCookies, parseAttribution, serializeAttribution } from "./attribution";
-import { clickAttribution, purchaseEvent } from "./tracking";
+import { beginCheckoutEvent, cartDelta, clickAttribution, purchaseEvent, viewItemEvent, viewItemListEvent } from "./tracking";
 
 // These numbers become a hotel's revenue in GA4 and their ROAS in Google Ads.
 // Everything here is about them being the numbers that were actually charged —
@@ -138,5 +138,88 @@ describe("click attribution", () => {
     expect(parseAttribution('{"gclid":"a","evil":"<script>"}')).toEqual({ gclid: "a" });
     expect(parseAttribution("not json")).toEqual({});
     expect(parseAttribution(undefined)).toEqual({});
+  });
+});
+
+const stay = { currency: "EUR", checkin: "2026-09-15", checkout: "2026-09-17", nights: 2, adults: 2, children: 0 };
+const items = (e: { params: Record<string, unknown> } | null) =>
+  (e!.params.ecommerce as { items: { item_id: string; item_variant?: string; price: number }[] }).items;
+
+describe("the funnel events", () => {
+  const rooms = [
+    { id: "r1", title: "Garden Suite", ratePlans: [
+      { title: "Room only", totalPrice: "300", allInTotal: 330 },
+      { title: "B&B", totalPrice: "400", allInTotal: 440 },
+    ] },
+    { id: "r2", title: "Attic", ratePlans: [{ title: "B&B", totalPrice: "200", allInTotal: 220 }] },
+  ];
+
+  it("lists each room once, at the all-in price shown on its card", () => {
+    const e = viewItemListEvent(rooms, stay)!;
+    expect(e.event).toBe("view_item_list");
+    expect(items(e)).toEqual([
+      { item_id: "r1", item_name: "Garden Suite", item_variant: "Room only", price: 330, quantity: 1 },
+      { item_id: "r2", item_name: "Attic", item_variant: "B&B", price: 220, quantity: 1 },
+    ]);
+  });
+
+  it("sends nothing when a search found nothing — an empty list is not a product view", () => {
+    expect(viewItemListEvent([], stay)).toBeNull();
+    expect(viewItemListEvent([{ id: "r1", title: "X", ratePlans: [] }], stay)).toBeNull();
+  });
+
+  it("reports every rate on a room page, since which one they looked at is the question", () => {
+    const e = viewItemEvent(rooms[0], stay)!;
+    expect(items(e).map((i) => [i.item_variant, i.price])).toEqual([["Room only", 330], ["B&B", 440]]);
+  });
+
+  it("values begin_checkout at the same grand total purchase will report", () => {
+    const e = beginCheckoutEvent(
+      [{ roomId: "r1", roomTitle: "Garden Suite", rateTitle: "B&B", total: 440 }],
+      stay,
+      512.5,
+    )!;
+    expect((e.params.ecommerce as { value: number }).value).toBe(512.5);
+    expect(e.params.nights).toBe(2);
+  });
+});
+
+describe("the cart diff", () => {
+  const line = (t: string) => ({ roomId: t.split(":")[0], roomTitle: t.split(":")[0].toUpperCase(), rateTitle: "B&B", total: 100 });
+
+  it("reports an add", () => {
+    const [e] = cartDelta("r1:x:2", "r1:x:2,r2:x:2", line, stay);
+    expect(e.event).toBe("add_to_cart");
+    expect(items(e).map((i) => i.item_id)).toEqual(["r2"]);
+  });
+
+  it("reports a removal", () => {
+    const [e] = cartDelta("r1:x:2,r2:x:2", "r1:x:2", line, stay);
+    expect(e.event).toBe("remove_from_cart");
+    expect(items(e).map((i) => i.item_id)).toEqual(["r2"]);
+  });
+
+  it("reports both when a room is swapped", () => {
+    const out = cartDelta("r1:x:2", "r2:x:2", line, stay);
+    expect(out.map((e) => e.event)).toEqual(["add_to_cart", "remove_from_cart"]);
+  });
+
+  it("counts the same room twice as two, which a Set would swallow", () => {
+    const [e] = cartDelta("r1:x:2", "r1:x:2,r1:x:2", line, stay);
+    expect(items(e)).toHaveLength(1);
+    const [rm] = cartDelta("r1:x:2,r1:x:2", "r1:x:2", line, stay);
+    expect(items(rm)).toHaveLength(1);
+  });
+
+  it("reports nothing for a shared link arriving with rooms already in it", () => {
+    expect(cartDelta(null, "r1:x:2,r2:x:2,r3:x:2", line, stay)).toEqual([]);
+  });
+
+  it("reports nothing when the cart did not change", () => {
+    expect(cartDelta("r1:x:2", "r1:x:2", line, stay)).toEqual([]);
+  });
+
+  it("drops a token it cannot resolve rather than sending a nameless item", () => {
+    expect(cartDelta("", "gone:x:2", () => undefined, stay)).toEqual([]);
   });
 });

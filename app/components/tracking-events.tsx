@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
 import { useConsent } from "~/components/tracking-scripts";
-import type { TrackingEvent } from "~/lib/tracking";
+import { cartDelta, type StayParams, type TrackingEvent } from "~/lib/tracking";
 
 function push(event: string, params: Record<string, unknown>): void {
   window.dataLayer = window.dataLayer || [];
@@ -78,5 +78,60 @@ export function TrackEvent({ event, dedupeKey }: { event: TrackingEvent | null; 
       });
     }
   }, [event, dedupeKey, adsGranted]);
+  return null;
+}
+
+/**
+ * A funnel event, once per distinct signature per page load.
+ *
+ * Not sessionStorage — unlike `purchase`, seeing the same room list twice in a
+ * session is a real second view and should report as one. The signature is
+ * what makes a repeat a repeat: same page, same search, same cart. Module
+ * scope so a remount (React strict mode, a re-render on consent change)
+ * doesn't refire it.
+ */
+const sentSignatures = new Set<string>();
+
+export function TrackFunnel({ event, signature }: { event: TrackingEvent | null; signature: string }) {
+  useEffect(() => {
+    if (!event || sentSignatures.has(signature)) return;
+    sentSignatures.add(signature);
+    push(event.event, event.params);
+  }, [event, signature]);
+  return null;
+}
+
+/**
+ * add_to_cart / remove_from_cart, from the change in `sel`.
+ *
+ * Two pieces of state have to survive a route change, so both are module scope:
+ * the last `sel` we saw (there is no delta without a before), and every cart
+ * line we have ever been told about. The second is what lets a REMOVAL be
+ * named — the room is by definition absent from the loader that notices it is
+ * gone, so if we did not remember it we could only report that something
+ * unidentified left the cart.
+ */
+let lastSel: string | null = null;
+const knownLines = new Map<string, { roomId: string; roomTitle: string; rateTitle: string; total: number }>();
+
+export function TrackCart({
+  sel,
+  lines,
+  stay,
+}: {
+  /** The raw `sel` param — diffed as text, so it matches what the URL carries. */
+  sel: string;
+  /** This page's resolved cart, keyed by the same token text. */
+  lines: Record<string, { roomId: string; roomTitle: string; rateTitle: string; total: number }>;
+  stay: StayParams;
+}) {
+  useEffect(() => {
+    for (const [token, line] of Object.entries(lines)) knownLines.set(token, line);
+    // First sel of the session: remembered, never reported. A shared link
+    // carrying three rooms is not three adds the guest made.
+    const events = cartDelta(lastSel, sel, (t) => knownLines.get(t), stay);
+    lastSel = sel;
+    for (const e of events) push(e.event, e.params);
+  }, [sel, lines, stay]);
   return null;
 }
