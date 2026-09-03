@@ -383,6 +383,7 @@ const TR: Dict = {
     "Bu rezervasyonun iade edilemez olduğunu ve kartımdan bugün {amount} tahsil edileceğini anlıyorum.",
   ackNonRefundable: "Bu rezervasyonun iade edilemez olduğunu anlıyorum.",
   ackCharged: "Kartımdan bugün {amount} tahsil edileceğini anlıyorum.",
+  reviewPreviewNote: "Önizleme — misafirinizin gördüğü sayfa budur. Buraya yazdıklarınız kaydedilmez.",
   reviewHeading: "Konaklamanız nasıldı?",
   reviewIntro:
     "Geri bildiriminiz {hotel} tesisinin gelişmesine ve gelecekteki misafirlerin karar vermesine yardımcı olur.",

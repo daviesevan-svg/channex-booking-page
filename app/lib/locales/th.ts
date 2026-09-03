@@ -365,6 +365,7 @@ const TH: Dict = {
   ackNonRefundable: "ฉันเข้าใจว่าการจองนี้ไม่สามารถขอเงินคืนได้",
   ackCharged: "ฉันเข้าใจว่าบัตรของฉันจะถูกเรียกเก็บ {amount} ในวันนี้",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "ตัวอย่าง — นี่คือหน้าที่ผู้เข้าพักของคุณเห็น สิ่งที่กรอกที่นี่จะไม่ถูกบันทึก",
   reviewHeading: "การเข้าพักของคุณเป็นอย่างไร",
   reviewIntro: "ความคิดเห็นของคุณช่วยให้ {hotel} พัฒนาขึ้น และช่วยผู้เข้าพักคนต่อไปตัดสินใจ",
   overallRating: "คะแนนโดยรวม",
