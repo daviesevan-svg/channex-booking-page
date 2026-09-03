@@ -57,7 +57,7 @@ function localNowParts(tz: string, now: Date): { date: string; minutes: number }
   }
 }
 
-function addDaysISO(dateISO: string, n: number): string {
+export function addDaysISO(dateISO: string, n: number): string {
   return new Date(Date.parse(`${dateISO}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }
 
