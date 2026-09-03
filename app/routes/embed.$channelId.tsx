@@ -1,7 +1,7 @@
 import { Outlet } from "react-router";
 
 import type { Route } from "./+types/embed.$channelId";
-import { FontStylesheet } from "~/components/font-stylesheet";
+import { FontFaces } from "~/components/font-faces";
 import { accentColors, mixWithWhite } from "~/lib/accessible-accent";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import { DEFAULT_THEME, fontPair, langFromRequest } from "~/lib/content";
@@ -78,10 +78,10 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
-      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
-          It's rendered here rather than in `links()` because the chosen pair only
-          becomes known from loader data. */}
-      <FontStylesheet href={font.href} />
+      {/* Inline @font-face for the chosen pair, served from our own origin —
+          see FontFaces. Rendered here rather than in `links()` because the pair
+          only becomes known from loader data. */}
+      <FontFaces pair={font.id} />
       <Outlet context={context} />
     </div>
   );

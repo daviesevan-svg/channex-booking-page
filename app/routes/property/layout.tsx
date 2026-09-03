@@ -23,7 +23,7 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { formatAddress } from "~/lib/address";
-import { FontStylesheet } from "~/components/font-stylesheet";
+import { FontFaces } from "~/components/font-faces";
 import { ConsentSettingsLink, TrackingRoot } from "~/components/tracking-scripts";
 import { PageViews } from "~/components/tracking-events";
 import { consentFromCookies, consentGate } from "~/lib/consent";
@@ -467,10 +467,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
       data-headings={style.headings ? "" : undefined}
       style={themeStyle}
     >
-      {/* Non-blocking, same as the default pair in root — see FontStylesheet.
-          It's rendered here rather than in `links()` because the chosen pair only
-          becomes known from loader data. */}
-      <FontStylesheet href={font.href} />
+      {/* Inline @font-face for the chosen pair, served from our own origin —
+          see FontFaces. Rendered here rather than in `links()` because the pair
+          only becomes known from loader data. */}
+      <FontFaces pair={font.id} />
       {/* The hotel's own tab icon. Rendered here, not in root: root resolves a
           favicon from the HOSTNAME (a partner's), and only this layout knows
           which property the request is for — resolving it up there would mean

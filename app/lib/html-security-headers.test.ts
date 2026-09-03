@@ -70,17 +70,27 @@ describe("htmlSecurityHeaders", () => {
     expect(cspMap("/embed/p")["frame-ancestors"]).toBe("*");
   });
 
-  it("allows Maps, fonts, and inline hydration without Stripe/Viva frame-src", () => {
+  it("allows Maps and inline hydration without Stripe/Viva frame-src", () => {
     const csp = cspMap("/hotel");
     expect(csp["script-src"]).toContain("'unsafe-inline'");
     expect(csp["script-src"]).toContain("https://maps.googleapis.com");
     expect(csp["script-src"]).not.toContain("js.stripe.com");
-    expect(csp["style-src"]).toContain("https://fonts.googleapis.com");
-    expect(csp["font-src"]).toContain("https://fonts.gstatic.com");
     expect(csp["img-src"]).toContain("https:");
     expect(csp["frame-src"]).toBe("'self'");
     expect(csp["frame-src"]).not.toContain("stripe");
     expect(csp["frame-src"]).not.toContain("viva");
+  });
+
+  // The typefaces are mirrored into public/fonts/ and served from 'self'. This
+  // asserts the policy that keeps it that way: if someone re-adds a Google font
+  // host, the browser would happily fetch from it again and every German guest's
+  // IP would go back to Google. CSP is the only mechanism that fails loudly.
+  it("gives fonts no route back to Google", () => {
+    const csp = cspMap("/hotel");
+    expect(csp["font-src"]).toBe("'self' data:");
+    expect(csp["style-src"]).not.toContain("fonts.googleapis.com");
+    expect(csp["style-src"]).not.toContain("fonts.gstatic.com");
+    expect(csp["default-src"]).toBe("'self'");
   });
 
   it("lets Chrome follow the checkout/Connect POST→302 onto Stripe and Viva", () => {

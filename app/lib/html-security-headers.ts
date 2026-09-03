@@ -36,7 +36,7 @@
 // CSP exceptions that would break the existing app if omitted:
 //
 //  * script-src/style-src `'unsafe-inline'` — React Router hydration, the
-//    FontStylesheet loader, JSON-adjacent inline tags, and React `style={{}}`.
+//    inline @font-face block, JSON-adjacent inline tags, and React `style={{}}`.
 //    A nonce would be tighter but would have to thread through every inline
 //    emission; that is a follow-up, not this change.
 //  * maps.googleapis.com / maps.gstatic.com / *.googleapis.com — click-to-load
@@ -48,7 +48,11 @@
 //    can't be: the policy is a static header, the decision is per property and
 //    per guest. Given script-src already carries 'unsafe-inline' for
 //    hydration, a conditional header would buy nothing real here.
-//  * fonts.googleapis.com / fonts.gstatic.com — the FONT_PAIRS stylesheets.
+//    (Google's FONT hosts are a different matter and are NOT here: the
+//    typefaces are mirrored into public/fonts/ and served from 'self' — see
+//    scripts/fetch-fonts.mjs. Do not re-add them; a guest's browser reaching
+//    Google for a font is the exposure that self-hosting exists to remove, and
+//    here CSP is exactly what keeps it that way.)
 //  * img-src https: — hotel-supplied photos, partner favicons, booking.com
 //    import URLs, and Maps tiles (khms*, streetview, gstatic).
 //  * form-action Stripe + Viva hosts — Chrome applies form-action to the
@@ -91,10 +95,10 @@ export function documentContentSecurityPolicy(pathname: string, partner: Partner
     "default-src 'self'",
     "base-uri 'self'",
     "object-src 'none'",
-    // Hydration + FontStylesheet + Maps bootstrap (maps.google* only; no Stripe.js).
+    // Hydration + inline @font-face + Maps bootstrap + the tag manager.
     "script-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com https://www.googletagmanager.com",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com https://maps.googleapis.com https://maps.gstatic.com",
-    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://maps.googleapis.com https://maps.gstatic.com",
+    "font-src 'self' data:",
     "img-src 'self' data: blob: https:",
     "connect-src 'self' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://www.google.com https://googleads.g.doubleclick.net https://pagead2.googlesyndication.com https://www.googleadservices.com",
     "worker-src 'self' blob:",
