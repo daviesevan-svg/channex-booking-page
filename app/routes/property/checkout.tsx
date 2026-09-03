@@ -1,7 +1,7 @@
 import { format, parseISO } from "date-fns";
 
 import { useState } from "react";
-import { Form, Link, redirect, useNavigation, useSearchParams } from "react-router";
+import { Form, Link, redirect, redirectDocument, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
 import { z } from "zod";
 
@@ -429,7 +429,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     fingerprint,
     (ref) => `${base}/confirmation/${ref}?${next.toString()}`,
   );
-  if (resolved.kind === "redirect") throw redirect(resolved.url);
+  // A replay that lands on the confirmation page goes as a DOCUMENT navigation,
+  // for the same reason as the first-time redirect below. A replay to a payment
+  // URL is cross-origin and was always a document navigation anyway.
+  if (resolved.kind === "redirect") throw (resolved.document ? redirectDocument : redirect)(resolved.url);
   const reference = resolved.reference;
 
   // Throttle new booking creation per client — not replays of a stay we
@@ -637,7 +640,25 @@ export async function action({ params, request }: Route.ActionArgs) {
     return { bookingError: record.error };
   }
   await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "confirmed", reference });
-  return redirect(`${base}/confirmation/${reference}?${next.toString()}`);
+  // redirectDocument, NOT redirect: the booking is already created, pushed to
+  // the PMS and emailed, so this navigation must not be able to fail.
+  //
+  // A plain redirect is followed CLIENT-side. React Router first has to
+  // discover the confirmation route, which for a tab opened before the last
+  // deploy means GET /__manifest?...&version=<stale> — and the server answers
+  // that 204 with X-Remix-Reload-Document. React Router's own recovery for it
+  // gives up silently once sessionStorage already holds that stale version
+  // (fog-of-war.js), and the vite:preloadError handler in entry.client.tsx
+  // can't stand in: a 204 from a fetch is not a module preload failure. The
+  // route is never discovered, the navigation dies, and the guest gets the
+  // root error boundary — with the booking made and the confirmation email in
+  // their inbox. A Portuguese guest lost a seven-room Christmas booking to
+  // exactly this on 2026-09-02; the Worker logged the action as a clean 202 and
+  // never saw a request for the confirmation page at all.
+  //
+  // A document redirect is a plain GET against the current deployment: no
+  // manifest lookup, no route discovery, no chunks from a build that is gone.
+  return redirectDocument(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 
 // Channex validates arrival_hour as strict HH:MM — offer a fixed list of times
