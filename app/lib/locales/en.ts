@@ -561,6 +561,22 @@ const EN: Dict = {
   star_other: "{n} stars",
   reviewTapStar: "Tap a star to start your review",
   reviewOpenPage: "Or open the review page",
+
+  // -- consent banner --
+  ccTitle: "Cookies on this page",
+  ccBody: "We measure how this booking page is used, and whether an advert brought you here. Nothing is loaded until you choose.",
+  ccAcceptAll: "Accept all",
+  ccRejectAll: "Reject all",
+  ccConfigure: "Choose",
+  ccSave: "Save choices",
+  ccNecessary: "Necessary",
+  ccNecessaryDesc: "Your dates, your chosen rooms and your booking. Always on — the page cannot work without them.",
+  ccAnalytics: "Analytics",
+  ccAnalyticsDesc: "How guests move through the booking steps, so the hotel can see where it goes wrong.",
+  ccAds: "Advertising",
+  ccAdsDesc: "Whether an advert led to your booking. Used for the hotel's own advertising reports.",
+  ccSettings: "Cookie settings",
+
 };
 
 export default EN;

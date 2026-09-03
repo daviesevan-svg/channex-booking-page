@@ -557,6 +557,22 @@ const DE: Dict = {
   star_other: "{n} Sterne",
   reviewTapStar: "Tippen Sie auf einen Stern, um Ihre Bewertung zu beginnen",
   reviewOpenPage: "Oder öffnen Sie die Bewertungsseite",
+
+  // -- consent banner --
+  ccTitle: "Cookies auf dieser Seite",
+  ccBody: "Wir messen, wie diese Buchungsseite genutzt wird und ob Sie über eine Anzeige hierher gekommen sind. Bis zu Ihrer Entscheidung wird nichts geladen.",
+  ccAcceptAll: "Alle akzeptieren",
+  ccRejectAll: "Alle ablehnen",
+  ccConfigure: "Auswählen",
+  ccSave: "Auswahl speichern",
+  ccNecessary: "Notwendig",
+  ccNecessaryDesc: "Ihre Daten, Ihre gewählten Zimmer und Ihre Buchung. Immer aktiv – ohne sie funktioniert die Seite nicht.",
+  ccAnalytics: "Statistik",
+  ccAnalyticsDesc: "Wie Gäste die Buchungsschritte durchlaufen, damit das Hotel sieht, wo es hakt.",
+  ccAds: "Werbung",
+  ccAdsDesc: "Ob eine Anzeige zu Ihrer Buchung geführt hat. Wird für die Werbeauswertung des Hotels genutzt.",
+  ccSettings: "Cookie-Einstellungen",
+
 };
 
 export default DE;
