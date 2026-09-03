@@ -1,4 +1,5 @@
 import { addDays, format, parseISO } from "date-fns";
+import type { ClickAttribution } from "./tracking";
 
 import type { CancellationSnapshot } from "./policy.server";
 import type { AppliedPromo } from "./promotions";
@@ -140,6 +141,16 @@ export interface BookingRecord {
   payment?: PaymentInfo;
   /** Extras ("Enhance your stay") purchased, priced at booking time. */
   extras?: ResolvedExtra[];
+  /**
+   * Where the booking came from: the click ID and campaign parameters on the
+   * URL the guest first landed on, snapshotted at checkout.
+   *
+   * Only present when the guest allowed advertising — before that the click ID
+   * is never written down (see lib/attribution.ts). Its job is the one thing
+   * the live conversion tag cannot do: match a booking to its ad AFTER the
+   * fact, for a hotel importing offline conversions or reconciling by hand.
+   */
+  attribution?: ClickAttribution;
   /** Consent captured at checkout — the defence for disputes/chargebacks. */
   consent?: {
     acceptedAt: string;

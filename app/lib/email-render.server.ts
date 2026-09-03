@@ -391,10 +391,15 @@ export function composeReviewEmail(args: {
   };
 }
 
+/** The id the preview/test booking carries. The guest review page recognises it
+ *  and renders itself read-only instead of 404ing on a booking that was never
+ *  in the database — see routes/property/review.tsx. */
+export const SAMPLE_BOOKING_ID = "sample";
+
 /** A representative booking for editor previews + test sends. */
 export function sampleBooking(currency = "GBP"): BookingRecord {
   return {
-    id: "sample",
+    id: SAMPLE_BOOKING_ID,
     reference: "AB7C9XK2",
     status: "confirmed",
     lifecycle: "active",

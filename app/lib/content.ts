@@ -38,6 +38,34 @@ export const DEFAULT_PROMO_PLACEHOLDER = "SUMMER10";
  * a guest can't re-read on another page would be a worse consent record, not a
  * better one.
  */
+/**
+ * How a property's non-essential tags are gated.
+ *
+ *  banner    our own banner asks, and nothing fires until the guest says yes.
+ *  external  the hotel's own CMP (Cookiebot, OneTrust, Osano) grants — we emit
+ *            Consent Mode defaults of denied and show no banner of our own.
+ *  off       tags fire immediately. Legal outside the EU/EEA; inside it, the
+ *            hotel is choosing to carry that risk, and the admin copy says so.
+ *
+ * The default is `banner`, deliberately: the posture that is safe everywhere is
+ * the one a hotel gets by not reading the setting.
+ */
+export type ConsentPosture = "banner" | "external" | "off";
+
+export interface AnalyticsSettings {
+  /** GA4 Measurement IDs (`G-…`). Plural because hotel-plus-agency dual tagging
+   *  is the normal case, not an edge case. */
+  ga4MeasurementIds?: string[];
+  /** Google Tag Manager container (`GTM-…`). */
+  gtmContainerId?: string;
+  /** Google Ads conversion (`AW-…` plus the conversion's label). Both or
+   *  neither — a send_to needs the pair, and half of one silently measures
+   *  nothing. */
+  adsConversionId?: string;
+  adsConversionLabel?: string;
+  consent?: ConsentPosture;
+}
+
 export interface LegalLink {
   label: string;
   url?: string;
@@ -337,6 +365,11 @@ export interface SiteSettings {
   /** Guest-facing property facilities — keys from PROPERTY_FACILITIES. Free-text
    *  extras live per language in the content store (they need translating). */
   facilities?: string[];
+  // ----- Analytics & advertising -----
+  /** Measurement tags and the consent posture that governs them. Absent means
+   *  the property is untagged: nothing third-party loads, and no consent banner
+   *  is shown because there is nothing to consent to. */
+  analytics?: AnalyticsSettings;
   /** Links shown in the checkout consent line (rendered as links only when set). */
   termsUrl?: string;
   privacyUrl?: string;

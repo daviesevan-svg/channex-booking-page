@@ -24,6 +24,10 @@ import {
 } from "~/lib/content";
 import { formatAddress } from "~/lib/address";
 import { FontFaces } from "~/components/font-faces";
+import { ConsentSettingsLink, TrackingRoot } from "~/components/tracking-scripts";
+import { PageViews } from "~/components/tracking-events";
+import { consentFromCookies, consentGate } from "~/lib/consent";
+import { isTagged } from "~/lib/tracking-settings";
 import { LanguageSwitcher } from "~/components/language-switcher";
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getPublicOffers } from "~/lib/promotions.server";
@@ -193,6 +197,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
     termsUrl: settings.termsUrl ?? null,
     privacyUrl: settings.privacyUrl ?? null,
+    // Measurement, and whether this guest has to be asked before any of it
+    // loads. Decided here rather than in the browser so the banner is in the
+    // first HTML — a banner that appears after hydration is a layout shift on
+    // top of a legal notice.
+    analytics: settings.analytics ?? {},
+    consent: consentGate({
+      posture: settings.analytics?.consent,
+      tagged: isTagged(settings.analytics),
+      country: request.headers.get("cf-ipcountry"),
+      propertyCountry: settings.addressCountry,
+      stored: consentFromCookies(request.headers.get("Cookie")),
+    }),
     // Footer links only — a row without a URL has nothing to link to, and its
     // label is already in front of the guest as a checkout tick-box.
     legalLinks: (settings.legalLinks ?? []).filter((l) => l.url),
@@ -275,7 +291,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, footerBrand, adminHref } =
+  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, analytics, consent, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -420,6 +436,21 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
   return (
     <SiteStyleProvider id={siteStyleId ?? undefined}>
+    {/* Wraps the whole guest tree — marketing pages, funnel and confirmation
+        alike — on the layout mounted at both `/:channelId` and the custom-domain
+        root. It has to WRAP rather than sit beside: the confirmation page reads
+        live consent to decide whether the Google Ads conversion may fire, and a
+        sibling can't provide context. Renders no banner and loads no script for
+        an untagged property. The embed iframe is a separate tree, so the widget
+        stays untagged by construction rather than by someone remembering. */}
+    <TrackingRoot
+      analytics={analytics}
+      ask={consent.ask}
+      granted={consent.granted}
+      privacyUrl={privacyUrl ?? undefined}
+      tr={tr}
+    >
+    <PageViews />
     {/* The wrapper covers the viewport, but `body` keeps the default cream from
         app.css — which shows as a pale band the moment a dark page is rubber-
         banded on iOS, and behind the address bar. The page colour is a validated
@@ -584,6 +615,16 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
                 </a>
               </Fragment>
             ))}
+            {/* Only where we actually asked. A choice you can't revisit isn't a
+                choice — "withdraw as easily as you gave" is the wording of the
+                rule — but a hotel whose CMP handles consent has its own link,
+                and an untagged one has nothing to withdraw. */}
+            {analytics.consent !== "external" && isTagged(analytics) && (
+              <>
+                <span className="text-faint">·</span>
+                <ConsentSettingsLink label={tr.t("ccSettings")} />
+              </>
+            )}
           </span>
           <span className="flex items-center gap-2">
             {tr.t("footerRight", { brand: footerBrand })}
@@ -612,6 +653,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         </div>
       </footer>
     </div>
+    </TrackingRoot>
     </SiteStyleProvider>
   );
 }

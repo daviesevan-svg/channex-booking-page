@@ -287,6 +287,7 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         // Integrations
         { to: "/admin/connectivity", label: t("navConnectivity"), page: "connectivity" },
         { to: "/admin/google-hotels", label: t("navGoogle"), page: "google-hotels" },
+        { to: "/admin/tracking", label: t("navTracking") },
         { to: "/admin/website-widget", label: t("navWidget") },
         { to: "/admin/brand-kit", label: t("navBrandKit"), page: "brand-kit" },
         { to: "/admin/payments", label: t("navPayments"), area: "payments" },

@@ -25,6 +25,9 @@ import { childrenAgeParam, partySize, ratePlansForParty, roomCapacity } from "~/
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
 import { funnelContext, queueFunnelEvent } from "~/lib/funnel-analytics.server";
+import { viewItemEvent } from "~/lib/tracking";
+import { isTagged } from "~/lib/tracking-settings";
+import { TrackFunnel } from "~/components/tracking-events";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -139,7 +142,32 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
   ]);
 
+  const stayParams = {
+    currency,
+    checkin,
+    checkout,
+    nights,
+    adults,
+    children: childrenAge?.length ?? 0,
+  };
+
   return {
+    // Every rate on the page, priced all-in like the cards: which rate a guest
+    // looked at before choosing is the question this event answers.
+    tracking: isTagged(settings.analytics)
+      ? viewItemEvent(
+          {
+            id: room.id,
+            title: room.title,
+            ratePlans: ratePlansForParty(room, party).map((rp) => ({
+              title: rp.title,
+              totalPrice: rp.totalPrice,
+              allInTotal: allIn(Number(rp.totalPrice)),
+            })),
+          },
+          stayParams,
+        )
+      : null,
     room,
     nights,
     party,
@@ -228,7 +256,7 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
+  const { tracking, room, nights, party, searched, maxAdults, capacity, defaultAdults, defaultChildrenCount, childrenPool, editIndex, editRateId, text, jsonLd, taxConfig, cleaningFee, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -341,6 +369,9 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
+      {/* Signed by the room and the search, so changing the party size on this
+          page reports a fresh view of what is now a different set of prices. */}
+      <TrackFunnel event={tracking} signature={`item:${params.roomId}:${qs}`} />
       <Link
         to={singleUnit ? `${base}?${qs}` : `${base}/rooms?${qs}`}
         className="mb-5 inline-block text-sm font-semibold text-muted hover:text-accent"
