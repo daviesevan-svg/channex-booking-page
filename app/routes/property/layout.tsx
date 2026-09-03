@@ -25,6 +25,7 @@ import {
 import { formatAddress } from "~/lib/address";
 import { FontStylesheet } from "~/components/font-stylesheet";
 import { ConsentSettingsLink, TrackingRoot } from "~/components/tracking-scripts";
+import { PageViews } from "~/components/tracking-events";
 import { consentFromCookies, consentGate } from "~/lib/consent";
 import { isTagged } from "~/lib/tracking-settings";
 import { LanguageSwitcher } from "~/components/language-switcher";
@@ -435,6 +436,21 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
 
   return (
     <SiteStyleProvider id={siteStyleId ?? undefined}>
+    {/* Wraps the whole guest tree — marketing pages, funnel and confirmation
+        alike — on the layout mounted at both `/:channelId` and the custom-domain
+        root. It has to WRAP rather than sit beside: the confirmation page reads
+        live consent to decide whether the Google Ads conversion may fire, and a
+        sibling can't provide context. Renders no banner and loads no script for
+        an untagged property. The embed iframe is a separate tree, so the widget
+        stays untagged by construction rather than by someone remembering. */}
+    <TrackingRoot
+      analytics={analytics}
+      ask={consent.ask}
+      granted={consent.granted}
+      privacyUrl={privacyUrl ?? undefined}
+      tr={tr}
+    >
+    <PageViews />
     {/* The wrapper covers the viewport, but `body` keeps the default cream from
         app.css — which shows as a pale band the moment a dark page is rubber-
         banded on iOS, and behind the address bar. The page colour is a validated
@@ -636,20 +652,8 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           </span>
         </div>
       </footer>
-
-      {/* Mounted once for the whole guest tree, on the layout that wraps every
-          route — marketing pages, funnel and confirmation alike. Renders
-          nothing at all for an untagged property. The embed iframe has its own
-          tree, so the widget stays untagged by construction rather than by
-          someone remembering to exclude it. */}
-      <TrackingRoot
-        analytics={analytics}
-        ask={consent.ask}
-        granted={consent.granted}
-        privacyUrl={privacyUrl ?? undefined}
-        tr={tr}
-      />
     </div>
+    </TrackingRoot>
     </SiteStyleProvider>
   );
 }

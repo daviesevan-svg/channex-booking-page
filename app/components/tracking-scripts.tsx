@@ -24,13 +24,45 @@
 // not storage, and both GTM and gtag replay what they find in it when they
 // load. So a guest who accepts on the checkout page still reports the steps
 // they took before accepting, and a guest who declines has had nothing sent.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConsentBanner, type ConsentDecision } from "~/components/consent-banner";
+import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE_SEC, serializeAttribution } from "~/lib/attribution";
 import { consentModeSignals } from "~/lib/consent";
+import { clickAttribution, type ClickAttribution } from "~/lib/tracking";
 import type { Translator } from "~/lib/i18n";
 import type { AnalyticsSettings } from "~/lib/content";
 import { isTagged } from "~/lib/tracking-settings";
+
+/**
+ * What the guest has allowed, for anything that needs to branch on it.
+ *
+ * Defaults to nothing granted: a component rendered outside the provider is a
+ * component on a page with no tags, and "assume denied" is the only safe answer
+ * to a question nobody set up.
+ */
+const ConsentContext = createContext<ConsentDecision>({ analytics: false, ads: false });
+export const useConsent = () => useContext(ConsentContext);
+
+/**
+ * The click ID from the landing URL, held in memory.
+ *
+ * Read once, at module load, and never written to the device until advertising
+ * consent exists — a gclid is unrecoverable if not taken at landing and not
+ * storable before the guest agrees. See lib/attribution.ts.
+ */
+let landingAttribution: ClickAttribution | null = null;
+function captureLanding(): ClickAttribution {
+  if (landingAttribution) return landingAttribution;
+  landingAttribution = typeof window === "undefined" ? {} : clickAttribution(window.location.search);
+  return landingAttribution;
+}
+
+function writeAttributionCookie(a: ClickAttribution): void {
+  if (!Object.keys(a).length) return;
+  const secure = location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${ATTRIBUTION_COOKIE}=${encodeURIComponent(serializeAttribution(a))}; Path=/; Max-Age=${ATTRIBUTION_MAX_AGE_SEC}; SameSite=Lax${secure}`;
+}
 
 /** Dispatch this to reopen the banner — the footer's "Cookie settings". A
  *  window event rather than context: the link lives several components away in
@@ -120,6 +152,7 @@ export function TrackingRoot({
   granted: initialGranted,
   privacyUrl,
   tr,
+  children,
 }: {
   analytics: AnalyticsSettings;
   /** Show the banner now (server-decided, so there is no flash). */
@@ -129,6 +162,8 @@ export function TrackingRoot({
   /** The guest's translator — see ConsentBanner for why it is threaded rather
    *  than taken from useT(). */
   tr: Translator;
+  /** The guest tree, so everything under it can read the consent context. */
+  children?: React.ReactNode;
 }) {
   const [granted, setGranted] = useState(initialGranted);
   const [open, setOpen] = useState(ask);
@@ -139,6 +174,20 @@ export function TrackingRoot({
   const done = useRef<Set<string>>(new Set());
 
   const tagged = isTagged(analytics);
+
+  // Take the click ID out of the URL before the first client-side navigation
+  // replaces it. Memory only — writing it down needs consent, below.
+  useEffect(() => {
+    if (tagged) captureLanding();
+  }, [tagged]);
+
+  // Once advertising is allowed, the click ID may be stored: it is what lets
+  // this booking be matched to the ad that paid for it, including through the
+  // payment redirect, and it is written at the moment permission arrives rather
+  // than at landing.
+  useEffect(() => {
+    if (tagged && granted.ads) writeAttributionCookie(captureLanding());
+  }, [tagged, granted.ads]);
 
   // "Cookie settings" in the footer, and anything else that wants to reopen it.
   useEffect(() => {
@@ -168,8 +217,6 @@ export function TrackingRoot({
     syncTags(analytics, granted, done.current);
   }, [tagged, granted, analytics]);
 
-  if (!tagged) return null;
-
   const choose = (choice: ConsentDecision) => {
     setGranted(choice);
     setOpen(false);
@@ -180,9 +227,24 @@ export function TrackingRoot({
   // RIGHT NOW, which is this state and not the loader's — a choice made a
   // moment ago doesn't revalidate the layout, so reading it from loader data
   // reopened the panel on a blank slate and offered to "save" it.
-  return open ? (
-    <ConsentBanner current={reopened ? granted : undefined} onChoice={choose} privacyUrl={privacyUrl} tr={tr} />
-  ) : null;
+  return (
+    <ConsentProvider granted={tagged ? granted : DENIED}>
+      {tagged && open ? (
+        <ConsentBanner current={reopened ? granted : undefined} onChoice={choose} privacyUrl={privacyUrl} tr={tr} />
+      ) : null}
+      {children}
+    </ConsentProvider>
+  );
+}
+
+const DENIED: ConsentDecision = { analytics: false, ads: false };
+
+function ConsentProvider({ granted, children }: { granted: ConsentDecision; children?: React.ReactNode }) {
+  // Memoised on the two booleans, not the object: a new object every render
+  // would re-run every consumer's effects, and one of those consumers fires a
+  // purchase conversion.
+  const value = useMemo(() => ({ analytics: granted.analytics, ads: granted.ads }), [granted.analytics, granted.ads]);
+  return <ConsentContext.Provider value={value}>{children}</ConsentContext.Provider>;
 }
 
 /** The footer entry that reopens the banner. Required where consent was asked

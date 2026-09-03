@@ -10,6 +10,10 @@ import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
 import { getPageText, getSettings } from "~/lib/overrides.server";
+import { getBookingByReference } from "~/lib/bookings.server";
+import { purchaseEvent } from "~/lib/tracking";
+import { isTagged } from "~/lib/tracking-settings";
+import { TrackEvent } from "~/components/tracking-events";
 
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { taxConfigFrom } from "~/lib/pricing";
@@ -108,8 +112,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { adults: occ.adults, children: occ.childrenAge?.length ?? 0 },
   );
 
+  // The analytics payload is built from the STORED booking, never from the
+  // numbers above: everything this page displays is recomputed from query
+  // params, so a guest editing the URL changes what they see. Reporting revenue
+  // the same way would let a guest edit the hotel's Google Ads figures from the
+  // address bar, and any drift from what was actually captured would show up as
+  // revenue that never reconciles against Stripe. Null for an untagged property
+  // (nothing to send), a failed booking, or a cancelled one.
+  const booking = isTagged(settings.analytics) && params.ref ? await getBookingByReference(pid, params.ref) : undefined;
+  const purchase = booking
+    ? purchaseEvent(booking, { propertyId: pid, analytics: settings.analytics })
+    : null;
+
   return {
     reference: params.ref,
+    purchase,
     simulated,
     failed,
     refunded,
@@ -138,7 +155,7 @@ export function meta({ matches }: Route.MetaArgs) {
 
 export default function Confirmation({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
-  const { reference, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, valueAdds, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
+  const { reference, purchase, simulated, failed, refunded, rooms, currency, total, discount, promoCode, offer, valueAdds, pricing, extraLines, grandTotal, checkin, checkout, nights, adults, childrenAge, text } =
     loaderData;
   const { hotelName } = useProperty();
   const tr = useT();
@@ -185,6 +202,11 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
 
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-16 text-center">
+      {/* Once per booking reference, per tab. This page is refreshable,
+          bookmarkable and reachable by back-navigation, and each of those would
+          otherwise report another sale. Not rendered in the `failed` branch
+          above — a refunded failure is not revenue. */}
+      <TrackEvent event={purchase} dedupeKey={`rp_purchase_${reference}`} />
       {simulated && (
         <div className={cx("mb-6", s.well, "px-4 py-3 text-caption text-muted")}>
           {tr.t("demoMode")}
