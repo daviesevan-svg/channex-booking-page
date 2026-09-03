@@ -295,6 +295,7 @@ const IT: Dict = {
   ackNonRefundable: "Comprendo che questa prenotazione non è rimborsabile.",
   ackCharged: "Comprendo che oggi verrà addebitato {amount} sulla mia carta.",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "Anteprima — questa è la pagina che vede il tuo ospite. Quello che scrivi qui non viene salvato.",
   reviewHeading: "Com’è andato il soggiorno?",
   reviewIntro: "Il tuo feedback aiuta {hotel} a migliorare e i futuri ospiti a scegliere.",
   overallRating: "Valutazione complessiva",

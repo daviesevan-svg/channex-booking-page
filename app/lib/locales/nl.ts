@@ -295,6 +295,7 @@ const NL: Dict = {
   ackNonRefundable: "Ik begrijp dat deze boeking niet-restitueerbaar is.",
   ackCharged: "Ik begrijp dat vandaag {amount} van mijn kaart wordt afgeschreven.",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "Voorbeeld — dit is de pagina die uw gast ziet. Wat u hier invult, wordt niet opgeslagen.",
   reviewHeading: "Hoe was uw verblijf?",
   reviewIntro: "Uw feedback helpt {hotel} te verbeteren en toekomstige gasten te kiezen.",
   overallRating: "Algemene beoordeling",

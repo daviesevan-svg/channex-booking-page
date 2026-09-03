@@ -352,6 +352,7 @@ const EL: Dict = {
   ackNonRefundable: "Κατανοώ ότι αυτή η κράτηση δεν επιστρέφεται.",
   ackCharged: "Κατανοώ ότι η κάρτα μου θα χρεωθεί με {amount} σήμερα.",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "Προεπισκόπηση — αυτή είναι η σελίδα που βλέπει ο επισκέπτης σας. Ό,τι γράψετε εδώ δεν αποθηκεύεται.",
   reviewHeading: "Πώς ήταν η διαμονή σας;",
   reviewIntro: "Η γνώμη σας βοηθά το {hotel} να βελτιωθεί και τους μελλοντικούς επισκέπτες να επιλέξουν.",
   overallRating: "Συνολική βαθμολογία",

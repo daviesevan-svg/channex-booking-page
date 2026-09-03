@@ -363,6 +363,7 @@ const EN: Dict = {
   ackNonRefundable: "I understand this booking is non-refundable.",
   ackCharged: "I understand my card will be charged {amount} today.",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "Preview — this is the page your guest sees. Nothing entered here is saved.",
   reviewHeading: "How was your stay?",
   reviewIntro: "Your feedback helps {hotel} improve and helps future guests choose.",
   overallRating: "Overall rating",
