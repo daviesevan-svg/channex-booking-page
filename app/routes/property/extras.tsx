@@ -28,11 +28,14 @@ import { partySize } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
+import { cartTokenMap } from "~/lib/cart-tokens";
+import { isTagged } from "~/lib/tracking-settings";
+import { TrackCart } from "~/components/tracking-events";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const { pid, base, url, checkin, checkout, occ, currency, nights } =
+  const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
     await requireDatedStay(params.channelId, request);
 
   const sp = url.searchParams.toString();
@@ -62,6 +65,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const state = parseExtrasState(url.searchParams);
   const text = await getPageText(pid, "extras", langFromRequest(request));
   return {
+    // No view event here — extras aren't the product. This step reports the
+    // cart only, because the add that got the guest here happened on the room
+    // page and this is the first loader that sees the new `sel`.
+    tracking: isTagged(settings.analytics)
+      ? {
+          sel: url.searchParams.get("sel") ?? "",
+          cart: cartTokenMap(cartLines),
+          stay: {
+            currency,
+            checkin,
+            checkout,
+            nights,
+            adults: occ.adults,
+            children: occ.childrenAge?.length ?? 0,
+          },
+        }
+      : null,
     lineIndex,
     nights,
     currency,
@@ -185,7 +205,7 @@ function ExtraSection({
 export default function Extras({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
+  const { tracking, lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
     loaderData;
   const { currency: ctxCurrency } = useProperty();
   const cur = ctxCurrency || currency;
@@ -214,6 +234,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
   return (
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+      {tracking && <TrackCart sel={tracking.sel} lines={tracking.cart} stay={tracking.stay} />}
       <Link
         to={`${base}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"

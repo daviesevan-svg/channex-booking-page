@@ -353,6 +353,7 @@ const PT: Dict = {
   ackNonRefundable: "Compreendo que esta reserva não é reembolsável.",
   ackCharged: "Compreendo que hoje será cobrado {amount} no meu cartão.",
   // Guest reviews (review page + public display).
+  reviewPreviewNote: "Pré-visualização — esta é a página que o seu hóspede vê. Nada do que escrever aqui é guardado.",
   reviewHeading: "Como foi a sua estadia?",
   reviewIntro: "A sua opinião ajuda {hotel} a melhorar e os futuros hóspedes a escolher.",
   overallRating: "Avaliação geral",
@@ -547,6 +548,22 @@ const PT: Dict = {
   star_other: "{n} estrelas",
   reviewTapStar: "Toque numa estrela para começar a sua avaliação",
   reviewOpenPage: "Ou abra a página de avaliação",
+
+  // -- consent banner --
+  ccTitle: "Cookies nesta página",
+  ccBody: "Medimos como esta página de reservas é usada e se um anúncio o trouxe até aqui. Nada é carregado até que escolha.",
+  ccAcceptAll: "Aceitar tudo",
+  ccRejectAll: "Rejeitar tudo",
+  ccConfigure: "Escolher",
+  ccSave: "Guardar escolhas",
+  ccNecessary: "Necessários",
+  ccNecessaryDesc: "As suas datas, os quartos escolhidos e a sua reserva. Sempre ativos — a página não funciona sem eles.",
+  ccAnalytics: "Estatísticas",
+  ccAnalyticsDesc: "Como os hóspedes avançam nos passos da reserva, para o hotel ver onde falha.",
+  ccAds: "Publicidade",
+  ccAdsDesc: "Se um anúncio levou à sua reserva. Usado nos relatórios de publicidade do hotel.",
+  ccSettings: "Definições de cookies",
+
 };
 
 export default PT;

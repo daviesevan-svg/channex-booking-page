@@ -383,6 +383,7 @@ const TR: Dict = {
     "Bu rezervasyonun iade edilemez olduğunu ve kartımdan bugün {amount} tahsil edileceğini anlıyorum.",
   ackNonRefundable: "Bu rezervasyonun iade edilemez olduğunu anlıyorum.",
   ackCharged: "Kartımdan bugün {amount} tahsil edileceğini anlıyorum.",
+  reviewPreviewNote: "Önizleme — misafirinizin gördüğü sayfa budur. Buraya yazdıklarınız kaydedilmez.",
   reviewHeading: "Konaklamanız nasıldı?",
   reviewIntro:
     "Geri bildiriminiz {hotel} tesisinin gelişmesine ve gelecekteki misafirlerin karar vermesine yardımcı olur.",
@@ -584,6 +585,22 @@ const TR: Dict = {
   star_other: "{n} yıldız",
   reviewTapStar: "Değerlendirmenize başlamak için bir yıldıza dokunun",
   reviewOpenPage: "Veya değerlendirme sayfasını açın",
+
+  // -- consent banner --
+  ccTitle: "Bu sayfadaki çerezler",
+  ccBody: "Bu rezervasyon sayfasının nasıl kullanıldığını ve buraya bir reklamla gelip gelmediğinizi ölçüyoruz. Siz seçim yapana kadar hiçbir şey yüklenmez.",
+  ccAcceptAll: "Tümünü kabul et",
+  ccRejectAll: "Tümünü reddet",
+  ccConfigure: "Seç",
+  ccSave: "Seçimleri kaydet",
+  ccNecessary: "Gerekli",
+  ccNecessaryDesc: "Tarihleriniz, seçtiğiniz odalar ve rezervasyonunuz. Her zaman açık — bunlar olmadan sayfa çalışmaz.",
+  ccAnalytics: "İstatistik",
+  ccAnalyticsDesc: "Misafirlerin rezervasyon adımlarında nasıl ilerlediği; otel nerede takıldığını görebilsin diye.",
+  ccAds: "Reklam",
+  ccAdsDesc: "Bir reklamın rezervasyonunuza yol açıp açmadığı. Otelin kendi reklam raporları için kullanılır.",
+  ccSettings: "Çerez ayarları",
+
 };
 
 export default TR;

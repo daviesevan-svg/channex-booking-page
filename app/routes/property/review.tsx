@@ -9,6 +9,7 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/review";
 import { pageMeta } from "~/lib/page-meta";
 import { getBooking } from "~/lib/bookings.server";
+import { SAMPLE_BOOKING_ID, sampleBooking } from "~/lib/email-render.server";
 import { getReviewByBooking, upsertReview } from "~/lib/reviews.server";
 import { REVIEW_CATEGORIES, type ReviewCategory } from "~/lib/reviews";
 
@@ -27,9 +28,28 @@ const clampStars = (v: unknown): number | undefined => {
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await getBooking(pid, params.bookingId);
-  if (!booking) throw new Response("Not found", { status: 404 });
-  const review = await getReviewByBooking(pid, booking.id);
   const url = new URL(request.url);
+  // The email editor previews and test-sends the review request against the
+  // sample booking, so its stars link here with an id that was never in the
+  // database. 404ing on our OWN link makes the test send look broken: show the
+  // page instead, read-only, with the tapped star prefilled. Any other unknown
+  // id is a wrong link and still 404s.
+  if (!booking) {
+    if (params.bookingId !== SAMPLE_BOOKING_ID) throw new Response("Not found", { status: 404 });
+    const sample = sampleBooking();
+    return {
+      checkin: sample.checkin,
+      checkout: sample.checkout,
+      firstName: sample.guest.firstName,
+      initialStars: clampStars(url.searchParams.get("stars")) ?? 0,
+      initialCategories: {},
+      initialPublicText: "",
+      initialPrivateNote: "",
+      hasReview: false,
+      preview: true,
+    };
+  }
+  const review = await getReviewByBooking(pid, booking.id);
   return {
     checkin: booking.checkin,
     checkout: booking.checkout,
@@ -40,12 +60,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     initialPublicText: review?.publicText ?? "",
     initialPrivateNote: review?.privateNote ?? "",
     hasReview: Boolean(review),
+    preview: false,
   };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
   const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await getBooking(pid, params.bookingId);
+  // No booking, no review — the sample id gets a rendered page from the loader
+  // but never a write, whatever the form posts.
   if (!booking) throw new Response("Not found", { status: 404 });
 
   const form = await request.formData();
@@ -115,6 +138,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
   const submitting = nav.state === "submitting";
   const [stars, setStars] = useState(loaderData.initialStars);
   const [cats, setCats] = useState<Record<string, number>>(loaderData.initialCategories as Record<string, number>);
+  const preview = loaderData.preview;
 
   if (actionData && "ok" in actionData && actionData.ok) {
     return (
@@ -129,13 +153,22 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
   const label = "mb-1.5 block text-caption font-semibold text-secondary";
   return (
     <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-10">
+      {preview && (
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
+          {tr.t("reviewPreviewNote")}
+        </div>
+      )}
       <h1 className="mb-2 font-serif text-display-md font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
       <p className="mb-1 text-body-lg text-secondary">{tr.t("reviewIntro", { hotel: hotelName })}</p>
       <p className="mb-7 text-caption text-muted-2">
         {fmtDate(loaderData.checkin, "d MMM")} — {fmtDate(loaderData.checkout, "d MMM yyyy")}
       </p>
 
-      <Form method="post" className={cx("flex flex-col gap-6", s.panel, "p-[26px]")}>
+      <Form
+        method="post"
+        onSubmit={(e) => preview && e.preventDefault()}
+        className={cx("flex flex-col gap-6", s.panel, "p-[26px]")}
+      >
         <div>
           <div className={label}>{tr.t("overallRating")}</div>
           <Stars name="stars" value={stars} onChange={setStars} size={38} />
@@ -180,7 +213,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
 
         <button
           type="submit"
-          disabled={submitting || stars === 0}
+          disabled={preview || submitting || stars === 0}
           className="self-start rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent hover:bg-accent-deep disabled:opacity-60"
         >
           {tr.t("submitReview")}
