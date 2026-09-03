@@ -558,6 +558,22 @@ const NL: Dict = {
   star_other: "{n} sterren",
   reviewTapStar: "Tik op een ster om je beoordeling te starten",
   reviewOpenPage: "Of open de beoordelingspagina",
+
+  // -- consent banner --
+  ccTitle: "Cookies op deze pagina",
+  ccBody: "We meten hoe deze boekingspagina wordt gebruikt en of een advertentie u hier bracht. Er wordt niets geladen totdat u kiest.",
+  ccAcceptAll: "Alles accepteren",
+  ccRejectAll: "Alles weigeren",
+  ccConfigure: "Kiezen",
+  ccSave: "Keuzes opslaan",
+  ccNecessary: "Noodzakelijk",
+  ccNecessaryDesc: "Uw data, uw gekozen kamers en uw boeking. Altijd aan — zonder deze werkt de pagina niet.",
+  ccAnalytics: "Statistieken",
+  ccAnalyticsDesc: "Hoe gasten door de boekingsstappen gaan, zodat het hotel ziet waar het misgaat.",
+  ccAds: "Advertenties",
+  ccAdsDesc: "Of een advertentie tot uw boeking heeft geleid. Gebruikt voor de advertentierapportage van het hotel.",
+  ccSettings: "Cookie-instellingen",
+
 };
 
 export default NL;
