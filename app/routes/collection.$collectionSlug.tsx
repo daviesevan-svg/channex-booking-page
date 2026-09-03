@@ -393,7 +393,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   if (isCustom) {
     // Moved only as far as legibility needs, and the colour to write ON it
     // picked rather than assumed to be white — see accessible-accent.ts.
-    const { accent, onAccent, deep } = accentColors(customColor!, customBg || "#f7f2ec");
+    const { accent, onAccent, deep } = accentColors(customColor!, customBg || "#f7f2ec", "#ffffff");
     Object.assign(themeStyle, {
       "--accent": accent,
       "--accent-deep": deep,

@@ -84,10 +84,10 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  active: "bg-[#e8f0e6] text-[#3f7a52]",
+  active: "bg-success-soft text-success",
   redeemed: "bg-chip text-muted",
-  cancelled: "bg-[#fbe9e7] text-[#c0392b]",
-  expired: "bg-[#fbe9e7] text-[#c0392b]",
+  cancelled: "bg-danger-soft text-danger",
+  expired: "bg-danger-soft text-danger",
 };
 
 export default function Voucher({ loaderData, params }: Route.ComponentProps) {
@@ -103,18 +103,18 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
   return (
     <main className="mx-auto max-w-[720px] px-7 pb-[72px] pt-10">
       {issued && (
-        <div className="mb-6 rounded-card border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3 text-body font-medium text-[#3f7a52]">
+        <div className="mb-6 rounded-card border border-success-line bg-success-soft px-4 py-3 text-body font-medium text-success">
           ✓ {tr.t("voucherIssued")}
         </div>
       )}
       {v.simulated && (
-        <div className="mb-6 rounded-card border border-amber-200 bg-amber-50 px-4 py-3 text-caption text-amber-900">
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-caption text-notice">
           Test voucher — no payment was taken.
         </div>
       )}
       {booking && (
         <div
-          className={`mb-6 rounded-card border border-[#cfe3d0] bg-[#eef5ec] px-4 py-3.5 text-body leading-[1.6] text-[#3f7a52]`}
+          className={`mb-6 rounded-card border border-success-line bg-success-soft px-4 py-3.5 text-body leading-[1.6] text-success`}
         >
           {justBooked && <div className="font-semibold">✓ {tr.t("bookingConfirmedTitle")}</div>}
           <div>

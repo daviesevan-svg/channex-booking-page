@@ -471,7 +471,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
           >
             <div className="p-6 pb-[22px]">
               {soldOut ? (
-                <p className="m-0 text-body-lg font-semibold text-[#c0392b]">{tr.t("voucherSoldOut")}</p>
+                <p className="m-0 text-body-lg font-semibold text-danger">{tr.t("voucherSoldOut")}</p>
               ) : (
                 <>
                   <div className="mb-0.5 flex items-baseline gap-2">
@@ -552,7 +552,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
                         </label>
                       )}
 
-                      {actionData?.error && <p className="m-0 text-caption text-red-600">{actionData.error}</p>}
+                      {actionData?.error && <p className="m-0 text-caption text-danger">{actionData.error}</p>}
                       <button type="submit" disabled={busy} className={primaryBtn}>
                         {busy ? "…" : tr.t("voucherBuy", { amount: money(p.price) })}
                       </button>

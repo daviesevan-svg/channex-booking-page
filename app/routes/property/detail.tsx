@@ -419,7 +419,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             {room.title}
           </h1>
           {room.description && (
-            <p className="mb-7 max-w-[560px] text-lead leading-[1.65] text-[#5e5547]">
+            <p className="mb-7 max-w-[560px] text-lead leading-[1.65] text-secondary">
               {room.description}
             </p>
           )}
@@ -428,7 +428,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               <h3 className="mb-4 font-serif text-title-md font-semibold">{text.amenitiesTitle}</h3>
               <div className="grid max-w-[520px] grid-cols-1 gap-x-7 gap-y-3 sm:grid-cols-2">
                 {amenities.map((a) => (
-                  <div key={a} className="flex items-center gap-3 text-body-lg text-[#4a4236]">
+                  <div key={a} className="flex items-center gap-3 text-body-lg text-secondary">
                     <span
                       className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
                       style={{ transform: "rotate(45deg)" }}
@@ -496,8 +496,8 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                   onClick={() => setSelectedRate(plan.id)}
                   className="flex items-start gap-3 rounded-card border-[1.5px] p-4 text-left transition-colors"
                   style={{
-                    borderColor: active ? "var(--accent)" : "#e8e0d5",
-                    background: active ? "var(--accent-soft)" : "#fff",
+                    borderColor: active ? "var(--accent)" : "var(--color-line-alt)",
+                    background: active ? "var(--accent-soft)" : "var(--color-surface)",
                   }}
                 >
                   <span
@@ -512,7 +512,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                       <span className="min-w-0">
                         <span className="block text-body-lg font-semibold">{plan.title}</span>
                         {plan.offer && (
-                          <span className="mt-1 inline-block rounded-full bg-[#ece6f0] px-2 py-0.5 text-micro font-semibold text-[#6b4f8a]">
+                          <span className="mt-1 inline-block rounded-full bg-info-soft px-2 py-0.5 text-micro font-semibold text-info">
                             {plan.offer.name} −{plan.offer.percent}%
                           </span>
                         )}
@@ -538,9 +538,9 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             })}
           </div>
           {(chosen?.description || chosen?.inclusions?.length) && (
-            <div className="mb-4 rounded-card bg-[#faf6ef] p-4">
+            <div className="mb-4 rounded-card bg-surface-alt p-4">
               {chosen?.description && (
-                <p className="text-caption leading-[1.55] text-[#5e5547]">{chosen.description}</p>
+                <p className="text-caption leading-[1.55] text-secondary">{chosen.description}</p>
               )}
               {chosen?.inclusions?.length ? (
                 <>
@@ -555,7 +555,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                     {chosen.inclusions.map((inc, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-2 text-caption text-[#4a4236]"
+                        className="flex items-start gap-2 text-caption text-secondary"
                       >
                         <span
                           className="mt-[6px] h-[6px] w-[6px] flex-none rounded-mark bg-accent"
@@ -587,7 +587,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
               </div>
               <ul className="flex flex-col gap-1.5">
                 {va.inclusions.map((inc, i) => (
-                  <li key={i} className="flex items-start gap-2 text-caption text-[#4a4236]">
+                  <li key={i} className="flex items-start gap-2 text-caption text-secondary">
                     <span className="mt-[3px] flex-none text-accent">✓</span>
                     {inc}
                   </li>

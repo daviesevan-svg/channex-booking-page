@@ -53,7 +53,7 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
     // The chosen colour, moved only as far as legibility needs — and the colour
     // to write ON it, which is picked rather than assumed to be white. See
     // accessible-accent.ts.
-    const { accent, onAccent, deep } = accentColors(customColor!, customBg || mixWithWhite(customColor!, 7));
+    const { accent, onAccent, deep } = accentColors(customColor!, customBg || mixWithWhite(customColor!, 7), "#ffffff");
     Object.assign(themeStyle, {
       "--accent": accent,
       "--accent-deep": deep,
