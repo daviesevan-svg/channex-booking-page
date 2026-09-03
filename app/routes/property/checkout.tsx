@@ -925,7 +925,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               <textarea
                 name="requests"
                 rows={3}
-                placeholder={tr.t("requestsPlaceholder")}
+                placeholder={text.requestsPlaceholder}
                 className={cx("mt-[7px] block w-full resize-y", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
               />
             </label>

@@ -470,7 +470,6 @@ const PT: Dict = {
   // Checkout field validation and payment failures (were hardcoded in the
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Obrigatório",
-  requestsPlaceholder: "Quarto tranquilo, entrada antecipada, tudo o que devamos saber…",
   paymentRefundedNotice: "Não foi possível aplicar o seu pagamento a esta estadia, por isso reembolsámo-lo na totalidade — nada foi reservado. Verifique os seus dados e tente novamente, ou contacte-nos se precisar de ajuda.",
   paymentStartFailed: "Não foi possível iniciar o pagamento seguro neste momento. Tente novamente dentro de instantes — se continuar a acontecer, contacte-nos e ajudamos a concluir a sua reserva.",
   paymentNotConfigured: "Esta tarifa exige pagamento online, mas os pagamentos com cartão ainda não estão configurados para este alojamento. Contacte-nos para concluir a sua reserva.",
