@@ -178,6 +178,8 @@ export async function sendReviewRequestEmail(
   pid: string,
   booking: BookingRecord,
   reviewUrl: string,
+  /** Which of the three asks this is — picks the subject line. */
+  attempt = 1,
 ): Promise<boolean> {
   try {
     const [settings, ov, text] = await Promise.all([
@@ -192,6 +194,7 @@ export async function sendReviewRequestEmail(
       hotelName,
       brand: await emailBrand(pid, accentHex(settings)),
       reviewUrl,
+      attempt,
     });
     const r = await sendEmail({
       to: booking.guest.email,

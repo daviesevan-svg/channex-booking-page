@@ -212,54 +212,72 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
   review_request: {
     fr: {
       subject: "Comment s'est passé votre séjour à {hotel_name} ?",
+      subject2: "Une minute pour noter votre séjour, {guest_first_name} ?",
+      subject3: "Dernière chance de donner votre avis sur {hotel_name}",
       heading: "Comment s'est passé votre séjour, {guest_first_name} ?",
       intro:
         "Merci d'avoir séjourné à {hotel_name}. Nous aimerions savoir comment cela s'est passé — votre avis nous aide à nous améliorer et aide les futurs voyageurs à choisir.\n\nCela ne prend qu'une minute — appuyez simplement sur une étoile ci-dessous pour commencer.",
     },
     de: {
       subject: "Wie war Ihr Aufenthalt bei {hotel_name}?",
+      subject2: "Eine Minute, um Ihren Aufenthalt zu bewerten, {guest_first_name}?",
+      subject3: "Letzte Gelegenheit, {hotel_name} zu bewerten",
       heading: "Wie war Ihr Aufenthalt, {guest_first_name}?",
       intro:
         "Danke für Ihren Aufenthalt bei {hotel_name}. Wir würden gern erfahren, wie es war — Ihr Feedback hilft uns, besser zu werden, und künftigen Gästen bei der Wahl.\n\nEs dauert nur eine Minute — tippen Sie einfach unten auf einen Stern, um zu beginnen.",
     },
     es: {
       subject: "¿Qué tal tu estancia en {hotel_name}?",
+      subject2: "¿Un minuto para valorar tu estancia, {guest_first_name}?",
+      subject3: "Última oportunidad para valorar tu estancia en {hotel_name}",
       heading: "¿Qué tal tu estancia, {guest_first_name}?",
       intro:
         "Gracias por alojarte en {hotel_name}. Nos encantaría saber cómo fue: tu opinión nos ayuda a mejorar y ayuda a futuros huéspedes a elegir.\n\nSolo te llevará un minuto: toca una estrella abajo para empezar.",
     },
     it: {
       subject: "Com'è andato il tuo soggiorno presso {hotel_name}?",
+      subject2: "Un minuto per valutare il tuo soggiorno, {guest_first_name}?",
+      subject3: "Ultima occasione per recensire il tuo soggiorno presso {hotel_name}",
       heading: "Com'è andato il tuo soggiorno, {guest_first_name}?",
       intro:
         "Grazie per aver soggiornato presso {hotel_name}. Ci piacerebbe sapere com'è andata — il tuo feedback ci aiuta a migliorare e aiuta i futuri ospiti a scegliere.\n\nBasta un minuto — tocca una stella qui sotto per iniziare.",
     },
     pt: {
       subject: "Como foi a sua estadia em {hotel_name}?",
+      subject2: "Um minuto para avaliar a sua estadia, {guest_first_name}?",
+      subject3: "Última oportunidade para avaliar a sua estadia em {hotel_name}",
       heading: "Como foi a sua estadia, {guest_first_name}?",
       intro:
         "Obrigado por ficar em {hotel_name}. Gostávamos de saber como correu — a sua opinião ajuda-nos a melhorar e ajuda futuros hóspedes a escolher.\n\nDemora apenas um minuto — toque numa estrela abaixo para começar.",
     },
     nl: {
       subject: "Hoe was je verblijf bij {hotel_name}?",
+      subject2: "Een minuutje om uw verblijf te beoordelen, {guest_first_name}?",
+      subject3: "Laatste kans om uw verblijf bij {hotel_name} te beoordelen",
       heading: "Hoe was je verblijf, {guest_first_name}?",
       intro:
         "Bedankt voor je verblijf bij {hotel_name}. We horen graag hoe het was — jouw feedback helpt ons verbeteren en helpt toekomstige gasten kiezen.\n\nHet duurt maar een minuut — tik hieronder op een ster om te beginnen.",
     },
     el: {
       subject: "Πώς ήταν η διαμονή σας στο {hotel_name};",
+      subject2: "Ένα λεπτό για να βαθμολογήσετε τη διαμονή σας, {guest_first_name};",
+      subject3: "Τελευταία ευκαιρία να αξιολογήσετε τη διαμονή σας στο {hotel_name}",
       heading: "Πώς ήταν η διαμονή σας, {guest_first_name};",
       intro:
         "Ευχαριστούμε που μείνατε στο {hotel_name}. Θα θέλαμε πολύ να μάθουμε πώς ήταν — τα σχόλιά σας μας βοηθούν να βελτιωνόμαστε και βοηθούν τους επόμενους επισκέπτες να επιλέξουν.\n\nΧρειάζεται μόνο ένα λεπτό — πατήστε ένα αστέρι παρακάτω για να ξεκινήσετε.",
     },
     th: {
       subject: "การเข้าพักที่ {hotel_name} เป็นอย่างไรบ้าง",
+      subject2: "ขอเวลาสักครู่เพื่อให้คะแนนการเข้าพักของคุณไหม {guest_first_name}",
+      subject3: "โอกาสสุดท้ายในการรีวิวการเข้าพักของคุณที่ {hotel_name}",
       heading: "การเข้าพักเป็นอย่างไรบ้าง คุณ{guest_first_name}",
       intro:
         "ขอบคุณที่เข้าพักที่ {hotel_name} เราอยากทราบว่าเป็นอย่างไรบ้าง — ความคิดเห็นของคุณช่วยให้เราพัฒนาและช่วยให้ผู้เข้าพักในอนาคตตัดสินใจได้\n\nใช้เวลาเพียงนาทีเดียว — แตะดาวด้านล่างเพื่อเริ่ม",
     },
     tr: {
       subject: "{hotel_name} konaklamanız nasıldı?",
+      subject2: "Konaklamanızı puanlamak için bir dakikanız var mı {guest_first_name}?",
+      subject3: "{hotel_name} konaklamanızı değerlendirmek için son şans",
       heading: "Konaklamanız nasıldı, {guest_first_name}?",
       intro:
         "{hotel_name} tesisinde konakladığınız için teşekkürler. Nasıl geçtiğini duymayı çok isteriz — geri bildiriminiz hem gelişmemize hem de gelecekteki misafirlerin seçim yapmasına yardımcı olur.\n\nYalnızca bir dakika sürer — başlamak için aşağıdaki yıldızlardan birine dokunun.",

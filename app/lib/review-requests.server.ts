@@ -76,7 +76,7 @@ export async function scheduledReviewRequests(): Promise<void> {
       if (!property) continue;
       const origin = getConfig().appUrl.replace(/\/+$/, "");
       const reviewUrl = `${origin}/${property.slug || row.pid}/review/${booking.id}`;
-      const sent = await sendReviewRequestEmail(row.pid, booking, reviewUrl);
+      const sent = await sendReviewRequestEmail(row.pid, booking, reviewUrl, count + 1);
       if (sent) {
         await updateBooking(row.pid, booking.id, {
           reviewRequests: { count: count + 1, lastAt: new Date().toISOString() },

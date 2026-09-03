@@ -76,6 +76,32 @@ describe("email templates", () => {
     const cleared = (await email.loader({ request: req("/v1/manage/emails/booking_confirmation?lang=de", ak), params: { id: "booking_confirmation" } } as never)) as Response;
     expect(((await cleared.json()) as { data: { values: Record<string, string> } }).data.values).toEqual({});
   });
+
+  it("exposes the review request's reminder subjects, and only on that template", async () => {
+    // The review request sends three times with a different subject each time,
+    // so it carries two fields the others don't. Field keys are per-template:
+    // the admin editor and this API both read the same list, so a template that
+    // has no reminders must still reject them.
+    const ak = await akPromise;
+    const email = await import("../routes/api.v1.manage.emails.$id");
+
+    const get = (await email.loader({ request: req("/v1/manage/emails/review_request", ak), params: { id: "review_request" } } as never)) as Response;
+    const fields = ((await get.json()) as { data: { fields: { key: string }[] } }).data.fields.map((f) => f.key);
+    expect(fields).toEqual(["subject", "subject2", "subject3", "heading", "intro", "outro"]);
+
+    const saved = (await email.action({
+      request: req("/v1/manage/emails/review_request", ak, "PATCH", { subject3: "Last call, {guest_first_name}" }),
+      params: { id: "review_request" },
+    } as never)) as Response;
+    expect(saved.status).toBe(200);
+    expect(((await saved.json()) as { data: { effective: Record<string, string> } }).data.effective.subject3).toBe("Last call, {guest_first_name}");
+
+    const wrongTemplate = (await email.action({
+      request: req("/v1/manage/emails/booking_confirmation", ak, "PATCH", { subject2: "x" }),
+      params: { id: "booking_confirmation" },
+    } as never)) as Response;
+    expect(wrongTemplate.status).toBe(422);
+  });
 });
 
 describe("sender identity via property PATCH", () => {

@@ -919,13 +919,15 @@ export const MANAGE_EMAIL_TOOLS: McpTool[] = [
   {
     name: "update_email_template",
     description:
-      "Edit one email template's text for ONE language, sparsely: subject/heading/intro/outro → text (null clears → fallback). Use the {tokens} get_email_template lists — e.g. {guest_first_name}, {reference} — and keep them intact when rewording. Changes affect real guest email immediately.",
+      "Edit one email template's text for ONE language, sparsely: subject/heading/intro/outro → text (null clears → fallback). review_request also takes subject2/subject3 — it is sent up to three times (checkout day, then 3 and 5 days later) and each reminder has its own subject line; blank falls back to `subject`. Sending a field the template does not have is a 422 — get_email_template's `fields` lists them. Use the {tokens} get_email_template lists — e.g. {guest_first_name}, {reference} — and keep them intact when rewording. Changes affect real guest email immediately.",
     inputSchema: {
       type: "object",
       properties: {
         id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "review_request"] },
         ...langArg,
         subject: { type: ["string", "null"] },
+        subject2: { type: ["string", "null"], description: "review_request only — 1st reminder's subject." },
+        subject3: { type: ["string", "null"], description: "review_request only — 2nd reminder's subject." },
         heading: { type: ["string", "null"] },
         intro: { type: ["string", "null"] },
         outro: { type: ["string", "null"] },
