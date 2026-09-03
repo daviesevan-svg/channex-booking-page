@@ -16,7 +16,7 @@ export function cellStyle(cell: DayCell): CSSProperties {
   // A selected day always looks selected — even a sold-out night chosen as the
   // check-out (which is otherwise un-clickable).
   if (cell.isCheckin || cell.isCheckout) {
-    return { background: "var(--accent)", color: "#fff", fontWeight: 600 };
+    return { background: "var(--accent)", color: "var(--on-accent)", fontWeight: 600 };
   }
   if (cell.inRange) {
     return { background: "var(--accent-soft)", color: "var(--color-ink)", fontWeight: 600 };
@@ -48,7 +48,7 @@ export function CalendarNav({ state, title }: { state: DateRangeState; title?: s
         onClick={state.prevMonth}
         disabled={!state.canPrev}
         aria-label={tr.t("prevMonth")}
-        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-secondary enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ‹
       </button>
@@ -58,7 +58,7 @@ export function CalendarNav({ state, title }: { state: DateRangeState; title?: s
         onClick={state.nextMonth}
         disabled={!state.canNext}
         aria-label={tr.t("nextMonth")}
-        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-[#5a5145] enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
+        className="h-9 w-9 rounded-control border border-line-alt bg-surface-alt text-title-sm leading-none text-secondary enabled:hover:border-accent enabled:hover:text-accent disabled:opacity-40"
       >
         ›
       </button>

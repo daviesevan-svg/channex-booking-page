@@ -138,7 +138,7 @@ export function MapSection({
                 <button
                   type="button"
                   onClick={() => setShow(true)}
-                  className="cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-white shadow-sm hover:bg-accent-deep"
+                  className="cursor-pointer rounded-control bg-accent px-6 py-3 text-body-lg font-semibold text-on-accent shadow-sm hover:bg-accent-deep"
                 >
                   {tr.t("showMap")}
                 </button>

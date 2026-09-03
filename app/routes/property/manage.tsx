@@ -109,10 +109,10 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
 
   const { bookings, vouchers } = loaderData;
   const statusChip: Record<string, string> = {
-    active: "bg-[#e8f0e6] text-[#3f7a52]",
+    active: "bg-success-soft text-success",
     redeemed: "bg-chip text-muted",
-    cancelled: "bg-[#fbe9e7] text-[#c0392b]",
-    expired: "bg-[#fbe9e7] text-[#c0392b]",
+    cancelled: "bg-danger-soft text-danger",
+    expired: "bg-danger-soft text-danger",
   };
 
   return (
@@ -240,9 +240,9 @@ function ManageLogin({
           <input name="email" type="email" placeholder="you@email.com" className={inputCls} />
         </label>
         {tooMany ? (
-          <p className="text-caption text-red-600">{tr.t("manageTooMany")}</p>
+          <p className="text-caption text-danger">{tr.t("manageTooMany")}</p>
         ) : (
-          notFound && <p className="text-caption text-red-600">{tr.t("manageNotFound")}</p>
+          notFound && <p className="text-caption text-danger">{tr.t("manageNotFound")}</p>
         )}
         <button
           type="submit"

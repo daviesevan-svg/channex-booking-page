@@ -369,7 +369,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             type="button"
             onClick={searchRooms}
             disabled={searching}
-            className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-white transition-colors hover:bg-accent-deep disabled:opacity-70"
+            className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
             {searching ? tr.t("searching") : searchButton}
           </button>

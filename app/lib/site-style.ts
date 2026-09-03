@@ -250,7 +250,7 @@ const CLASSIC: StyleSlots = {
   // Same string as `well` in classic — they only diverge in a style that treats
   // a form control differently from a note, which is most of them.
   field: "rounded-control border border-line-alt bg-surface-alt",
-  btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
+  btnPrimary: "rounded-card bg-accent text-on-accent hover:bg-accent-deep",
   btnSecondary: "rounded-control border border-line-alt bg-surface-alt",
   rule: "border-divider",
 
@@ -470,7 +470,7 @@ const STYLE_DEFS: Record<
       // the card fields, which stay fully boxed so the payment area reads as an
       // enclosed control. Those are Stripe's own iframe, so they already do.
       field: "rounded-none border-0 border-b border-line-alt bg-transparent",
-      btnPrimary: "rounded-card bg-accent text-white hover:bg-accent-deep",
+      btnPrimary: "rounded-card bg-accent text-on-accent hover:bg-accent-deep",
       btnSecondary: "rounded-control border border-line-alt bg-surface",
       rule: "border-line",
 
