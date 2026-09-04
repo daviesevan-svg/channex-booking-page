@@ -164,6 +164,8 @@ export default [
   // declared here rather than inside the admin layout — but the URL stays under
   // /admin/rooms so the per-teammate area guard covers it (see room-photo.tsx).
   route("admin/rooms/:roomId/photo", "routes/admin/room-photo.tsx"),
+  route("admin/gallery/photo", "routes/admin/gallery-photo.tsx"),
+  route("admin/website/sections/photo", "routes/admin/section-photo.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),

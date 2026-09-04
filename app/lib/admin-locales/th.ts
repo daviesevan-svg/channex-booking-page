@@ -129,6 +129,7 @@ const TH: Record<string, string> = {
   puRemove: "นำออก",
   puNotImage: "\"{name}\" ไม่ใช่ไฟล์รูปภาพ",
   puTooBig: "\"{name}\" มีขนาด {size}MB — จำกัดไม่เกิน {limit}MB ต่อรูป",
+  puNoRoom: "คุณเลือก {got} รูป แต่เพิ่มได้อีก {room} รูป กรุณาเลือกให้น้อยลง",
   afChannexHint: "จากระบบจัดการช่องทางขาย: {value} — เว้นว่างไว้เพื่อใช้ค่านี้",
 
   // -- blocked-ranges editor --

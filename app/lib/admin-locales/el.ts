@@ -112,6 +112,7 @@ const EL: Record<string, string> = {
   puRemove: "Αφαίρεση",
   puNotImage: "Το «{name}» δεν είναι εικόνα.",
   puTooBig: "Το «{name}» είναι {size}MB — το όριο είναι {limit}MB ανά φωτογραφία.",
+  puNoRoom: "Επιλέξατε {got}, αλλά υπάρχει χώρος για {room}. Επιλέξτε λιγότερες.",
   afChannexHint: "Από το channel manager: {value} — αφήστε το κενό για να χρησιμοποιηθεί αυτό.",
   brPickStart: "Επιλέξτε ημερομηνία έναρξης.",
   brEndBeforeStart: "Η ημερομηνία λήξης είναι πριν από την ημερομηνία έναρξης.",
