@@ -1,3 +1,4 @@
+import { useState, type ReactNode } from "react";
 import { Form, useNavigation } from "react-router";
 
 import type { Route } from "./+types/payments";
@@ -196,7 +197,10 @@ export function meta({ matches }: Route.MetaArgs) {
   return adminMeta(matches, { key: "navPayments" });
 }
 
-function VivaField({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
+/** A credential field. Monospaced on purpose: everything typed here is a
+ *  pasted key, id or code, and a transposed character is invisible in
+ *  proportional text. Shared by Viva and iyzico. */
+function CredField({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
   return (
     <label className="block text-[12px] font-semibold text-secondary">
       {label}
@@ -220,6 +224,126 @@ function UrlRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** A row in one of the connected panels' detail lists. */
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted">{label}</dt>
+      <dd className="text-ink">{children}</dd>
+    </>
+  );
+}
+
+const DETAIL_LIST = "mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]";
+const PRIMARY_BUTTON =
+  "rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60";
+const QUIET_BUTTON =
+  "rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60";
+
+function OkBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
+      {children}
+    </span>
+  );
+}
+
+function WarnBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="flex-none rounded-full bg-[#fbeede] px-2.5 py-1 text-[11px] font-semibold text-[#9a6a1e]">
+      {children}
+    </span>
+  );
+}
+
+function Note({ children }: { children: ReactNode }) {
+  return (
+    <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] leading-[1.5] text-amber-800">
+      {children}
+    </p>
+  );
+}
+
+/** The card chrome every provider shares: name, one-line description and an
+ *  optional status badge, over whatever body the state calls for. */
+function Panel({
+  name,
+  desc,
+  badge,
+  children,
+}: {
+  name: string;
+  desc: string;
+  badge?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[14px] border border-line bg-surface p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-serif text-[18px] font-semibold">{name}</div>
+          <div className="mt-0.5 text-[12px] leading-[1.5] text-muted">{desc}</div>
+        </div>
+        {badge}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+type ProviderId = "stripe" | "viva" | "iyzico";
+
+/** Name and blurb per provider. Order is the order of the chooser. */
+const PROVIDERS: { id: ProviderId; name: string; descKey: string }[] = [
+  { id: "stripe", name: "Stripe", descKey: "payStripeDesc" },
+  { id: "viva", name: "Viva", descKey: "payVivaDesc" },
+  { id: "iyzico", name: "iyzico", descKey: "payIyzicoDesc" },
+];
+
+/** One provider in the chooser. A radio, not a button: a property charges
+ *  through exactly one gateway, so the control should say so. `blocker` is the
+ *  reason this provider can't be picked (wrong currency, platform not set up)
+ *  and replaces the blurb — the reason belongs on the thing it disqualifies,
+ *  not in a banner above three cards. */
+function ProviderTile({
+  name,
+  desc,
+  blocker,
+  selected,
+  onSelect,
+}: {
+  name: string;
+  desc: string;
+  blocker?: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <label
+      className={`flex items-start gap-3 rounded-[14px] border bg-surface p-4 ${
+        blocker
+          ? "cursor-not-allowed border-line opacity-60"
+          : `cursor-pointer ${selected ? "border-accent ring-1 ring-accent" : "border-line hover:border-line-alt"}`
+      }`}
+    >
+      <input
+        type="radio"
+        name="gateway"
+        checked={selected}
+        disabled={Boolean(blocker)}
+        onChange={onSelect}
+        className="mt-1 h-4 w-4 flex-none border-line-alt text-accent focus:ring-accent"
+      />
+      <span className="min-w-0">
+        <span className="block font-serif text-[17px] font-semibold text-ink">{name}</span>
+        <span className={`mt-0.5 block text-[12px] leading-[1.5] ${blocker ? "text-amber-800" : "text-muted"}`}>
+          {blocker ?? desc}
+        </span>
+      </span>
+    </label>
+  );
+}
+
 export default function AdminPayments({ loaderData, actionData }: Route.ComponentProps) {
   const nav = useNavigation();
   const busy = nav.state !== "idle";
@@ -235,9 +359,20 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
   }
 
   const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk } = loaderData;
-  const connected = Boolean(accountId);
-  const vivaConnected = Boolean(viva);
-  const iyzicoConnected = Boolean(iyzico);
+
+  // Exactly one of these can be set: the action refuses a second gateway.
+  const active: ProviderId | null = accountId ? "stripe" : viva ? "viva" : iyzico ? "iyzico" : null;
+
+  // Which provider's setup form is open. Nothing is open until the operator
+  // picks one — three credential forms stacked open was the whole problem.
+  const [choice, setChoice] = useState<ProviderId | null>(null);
+
+  // Why a provider can't be picked, if it can't. Undefined means available.
+  const blockers: Record<ProviderId, string | undefined> = {
+    stripe: platformReady ? undefined : t("payPlatformMissing"),
+    viva: vivaCurrencyOk ? undefined : t("payVivaCurrency", { currency }),
+    iyzico: iyzicoCurrencyOk ? undefined : t("payIyzicoCurrency", { currency }),
+  };
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
     connected: { ok: true, text: t("payNoticeConnected") },
@@ -246,6 +381,15 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     error: { ok: false, text: t("payNoticeError") },
   };
   const banner = notice ? NOTICES[notice] : undefined;
+
+  const disconnect = (intent: string) => (
+    <Form method="post">
+      <input type="hidden" name="intent" value={intent} />
+      <button type="submit" disabled={busy} className={QUIET_BUTTON}>
+        {t("payDisconnect")}
+      </button>
+    </Form>
+  );
 
   return (
     <div>
@@ -261,305 +405,238 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         <SavedPill show={Boolean(actionData?.ok)} />
       </div>
 
-      <p className="mb-5 max-w-2xl text-[14px] text-secondary">{t("payIntro")}</p>
+      {/* One column, one width. The old three-abreast layout wrapped into a
+          ragged row because the cards' natural heights differ by a factor of
+          five — a Stripe button against Viva's five credential fields. */}
+      <div className="max-w-3xl">
+        <p className="mb-5 text-[14px] leading-[1.6] text-secondary">{t("payIntro")}</p>
 
-      {banner && (
-        <p
-          className={`mb-4 max-w-2xl rounded-[10px] border px-4 py-2.5 text-[13px] ${
-            banner.ok ? "border-[#cfe3d0] bg-[#eef5ec] text-[#3f7a52]" : "border-red-200 bg-red-50 text-red-700"
-          }`}
-        >
-          {banner.ok ? "✓ " : ""}
-          {banner.text}
-        </p>
-      )}
+        {banner && (
+          <p
+            className={`mb-4 rounded-[10px] border px-4 py-2.5 text-[13px] ${
+              banner.ok ? "border-[#cfe3d0] bg-[#eef5ec] text-[#3f7a52]" : "border-red-200 bg-red-50 text-red-700"
+            }`}
+          >
+            {banner.ok ? "✓ " : ""}
+            {banner.text}
+          </p>
+        )}
 
-      {platformReady && !secretReady && (
-        <p className="mb-4 max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] text-amber-800">
-          {t("paySecretMissingBefore")}
-          <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>
-          {t("paySecretMissingAfter")}
-        </p>
-      )}
+        {platformReady && !secretReady && (
+          <p className="mb-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[12px] leading-[1.5] text-amber-800">
+            {t("paySecretMissingBefore")}
+            <code className="mx-1 rounded bg-white/60 px-1">STRIPE_SECRET_KEY</code>
+            {t("paySecretMissingAfter")}
+          </p>
+        )}
 
-      {actionData?.error && (
-        <p className="mb-4 max-w-xl rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">
-          {actionData.error}
-        </p>
-      )}
+        {actionData?.error && (
+          <p className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] leading-[1.5] text-red-700">
+            {actionData.error}
+          </p>
+        )}
 
-      <div className="flex max-w-5xl flex-wrap items-start gap-5">
-        {/* ---- Stripe ---- */}
-        <div className="min-w-[320px] max-w-xl flex-1 rounded-[14px] border border-line bg-surface p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-serif text-[18px] font-semibold">Stripe</div>
-              <div className="text-[12px] text-muted">{t("payStripeDesc")}</div>
-            </div>
-            {connected && (
-              <span
-                className={`flex-none rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  chargesEnabled ? "bg-[#e8f0e6] text-[#3f7a52]" : "bg-[#fbeede] text-[#9a6a1e]"
-                }`}
-              >
-                {chargesEnabled ? t("payConnected") : t("payConnectedFinishSetup")}
-              </span>
-            )}
-          </div>
-
-          {connected && (
-            <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
-              {account?.name && (
-                <>
-                  <dt className="text-muted">{t("payAccount")}</dt>
-                  <dd className="font-semibold text-ink">{account.name}</dd>
-                </>
-              )}
-              <dt className="text-muted">{t("payAccountId")}</dt>
-              <dd className="font-mono text-[12px] text-ink">{accountId}</dd>
-              {account?.email && (
-                <>
-                  <dt className="text-muted">{t("payEmail")}</dt>
-                  <dd className="text-ink">{account.email}</dd>
-                </>
-              )}
+        {/* ---- Connected: one panel for the gateway that's live ---- */}
+        {active === "stripe" && (
+          <Panel
+            name="Stripe"
+            desc={t("payStripeDesc")}
+            badge={chargesEnabled ? <OkBadge>{t("payConnected")}</OkBadge> : <WarnBadge>{t("payConnectedFinishSetup")}</WarnBadge>}
+          >
+            <dl className={DETAIL_LIST}>
+              {account?.name && <DetailRow label={t("payAccount")}><span className="font-semibold">{account.name}</span></DetailRow>}
+              <DetailRow label={t("payAccountId")}>
+                <span className="font-mono text-[12px]">{accountId}</span>
+              </DetailRow>
+              {account?.email && <DetailRow label={t("payEmail")}>{account.email}</DetailRow>}
               {(account?.country || account?.currency) && (
-                <>
-                  <dt className="text-muted">{t("payCountryCurrency")}</dt>
-                  <dd className="text-ink">{[account?.country, account?.currency].filter(Boolean).join(" · ")}</dd>
-                </>
+                <DetailRow label={t("payCountryCurrency")}>
+                  {[account?.country, account?.currency].filter(Boolean).join(" · ")}
+                </DetailRow>
               )}
               <dt className="text-muted">{t("payCharges")}</dt>
               <dd className={chargesEnabled ? "font-semibold text-[#3f7a52]" : "font-semibold text-[#9a6a1e]"}>
                 {chargesEnabled ? t("payEnabled") : t("payNotEnabledYet")}
               </dd>
             </dl>
-          )}
 
-          {connected && !chargesEnabled && (
-            <p className="mt-3 text-[13px] text-secondary">{t("payFinishOnboarding")}</p>
-          )}
+            {!chargesEnabled && <p className="mt-3 text-[13px] leading-[1.6] text-secondary">{t("payFinishOnboarding")}</p>}
+            {!platformReady && <Note>{t("payPlatformMissing")}</Note>}
 
-          {!platformReady && (
-            <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
-              {t("payPlatformMissing")}
-            </p>
-          )}
+            <div className="mt-5">{disconnect("disconnect")}</div>
+          </Panel>
+        )}
 
-          <div className="mt-5">
-            {connected ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="disconnect" />
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                >
-                  {t("payDisconnect")}
-                </button>
-              </Form>
-            ) : (
-              <Form method="post">
-                <input type="hidden" name="intent" value="connect" />
-                <button
-                  type="submit"
-                  disabled={busy || !platformReady || vivaConnected}
-                  className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-                >
-                  {t("payConnectWithStripe")}
-                </button>
-                {vivaConnected && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
-              </Form>
-            )}
-          </div>
-        </div>
+        {active === "viva" && viva && (
+          <Panel
+            name="Viva"
+            desc={t("payVivaDesc")}
+            badge={<OkBadge>{viva.demo ? t("payVivaConnectedDemo") : t("payConnected")}</OkBadge>}
+          >
+            <dl className={DETAIL_LIST}>
+              <DetailRow label={t("payVivaMerchantId")}>
+                <span className="font-mono text-[12px]">{viva.merchantId}</span>
+              </DetailRow>
+              <DetailRow label={t("payVivaSourceCode")}>
+                <span className="font-mono text-[12px]">{viva.sourceCode}</span>
+              </DetailRow>
+              <DetailRow label={t("payVivaEnvironment")}>{viva.demo ? t("payVivaEnvDemo") : t("payVivaEnvLive")}</DetailRow>
+              <DetailRow label={t("payVivaModel")}>{viva.isv ? t("payVivaModelIsv") : t("payVivaModelMerchant")}</DetailRow>
+            </dl>
 
-        {/* ---- Viva ---- */}
-        <div className="min-w-[320px] max-w-xl flex-1 rounded-[14px] border border-line bg-surface p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-serif text-[18px] font-semibold">Viva</div>
-              <div className="text-[12px] text-muted">{t("payVivaDesc")}</div>
-            </div>
-            {vivaConnected && (
-              <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
-                {viva?.demo ? t("payVivaConnectedDemo") : t("payConnected")}
-              </span>
-            )}
-          </div>
-
-          {!vivaCurrencyOk && (
-            <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
-              {t("payVivaCurrency", { currency })}
-            </p>
-          )}
-
-          {vivaConnected && viva ? (
-            <>
-              <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
-                <dt className="text-muted">{t("payVivaMerchantId")}</dt>
-                <dd className="font-mono text-[12px] text-ink">{viva.merchantId}</dd>
-                <dt className="text-muted">{t("payVivaSourceCode")}</dt>
-                <dd className="font-mono text-[12px] text-ink">{viva.sourceCode}</dd>
-                <dt className="text-muted">{t("payVivaEnvironment")}</dt>
-                <dd className="text-ink">{viva.demo ? t("payVivaEnvDemo") : t("payVivaEnvLive")}</dd>
-                <dt className="text-muted">{t("payVivaModel")}</dt>
-                <dd className="text-ink">{viva.isv ? t("payVivaModelIsv") : t("payVivaModelMerchant")}</dd>
-              </dl>
-
-              <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
-                <p className="mb-2 text-[12px] font-semibold text-secondary">{t("payVivaUrlsTitle")}</p>
-                <p className="mb-3 text-[12px] leading-[1.5] text-muted">{t("payVivaUrlsHelp")}</p>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px]">
-                  <UrlRow label={t("payVivaSuccessUrl")} value={vivaUrls.success} />
-                  <UrlRow label={t("payVivaFailureUrl")} value={vivaUrls.failure} />
-                  <UrlRow label={t("payVivaWebhookUrl")} value={vivaUrls.webhook} />
-                </dl>
-                <p className="mt-3 text-[12px] leading-[1.5] text-muted">{t("payVivaWebhookSteps")}</p>
-                <p className="mt-2 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-[1.5] text-amber-900">
-                  {t("payVivaWebhookVerifyNote")}
-                </p>
-              </div>
-
-              <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
-
-              <div className="mt-5 flex flex-wrap items-center gap-3">
-                <Form method="post">
-                  <input type="hidden" name="intent" value="viva-disconnect" />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                  >
-                    {t("payDisconnect")}
-                  </button>
-                </Form>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="viva-diagnostics" />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                  >
-                    {t("payVivaDiagRun")}
-                  </button>
-                </Form>
-              </div>
-
-            </>
-          ) : (
-            <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
-              <input type="hidden" name="intent" value="viva-connect" />
-              <p className="text-[12px] leading-[1.5] text-muted">{t("payVivaSetupHelp")}</p>
-              <VivaField name="merchantId" label={t("payVivaMerchantId")} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-              <VivaField name="apiKey" label={t("payVivaApiKey")} />
-              <VivaField name="clientId" label={t("payVivaClientId")} placeholder="…apps.vivapayments.com" />
-              <VivaField name="clientSecret" label={t("payVivaClientSecret")} />
-              <VivaField name="sourceCode" label={t("payVivaSourceCode")} placeholder="1234" />
-              <label className="flex items-center gap-2 text-[13px] text-secondary">
-                <input type="checkbox" name="isv" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
-                {t("payVivaIsvToggle")}
-              </label>
-              <p className="-mt-2 text-[12px] leading-[1.5] text-muted">{t("payVivaIsvHelp")}</p>
-              <label className="flex items-center gap-2 text-[13px] text-secondary">
-                <input type="checkbox" name="demo" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
-                {t("payVivaDemoToggle")}
-              </label>
-              <div>
-                <button
-                  type="submit"
-                  disabled={busy || connected || !vivaCurrencyOk}
-                  className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-                >
-                  {busy ? t("payVivaVerifying") : t("payVivaConnect")}
-                </button>
-                {connected && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
-              </div>
-            </Form>
-          )}
-
-          {/* Rendered for BOTH the connected card's diagnostics button and a
-              failed connect attempt — the ticket-worthy state is usually the
-              failure, where no connected card exists yet. Raw JSON on purpose:
-              this block is pasted verbatim into a Viva support ticket, so it
-              must not be translated or reformatted. No secrets (no access token). */}
-          {actionData && "vivaDiag" in actionData && actionData.vivaDiag && (
             <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
-              <p className="mb-2 text-[12px] leading-[1.5] text-muted">{t("payVivaDiagHelp")}</p>
-              <pre className="overflow-x-auto rounded-[8px] border border-line-alt bg-surface p-3 font-mono text-[11px] leading-[1.6] text-ink">
-                {JSON.stringify(actionData.vivaDiag, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-
-        {/* iyzico — the same shape as Viva: per-property credentials, a hosted
-            payment page, no card ever on our side. The callback URL is passed
-            per request, so unlike Viva there is nothing for the hotel to paste
-            into their iyzico account. */}
-        <div className="rounded-[14px] border border-line bg-surface p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-serif text-[18px] font-semibold">iyzico</div>
-              <div className="text-[12px] text-muted">{t("payIyzicoDesc")}</div>
-            </div>
-            {iyzicoConnected && (
-              <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
-                {iyzico?.sandbox ? t("payIyzicoConnectedSandbox") : t("payConnected")}
-              </span>
-            )}
-          </div>
-
-          {!iyzicoCurrencyOk && (
-            <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
-              {t("payIyzicoCurrency", { currency })}
-            </p>
-          )}
-
-          {iyzicoConnected && iyzico ? (
-            <>
-              <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
-                <dt className="text-muted">{t("payIyzicoMerchantId")}</dt>
-                <dd className="font-mono text-[12px] text-ink">{iyzico.merchantId || "—"}</dd>
-                <dt className="text-muted">{t("payVivaEnvironment")}</dt>
-                <dd className="text-ink">{iyzico.sandbox ? t("payIyzicoEnvSandbox") : t("payVivaEnvLive")}</dd>
+              <p className="mb-2 text-[12px] font-semibold text-secondary">{t("payVivaUrlsTitle")}</p>
+              <p className="mb-3 text-[12px] leading-[1.5] text-muted">{t("payVivaUrlsHelp")}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[12px]">
+                <UrlRow label={t("payVivaSuccessUrl")} value={vivaUrls.success} />
+                <UrlRow label={t("payVivaFailureUrl")} value={vivaUrls.failure} />
+                <UrlRow label={t("payVivaWebhookUrl")} value={vivaUrls.webhook} />
               </dl>
-              <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payIyzicoNoGuarantee")}</p>
-              <Form method="post" className="mt-5">
-                <input type="hidden" name="intent" value="iyzico-disconnect" />
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                >
-                  {t("payDisconnect")}
+              <p className="mt-3 text-[12px] leading-[1.5] text-muted">{t("payVivaWebhookSteps")}</p>
+              <p className="mt-2 rounded-[8px] border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] leading-[1.5] text-amber-900">
+                {t("payVivaWebhookVerifyNote")}
+              </p>
+            </div>
+
+            <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
+
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              {disconnect("viva-disconnect")}
+              <Form method="post">
+                <input type="hidden" name="intent" value="viva-diagnostics" />
+                <button type="submit" disabled={busy} className={QUIET_BUTTON}>
+                  {t("payVivaDiagRun")}
                 </button>
               </Form>
-            </>
-          ) : (
-            <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
-              <input type="hidden" name="intent" value="iyzico-connect" />
-              <p className="text-[12px] leading-[1.5] text-muted">{t("payIyzicoSetupHelp")}</p>
-              <VivaField name="apiKey" label={t("payIyzicoApiKey")} placeholder="sandbox-…" />
-              <VivaField name="secretKey" label={t("payIyzicoSecretKey")} />
-              <VivaField name="merchantId" label={t("payIyzicoMerchantIdOptional")} />
-              <label className="flex items-center gap-2 text-[13px] text-secondary">
-                <input type="checkbox" name="sandbox" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
-                {t("payIyzicoSandboxToggle")}
-              </label>
-              <div>
-                <button
-                  type="submit"
-                  disabled={busy || connected || vivaConnected || !iyzicoCurrencyOk}
-                  className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-                >
-                  {busy ? t("payIyzicoVerifying") : t("payIyzicoConnect")}
-                </button>
-                {(connected || vivaConnected) && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
+            </div>
+          </Panel>
+        )}
+
+        {active === "iyzico" && iyzico && (
+          <Panel
+            name="iyzico"
+            desc={t("payIyzicoDesc")}
+            badge={<OkBadge>{iyzico.sandbox ? t("payIyzicoConnectedSandbox") : t("payConnected")}</OkBadge>}
+          >
+            <dl className={DETAIL_LIST}>
+              <DetailRow label={t("payIyzicoMerchantId")}>
+                <span className="font-mono text-[12px]">{iyzico.merchantId || "—"}</span>
+              </DetailRow>
+              <DetailRow label={t("payVivaEnvironment")}>
+                {iyzico.sandbox ? t("payIyzicoEnvSandbox") : t("payVivaEnvLive")}
+              </DetailRow>
+            </dl>
+            <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payIyzicoNoGuarantee")}</p>
+            <div className="mt-5">{disconnect("iyzico-disconnect")}</div>
+          </Panel>
+        )}
+
+        {/* Said once, under the live gateway, instead of once per card that
+            can't be used. */}
+        {active && <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payOneGateway")}</p>}
+
+        {/* ---- Nothing connected: pick one, then set that one up ---- */}
+        {!active && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {PROVIDERS.map((p) => (
+                <ProviderTile
+                  key={p.id}
+                  name={p.name}
+                  desc={t(p.descKey)}
+                  blocker={blockers[p.id]}
+                  selected={choice === p.id}
+                  onSelect={() => setChoice(p.id)}
+                />
+              ))}
+            </div>
+
+            {choice === "stripe" && (
+              <div className="mt-4">
+                <Panel name="Stripe" desc={t("payStripeDesc")}>
+                  <Form method="post" className="mt-5 border-t border-divider pt-5">
+                    <input type="hidden" name="intent" value="connect" />
+                    <button type="submit" disabled={busy || !platformReady} className={PRIMARY_BUTTON}>
+                      {t("payConnectWithStripe")}
+                    </button>
+                  </Form>
+                </Panel>
               </div>
-            </Form>
-          )}
-        </div>
+            )}
+
+            {choice === "viva" && (
+              <div className="mt-4">
+                <Panel name="Viva" desc={t("payVivaDesc")}>
+                  <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
+                    <input type="hidden" name="intent" value="viva-connect" />
+                    <p className="text-[12px] leading-[1.5] text-muted">{t("payVivaSetupHelp")}</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <CredField name="merchantId" label={t("payVivaMerchantId")} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
+                      <CredField name="apiKey" label={t("payVivaApiKey")} />
+                      <CredField name="clientId" label={t("payVivaClientId")} placeholder="…apps.vivapayments.com" />
+                      <CredField name="clientSecret" label={t("payVivaClientSecret")} />
+                      <CredField name="sourceCode" label={t("payVivaSourceCode")} placeholder="1234" />
+                    </div>
+                    <label className="mt-1 flex items-center gap-2 text-[13px] text-secondary">
+                      <input type="checkbox" name="isv" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                      {t("payVivaIsvToggle")}
+                    </label>
+                    <p className="-mt-2 text-[12px] leading-[1.5] text-muted">{t("payVivaIsvHelp")}</p>
+                    <label className="flex items-center gap-2 text-[13px] text-secondary">
+                      <input type="checkbox" name="demo" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                      {t("payVivaDemoToggle")}
+                    </label>
+                    <div className="mt-1">
+                      <button type="submit" disabled={busy || !vivaCurrencyOk} className={PRIMARY_BUTTON}>
+                        {busy ? t("payVivaVerifying") : t("payVivaConnect")}
+                      </button>
+                    </div>
+                  </Form>
+                </Panel>
+              </div>
+            )}
+
+            {choice === "iyzico" && (
+              <div className="mt-4">
+                <Panel name="iyzico" desc={t("payIyzicoDesc")}>
+                  <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
+                    <input type="hidden" name="intent" value="iyzico-connect" />
+                    <p className="text-[12px] leading-[1.5] text-muted">{t("payIyzicoSetupHelp")}</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <CredField name="apiKey" label={t("payIyzicoApiKey")} placeholder="sandbox-…" />
+                      <CredField name="secretKey" label={t("payIyzicoSecretKey")} />
+                      <CredField name="merchantId" label={t("payIyzicoMerchantIdOptional")} />
+                    </div>
+                    <label className="mt-1 flex items-center gap-2 text-[13px] text-secondary">
+                      <input type="checkbox" name="sandbox" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                      {t("payIyzicoSandboxToggle")}
+                    </label>
+                    <div className="mt-1">
+                      <button type="submit" disabled={busy || !iyzicoCurrencyOk} className={PRIMARY_BUTTON}>
+                        {busy ? t("payIyzicoVerifying") : t("payIyzicoConnect")}
+                      </button>
+                    </div>
+                  </Form>
+                </Panel>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Rendered for BOTH the connected panel's diagnostics button and a
+            failed connect attempt — the ticket-worthy state is usually the
+            failure, where no connected panel exists yet, so it sits at page
+            level rather than inside Viva's card. Raw JSON on purpose: this
+            block is pasted verbatim into a Viva support ticket, so it must not
+            be translated or reformatted. No secrets (no access token). */}
+        {actionData && "vivaDiag" in actionData && actionData.vivaDiag && (
+          <div className="mt-4 rounded-[10px] border border-line bg-canvas p-3.5">
+            <p className="mb-2 text-[12px] leading-[1.5] text-muted">{t("payVivaDiagHelp")}</p>
+            <pre className="overflow-x-auto rounded-[8px] border border-line-alt bg-surface p-3 font-mono text-[11px] leading-[1.6] text-ink">
+              {JSON.stringify(actionData.vivaDiag, null, 2)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );
