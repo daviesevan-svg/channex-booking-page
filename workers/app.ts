@@ -12,6 +12,7 @@ import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
 import { httpsRedirect, withHsts } from "../app/lib/https-redirect";
+import { hasInternalParams, stripInternalParams } from "../app/lib/internal-params";
 import { runWithRequestCache } from "../app/lib/request-cache.server";
 
 
@@ -67,12 +68,12 @@ function canonicalRedirect(request: Request): Response | null {
  * Real `.data` requests keep their `_routes` untouched, and non-GET requests
  * are left alone (redirecting a POST would drop its body).
  */
-function stripInternalParams(request: Request): Response | null {
+function internalParamRedirect(request: Request): Response | null {
   if (request.method !== "GET" && request.method !== "HEAD") return null;
   const url = new URL(request.url);
   if (url.pathname.endsWith(".data")) return null;
-  if (!url.searchParams.has("_routes")) return null;
-  url.searchParams.delete("_routes");
+  if (!hasInternalParams(url.searchParams)) return null;
+  stripInternalParams(url.searchParams);
   return Response.redirect(url.toString(), 301);
 }
 
@@ -90,7 +91,7 @@ export default {
       const response =
         httpsRedirect(request, appUrl) ??
         canonicalRedirect(request) ??
-        stripInternalParams(request) ??
+        internalParamRedirect(request) ??
         (await requestHandler(request));
       return withHsts(response, request, appUrl);
     });

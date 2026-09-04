@@ -15,6 +15,7 @@ import { redirect } from "react-router";
 
 import { basePath, homePath } from "./base";
 import { isStayBookable, isTooLastMinute } from "./dates";
+import { stripInternalParams } from "./internal-params";
 import { readOccupancy, type Occupancy } from "./occupancy";
 import { getBookingCutoff, getSettings } from "./overrides.server";
 import { resolveRequestProperty } from "./property-scope.server";
@@ -25,6 +26,16 @@ export interface DatedStay {
   /** Link prefixes keyed by the ORIGINAL URL segment, so slugs stay in the URL. */
   base: string;
   home: string;
+  /**
+   * The request URL, minus React Router's internal params.
+   *
+   * Every dated page builds redirects and links by copying this query string
+   * (`?${url.searchParams}`), and during a client-side navigation the request is
+   * for `<path>.data?…&_routes=…`. Copying that verbatim put `_routes` in the
+   * guest's address bar for the rest of the funnel — see internal-params.ts for
+   * what it then breaks. Stripped once here rather than at each of the seven
+   * call sites, so a new one can't reintroduce it.
+   */
   url: URL;
   checkin: string;
   checkout: string;
@@ -48,6 +59,7 @@ export async function requireDatedStay(
   const base = basePath(channelId);
   const home = homePath(channelId);
   const url = new URL(request.url);
+  stripInternalParams(url.searchParams);
   const checkin = url.searchParams.get("checkin");
   const checkout = url.searchParams.get("checkout");
   const occ = readOccupancy(url.searchParams);
