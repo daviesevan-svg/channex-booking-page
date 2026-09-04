@@ -22,7 +22,7 @@ import type { Route } from "./+types/room-photo";
 import { requireAdmin } from "~/lib/auth.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { mb, MAX_IMAGE_BYTES } from "~/lib/upload-limits";
+import { imageProblem, imageProblemMessage } from "~/lib/upload-limits";
 
 /** The key prefix segment for this editor's photos. Only cosmetic — ownership
  *  and the GC key off `catalog/<propertyId>/` alone (image-paths.ts) — but it
@@ -57,12 +57,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     return Response.json({ error: "No photo attached." }, { status: 400 });
   }
   // The browser checks this too; this is the one that counts.
-  if (file.size > MAX_IMAGE_BYTES) {
-    return Response.json(
-      { error: `Too large (${mb(file.size)}MB, max ${mb(MAX_IMAGE_BYTES)}MB).` },
-      { status: 400 },
-    );
-  }
+  const problem = imageProblem(file);
+  if (problem) return Response.json({ error: imageProblemMessage(problem) }, { status: 400 });
 
   try {
     return Response.json({ url: await uploadCatalogRoomImage(propertyId, segment, file) });

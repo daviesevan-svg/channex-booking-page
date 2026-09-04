@@ -24,7 +24,7 @@ import { uploadSectionImage } from "~/lib/images.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { MAX_SECTION_IMAGES } from "~/lib/sections";
 import { addSectionImages } from "~/lib/site.server";
-import { mb, MAX_IMAGE_BYTES } from "~/lib/upload-limits";
+import { imageProblem, imageProblemMessage } from "~/lib/upload-limits";
 
 export async function action({ request }: Route.ActionArgs) {
   await requireAdmin(request);
@@ -46,12 +46,9 @@ export async function action({ request }: Route.ActionArgs) {
   if (!(file instanceof File) || file.size === 0) {
     return Response.json({ error: "No photo attached." }, { status: 400 });
   }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return Response.json(
-      { error: `Too large (${mb(file.size)}MB, max ${mb(MAX_IMAGE_BYTES)}MB).` },
-      { status: 400 },
-    );
-  }
+  // The browser checks this too; this is the one that counts.
+  const problem = imageProblem(file);
+  if (problem) return Response.json({ error: imageProblemMessage(problem) }, { status: 400 });
 
   try {
     const url = await uploadSectionImage(propertyId, file);

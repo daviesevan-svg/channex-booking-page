@@ -1,9 +1,9 @@
 // Shared building blocks for the admin editor forms.
 import { useState } from "react";
 
-import { useAdminT, type AdminT } from "~/lib/admin-i18n";
+import { useAdminT } from "~/lib/admin-i18n";
 import { DEFAULT_LANG, langLabel } from "~/lib/content";
-import { checkUploadBatch, mb, type UploadBatchProblem } from "~/lib/upload-limits";
+import { imageProblem, imageProblemText, type ImageProblem } from "~/lib/upload-limits";
 
 /** Standard text-input styling used across the admin editors. */
 export const FIELD_INPUT =
@@ -96,24 +96,10 @@ export function Field({
 /** File upload control with translatable labels — the native input renders
  *  browser-chrome text ("Choose file / No file chosen") in the BROWSER's
  *  language, so it's visually hidden behind a styled button. */
-/** The batch problem as translated copy. The server has its own English
- *  wording (uploadProblemMessage); this is the one an admin normally sees,
- *  because the pick is checked before anything is sent. */
-function uploadProblemText(t: AdminT, problem: UploadBatchProblem): string {
-  switch (problem.kind) {
-    case "count":
-      return t("uploadTooMany", { got: problem.got, limit: problem.limit });
-    case "file":
-      return t("uploadFileTooBig", { name: problem.name, size: mb(problem.size), limit: mb(problem.limit) });
-    case "total":
-      return t("uploadTotalTooBig", { got: mb(problem.got), limit: mb(problem.limit) });
-  }
-}
-
 export function FilePicker({ name, accept, multiple }: { name: string; accept?: string; multiple?: boolean }) {
   const t = useAdminT();
   const [fileName, setFileName] = useState<string | null>(null);
-  const [problem, setProblem] = useState<UploadBatchProblem | null>(null);
+  const [problem, setProblem] = useState<ImageProblem | null>(null);
   return (
     <div>
       <label className="flex cursor-pointer flex-wrap items-center gap-3 text-caption">
@@ -130,13 +116,11 @@ export function FilePicker({ name, accept, multiple }: { name: string; accept?: 
           onChange={(e) => {
             const input = e.currentTarget;
             const files = Array.from(input.files ?? []);
-            // Say so here rather than let the request fail: past the batch
-            // limits the body is refused by the platform or exhausts the
-            // Worker's memory, and the admin gets a blank "unexpected error"
-            // with no hint that the photos were the problem (upload-limits.ts).
-            // The pick is dropped too — an input still holding 100 MB would go
-            // out on the next submit regardless of the warning shown.
-            const found = checkUploadBatch(files);
+            // Say so here rather than let the save fail on it: a refused file
+            // reaching the action comes back as a bare error with no hint which
+            // photo it was about. The pick is dropped too, or the file the
+            // warning is about would still go out on the next submit.
+            const found = files.map(imageProblem).find((p) => p !== null) ?? null;
             setProblem(found);
             if (found) {
               input.value = "";
@@ -149,7 +133,7 @@ export function FilePicker({ name, accept, multiple }: { name: string; accept?: 
       </label>
       {problem && (
         <p role="alert" className="mt-1 text-caption text-red-600">
-          {uploadProblemText(t, problem)}
+          {imageProblemText(t, problem)}
         </p>
       )}
     </div>
