@@ -118,6 +118,17 @@ const EN: Record<string, string> = {
   uploadTooMany: "Too many photos at once ({got}) — add up to {limit} at a time.",
   uploadFileTooBig: "\"{name}\" is {size}MB — the limit is {limit}MB per photo.",
   uploadTotalTooBig: "That is {got}MB in one go — the limit is {limit}MB. Add them in smaller batches.",
+  // -- per-photo uploader (admin-photo-uploader.tsx) --
+  puAdd: "Add photos",
+  puBusyHint: "Uploading — wait for these to finish before saving.",
+  puQueued: "Waiting…",
+  puUploading: "Uploading… {pct}%",
+  puDone: "Uploaded",
+  puDropped: "Removed — will not be saved",
+  puRetry: "Retry",
+  puRemove: "Remove",
+  puNotImage: "\"{name}\" is not an image.",
+  puTooBig: "\"{name}\" is {size}MB — the limit is {limit}MB per photo.",
   afChannexHint: "From your channel manager: {value} — leave blank to use this.",
 
   // -- blocked-ranges editor --

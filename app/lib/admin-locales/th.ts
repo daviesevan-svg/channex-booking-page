@@ -118,6 +118,17 @@ const TH: Record<string, string> = {
   uploadTooMany: "เลือกรูปมากเกินไป ({got} รูป) — ได้ครั้งละไม่เกิน {limit} รูป",
   uploadFileTooBig: "\"{name}\" มีขนาด {size}MB — จำกัดไม่เกิน {limit}MB ต่อรูป",
   uploadTotalTooBig: "รวมทั้งหมด {got}MB ในครั้งเดียว — จำกัดไม่เกิน {limit}MB กรุณาอัปโหลดเป็นชุดย่อย",
+  // -- อัปโหลดทีละรูป (admin-photo-uploader.tsx) --
+  puAdd: "เพิ่มรูปภาพ",
+  puBusyHint: "กำลังอัปโหลด — โปรดรอให้เสร็จก่อนบันทึก",
+  puQueued: "รอคิว…",
+  puUploading: "กำลังอัปโหลด… {pct}%",
+  puDone: "อัปโหลดแล้ว",
+  puDropped: "นำออกแล้ว — จะไม่ถูกบันทึก",
+  puRetry: "ลองอีกครั้ง",
+  puRemove: "นำออก",
+  puNotImage: "\"{name}\" ไม่ใช่ไฟล์รูปภาพ",
+  puTooBig: "\"{name}\" มีขนาด {size}MB — จำกัดไม่เกิน {limit}MB ต่อรูป",
   afChannexHint: "จากระบบจัดการช่องทางขาย: {value} — เว้นว่างไว้เพื่อใช้ค่านี้",
 
   // -- blocked-ranges editor --
