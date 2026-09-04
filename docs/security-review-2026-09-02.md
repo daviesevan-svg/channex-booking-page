@@ -117,7 +117,7 @@ The `properties` registry is one KV key written by every tenant (`addProperty`, 
 | M2 web uncarded live bookings have no D1 claim | open | `checkout.tsx` finalize with `payment === undefined` behind KV `rateLimit(book:…, 10, 600)` only |
 | M3 adults cap only on URL reader | partial | cart capped by room capacity; `GET /v1/availability` still uncapped adults and nights |
 | M5 confirmation page shows "Confirmed" for any reference | open | `confirmation.tsx` never calls `getBookingByReference` |
-| M7 teammate-open owner controls | partial | PR 480 gated payments/live/slug/public/auto-refund; **still open:** custom domain claim/remove (`website.tsx`), currency/pricing mode (`general.tsx`), booking cancel (by decision, H4) — connectivity fixed here |
+| M7 teammate-open owner controls | partial | PR 480 gated payments/live/slug/public/auto-refund; **payments re-opened by decision** (see note below); **still open:** custom domain claim/remove (`website.tsx`), currency/pricing mode (`general.tsx`), booking cancel (by decision, H4) — connectivity fixed here |
 | L1 Viva `merchantTrns` not compared | open (mitigated) | order-code mapping is the bind |
 | L2 checkout intent claimed before rate limit | open | `checkout.tsx` |
 | L3 fail-open without D1/KV | open (latent) | `rate-limit.server.ts`, `checkout-idem.server.ts` |
@@ -127,6 +127,21 @@ The `properties` registry is one KV key written by every tenant (`addProperty`, 
 | L8 colours unsanitised at render | mitigated at every write path; the collections form (`admin/collection.tsx` `customColor`) is the one raw path (superadmin-only) → CSS injection on `/c/*` |
 | L9 `admin/lang` | fixed (H3) | |
 | M4, M6 | **fixed** | `partnerId` stamped on add/clone; `canManageProperty` in use |
+
+**Payments, re-opened by decision (2026-09-04).** PR 480's `isOwnerOrSuper` gate on
+`/admin/payments` made the page read-only for every non-owner, including a teammate the
+owner had deliberately granted the `payments` area — the forms simply vanished, with no
+explanation. Authorization for that page is now the area grant itself: the owner decides,
+per teammate, on the Team page, and `assertMemberAreaAllowed` (which runs on the action as
+well as the loader, since the POST pathname is `/admin/payments`) is the gate. The Stripe
+Connect callback resolves its property from the stored nonce, so it re-checks the area
+directly via `hiddenMemberAreasFor`.
+
+**Residual risk, accepted:** a teammate with the `payments` area can disconnect the hotel's
+gateway and connect a different Stripe/Viva/iyzico account, i.e. re-point where guest money
+lands. `partner_admin` still cannot be locked out of the area at all (whitelabel.md §4), so
+a PMS staffer of the property's partner has the same power. Refunds remain on
+`canManageProperty`, and the money-touching `/v1` and MCP surfaces are unchanged.
 
 #### M8 — `removeUser` does not strip ownerships or memberships
 
@@ -160,7 +175,7 @@ The `properties` registry is one KV key written by every tenant (`addProperty`, 
 
 - **Cross-partner isolation:** sessions host-bound both directions; `getVisibleProperties` / `canAccess` / `currentPropertyId` remain the sole chokepoints; every property-scoped action re-runs its guard (no loader-only gates); no action uses a form-supplied property id without a visibility check except the collections target (L1). Partner hostnames superadmin-only with own-host/reserved/other-partner refusals.
 - **Management API + MCP:** all 41 routes and both MCP entry kinds call `authenticateApiKey(request, "manage")`; `sk_` on manage → 403; no route reads a pid from path/query/body; every `:id` resolves inside `auth.pid`-scoped stores; `mapArguments` never maps a pid/host; `callTool` forwards only the original `Authorization`; `tools/list` carries no property data. Settings writes allowlisted (`rejectUnknown` + explicit mapping) — `stripeAccountId`, `liveBooking`, `connectedSystem`, `websiteDomain`, `partnerId`, `slug`, `public` unreachable. Team ops never write `owner`/`role`. Webhook SSRF gate on route and store; secret only in the POST response. From-address not writable. Images: `image/*`, ≤ 8 MB, UUID keys, `/images/*` served with `CSP: sandbox` + nosniff. Create-property copies owner/partner from the key property's record; no escalation.
-- **Payments:** Stripe webhook HMAC + 300 s; session bind on every finalize caller (`checkout.complete`, `api.stripe-webhook` booking + voucher, `vouchers-complete`, `finalizeFromStripeSession`); Connect OAuth nonce + `canAccess` + `isOwnerOrSuper`; refunds `canManageProperty`/`ownerGate`, full-amount only, audited, Stripe-idempotent; PR 478 holds (`/v1` never charges unless `live`). Viva webhook body untrusted — finalize re-fetches with the order's property credentials and binds orderCode + status + amount/currency/mode; ISV endpoints scoped by stored `merchantId`; credentials in their own KV key, never in loader data; diagnostics contain no secrets. Price integrity: currency pinned to settings; rates/offers from catalog; occupancy capped; promo re-resolved and clamped; extras server-priced; voucher lookups pid-scoped and throttled; zero-decimal handled on both sides of the bind; finalize-once via `UNIQUE(pid, reference)`.
+- **Payments:** Stripe webhook HMAC + 300 s; session bind on every finalize caller (`checkout.complete`, `api.stripe-webhook` booking + voucher, `vouchers-complete`, `finalizeFromStripeSession`); Connect OAuth nonce + `canAccess` + `payments` area (owner gate removed by decision, see M7); refunds `canManageProperty`/`ownerGate`, full-amount only, audited, Stripe-idempotent; PR 478 holds (`/v1` never charges unless `live`). Viva webhook body untrusted — finalize re-fetches with the order's property credentials and binds orderCode + status + amount/currency/mode; ISV endpoints scoped by stored `merchantId`; credentials in their own KV key, never in loader data; diagnostics contain no secrets. Price integrity: currency pinned to settings; rates/offers from catalog; occupancy capped; promo re-resolved and clamped; extras server-priced; voucher lookups pid-scoped and throttled; zero-decimal handled on both sides of the bind; finalize-once via `UNIQUE(pid, reference)`.
 - **Guest surfaces:** only `dangerouslySetInnerHTML` uses are JSON-LD via `jsonLdHtml` and the regex-allowlisted font loader; rich text parses to a tree, links `https?://` only; footer/social/CTA/terms/privacy URLs `httpUrl`/`safeUrl` at write and read; image refs `/images/` only; fonts `FONT_PAIRS`; page slugs regex + reserved; room/rate translations text-only; HTML emails `esc()` every dynamic value except the write-validated brand colours. Guest cookie `httpOnly`/`Lax`/`Secure`/signed; manage-booking and manage-voucher email-ownership checks; manage login generic errors + throttle; booking refs 40 bits paired with email. Every other redirect is built from constants after property resolution or from server data. Embed postMessage checks origin, source and URL prefix.
 - **Data layer:** every `.prepare(` parameterised; the only interpolations are fixed literals or `placeholders(n)`; every tenant table query binds `pid`; D1 100-param cap chunked everywhere lists are bound. `wrangler.jsonc` `vars` hold no secrets; `SESSION_SECRET` fail-closes in PROD; missing `OPEN_CHANNEL_API_KEY` → 401. XML escaping on Google feeds/ARI; SparkPost JSON API (no raw header injection); `reply_to`/`host_notify_email` regex-validated on both paths. Per-request KV cache is `AsyncLocalStorage`-scoped per `fetch`, absolute keys, no cross-tenant path.
 - **Live headers:** CSP, `X-Frame-Options`, nosniff, referrer policy correct per path; CNAME target 301s to canonical; `/v1` without a key → 401; `/mcp` GET is the documented unauthenticated probe.
