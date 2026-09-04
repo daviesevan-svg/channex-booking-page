@@ -7,6 +7,7 @@ import { finalizeFromStripeSession } from "~/lib/booking-finalize.server";
 import { SessionBindError } from "~/lib/stripe-session-bind";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { basePath, homePath } from "~/lib/base";
+import { stripInternalParams } from "~/lib/internal-params";
 
 // Stripe sends the guest here after paying. We retrieve the session to confirm
 // payment, finalize the booking (idempotent — the webhook may have raced us),
@@ -24,6 +25,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const fwd = new URLSearchParams(url.searchParams);
   fwd.delete("session_id");
   fwd.delete("ref");
+  // Everything below redirects to a URL built from `fwd`, so React Router's
+  // internal params must not ride along into the address bar (internal-params.ts).
+  stripInternalParams(fwd);
   const checkoutUrl = `${basePath(channel)}/checkout?${fwd.toString()}`;
   if (!ref || !sessionId) throw redirect(homePath(channel));
 
