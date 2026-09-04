@@ -21,6 +21,7 @@ import {
 } from "./content";
 import { withEmailDefaults } from "./email-defaults.server";
 import { vivaConfigured, type VivaConfig } from "./viva.server";
+import { iyzicoConfigured, type IyzicoConfig } from "./iyzico.server";
 import { ownerOnlyValue } from "./property-access";
 
 // Localized content is stored per language: KV value is { [lang]: data }.
@@ -389,6 +390,23 @@ export async function saveVivaConfig(pid: string, config: VivaConfig | null): Pr
   if (config) await writeJson(vivaKey(pid), config);
   else await kv.delete(vivaKey(pid));
 }
+const iyzicoKey = (pid: string) => `iyzico_config:${pid}`;
+
+export async function getIyzicoConfig(pid: string): Promise<IyzicoConfig | null> {
+  const c = await readJson<IyzicoConfig>(iyzicoKey(pid));
+  return iyzicoConfigured(c) ? c : null;
+}
+
+/** Store (or, with null, disconnect) the property's iyzico credentials. Their
+ *  own KV key rather than the settings blob, for the same reason as Viva's: a
+ *  secret key has no business riding along with every settings read. */
+export async function saveIyzicoConfig(pid: string, config: IyzicoConfig | null): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  if (config) await writeJson(iyzicoKey(pid), config);
+  else await kv.delete(iyzicoKey(pid));
+}
+
 /** Accept only http(s) URLs; otherwise drop (so a bad value never becomes a link). */
 function safeUrl(v: FormDataEntryValue | null): string | undefined {
   const s = String(v ?? "").trim();

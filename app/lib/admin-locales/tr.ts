@@ -2214,6 +2214,22 @@ const TR: Record<string, string> = {
   trkErrAdsIdMissing: "Dönüşüm kimliğini de ekleyin — etiket tek başına gönderilemez.",
   trkErrAdsLabel: "Dönüşüm etiketini de ekleyin veya kodun tamamını kimlik kutusuna yapıştırın. Google ikisini tek değer olarak gönderir, hiçbiri tek başına çalışmaz.",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "Türkiye'deki tesisler için iyzico'nun ödeme sayfasında kartlı ödeme.",
+  payIyzicoSetupHelp: "iyzico üye iş yeri panelinizden → Ayarlar → Üye iş yeri ayarları. API anahtarı ile gizli anahtar bir çifttir; üye iş yeri numarası isteğe bağlıdır ve yalnızca sizin için saklanır. iyzico tarafına hiçbir şey yapıştırmanız gerekmez — dönüş adresi her ödemeyle birlikte gönderilir.",
+  payIyzicoApiKey: "API anahtarı",
+  payIyzicoSecretKey: "Gizli anahtar",
+  payIyzicoMerchantId: "Üye iş yeri numarası",
+  payIyzicoMerchantIdOptional: "Üye iş yeri numarası (isteğe bağlı)",
+  payIyzicoConnect: "iyzico'yu bağla",
+  payIyzicoVerifying: "iyzico ile doğrulanıyor…",
+  payIyzicoSandboxToggle: "Bunlar sandbox bilgileridir",
+  payIyzicoConnectedSandbox: "Bağlandı (sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "iyzico, bu tesisin para birimi olan {currency} birimini kabul etmiyor. TRY, USD, EUR, GBP, NOK ve CHF kabul ediliyor.",
+  payIyzicoNoGuarantee: "iyzico ödeme tahsil eder, kartı teminat olarak saklayamaz. Kart isteyip tahsilat yapmayan fiyatlar, hiçbir ödeme altyapısı bağlı değilmiş gibi kartsız rezerve edilir.",
+
 };
 
 export default TR;

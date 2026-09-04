@@ -2014,6 +2014,22 @@ const EL: Record<string, string> = {
   trkErrAdsIdMissing: "Προσθέστε και το αναγνωριστικό μετατροπής — μια ετικέτα μόνη της δεν μπορεί να σταλεί.",
   trkErrAdsLabel: "Προσθέστε και την ετικέτα μετατροπής ή επικολλήστε ολόκληρο το snippet στο πεδίο του αναγνωριστικού. Η Google στέλνει και τα δύο ως μία τιμή και κανένα δεν λειτουργεί μόνο του.",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "Πληρωμές με κάρτα για καταλύματα στην Τουρκία, στη σελίδα πληρωμής της iyzico.",
+  payIyzicoSetupHelp: "Από τον πίνακα εμπόρου iyzico → Ρυθμίσεις → Ρυθμίσεις εμπόρου. Το κλειδί API και το μυστικό κλειδί πηγαίνουν μαζί· το αναγνωριστικό εμπόρου είναι προαιρετικό και κρατείται μόνο για δική σας αναφορά. Δεν χρειάζεται να καταχωρίσετε τίποτα στην iyzico — η διεύθυνση επιστροφής στέλνεται με κάθε πληρωμή.",
+  payIyzicoApiKey: "Κλειδί API",
+  payIyzicoSecretKey: "Μυστικό κλειδί",
+  payIyzicoMerchantId: "Αναγνωριστικό εμπόρου",
+  payIyzicoMerchantIdOptional: "Αναγνωριστικό εμπόρου (προαιρετικό)",
+  payIyzicoConnect: "Σύνδεση iyzico",
+  payIyzicoVerifying: "Γίνεται έλεγχος στην iyzico…",
+  payIyzicoSandboxToggle: "Αυτά είναι διαπιστευτήρια sandbox",
+  payIyzicoConnectedSandbox: "Συνδέθηκε (sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "Η iyzico δεν δέχεται {currency}, που είναι το νόμισμα αυτού του καταλύματος. Δέχεται TRY, USD, EUR, GBP, NOK και CHF.",
+  payIyzicoNoGuarantee: "Η iyzico εισπράττει πληρωμές, αλλά δεν κρατά κάρτα ως εγγύηση. Οι τιμές που ζητούν κάρτα χωρίς χρέωση θα κρατούνται χωρίς κάρτα, όπως και χωρίς συνδεδεμένη πύλη πληρωμών.",
+
 };
 
 export default EL;

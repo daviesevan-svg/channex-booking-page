@@ -72,6 +72,21 @@ export function signatureAmount(value: string | number | undefined | null): stri
   return s.replace(/0+$/, "").replace(/\.$/, "");
 }
 
+/**
+ * What goes in the buyer's `identityNumber`.
+ *
+ * iyzico's API requires the field — it is a Turkish national ID (TC Kimlik) —
+ * and a hotel booking has no business collecting one: most guests are not
+ * Turkish residents and would have nothing to give, and for those who are it is
+ * a sensitive identifier we would then be storing for no purpose of our own.
+ *
+ * So every booking sends the filler iyzico's own sample code uses. Decided with
+ * Evan, Sep 2026, and worth confirming with the merchant: if their account is
+ * configured to expect real numbers, iyzico's fraud scoring is where it will
+ * show up, not as a rejected request.
+ */
+export const IYZICO_PLACEHOLDER_IDENTITY = "11111111111";
+
 /** tr for Turkish guests, en for everyone else — the only two iyzico has. */
 export const iyzicoLocale = (lang: string | undefined): "tr" | "en" => (lang === "tr" ? "tr" : "en");
 

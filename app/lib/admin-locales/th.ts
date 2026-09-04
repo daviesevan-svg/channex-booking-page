@@ -2132,6 +2132,22 @@ const TH: Record<string, string> = {
   trkErrAdsIdMissing: "โปรดใส่รหัส Conversion ด้วย เพราะป้ายกำกับเพียงอย่างเดียวส่งไม่ได้",
   trkErrAdsLabel: "โปรดใส่ป้ายกำกับ Conversion ด้วย หรือวางสคริปต์ทั้งชุดในช่องรหัส Google ส่งทั้งสองส่วนเป็นค่าเดียวกันและใช้แยกกันไม่ได้",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "การชำระเงินด้วยบัตรสำหรับที่พักในตุรกี บนหน้าชำระเงินของ iyzico",
+  payIyzicoSetupHelp: "จากแผงผู้ค้า iyzico → การตั้งค่า → การตั้งค่าผู้ค้า คีย์ API และคีย์ลับเป็นคู่กัน ส่วนรหัสผู้ค้าเป็นตัวเลือกและเก็บไว้เพื่อการอ้างอิงของคุณเท่านั้น ไม่ต้องนำอะไรไปวางใน iyzico เพราะที่อยู่สำหรับส่งกลับจะถูกส่งไปพร้อมทุกการชำระเงิน",
+  payIyzicoApiKey: "คีย์ API",
+  payIyzicoSecretKey: "คีย์ลับ",
+  payIyzicoMerchantId: "รหัสผู้ค้า",
+  payIyzicoMerchantIdOptional: "รหัสผู้ค้า (ไม่บังคับ)",
+  payIyzicoConnect: "เชื่อมต่อ iyzico",
+  payIyzicoVerifying: "กำลังตรวจสอบกับ iyzico…",
+  payIyzicoSandboxToggle: "ข้อมูลนี้เป็นข้อมูลรับรองแบบ sandbox",
+  payIyzicoConnectedSandbox: "เชื่อมต่อแล้ว (sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "iyzico ไม่รองรับ {currency} ซึ่งเป็นสกุลเงินของที่พักนี้ โดยรองรับ TRY, USD, EUR, GBP, NOK และ CHF",
+  payIyzicoNoGuarantee: "iyzico เรียกเก็บเงินได้ แต่ไม่สามารถเก็บบัตรไว้เป็นหลักประกัน ราคาที่ขอบัตรโดยไม่เรียกเก็บเงินจะจองได้โดยไม่ต้องใช้บัตร เช่นเดียวกับกรณีที่ไม่ได้เชื่อมต่อช่องทางชำระเงินใด ๆ",
+
 };
 
 export default TH;

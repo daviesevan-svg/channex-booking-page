@@ -41,6 +41,7 @@ import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { taxConfigFrom } from "~/lib/pricing";
 import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
+import { IYZICO_PLACEHOLDER_IDENTITY, initializeCheckoutForm } from "~/lib/iyzico.server";
 import { activeGateway, canSaveCard } from "~/lib/payments.server";
 import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
@@ -635,6 +636,46 @@ export async function action({ params, request }: Route.ActionArgs) {
         // this isn't mistaken for "not set up".
         console.log(
           `[checkout] viva order failed for pid=${stay.channelId}: ${e instanceof Error ? e.message : e}`,
+        );
+        if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+        await releaseCheckoutIntent(stay.channelId, fingerprint);
+        return { paymentError: "failed" as const };
+      }
+      await stashPending(reference, { ...pending, paymentUrl: payUrl });
+      await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "payment", reference, url: payUrl });
+      throw redirect(payUrl);
+    }
+
+    if (gateway.kind === "iyzico") {
+      // iyzico's hosted Checkout Form. Unlike Viva, the callback URL is given
+      // per request, so it carries the reference itself and needs no order-code
+      // mapping: the return leg reads ?ref= and finds the pending booking.
+      let payUrl: string;
+      try {
+        const form = await initializeCheckoutForm(gateway.iyzico, {
+          reference,
+          amount: dueAfterVoucher,
+          currency: stay.currency,
+          callbackUrl: `${url.origin}${base}/iyzico/return?ref=${reference}`,
+          lang: guestLang,
+          buyer: {
+            firstName: g.firstName,
+            lastName: g.lastName,
+            email: g.email,
+            phone: g.phone,
+            ip: request.headers.get("cf-connecting-ip") || undefined,
+          },
+          // One line, because iyzico requires the basket to sum to the amount
+          // charged and `dueAfterVoucher` is a deposit or a voucher remainder
+          // as often as it is the full stay — itemising rooms here would make
+          // the two disagree on every booking that isn't paid in full.
+          items: [{ id: reference, name: `${hotelName} — ${roomName}`, price: dueAfterVoucher }],
+          identityNumber: IYZICO_PLACEHOLDER_IDENTITY,
+        });
+        payUrl = form.paymentPageUrl;
+      } catch (e) {
+        console.log(
+          `[checkout] iyzico form failed for pid=${stay.channelId}: ${e instanceof Error ? e.message : e}`,
         );
         if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
         await releaseCheckoutIntent(stay.channelId, fingerprint);

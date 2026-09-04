@@ -2140,6 +2140,22 @@ const DE: Record<string, string> = {
   trkErrAdsIdMissing: "Ergänzen Sie auch die Conversion-ID – ein Label allein kann nicht gesendet werden.",
   trkErrAdsLabel: "Ergänzen Sie auch das Conversion-Label, oder fügen Sie das ganze Snippet in das ID-Feld ein. Google sendet beides als einen Wert, keines funktioniert allein.",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "Kartenzahlungen für türkische Unterkünfte, auf der Zahlungsseite von iyzico.",
+  payIyzicoSetupHelp: "Aus Ihrem iyzico-Händlerkonto → Einstellungen → Händlereinstellungen. API-Schlüssel und Secret-Schlüssel gehören zusammen; die Händler-ID ist optional und dient nur Ihrer Übersicht. Bei iyzico muss nichts hinterlegt werden – die Rückkehradresse wird mit jeder Zahlung übermittelt.",
+  payIyzicoApiKey: "API-Schlüssel",
+  payIyzicoSecretKey: "Secret-Schlüssel",
+  payIyzicoMerchantId: "Händler-ID",
+  payIyzicoMerchantIdOptional: "Händler-ID (optional)",
+  payIyzicoConnect: "iyzico verbinden",
+  payIyzicoVerifying: "Wird bei iyzico geprüft…",
+  payIyzicoSandboxToggle: "Dies sind Sandbox-Zugangsdaten",
+  payIyzicoConnectedSandbox: "Verbunden (Sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "iyzico akzeptiert {currency} nicht – die Währung dieser Unterkunft. Möglich sind TRY, USD, EUR, GBP, NOK und CHF.",
+  payIyzicoNoGuarantee: "iyzico zieht Zahlungen ein, kann aber keine Karte als Garantie hinterlegen. Tarife, die eine Karte ohne Belastung verlangen, werden ohne Karte gebucht – wie ohne verbundenes Zahlungssystem.",
+
 };
 
 export default DE;

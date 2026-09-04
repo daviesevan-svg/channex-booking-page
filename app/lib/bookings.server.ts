@@ -30,7 +30,7 @@ export type BookingLifecycle = "active" | "cancelled";
  *  (Stripe only — Viva has no card-on-file mode). */
 export interface PaymentInfo {
   /** "voucher" = the stay was prepaid by redeeming a package voucher. */
-  provider: "stripe" | "viva" | "voucher";
+  provider: "stripe" | "viva" | "iyzico" | "voucher";
   mode: "payment" | "setup";
   /** Stripe: the connected account id. Viva: the merchant id. */
   accountId: string;

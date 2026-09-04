@@ -6,11 +6,12 @@ import { SavedPill } from "~/components/admin-page-header";
 import { requireAdmin, stampStripeConnectState } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
-import { getSettings, getVivaConfig, savePaymentSettings, saveVivaConfig } from "~/lib/overrides.server";
+import { getIyzicoConfig, getSettings, getVivaConfig, savePaymentSettings, saveIyzicoConfig, saveVivaConfig } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { runVivaDiagnostics, verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
+import { IYZICO_CURRENCIES, verifyIyzicoConfig } from "~/lib/iyzico.server";
 import { saveVivaDiagnostics } from "~/lib/viva-diag.server";
 import { redirect } from "react-router";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -39,6 +40,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Viva connection status — only non-secret fields ever leave the loader.
   const viva = await getVivaConfig(propertyId);
+  const iyzico = await getIyzicoConfig(propertyId);
   // The URLs the operator pastes into their Viva account. They follow the
   // PROPERTY's guest host (a partner's hotel lives on the partner's domain);
   // /viva/return|failure are root-level and find the checkout by order code,
@@ -68,6 +70,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     },
     currency,
     vivaCurrencyOk: VIVA_CURRENCIES.has(currency),
+    // Only the non-secret half ever leaves the loader — same rule as Viva. The
+    // secret key is write-only from here: it goes in, it never comes back out.
+    iyzico: iyzico ? { merchantId: iyzico.merchantId ?? "", sandbox: Boolean(iyzico.sandbox) } : null,
+    iyzicoCurrencyOk: IYZICO_CURRENCIES.has(currency),
     canOwn: await isOwnerOrSuper(request, propertyId),
   };
 }
@@ -83,7 +89,9 @@ export async function action({ request }: Route.ActionArgs) {
     intent === "disconnect" ||
     intent === "viva-connect" ||
     intent === "viva-disconnect" ||
-    intent === "viva-diagnostics"
+    intent === "viva-diagnostics" ||
+    intent === "iyzico-connect" ||
+    intent === "iyzico-disconnect"
   ) {
     if (!(await isOwnerOrSuper(request, propertyId))) {
       return { error: "Only an owner or manager can connect or disconnect payments." };
@@ -113,6 +121,7 @@ export async function action({ request }: Route.ActionArgs) {
     // One gateway per property: a Viva connection must be removed explicitly
     // before Stripe takes over, so charges never silently switch rails.
     if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
+    if (await getIyzicoConfig(propertyId)) return { error: "Disconnect iyzico first — a property charges through one gateway." };
     // One-time nonce in the admin session, bound to this property. The raw
     // property id is not secret and must not be OAuth `state` — SameSite=Lax
     // sends the session cookie on the top-level GET callback.
@@ -126,6 +135,7 @@ export async function action({ request }: Route.ActionArgs) {
   if (intent === "viva-connect") {
     const settings = await getSettings(propertyId);
     if (settings.stripeAccountId) return { error: "Disconnect Stripe first — a property charges through one gateway." };
+    if (await getIyzicoConfig(propertyId)) return { error: "Disconnect iyzico first — a property charges through one gateway." };
     const currency = (settings.currency || "GBP").toUpperCase();
     if (!VIVA_CURRENCIES.has(currency)) {
       return { error: `Viva Smart Checkout doesn't support ${currency}. Supported: ${[...VIVA_CURRENCIES].join(", ")}.` };
@@ -161,6 +171,36 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "viva-disconnect") {
     await saveVivaConfig(propertyId, null);
+    return { ok: true };
+  }
+
+  if (intent === "iyzico-connect") {
+    const settings = await getSettings(propertyId);
+    if (settings.stripeAccountId) return { error: "Disconnect Stripe first — a property charges through one gateway." };
+    if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
+    const currency = (settings.currency || "GBP").toUpperCase();
+    if (!IYZICO_CURRENCIES.has(currency)) {
+      return { error: `iyzico doesn't support ${currency}. Supported: ${[...IYZICO_CURRENCIES].join(", ")}.` };
+    }
+    const config = {
+      apiKey: String(form.get("apiKey") ?? "").trim(),
+      secretKey: String(form.get("secretKey") ?? "").trim(),
+      merchantId: String(form.get("merchantId") ?? "").trim() || undefined,
+      sandbox: form.get("sandbox") === "on",
+    };
+    if (!config.apiKey || !config.secretKey) return { error: "Both the API key and the secret key are required." };
+    // Exercised against iyzico before anything is stored: a mistyped secret has
+    // to fail here, not at a guest's first checkout. Their auth failures come
+    // back as a business error, so the message is theirs and specific
+    // ("Invalid signature").
+    const problem = await verifyIyzicoConfig(config);
+    if (problem) return { error: problem };
+    await saveIyzicoConfig(propertyId, config);
+    return { ok: true };
+  }
+
+  if (intent === "iyzico-disconnect") {
+    await saveIyzicoConfig(propertyId, null);
     return { ok: true };
   }
   return { error: "Unknown action." };
@@ -208,9 +248,10 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, canOwn } = loaderData;
+  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk, canOwn } = loaderData;
   const connected = Boolean(accountId);
   const vivaConnected = Boolean(viva);
+  const iyzicoConnected = Boolean(iyzico);
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
     connected: { ok: true, text: t("payNoticeConnected") },
@@ -468,6 +509,76 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </pre>
             </div>
           )}
+        </div>
+
+        {/* iyzico — the same shape as Viva: per-property credentials, a hosted
+            payment page, no card ever on our side. The callback URL is passed
+            per request, so unlike Viva there is nothing for the hotel to paste
+            into their iyzico account. */}
+        <div className="rounded-[14px] border border-line bg-surface p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-serif text-[18px] font-semibold">iyzico</div>
+              <div className="text-[12px] text-muted">{t("payIyzicoDesc")}</div>
+            </div>
+            {iyzicoConnected && (
+              <span className="flex-none rounded-full bg-[#e8f0e6] px-2.5 py-1 text-[11px] font-semibold text-[#3f7a52]">
+                {iyzico?.sandbox ? t("payIyzicoConnectedSandbox") : t("payConnected")}
+              </span>
+            )}
+          </div>
+
+          {!iyzicoCurrencyOk && (
+            <p className="mt-3 rounded-[10px] border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-[12px] text-amber-800">
+              {t("payIyzicoCurrency", { currency })}
+            </p>
+          )}
+
+          {iyzicoConnected && iyzico ? (
+            <>
+              <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 border-t border-divider pt-4 text-[13px]">
+                <dt className="text-muted">{t("payIyzicoMerchantId")}</dt>
+                <dd className="font-mono text-[12px] text-ink">{iyzico.merchantId || "—"}</dd>
+                <dt className="text-muted">{t("payVivaEnvironment")}</dt>
+                <dd className="text-ink">{iyzico.sandbox ? t("payIyzicoEnvSandbox") : t("payVivaEnvLive")}</dd>
+              </dl>
+              <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payIyzicoNoGuarantee")}</p>
+              {canOwn && (
+                <Form method="post" className="mt-5">
+                  <input type="hidden" name="intent" value="iyzico-disconnect" />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {t("payDisconnect")}
+                  </button>
+                </Form>
+              )}
+            </>
+          ) : canOwn ? (
+            <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
+              <input type="hidden" name="intent" value="iyzico-connect" />
+              <p className="text-[12px] leading-[1.5] text-muted">{t("payIyzicoSetupHelp")}</p>
+              <VivaField name="apiKey" label={t("payIyzicoApiKey")} placeholder="sandbox-…" />
+              <VivaField name="secretKey" label={t("payIyzicoSecretKey")} />
+              <VivaField name="merchantId" label={t("payIyzicoMerchantIdOptional")} />
+              <label className="flex items-center gap-2 text-[13px] text-secondary">
+                <input type="checkbox" name="sandbox" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                {t("payIyzicoSandboxToggle")}
+              </label>
+              <div>
+                <button
+                  type="submit"
+                  disabled={busy || connected || vivaConnected || !iyzicoCurrencyOk}
+                  className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+                >
+                  {busy ? t("payIyzicoVerifying") : t("payIyzicoConnect")}
+                </button>
+                {(connected || vivaConnected) && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
+              </div>
+            </Form>
+          ) : null}
         </div>
       </div>
     </div>
