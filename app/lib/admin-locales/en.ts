@@ -115,6 +115,9 @@ const EN: Record<string, string> = {
   saved: "✓ Saved",
   chooseFile: "Choose file",
   noFileChosen: "No file chosen",
+  uploadTooMany: "Too many photos at once ({got}) — add up to {limit} at a time.",
+  uploadFileTooBig: "\"{name}\" is {size}MB — the limit is {limit}MB per photo.",
+  uploadTotalTooBig: "That is {got}MB in one go — the limit is {limit}MB. Add them in smaller batches.",
   afChannexHint: "From your channel manager: {value} — leave blank to use this.",
 
   // -- blocked-ranges editor --

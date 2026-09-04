@@ -10,6 +10,8 @@ import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_KEYS } from "~/lib/conten
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadCatalogRoomImage } from "~/lib/images.server";
+import { dedupeImages, parsePastedImageUrls, pastedUrlError } from "~/lib/pasted-image-urls";
+import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
 import { AmenitiesPicker } from "~/components/amenities-picker";
 import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 
@@ -36,7 +38,18 @@ export async function action({ params, request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
-  const form = await request.formData();
+  // Reading the body can fail before any of our own validation gets a look in —
+  // an oversized multipart upload is refused by the platform, and a Worker that
+  // runs out of memory buffering it dies here. Unguarded, that reached root's
+  // ErrorBoundary as "An unexpected error occurred", which tells an admin
+  // nothing about the photos they just attached. The batch limits below are
+  // what stop it happening; this is the message if something still does.
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return { error: "Could not read the upload — it may be too large. Try fewer or smaller photos." };
+  }
   const isNew = params.roomId === "new";
 
   if (form.get("intent") === "delete" && !isNew) {
@@ -62,11 +75,17 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (onDefault && !title) return { error: "Enter a room name." };
 
   const keep = form.getAll("keepImage").map(String);
-  const urls = String(form.get("imageUrls") ?? "")
-    .split("\n")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const files = form.getAll("uploads").filter((f): f is File => f instanceof File && f.size > 0);
+  // Refuse a mistyped url instead of storing it: it would become a permanently
+  // broken photo on the guest page with nothing to say why.
+  const pasted = parsePastedImageUrls(String(form.get("imageUrls") ?? ""));
+  if (pasted.rejected.length) return { error: pastedUrlError(pasted.rejected) };
+
+  const files = attachedFiles(form, "uploads");
+  // Checked here as well as in the browser, because the browser check is a
+  // courtesy and this one is the rule.
+  const tooMuch = checkUploadBatch(files);
+  if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
+
   const uploaded: string[] = [];
   try {
     for (const file of files) uploaded.push(await uploadCatalogRoomImage(propertyId, id, file));
@@ -104,7 +123,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     id,
     title: onDefault ? title : (existing?.title ?? title),
     description: onDefault ? description || undefined : existing?.description,
-    images: [...keep, ...uploaded, ...urls],
+    // Deduped: the three sources can name the same photo (a pasted url that is
+    // already kept), and a repeat is both a doubled thumbnail and a duplicate
+    // React key in the editor's "Current photos" grid.
+    images: dedupeImages([...keep, ...uploaded, ...pasted.urls]),
     maxAdults: posInt(form.get("maxAdults")),
     maxGuests: posInt(form.get("maxGuests")),
     cleaningFee: Math.max(0, Math.round((Number(form.get("cleaningFee")) || 0) * 100) / 100) || undefined,

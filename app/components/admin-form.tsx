@@ -1,8 +1,9 @@
 // Shared building blocks for the admin editor forms.
 import { useState } from "react";
 
-import { useAdminT } from "~/lib/admin-i18n";
+import { useAdminT, type AdminT } from "~/lib/admin-i18n";
 import { DEFAULT_LANG, langLabel } from "~/lib/content";
+import { checkUploadBatch, mb, type UploadBatchProblem } from "~/lib/upload-limits";
 
 /** Standard text-input styling used across the admin editors. */
 export const FIELD_INPUT =
@@ -95,26 +96,62 @@ export function Field({
 /** File upload control with translatable labels — the native input renders
  *  browser-chrome text ("Choose file / No file chosen") in the BROWSER's
  *  language, so it's visually hidden behind a styled button. */
+/** The batch problem as translated copy. The server has its own English
+ *  wording (uploadProblemMessage); this is the one an admin normally sees,
+ *  because the pick is checked before anything is sent. */
+function uploadProblemText(t: AdminT, problem: UploadBatchProblem): string {
+  switch (problem.kind) {
+    case "count":
+      return t("uploadTooMany", { got: problem.got, limit: problem.limit });
+    case "file":
+      return t("uploadFileTooBig", { name: problem.name, size: mb(problem.size), limit: mb(problem.limit) });
+    case "total":
+      return t("uploadTotalTooBig", { got: mb(problem.got), limit: mb(problem.limit) });
+  }
+}
+
 export function FilePicker({ name, accept, multiple }: { name: string; accept?: string; multiple?: boolean }) {
   const t = useAdminT();
   const [fileName, setFileName] = useState<string | null>(null);
+  const [problem, setProblem] = useState<UploadBatchProblem | null>(null);
   return (
-    <label className="flex cursor-pointer flex-wrap items-center gap-3 text-caption">
-      <span className="rounded-chip border border-line-alt bg-surface px-3 py-1.5 text-caption font-semibold text-secondary hover:border-accent">
-        {t("chooseFile")}
-      </span>
-      <span className="min-w-0 truncate text-muted">{fileName ?? t("noFileChosen")}</span>
-      <input
-        type="file"
-        name={name}
-        accept={accept}
-        multiple={multiple}
-        className="sr-only"
-        onChange={(e) => {
-          const names = Array.from(e.currentTarget.files ?? []).map((f) => f.name);
-          setFileName(names.length ? names.join(", ") : null);
-        }}
-      />
-    </label>
+    <div>
+      <label className="flex cursor-pointer flex-wrap items-center gap-3 text-caption">
+        <span className="rounded-chip border border-line-alt bg-surface px-3 py-1.5 text-caption font-semibold text-secondary hover:border-accent">
+          {t("chooseFile")}
+        </span>
+        <span className="min-w-0 truncate text-muted">{fileName ?? t("noFileChosen")}</span>
+        <input
+          type="file"
+          name={name}
+          accept={accept}
+          multiple={multiple}
+          className="sr-only"
+          onChange={(e) => {
+            const input = e.currentTarget;
+            const files = Array.from(input.files ?? []);
+            // Say so here rather than let the request fail: past the batch
+            // limits the body is refused by the platform or exhausts the
+            // Worker's memory, and the admin gets a blank "unexpected error"
+            // with no hint that the photos were the problem (upload-limits.ts).
+            // The pick is dropped too — an input still holding 100 MB would go
+            // out on the next submit regardless of the warning shown.
+            const found = checkUploadBatch(files);
+            setProblem(found);
+            if (found) {
+              input.value = "";
+              setFileName(null);
+              return;
+            }
+            setFileName(files.length ? files.map((f) => f.name).join(", ") : null);
+          }}
+        />
+      </label>
+      {problem && (
+        <p role="alert" className="mt-1 text-caption text-red-600">
+          {uploadProblemText(t, problem)}
+        </p>
+      )}
+    </div>
   );
 }
