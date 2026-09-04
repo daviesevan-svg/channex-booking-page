@@ -4,7 +4,7 @@ import type { Route } from "./+types/payments";
 import { adminMeta } from "~/lib/admin-meta";
 import { SavedPill } from "~/components/admin-page-header";
 import { requireAdmin, stampStripeConnectState } from "~/lib/auth.server";
-import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
 import { getIyzicoConfig, getSettings, getVivaConfig, savePaymentSettings, saveIyzicoConfig, saveVivaConfig } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
@@ -74,7 +74,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     // secret key is write-only from here: it goes in, it never comes back out.
     iyzico: iyzico ? { merchantId: iyzico.merchantId ?? "", sandbox: Boolean(iyzico.sandbox) } : null,
     iyzicoCurrencyOk: IYZICO_CURRENCIES.has(currency),
-    canOwn: await isOwnerOrSuper(request, propertyId),
   };
 }
 
@@ -84,19 +83,6 @@ export async function action({ request }: Route.ActionArgs) {
   if (!propertyId) return { error: "Add a property first." };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-  if (
-    intent === "connect" ||
-    intent === "disconnect" ||
-    intent === "viva-connect" ||
-    intent === "viva-disconnect" ||
-    intent === "viva-diagnostics" ||
-    intent === "iyzico-connect" ||
-    intent === "iyzico-disconnect"
-  ) {
-    if (!(await isOwnerOrSuper(request, propertyId))) {
-      return { error: "Only an owner or manager can connect or disconnect payments." };
-    }
-  }
 
   // Re-run the real token + probe-order exchange against Viva and show the raw
   // result — exactly what Viva support asks for (endpoints, token scope, order
@@ -248,7 +234,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk, canOwn } = loaderData;
+  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk } = loaderData;
   const connected = Boolean(accountId);
   const vivaConnected = Boolean(viva);
   const iyzicoConnected = Boolean(iyzico);
@@ -360,7 +346,6 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
             </p>
           )}
 
-          {canOwn && (
           <div className="mt-5">
             {connected ? (
               <Form method="post">
@@ -387,7 +372,6 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </Form>
             )}
           </div>
-          )}
         </div>
 
         {/* ---- Viva ---- */}
@@ -439,7 +423,6 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
 
               <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payVivaNoGuarantee")}</p>
 
-              {canOwn && (
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Form method="post">
                   <input type="hidden" name="intent" value="viva-disconnect" />
@@ -462,10 +445,9 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                   </button>
                 </Form>
               </div>
-              )}
 
             </>
-          ) : canOwn ? (
+          ) : (
             <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
               <input type="hidden" name="intent" value="viva-connect" />
               <p className="text-[12px] leading-[1.5] text-muted">{t("payVivaSetupHelp")}</p>
@@ -494,7 +476,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 {connected && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
               </div>
             </Form>
-          ) : null}
+          )}
 
           {/* Rendered for BOTH the connected card's diagnostics button and a
               failed connect attempt — the ticket-worthy state is usually the
@@ -543,20 +525,18 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 <dd className="text-ink">{iyzico.sandbox ? t("payIyzicoEnvSandbox") : t("payVivaEnvLive")}</dd>
               </dl>
               <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payIyzicoNoGuarantee")}</p>
-              {canOwn && (
-                <Form method="post" className="mt-5">
-                  <input type="hidden" name="intent" value="iyzico-disconnect" />
-                  <button
-                    type="submit"
-                    disabled={busy}
-                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
-                  >
-                    {t("payDisconnect")}
-                  </button>
-                </Form>
-              )}
+              <Form method="post" className="mt-5">
+                <input type="hidden" name="intent" value="iyzico-disconnect" />
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {t("payDisconnect")}
+                </button>
+              </Form>
             </>
-          ) : canOwn ? (
+          ) : (
             <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
               <input type="hidden" name="intent" value="iyzico-connect" />
               <p className="text-[12px] leading-[1.5] text-muted">{t("payIyzicoSetupHelp")}</p>
@@ -578,7 +558,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                 {(connected || vivaConnected) && <p className="mt-2 text-[12px] text-muted-2">{t("payOneGateway")}</p>}
               </div>
             </Form>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
