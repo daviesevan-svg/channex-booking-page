@@ -47,6 +47,9 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
     r("checkout", "routes/property/checkout.tsx", "checkout"),
     r("checkout/complete", "routes/property/checkout.complete.tsx", "checkout-complete"),
     r("confirmation/:ref", "routes/property/confirmation.tsx", "confirmation"),
+    // iyzico posts its callback here; the reference rides in ?ref=, so this
+    // needs no static configuration on their side (see the route).
+    r("iyzico/return", "routes/property/iyzico.return.tsx", "iyzico-return"),
     r("manage", "routes/property/manage.tsx", "manage"),
     r("manage/voucher/:code", "routes/property/manage-voucher.tsx", "manage-voucher"),
     r("manage/:id", "routes/property/manage-booking.tsx", "manage-booking"),

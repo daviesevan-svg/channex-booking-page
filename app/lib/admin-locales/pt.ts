@@ -2134,6 +2134,22 @@ const PT: Record<string, string> = {
   trkErrAdsIdMissing: "Acrescente também o ID de conversão — uma etiqueta sozinha não pode ser enviada.",
   trkErrAdsLabel: "Acrescente também a etiqueta de conversão, ou cole o snippet inteiro na caixa do ID. A Google envia ambos como um único valor e nenhum funciona sozinho.",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "Pagamentos com cartão para propriedades turcas, na página alojada da iyzico.",
+  payIyzicoSetupHelp: "No seu painel de comerciante iyzico → Definições → Definições de comerciante. A chave de API e a chave secreta formam o par; o ID de comerciante é opcional e fica apenas para sua referência. Não é preciso colar nada na iyzico — o endereço de retorno segue em cada pagamento.",
+  payIyzicoApiKey: "Chave de API",
+  payIyzicoSecretKey: "Chave secreta",
+  payIyzicoMerchantId: "ID de comerciante",
+  payIyzicoMerchantIdOptional: "ID de comerciante (opcional)",
+  payIyzicoConnect: "Ligar a iyzico",
+  payIyzicoVerifying: "A verificar na iyzico…",
+  payIyzicoSandboxToggle: "Estas são credenciais de sandbox",
+  payIyzicoConnectedSandbox: "Ligado (sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "A iyzico não aceita {currency}, que é a moeda desta propriedade. Aceita TRY, USD, EUR, GBP, NOK e CHF.",
+  payIyzicoNoGuarantee: "A iyzico cobra pagamentos, mas não guarda um cartão como garantia. As tarifas que pedem cartão sem cobrar ficam reservadas sem cartão, como acontece sem nenhum gateway ligado.",
+
 };
 
 export default PT;

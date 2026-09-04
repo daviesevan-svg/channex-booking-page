@@ -2134,6 +2134,22 @@ const EN: Record<string, string> = {
   trkErrAdsIdMissing: "Add the conversion ID as well — a label on its own can't be sent.",
   trkErrAdsLabel: "Add the conversion label too, or paste the whole snippet into the ID box. Google sends both as one value and neither works alone.",
 
+
+  // -- payments: iyzico --
+  payIyzicoDesc: "Card payments for Turkish properties, on iyzico's hosted page.",
+  payIyzicoSetupHelp: "From your iyzico merchant panel → Settings → Merchant settings. The API key and secret key are the pair; the merchant ID is optional and only kept for your own reference. Nothing needs pasting into iyzico — the return address is sent with every payment.",
+  payIyzicoApiKey: "API key",
+  payIyzicoSecretKey: "Secret key",
+  payIyzicoMerchantId: "Merchant ID",
+  payIyzicoMerchantIdOptional: "Merchant ID (optional)",
+  payIyzicoConnect: "Connect iyzico",
+  payIyzicoVerifying: "Checking with iyzico…",
+  payIyzicoSandboxToggle: "These are sandbox credentials",
+  payIyzicoConnectedSandbox: "Connected (sandbox)",
+  payIyzicoEnvSandbox: "Sandbox",
+  payIyzicoCurrency: "iyzico doesn't accept {currency}, which is this property's currency. It takes TRY, USD, EUR, GBP, NOK and CHF.",
+  payIyzicoNoGuarantee: "iyzico takes payment; it can't hold a card as a guarantee. Rates that ask for a card without charging it will book without one, as they do with no gateway connected.",
+
 };
 
 export default EN;

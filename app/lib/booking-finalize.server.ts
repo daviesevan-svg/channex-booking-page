@@ -34,6 +34,7 @@ import {
   type VivaConfig,
   type VivaTransaction,
 } from "./viva.server";
+import { iyzicoPaid, iyzicoRefund, type IyzicoConfig, type IyzicoPaymentResult } from "./iyzico.server";
 import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 import { getVivaConfig } from "./overrides.server";
 import { getVivaOrder } from "./pending-bookings.server";
@@ -97,6 +98,65 @@ export function paymentFromVivaTransaction(
     amount: tx.amount ?? 0,
     currency: vivaAlphaCurrency(tx.currencyCode),
   };
+}
+
+/**
+ * A verified iyzico payment, as a PaymentInfo — or null if it isn't money.
+ *
+ * Three checks, and each is a way a POST to our public callback could otherwise
+ * pay for the wrong booking: the payment must actually be complete (and not
+ * held in a fraud review), the response must carry iyzico's own signature over
+ * the fields we care about, and the reference iyzico echoes back must be the
+ * booking being finalized. Amount and currency are checked after this, by
+ * finalize's session bind.
+ */
+export function paymentFromIyzico(
+  iyzico: IyzicoConfig,
+  ref: string,
+  result: IyzicoPaymentResult,
+): PaymentInfo | null {
+  if (!iyzicoPaid(result)) return null;
+  if (!result.signatureVerified) return null;
+  if (result.conversationId !== ref && result.basketId !== ref) return null;
+  return {
+    provider: "iyzico",
+    mode: "payment",
+    accountId: iyzico.merchantId ?? "",
+    sessionId: ref,
+    transactionId: result.paymentId,
+    amount: result.paidPrice,
+    currency: result.currency,
+  };
+}
+
+/**
+ * An iyzico charge finalize refused — the twin of the Viva and Stripe legs.
+ * Refunded rather than kept, behind a once-only claim so a retry can't refund
+ * twice.
+ */
+export async function rejectMismatchedIyzicoPayment(
+  iyzico: IyzicoConfig,
+  payment: PaymentInfo,
+  ref: string,
+  err: SessionBindError,
+): Promise<void> {
+  if (shouldRefundMismatchedSession(err.reason) && payment.transactionId) {
+    const claimKey = `iyzico_mismatch:${ref}`;
+    if (await claimRefund(claimKey)) {
+      try {
+        const res = await iyzicoRefund(iyzico, payment.transactionId, payment.amount ?? 0, payment.currency ?? "TRY");
+        if (!res.refunded) throw new Error(res.message ?? "refused");
+        console.error(`[finalize] refunded mismatched iyzico charge for ${ref} payment=${payment.transactionId}`);
+      } catch (e) {
+        await releaseRefundClaim(claimKey);
+        console.error(
+          `[finalize] mismatch refund failed for ${ref} iyzico payment=${payment.transactionId}: ${e instanceof Error ? e.message : e}`,
+        );
+      }
+    }
+    await deletePending(ref);
+  }
+  console.error(`[finalize] reject ${ref}: ${err.message}`);
 }
 
 /** Look up the pending booking behind a Viva order code, verify the transaction
@@ -196,8 +256,8 @@ export function payloadWithPayment(
   const fmt = (n: number) => formatMoney(n, currency);
   // Append to any note set at prepare time (e.g. the gift-voucher line).
   const lines = typeof base.notes === "string" && base.notes ? [base.notes] : [];
-  const gatewayName = payment?.provider === "viva" ? "Viva" : "Stripe";
-  if (payment?.provider === "stripe" || payment?.provider === "viva") {
+  const gatewayName = payment?.provider === "viva" ? "Viva" : payment?.provider === "iyzico" ? "iyzico" : "Stripe";
+  if (payment?.provider === "stripe" || payment?.provider === "viva" || payment?.provider === "iyzico") {
     if (payment.mode === "payment") {
       lines.push(
         balance > 0
