@@ -26,7 +26,7 @@ import { MAX_GALLERY_IMAGES } from "~/lib/gallery";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadGalleryImage } from "~/lib/images.server";
 import { currentPropertyId } from "~/lib/properties.server";
-import { mb, MAX_IMAGE_BYTES } from "~/lib/upload-limits";
+import { imageProblem, imageProblemMessage } from "~/lib/upload-limits";
 
 const FULL = `The gallery is full (max ${MAX_GALLERY_IMAGES}). Remove one first.`;
 
@@ -46,12 +46,9 @@ export async function action({ request }: Route.ActionArgs) {
   if (!(file instanceof File) || file.size === 0) {
     return Response.json({ error: "No photo attached." }, { status: 400 });
   }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return Response.json(
-      { error: `Too large (${mb(file.size)}MB, max ${mb(MAX_IMAGE_BYTES)}MB).` },
-      { status: 400 },
-    );
-  }
+  // The browser checks this too; this is the one that counts.
+  const problem = imageProblem(file);
+  if (problem) return Response.json({ error: imageProblemMessage(problem) }, { status: 400 });
 
   // Checked before the bytes are spent, so a full gallery fails at once instead
   // of after an upload. Per file, "the gallery is full" is a definite answer

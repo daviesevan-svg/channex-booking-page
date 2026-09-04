@@ -115,9 +115,6 @@ const EN: Record<string, string> = {
   saved: "✓ Saved",
   chooseFile: "Choose file",
   noFileChosen: "No file chosen",
-  uploadTooMany: "Too many photos at once ({got}) — add up to {limit} at a time.",
-  uploadFileTooBig: "\"{name}\" is {size}MB — the limit is {limit}MB per photo.",
-  uploadTotalTooBig: "That is {got}MB in one go — the limit is {limit}MB. Add them in smaller batches.",
   // -- per-photo uploader (admin-photo-uploader.tsx) --
   puAdd: "Add photos",
   puBusyHint: "Uploading — wait for these to finish before saving.",

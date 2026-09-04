@@ -106,9 +106,6 @@ const TR: Record<string, string> = {
   saved: "✓ Kaydedildi",
   chooseFile: "Dosya seçin",
   noFileChosen: "Dosya seçilmedi",
-  uploadTooMany: "Aynı anda çok fazla fotoğraf ({got}) — her seferinde en fazla {limit} tane.",
-  uploadFileTooBig: "\"{name}\" {size}MB — fotoğraf başına sınır {limit}MB.",
-  uploadTotalTooBig: "Tek seferde {got}MB — sınır {limit}MB. Fotoğrafları daha küçük gruplar hâlinde yükleyin.",
   // -- fotoğraf başına yükleme (admin-photo-uploader.tsx) --
   puAdd: "Fotoğraf ekle",
   puBusyHint: "Yükleniyor — kaydetmeden önce bitmesini bekleyin.",

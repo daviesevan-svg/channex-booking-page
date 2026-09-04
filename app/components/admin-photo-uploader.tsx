@@ -18,8 +18,8 @@
 // no knowledge of any of this.
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useAdminT, type AdminT } from "~/lib/admin-i18n";
-import { mb, MAX_IMAGE_BYTES } from "~/lib/upload-limits";
+import { useAdminT } from "~/lib/admin-i18n";
+import { imageProblem, imageProblemText } from "~/lib/upload-limits";
 
 type ItemState = "queued" | "uploading" | "done" | "error" | "dropped";
 
@@ -34,16 +34,6 @@ interface Item {
   /** Set once stored. Kept when `dropped` so the save can have it cleaned up. */
   url?: string;
   error?: string;
-}
-
-/** Reject what the endpoint would reject, before spending the upload. Size and
- *  type only — the batch limits are gone, which is the point of this control. */
-function localProblem(file: File, t: AdminT): string | null {
-  if (file.type && !file.type.startsWith("image/")) return t("puNotImage", { name: file.name });
-  if (file.size > MAX_IMAGE_BYTES) {
-    return t("puTooBig", { name: file.name, size: mb(file.size), limit: mb(MAX_IMAGE_BYTES) });
-  }
-  return null;
 }
 
 /** POST one file, resolving to its stored url. Rejects with the server's own
@@ -212,8 +202,8 @@ export function PhotoUploader({
     const bad: string[] = [];
     const good: Item[] = [];
     for (const file of files) {
-      const problem = localProblem(file, t);
-      if (problem) bad.push(problem);
+      const problem = imageProblem(file);
+      if (problem) bad.push(imageProblemText(t, problem));
       else good.push({ key: nextKey.current++, file, state: "queued", pct: 0 });
     }
     setRejected(bad);

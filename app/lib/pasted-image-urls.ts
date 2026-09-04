@@ -71,7 +71,7 @@ export function parsePastedImageUrls(raw: string): PastedImageUrls {
 }
 
 /** The refusals as one English sentence for an action's `{ error }` (see
- *  uploadProblemMessage in upload-limits.ts on why these stay English). Only
+ *  imageProblemMessage in upload-limits.ts on why these stay English). Only
  *  the first two lines are named — a mis-paste is usually the whole box, and a
  *  twenty-line error is not more helpful than a two-line one. */
 export function pastedUrlError(rejected: PastedImageUrls["rejected"]): string {

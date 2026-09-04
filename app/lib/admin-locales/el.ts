@@ -98,9 +98,6 @@ const EL: Record<string, string> = {
   saved: "✓ Αποθηκεύτηκε",
   chooseFile: "Επιλογή αρχείου",
   noFileChosen: "Δεν επιλέχθηκε αρχείο",
-  uploadTooMany: "Πάρα πολλές φωτογραφίες μαζί ({got}) — έως {limit} κάθε φορά.",
-  uploadFileTooBig: "Το «{name}» είναι {size}MB — το όριο είναι {limit}MB ανά φωτογραφία.",
-  uploadTotalTooBig: "Είναι {got}MB μαζί — το όριο είναι {limit}MB. Ανεβάστε τις φωτογραφίες σε μικρότερες ομάδες.",
   // -- μεταφόρτωση ανά φωτογραφία (admin-photo-uploader.tsx) --
   puAdd: "Προσθήκη φωτογραφιών",
   puBusyHint: "Ανεβαίνουν — περιμένετε να ολοκληρωθούν πριν αποθηκεύσετε.",

@@ -2,95 +2,93 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAX_IMAGE_BYTES,
-  MAX_UPLOAD_FILES,
-  MAX_UPLOAD_TOTAL_BYTES,
-  attachedFiles,
-  checkUploadBatch,
+  imageProblem,
+  imageProblemMessage,
+  imageProblemText,
   mb,
-  uploadProblemMessage,
 } from "./upload-limits";
 
+// The batch limits these tests used to cover are gone with the batched
+// uploaders — every photo is its own request now, so nothing carries more than
+// one. What is left is the per-image cap and the type check, which run twice
+// (browser then endpoint) and so have to agree.
+
 const MB = 1024 * 1024;
-const file = (name: string, sizeMb: number) => ({ name, size: Math.round(sizeMb * MB) });
+const file = (name: string, sizeMb: number, type = "image/jpeg") => ({
+  name,
+  size: sizeMb * MB,
+  type,
+});
 
-describe("checkUploadBatch", () => {
-  it("passes a normal room gallery", () => {
-    expect(checkUploadBatch([])).toBeNull();
-    expect(checkUploadBatch([file("a.jpg", 3)])).toBeNull();
-    expect(checkUploadBatch(Array.from({ length: 8 }, (_, i) => file(`p${i}.jpg`, 2)))).toBeNull();
+describe("imageProblem", () => {
+  it("passes an image inside the cap, including one exactly at it", () => {
+    expect(imageProblem(file("a.jpg", 3))).toBeNull();
+    expect(imageProblem({ name: "edge.jpg", size: MAX_IMAGE_BYTES, type: "image/jpeg" })).toBeNull();
   });
 
-  it("allows exactly the limits", () => {
-    expect(checkUploadBatch([file("big.jpg", MAX_IMAGE_BYTES / MB)])).toBeNull();
-    const each = MAX_UPLOAD_TOTAL_BYTES / MAX_UPLOAD_FILES / MB;
-    expect(
-      checkUploadBatch(Array.from({ length: MAX_UPLOAD_FILES }, (_, i) => file(`p${i}.jpg`, each))),
-    ).toBeNull();
-  });
-
-  it("refuses more files than one request can process", () => {
-    const files = Array.from({ length: MAX_UPLOAD_FILES + 1 }, (_, i) => file(`p${i}.jpg`, 0.1));
-    expect(checkUploadBatch(files)).toEqual({
-      kind: "count",
-      got: MAX_UPLOAD_FILES + 1,
-      limit: MAX_UPLOAD_FILES,
+  it("names the file and its size when it is over the cap", () => {
+    expect(imageProblem(file("sea.jpg", 9))).toEqual({
+      kind: "size",
+      name: "sea.jpg",
+      size: 9 * MB,
     });
   });
 
-  it("names the oversized file rather than the batch", () => {
-    const problem = checkUploadBatch([file("fine.jpg", 1), file("huge.jpg", 9)]);
-    expect(problem).toMatchObject({ kind: "file", name: "huge.jpg" });
+  it("refuses a non-image", () => {
+    expect(imageProblem(file("deck.pdf", 1, "application/pdf"))).toEqual({
+      kind: "type",
+      name: "deck.pdf",
+    });
   });
 
-  // The bug this module exists for: each photo is under the per-file cap, so
-  // the old per-file check passed all of them, and the request then died
-  // buffering 140 MB with no error an admin could read.
-  it("refuses a total that no single file breaks", () => {
-    const files = Array.from({ length: 10 }, (_, i) => file(`phone-${i}.jpg`, 7));
-    expect(files.every((f) => f.size <= MAX_IMAGE_BYTES)).toBe(true);
-    expect(checkUploadBatch(files)).toMatchObject({ kind: "total", limit: MAX_UPLOAD_TOTAL_BYTES });
+  it("allows a file whose type the browser could not sniff", () => {
+    // An empty `type` is what some platforms report; refusing it would block an
+    // upload the server would have accepted.
+    expect(imageProblem({ name: "photo", size: MB, type: "" })).toBeNull();
+    expect(imageProblem({ name: "photo", size: MB })).toBeNull();
   });
 
-  it("reports count before size, so the actionable complaint comes first", () => {
-    const files = Array.from({ length: MAX_UPLOAD_FILES + 1 }, (_, i) => file(`p${i}.jpg`, 9));
-    expect(checkUploadBatch(files)?.kind).toBe("count");
+  it("reports the type before the size, so the message is the actionable one", () => {
+    expect(imageProblem(file("movie.mov", 40, "video/quicktime"))).toMatchObject({ kind: "type" });
+  });
+});
+
+describe("imageProblemText", () => {
+  // The dictionary's lookup, structurally — asserting the key and vars rather
+  // than English copy, which is what the caller actually depends on.
+  const t = (key: string, vars?: Record<string, string | number>) =>
+    `${key}:${JSON.stringify(vars ?? {})}`;
+
+  it("asks for the too-big message with the file, its size and the limit", () => {
+    expect(imageProblemText(t, { kind: "size", name: "sea.jpg", size: 9 * MB })).toBe(
+      'puTooBig:{"name":"sea.jpg","size":"9","limit":"8"}',
+    );
+  });
+
+  it("asks for the not-an-image message with the file", () => {
+    expect(imageProblemText(t, { kind: "type", name: "deck.pdf" })).toBe(
+      'puNotImage:{"name":"deck.pdf"}',
+    );
+  });
+});
+
+describe("imageProblemMessage", () => {
+  // The endpoint's backstop, in English — see the comment on it.
+  it("says which file and by how much", () => {
+    expect(imageProblemMessage({ kind: "size", name: "sea.jpg", size: 9.4 * MB })).toBe(
+      '"sea.jpg" is 9.4MB — the limit is 8MB per photo.',
+    );
+    expect(imageProblemMessage({ kind: "type", name: "deck.pdf" })).toBe(
+      '"deck.pdf" is not an image.',
+    );
   });
 });
 
 describe("mb", () => {
-  it("keeps whole limits whole and measured sizes precise", () => {
-    expect(mb(8 * MB)).toBe("8");
-    expect(mb(40 * MB)).toBe("40");
-    // Would otherwise read "8MB, max 8MB" and look like a bug in the check.
+  it("keeps the limit whole and a measured size to one decimal", () => {
+    // Otherwise an 8.4MB file is reported as "8MB, max 8MB".
+    expect(mb(MAX_IMAGE_BYTES)).toBe("8");
     expect(mb(8.4 * MB)).toBe("8.4");
-  });
-});
-
-describe("uploadProblemMessage", () => {
-  it("tells the admin what to do about it", () => {
-    expect(uploadProblemMessage({ kind: "count", got: 30, limit: 12 })).toContain("smaller batches");
-    expect(uploadProblemMessage({ kind: "file", name: "sea.jpg", size: 9 * MB, limit: 8 * MB })).toBe(
-      '"sea.jpg" is too large (9MB, max 8MB).',
-    );
-    expect(uploadProblemMessage({ kind: "total", got: 140 * MB, limit: 40 * MB })).toContain("140MB");
-  });
-});
-
-describe("attachedFiles", () => {
-  it("returns the chosen files and ignores an empty pick", () => {
-    const form = new FormData();
-    form.append("uploads", new File(["xx"], "a.jpg", { type: "image/jpeg" }));
-    // What a file input posts when nothing is selected.
-    form.append("uploads", new File([], "", { type: "application/octet-stream" }));
-    form.append("other", new File(["yy"], "b.jpg", { type: "image/jpeg" }));
-
-    expect(attachedFiles(form, "uploads").map((f) => f.name)).toEqual(["a.jpg"]);
-    expect(attachedFiles(form, "missing")).toEqual([]);
-  });
-
-  it("ignores a text field posted under the same name", () => {
-    const form = new FormData();
-    form.append("uploads", "not a file");
-    expect(attachedFiles(form, "uploads")).toEqual([]);
+    expect(mb(40 * MB)).toBe("40");
   });
 });

@@ -115,9 +115,6 @@ const TH: Record<string, string> = {
   saved: "✓ บันทึกแล้ว",
   chooseFile: "เลือกไฟล์",
   noFileChosen: "ยังไม่ได้เลือกไฟล์",
-  uploadTooMany: "เลือกรูปมากเกินไป ({got} รูป) — ได้ครั้งละไม่เกิน {limit} รูป",
-  uploadFileTooBig: "\"{name}\" มีขนาด {size}MB — จำกัดไม่เกิน {limit}MB ต่อรูป",
-  uploadTotalTooBig: "รวมทั้งหมด {got}MB ในครั้งเดียว — จำกัดไม่เกิน {limit}MB กรุณาอัปโหลดเป็นชุดย่อย",
   // -- อัปโหลดทีละรูป (admin-photo-uploader.tsx) --
   puAdd: "เพิ่มรูปภาพ",
   puBusyHint: "กำลังอัปโหลด — โปรดรอให้เสร็จก่อนบันทึก",
