@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/room";
@@ -9,11 +11,10 @@ import { deleteRoom, getRoom, getRooms, saveRoom, type CatalogRoom, type RoomTra
 import { DEFAULT_LANG, langParam, pickLang, VR_AMENITY_KEYS } from "~/lib/content";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadCatalogRoomImage } from "~/lib/images.server";
 import { dedupeImages, parsePastedImageUrls, pastedUrlError } from "~/lib/pasted-image-urls";
-import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
 import { AmenitiesPicker } from "~/components/amenities-picker";
-import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
+import { PhotoUploader } from "~/components/admin-photo-uploader";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -38,12 +39,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No DEFAULT_PROPERTY_ID configured." };
 
-  // Reading the body can fail before any of our own validation gets a look in —
-  // an oversized multipart upload is refused by the platform, and a Worker that
-  // runs out of memory buffering it dies here. Unguarded, that reached root's
-  // ErrorBoundary as "An unexpected error occurred", which tells an admin
-  // nothing about the photos they just attached. The batch limits below are
-  // what stop it happening; this is the message if something still does.
+  // Photos no longer ride on this body — each one was already stored by
+  // room-photo.tsx and arrives here as a url — so an oversized save should now
+  // be impossible. The guard stays because the failure it catches was
+  // invisible: a body that dies inside formData() reached root's ErrorBoundary
+  // as "An unexpected error occurred", attributable to nothing.
   let form: FormData;
   try {
     form = await request.formData();
@@ -80,19 +80,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   const pasted = parsePastedImageUrls(String(form.get("imageUrls") ?? ""));
   if (pasted.rejected.length) return { error: pastedUrlError(pasted.rejected) };
 
-  const files = attachedFiles(form, "uploads");
-  // Checked here as well as in the browser, because the browser check is a
-  // courtesy and this one is the rule.
-  const tooMuch = checkUploadBatch(files);
-  if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
-
-  const uploaded: string[] = [];
-  try {
-    for (const file of files) uploaded.push(await uploadCatalogRoomImage(propertyId, id, file));
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Upload failed." };
-  }
-
   const description = String(form.get("description") ?? "").trim();
   const facilities = String(form.get("facilities") ?? "")
     .split("\n")
@@ -123,10 +110,12 @@ export async function action({ params, request }: Route.ActionArgs) {
     id,
     title: onDefault ? title : (existing?.title ?? title),
     description: onDefault ? description || undefined : existing?.description,
-    // Deduped: the three sources can name the same photo (a pasted url that is
+    // Deduped: both sources can name the same photo (a pasted url that is
     // already kept), and a repeat is both a doubled thumbnail and a duplicate
-    // React key in the editor's "Current photos" grid.
-    images: dedupeImages([...keep, ...uploaded, ...pasted.urls]),
+    // React key in the editor's "Current photos" grid. Freshly uploaded photos
+    // arrive in `keep` too — the uploader posts the url it stored, so there is
+    // no third source any more (room-photo.tsx).
+    images: dedupeImages([...keep, ...pasted.urls]),
     maxAdults: posInt(form.get("maxAdults")),
     maxGuests: posInt(form.get("maxGuests")),
     cleaningFee: Math.max(0, Math.round((Number(form.get("cleaningFee")) || 0) * 100) / 100) || undefined,
@@ -141,7 +130,15 @@ export async function action({ params, request }: Route.ActionArgs) {
   // Unticking "keep" is how a photo is removed here, so the dropped ones are
   // whatever the room had and the new list doesn't.
   const kept = new Set(room.images);
-  queueImageCleanup(propertyId, (existing?.images ?? []).filter((u) => !kept.has(u)));
+  // Two sources of orphans now that photos are stored before the save (see
+  // room-photo.tsx): a photo the room used to have and no longer does, and one
+  // this editor uploaded but the admin dropped before saving. The second only
+  // reaches the GC because the uploader keeps declaring it.
+  const staged = form.getAll("stagedImage").map(String);
+  queueImageCleanup(
+    propertyId,
+    [...(existing?.images ?? []), ...staged].filter((u) => !kept.has(u)),
+  );
   await queueGoogleAriPush(propertyId, ["property_data", "ari"]);
   // Back to the rooms list after every save. Staying on the editor left the
   // chosen file in the upload input, so a second save re-uploaded it and created
@@ -161,6 +158,9 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
   const onDefault = lang === DEFAULT_LANG;
   const nav = useNavigation();
   const saving = nav.state === "submitting";
+  // Saving while photos are still going up would store the room without them,
+  // with nothing to say so — the uploader reports its own queue instead.
+  const [uploading, setUploading] = useState(false);
   const existing = room?.images ?? [];
 
   return (
@@ -272,7 +272,14 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
 
         <div>
           <div className="mb-1.5 text-[13px] font-semibold text-secondary">{t("rmUploadPhotos")}</div>
-          <FilePicker name="uploads" accept="image/*" multiple />
+          {/* Each photo is stored on pick, one request each, so there is no
+              batch ceiling and the progress shown is the real thing. The urls
+              arrive as hidden keepImage inputs — the same field the existing
+              photos above use. */}
+          <PhotoUploader
+            endpoint={`/admin/rooms/${room?.id ?? "new"}/photo`}
+            onBusyChange={setUploading}
+          />
           <span className="mt-1 block text-[11px] font-normal text-faint">
             {t("rmUploadFormats")} {isNew ? t("rmUploadNewHint") : t("rmUploadExistingHint")}
           </span>
@@ -294,7 +301,7 @@ export default function AdminRoom({ loaderData, actionData }: Route.ComponentPro
         <div className="flex items-center gap-3">
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || uploading}
             className="rounded-[10px] bg-accent px-6 py-3 text-[15px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
           >
             {saving ? t("saving") : isNew ? t("rmCreate") : t("rmSave")}

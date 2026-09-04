@@ -117,6 +117,17 @@ const PT: Record<string, string> = {
   uploadTooMany: "Demasiadas fotos de uma vez ({got}) — no máximo {limit} por envio.",
   uploadFileTooBig: "\"{name}\" tem {size}MB — o limite é {limit}MB por foto.",
   uploadTotalTooBig: "São {got}MB de uma só vez — o limite é {limit}MB. Envie as fotos em grupos menores.",
+  // -- envio foto a foto (admin-photo-uploader.tsx) --
+  puAdd: "Adicionar fotos",
+  puBusyHint: "A enviar — aguarde que terminem antes de guardar.",
+  puQueued: "Em espera…",
+  puUploading: "A enviar… {pct}%",
+  puDone: "Enviada",
+  puDropped: "Removida — não será guardada",
+  puRetry: "Tentar novamente",
+  puRemove: "Remover",
+  puNotImage: "\"{name}\" não é uma imagem.",
+  puTooBig: "\"{name}\" tem {size}MB — o limite é {limit}MB por foto.",
   afChannexHint: "Do channel manager: {value} — deixe em branco para usar este valor.",
 
   // -- blocked-ranges editor --

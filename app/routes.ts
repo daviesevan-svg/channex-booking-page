@@ -160,6 +160,10 @@ export default [
   route("admin/verify", "routes/admin/verify.tsx"),
   route("admin/logout", "routes/admin/logout.tsx"),
   route("admin/lang", "routes/admin/lang.tsx"),
+  // One-photo-at-a-time upload for the room editor. A resource route, so it is
+  // declared here rather than inside the admin layout — but the URL stays under
+  // /admin/rooms so the per-teammate area guard covers it (see room-photo.tsx).
+  route("admin/rooms/:roomId/photo", "routes/admin/room-photo.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
