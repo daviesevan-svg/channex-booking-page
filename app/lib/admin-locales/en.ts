@@ -129,6 +129,7 @@ const EN: Record<string, string> = {
   puRemove: "Remove",
   puNotImage: "\"{name}\" is not an image.",
   puTooBig: "\"{name}\" is {size}MB — the limit is {limit}MB per photo.",
+  puNoRoom: "You picked {got}, but there is room for {room}. Choose fewer.",
   afChannexHint: "From your channel manager: {value} — leave blank to use this.",
 
   // -- blocked-ranges editor --

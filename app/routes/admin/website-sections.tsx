@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Form, Link, useNavigation } from "react-router";
+import { Form, Link, useNavigation, useRevalidator } from "react-router";
 
 import type { Route } from "./+types/website-sections";
 import { adminMeta } from "~/lib/admin-meta";
@@ -21,10 +21,7 @@ import {
   type SiteSection,
 } from "~/lib/sections";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadSectionImage } from "~/lib/images.server";
-import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
 import {
-  addSectionImages,
   getPageEditor,
   getSiteStyle,
   listPages,
@@ -33,7 +30,8 @@ import {
   saveSiteStyle,
 } from "~/lib/site.server";
 import { siteStyle, SITE_STYLES, SITE_STYLE_IDS, type SiteStyleId } from "~/lib/site-style";
-import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
+import { PhotoUploader } from "~/components/admin-photo-uploader";
 import { BrandPanel } from "~/components/admin-brand-panel";
 import { DesignPreview } from "~/components/admin-design-preview";
 import { AdminPageHeader, SavedPill } from "~/components/admin-page-header";
@@ -190,27 +188,10 @@ export async function action({ request }: Route.ActionArgs) {
   }
   await saveSiteCopy(propertyId, lang, pageId, text);
 
-  // An upload comes from a button inside this same form, so everything above has
-  // just been persisted and nothing typed is lost — which is why the new files
-  // are appended after the save rather than instead of it.
-  const uploadFor = String(form.get("uploadFor") ?? "");
-  if (uploadFor) {
-    const files = attachedFiles(form, `file:${uploadFor}`);
-    if (!files.length) return { error: "Choose an image first." };
-    const tooMuch = checkUploadBatch(files);
-    if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
-    try {
-      const urls: string[] = [];
-      for (const file of files) urls.push(await uploadSectionImage(propertyId, file));
-      // One batch, one write — addSectionImages is read-modify-write.
-      const { skipped } = await addSectionImages(propertyId, pageId, uploadFor, urls);
-      if (skipped) {
-        return { error: `Only ${MAX_SECTION_IMAGES} images per section — ${skipped} not added.` };
-      }
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Image upload failed." };
-    }
-  }
+  // Images no longer arrive here: each one is its own request to
+  // section-photo.tsx, which stores it and attaches it. Attaching a photo used
+  // to submit this whole form, which meant it also saved every text field on
+  // the page as a side effect; saving the copy is now its own deliberate act.
   return { ok: true as const };
 }
 
@@ -663,8 +644,8 @@ function Editor({
               {def.images && (
                 <SectionImages
                   section={section}
+                  pageId={pageId}
                   text={text}
-                  saving={saving}
                   t={t}
                   onMove={(from, to) =>
                     patchImages(section.id, (imgs) => {
@@ -734,19 +715,23 @@ function Editor({
  */
 function SectionImages({
   section,
+  /** Which page this section is on — the upload endpoint needs telling. */
+  pageId,
   text,
-  saving,
   t,
   onMove,
   onRemove,
 }: {
   section: SiteSection;
+  pageId: string;
   text: Record<string, string>;
-  saving: boolean;
   t: ReturnType<typeof useAdminT>;
   onMove: (from: number, to: number) => void;
   onRemove: (imageId: string) => void;
 }) {
+  // Each image is committed by the endpoint as it arrives, so a finished batch
+  // refreshes the loader rather than coming back as an action result.
+  const revalidator = useRevalidator();
   const images = section.images ?? [];
   const full = images.length >= MAX_SECTION_IMAGES;
 
@@ -813,25 +798,19 @@ function SectionImages({
         </div>
       )}
 
-      {full ? (
-        <p className="text-[12px] text-muted-2">{t("secImagesFull", { n: MAX_SECTION_IMAGES })}</p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3">
-          <FilePicker name={`file:${section.id}`} accept="image/*" multiple />
-          {/* `uploadFor` tells the action which section the files belong to, and
-              only the clicked button carries it — every other section's picker
-              stays inert. */}
-          <button
-            type="submit"
-            name="uploadFor"
-            value={section.id}
-            disabled={saving}
-            className="cursor-pointer rounded-[9px] border border-accent px-4 py-2 text-[13px] font-semibold text-accent hover:bg-accent-soft disabled:opacity-50"
-          >
-            {saving ? t("saving") : t("secImagesUpload")}
-          </button>
-        </div>
-      )}
+      {/* Which section a photo belongs to travels with the request instead of
+          on a clicked button, so picking the files IS the upload and no submit
+          is involved — the images above refresh as each one lands. Rendered
+          even when full, so a refused photo's row survives the section filling
+          up (see disabledReason). */}
+      <PhotoUploader
+        endpoint="/admin/website/sections/photo"
+        fields={{ pageId, sectionId: section.id }}
+        staged={false}
+        onComplete={() => revalidator.revalidate()}
+        room={MAX_SECTION_IMAGES - images.length}
+        disabledReason={full ? t("secImagesFull", { n: MAX_SECTION_IMAGES }) : undefined}
+      />
     </div>
   );
 }

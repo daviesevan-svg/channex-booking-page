@@ -1,4 +1,4 @@
-import { Form, useNavigation } from "react-router";
+import { Form, useNavigation, useRevalidator } from "react-router";
 import { useState } from "react";
 
 import type { Route } from "./+types/gallery";
@@ -7,11 +7,10 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { langParam, pickLang } from "~/lib/content";
 import { MAX_GALLERY_IMAGES, type GalleryText } from "~/lib/gallery";
-import { addImages, getGallery, removeImage, saveGalleryLang } from "~/lib/gallery.server";
+import { getGallery, removeImage, saveGalleryLang } from "~/lib/gallery.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
-import { uploadGalleryImage } from "~/lib/images.server";
-import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
-import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
+import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
+import { PhotoUploader } from "~/components/admin-photo-uploader";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
 
@@ -46,27 +45,9 @@ export async function action({ request }: Route.ActionArgs) {
   }
   const lang = pickLang(String(form.get("lang") ?? ""));
 
-  // Branch on the form that was submitted, never on "did files arrive?" — the
-  // upload form carries no text rows, so treating an empty file pick as a save
-  // would persist an empty text map and wipe this language's captions.
-  if (String(form.get("op")) === "upload") {
-    const files = attachedFiles(form, "upload");
-    if (!files.length) return { error: "Choose an image first." };
-    const tooMuch = checkUploadBatch(files);
-    if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
-    try {
-      // One batch, one write — addImages is read-modify-write.
-      const urls: string[] = [];
-      for (const file of files) urls.push(await uploadGalleryImage(propertyId, file));
-      const { skipped } = await addImages(propertyId, urls);
-      return skipped
-        ? { error: `Gallery is full — ${skipped} image(s) not added (max ${MAX_GALLERY_IMAGES}).` }
-        : { ok: true as const };
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : "Image upload failed." };
-    }
-  }
-
+  // Uploads no longer arrive here at all — each image is its own request to
+  // gallery-photo.tsx, which stores it and adds it. What is left is the order +
+  // captions save, and the deletes below.
   // Save order + this language's text BEFORE handling a delete, so pending
   // edits in the other rows aren't thrown away by clicking a remove button.
   const order = form.getAll("imageId").map(String);
@@ -137,6 +118,9 @@ function GalleryEditor({
   saved: boolean;
   t: ReturnType<typeof useAdminT>;
 }) {
+  // The uploader commits each image itself, so a finished batch refreshes the
+  // loader rather than arriving as an action result.
+  const revalidator = useRevalidator();
   // Local order so the arrows reorder instantly; hidden inputs are rendered
   // from this, and one save persists it. Rows are keyed by image id, so React
   // carries each row's typed-but-unsaved text along with the move. The parent
@@ -159,29 +143,28 @@ function GalleryEditor({
       <TranslationNote lang={lang} />
 
       {/* Upload — its own form so a file pick can't carry the text fields. */}
-      <Form
-        method="post"
-        encType="multipart/form-data"
-        className="mb-6 rounded-[14px] border border-line bg-surface p-6"
-      >
-        <input type="hidden" name="lang" value={lang} />
-        <input type="hidden" name="op" value="upload" />
+      {/* Not a form any more: each image is its own request, stored and added
+          by gallery-photo.tsx as it arrives. There is nothing left to submit,
+          so the Upload button is gone — picking the files IS the upload — and
+          the grid below refreshes as they land. */}
+      <div className="mb-6 rounded-[14px] border border-line bg-surface p-6">
         <div className="mb-1 font-serif text-[18px] font-semibold">{t("galAdd")}</div>
         <p className="mb-3 text-[13px] text-muted">
           {t("galAddHint", { max: MAX_GALLERY_IMAGES, used: order.length })}
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <FilePicker name="upload" accept="image/*" multiple />
-          <button
-            type="submit"
-            disabled={saving || order.length >= MAX_GALLERY_IMAGES}
-            className="rounded-[10px] bg-accent px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
-          >
-            {saving ? t("saving") : t("galUpload")}
-          </button>
-        </div>
+        <PhotoUploader
+          endpoint="/admin/gallery/photo"
+          staged={false}
+          onComplete={() => revalidator.revalidate()}
+          room={MAX_GALLERY_IMAGES - order.length}
+          disabledReason={
+            order.length >= MAX_GALLERY_IMAGES
+              ? t("galAddHint", { max: MAX_GALLERY_IMAGES, used: order.length })
+              : undefined
+          }
+        />
         <p className="mt-2 text-[12px] text-faint">{t("homeImageFormats")}</p>
-      </Form>
+      </div>
 
       {error && (
         <p className="mb-4 rounded-[10px] border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">

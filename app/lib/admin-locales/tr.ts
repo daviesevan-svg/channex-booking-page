@@ -120,6 +120,7 @@ const TR: Record<string, string> = {
   puRemove: "Kaldır",
   puNotImage: "\"{name}\" bir görsel değil.",
   puTooBig: "\"{name}\" {size}MB — fotoğraf başına sınır {limit}MB.",
+  puNoRoom: "{got} fotoğraf seçtiniz ama {room} tanesi için yer var. Daha az seçin.",
   afChannexHint: "Kanal yöneticinizden: {value} — bunu kullanmak için boş bırakın.",
   brPickStart: "Bir başlangıç tarihi seçin.",
   brEndBeforeStart: "Bitiş tarihi, başlangıç tarihinden önce.",
