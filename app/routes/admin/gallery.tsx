@@ -10,6 +10,7 @@ import { MAX_GALLERY_IMAGES, type GalleryText } from "~/lib/gallery";
 import { addImages, getGallery, removeImage, saveGalleryLang } from "~/lib/gallery.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadGalleryImage } from "~/lib/images.server";
+import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
 import { FIELD_INPUT, FilePicker, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -34,15 +35,25 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No property selected." };
 
-  const form = await request.formData();
+  // See upload-limits.ts: an oversized multipart body dies inside formData(),
+  // before any error handling of ours, and surfaced as root's generic
+  // ErrorBoundary rather than anything an admin could act on.
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return { error: "Could not read the upload — it may be too large. Try fewer or smaller images." };
+  }
   const lang = pickLang(String(form.get("lang") ?? ""));
 
   // Branch on the form that was submitted, never on "did files arrive?" — the
   // upload form carries no text rows, so treating an empty file pick as a save
   // would persist an empty text map and wipe this language's captions.
   if (String(form.get("op")) === "upload") {
-    const files = form.getAll("upload").filter((f): f is File => f instanceof File && f.size > 0);
+    const files = attachedFiles(form, "upload");
     if (!files.length) return { error: "Choose an image first." };
+    const tooMuch = checkUploadBatch(files);
+    if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
     try {
       // One batch, one write — addImages is read-modify-write.
       const urls: string[] = [];

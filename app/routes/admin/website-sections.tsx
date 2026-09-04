@@ -22,6 +22,7 @@ import {
 } from "~/lib/sections";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { uploadSectionImage } from "~/lib/images.server";
+import { attachedFiles, checkUploadBatch, uploadProblemMessage } from "~/lib/upload-limits";
 import {
   addSectionImages,
   getPageEditor,
@@ -104,7 +105,15 @@ export async function action({ request }: Route.ActionArgs) {
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { error: "No property selected." };
 
-  const form = await request.formData();
+  // See upload-limits.ts: an oversized multipart body dies inside formData(),
+  // before any error handling of ours, and surfaced as root's generic
+  // ErrorBoundary rather than anything an admin could act on.
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return { error: "Could not read the upload — it may be too large. Try fewer or smaller images." };
+  }
   const lang = pickLang(String(form.get("lang") ?? ""));
   const pageId = String(form.get("pageId") ?? "") || HOME_PAGE_ID;
 
@@ -186,10 +195,10 @@ export async function action({ request }: Route.ActionArgs) {
   // are appended after the save rather than instead of it.
   const uploadFor = String(form.get("uploadFor") ?? "");
   if (uploadFor) {
-    const files = form
-      .getAll(`file:${uploadFor}`)
-      .filter((f): f is File => f instanceof File && f.size > 0);
+    const files = attachedFiles(form, `file:${uploadFor}`);
     if (!files.length) return { error: "Choose an image first." };
+    const tooMuch = checkUploadBatch(files);
+    if (tooMuch) return { error: uploadProblemMessage(tooMuch) };
     try {
       const urls: string[] = [];
       for (const file of files) urls.push(await uploadSectionImage(propertyId, file));

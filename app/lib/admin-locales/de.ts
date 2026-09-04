@@ -115,6 +115,9 @@ const DE: Record<string, string> = {
   saved: "✓ Gespeichert",
   chooseFile: "Datei auswählen",
   noFileChosen: "Keine Datei ausgewählt",
+  uploadTooMany: "Zu viele Fotos auf einmal ({got}) — maximal {limit} pro Vorgang.",
+  uploadFileTooBig: "„{name}“ hat {size}MB — erlaubt sind {limit}MB pro Foto.",
+  uploadTotalTooBig: "Das sind {got}MB auf einmal — erlaubt sind {limit}MB. Laden Sie die Fotos in kleineren Gruppen hoch.",
   afChannexHint: "Aus Ihrem Channel Manager: {value} — leer lassen, um dies zu verwenden.",
 
   // -- blocked-ranges editor --

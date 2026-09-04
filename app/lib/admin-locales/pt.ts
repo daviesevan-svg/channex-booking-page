@@ -114,6 +114,9 @@ const PT: Record<string, string> = {
   saved: "✓ Guardado",
   chooseFile: "Escolher ficheiro",
   noFileChosen: "Nenhum ficheiro escolhido",
+  uploadTooMany: "Demasiadas fotos de uma vez ({got}) — no máximo {limit} por envio.",
+  uploadFileTooBig: "\"{name}\" tem {size}MB — o limite é {limit}MB por foto.",
+  uploadTotalTooBig: "São {got}MB de uma só vez — o limite é {limit}MB. Envie as fotos em grupos menores.",
   afChannexHint: "Do channel manager: {value} — deixe em branco para usar este valor.",
 
   // -- blocked-ranges editor --

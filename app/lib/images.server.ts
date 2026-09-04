@@ -2,9 +2,13 @@ import { env } from "cloudflare:workers";
 
 import { getImagesBucket } from "./config.server";
 import { isAllowedImportImageParsed } from "./image-import-url";
+import { MAX_IMAGE_BYTES, mb } from "./upload-limits";
 import { isSafeWebhookUrl } from "./webhooks.server";
 
-const MAX_BYTES = 8 * 1024 * 1024; // 8MB
+// One definition, shared with the browser-side pre-check in FilePicker — a cap
+// the UI and the server disagreed about would either reject uploads the server
+// would have taken or promise ones it refuses.
+const MAX_BYTES = MAX_IMAGE_BYTES;
 
 /**
  * The image's pixel size, as a `-WxH` filename suffix.
@@ -67,7 +71,7 @@ async function uploadImage(prefix: string, file: File): Promise<string> {
   const bucket = getImagesBucket();
   if (!bucket) throw new Error("Image storage (R2) is not configured.");
   if (!file.type.startsWith("image/")) throw new Error("Only image files are allowed.");
-  if (file.size > MAX_BYTES) throw new Error("Image is too large (max 8MB).");
+  if (file.size > MAX_BYTES) throw new Error(`Image is too large (max ${mb(MAX_BYTES)}MB).`);
 
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   // The uploaded name is otherwise discarded — the key is a uuid so a hostile
@@ -138,7 +142,7 @@ async function importImageGated(prefix: string, url: string, allow: (u: URL) => 
   const type = res.headers.get("content-type")?.split(";")[0].trim() ?? "";
   if (!type.startsWith("image/")) throw new Error("URL did not return an image.");
   const bytes = await res.arrayBuffer();
-  if (bytes.byteLength > MAX_BYTES) throw new Error("Image is too large (max 8MB).");
+  if (bytes.byteLength > MAX_BYTES) throw new Error(`Image is too large (max ${mb(MAX_BYTES)}MB).`);
   const ext = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif", "image/gif": "gif" }[type] ?? "jpg";
   const key = `${prefix}/${crypto.randomUUID()}${await sizeSuffix(bytes)}.${ext}`;
   await bucket.put(key, bytes, { httpMetadata: { contentType: type } });
