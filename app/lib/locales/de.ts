@@ -417,6 +417,9 @@ const DE: Dict = {
   manageIntro: "Geben Sie Ihre Buchungsnummer und die E-Mail-Adresse ein, mit der Sie gebucht haben.",
   manageNotFound: "Wir konnten keine Buchung mit dieser Buchungsnummer und E-Mail-Adresse finden. Bitte prüfen Sie die Angaben und versuchen Sie es erneut.",
   manageTooMany: "Zu viele Versuche. Bitte warten Sie einige Minuten und versuchen Sie es erneut.",
+  manageLinkSent: "Prüfen Sie Ihre E-Mails",
+  manageLinkSentBody:
+    "Zu dieser E-Mail-Adresse liegt mehr als eine Buchung oder ein Gutschein vor, daher haben wir Ihnen einen Anmeldelink geschickt. Er ist 15 Minuten gültig.",
   findBooking: "Meine Buchung finden",
   bookingReference: "Buchungsnummer",
   emailAddress: "E-Mail",

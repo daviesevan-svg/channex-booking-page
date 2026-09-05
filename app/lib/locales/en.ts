@@ -35,6 +35,9 @@ const EN: Dict = {
   manageNotFound:
     "We couldn't find a booking with that reference and email. Please check and try again.",
   manageTooMany: "Too many attempts. Please wait a few minutes and try again.",
+  manageLinkSent: "Check your email",
+  manageLinkSentBody:
+    "This email has more than one booking or voucher with us, so we've sent you a sign-in link. It expires in 15 minutes.",
   yourBookings: "Your bookings",
   signOut: "Sign out",
   view: "View",

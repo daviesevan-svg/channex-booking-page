@@ -174,6 +174,43 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
 /** Review-request email (attempt 1–3): five tappable stars deep-linking into
  *  the review page with the rating prefilled. Returns whether the send was
  *  accepted so the cron only counts real attempts. Never throws. */
+/**
+ * The guest portal sign-in link, sent when a booking reference alone is not
+ * enough — i.e. when this email has more than one record at the property and
+ * the portal would otherwise reveal records the caller never proved.
+ *
+ * Branded and sent from the property, unlike the admin link: the guest asked
+ * a hotel for it, and a sign-in mail from an unfamiliar sender reads as
+ * phishing. English copy deliberately — the link is the payload, and a new
+ * operator-editable template is a bigger surface than this fix warrants.
+ */
+export async function sendGuestPortalLink(
+  pid: string,
+  email: string,
+  link: string,
+): Promise<boolean> {
+  const [settings, overrides] = await Promise.all([getSettings(pid), getOverrides(pid, DEFAULT_LANG)]);
+  // The hotel name is operator-written and lands inside markup; escape it.
+  // The link is ours (base64url token) but costs nothing to treat the same way.
+  const e = (v: string) =>
+    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const hotel = e(overrides.hotelName || "the hotel");
+  const href = e(link);
+  const { sent } = await sendEmail({
+    to: email,
+    subject: `Your booking link for ${overrides.hotelName || "your stay"}`,
+    html:
+      `<p>Here is your sign-in link for your bookings at ${hotel}:</p>` +
+      `<p><a href="${href}">${href}</a></p>` +
+      `<p>This link expires in 15 minutes. If you did not ask for it you can ignore this email — ` +
+      `nothing has changed on your booking.</p>`,
+    from: await senderFor(pid, settings),
+    replyTo: overrides.email || undefined,
+  });
+  if (!sent) console.log(`[guest] portal link email failed for ${pid}`);
+  return sent;
+}
+
 export async function sendReviewRequestEmail(
   pid: string,
   booking: BookingRecord,

@@ -13,7 +13,7 @@ import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
-import { getGuestEmail } from "~/lib/guest-auth.server";
+import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { getSettings } from "~/lib/overrides.server";
 import { getBooking } from "~/lib/bookings.server";
@@ -46,9 +46,18 @@ async function requireOwnVoucher(
   code: string,
 ): Promise<{ pid: string; email: string; v: VoucherRecord }> {
   const manageUrl = `${basePath(channelId)}/manage`;
-  const email = await getGuestEmail(request);
-  if (!email) throw redirect(manageUrl);
+  // Property first: a guest session belongs to one property and cannot be read
+  // without naming it.
   const pid = await resolveRequestProperty(channelId, request);
+  const session = await getGuestSession(request, pid);
+  if (!session) throw redirect(manageUrl);
+  // A reference-proved session is pinned to the one record it proved — for a
+  // voucher that identifier is the code itself, in its canonical form. The URL
+  // param is whatever was typed or shared, and the lookup below normalises it
+  // too late for this comparison: without normalising here, a guest's own
+  // lowercase link would be refused.
+  if (!sessionCanSee(session, normalizeVoucherCode(code))) throw redirect(manageUrl);
+  const email = session.email;
   const v = await lookupVoucherGuarded(pid, code, request);
   if (v === "limited" || !v || v.buyer.email.trim().toLowerCase() !== email.toLowerCase()) throw redirect(manageUrl);
   return { pid, email, v };

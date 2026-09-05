@@ -10,7 +10,15 @@ import {
 } from "~/lib/bookings.server";
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
 import { getVoucherByCode, listVouchersByEmail } from "~/lib/vouchers.server";
-import { createGuestSession, getGuestEmail, guestLogout } from "~/lib/guest-auth.server";
+import {
+  createGuestMagicToken,
+  createGuestSession,
+  getGuestSession,
+  guestLoginDecision,
+  guestLogout,
+  sessionCanSee,
+} from "~/lib/guest-auth.server";
+import { sendGuestPortalLink } from "~/lib/email.server";
 
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
@@ -21,14 +29,22 @@ import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const email = await getGuestEmail(request);
-  if (!email) return { authed: false as const };
-  // :channelId may be a slug — resolve to the real id for booking lookups.
+  // :channelId may be a slug — resolve to the real id for booking lookups. This
+  // has to happen BEFORE the session is read: a guest session belongs to one
+  // property, and there is no way to ask who the guest is without saying where.
   const pid = await resolveRequestProperty(params.channelId, request);
-  const [bookings, vouchers] = await Promise.all([
+  const session = await getGuestSession(request, pid);
+  if (!session) return { authed: false as const };
+  const { email } = session;
+  const [allBookings, allVouchers] = await Promise.all([
     getBookingsByEmail(pid, email),
     listVouchersByEmail(pid, email).catch(() => []),
   ]);
+  // A session proved by a reference alone may see that one record and nothing
+  // else. Filtering here rather than at the query keeps the ONE rule in one
+  // place: what the caller proved is what the caller sees.
+  const bookings = allBookings.filter((b) => sessionCanSee(session, b.id));
+  const vouchers = allVouchers.filter((v) => sessionCanSee(session, v.code));
   return {
     authed: true as const,
     email,
@@ -73,15 +89,42 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!reference || !email) return { notFound: true };
 
   const booking = await findBookingByRefAndEmail(pid, reference, email);
-  if (booking) return createGuestSession(email, `${base}/manage`);
-
   // Not a booking reference — maybe a voucher code (buyers of vouchers have no
   // booking). Same rule: the code must match together with the buyer's email.
-  const voucher = await getVoucherByCode(pid, normalizeVoucherCode(reference)).catch(() => null);
-  if (voucher && voucher.buyer.email.trim().toLowerCase() === email.toLowerCase()) {
-    return createGuestSession(email, `${base}/manage`);
+  const voucher = booking
+    ? null
+    : await getVoucherByCode(pid, normalizeVoucherCode(reference)).catch(() => null);
+  const provedId = booking
+    ? booking.id
+    : voucher && voucher.buyer.email.trim().toLowerCase() === email.toLowerCase()
+      ? voucher.code
+      : null;
+  if (!provedId) return { notFound: true };
+
+  // A reference proves knowledge of ONE record, not ownership of the mailbox —
+  // anyone able to book can book under someone else's address. So count what
+  // this email actually has here. If the proved record is the only one, a
+  // record-scoped session reveals nothing the caller didn't already type in.
+  // If there are others, they belong to whoever owns the mailbox, and only the
+  // mailbox can unlock them.
+  const [bookings, vouchers] = await Promise.all([
+    getBookingsByEmail(pid, email),
+    listVouchersByEmail(pid, email).catch(() => []),
+  ]);
+  const decision = guestLoginDecision({
+    provedId,
+    recordCount: bookings.length + vouchers.length,
+  });
+  if (decision.kind === "session") {
+    return createGuestSession({ email, pid, only: decision.only }, `${base}/manage`);
   }
-  return { notFound: true };
+
+  const token = await createGuestMagicToken(email, pid);
+  // Built from this request's own origin so the link works on the shared host,
+  // a partner's guest host and a hotel's custom domain alike.
+  const origin = new URL(request.url).origin;
+  await sendGuestPortalLink(pid, email, `${origin}${base}/manage/verify?token=${encodeURIComponent(token)}`);
+  return { linkSent: true };
 }
 
 export function meta({ matches }: Route.MetaArgs) {
@@ -103,6 +146,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
         submitting={nav.state === "submitting"}
         notFound={Boolean(actionData && "notFound" in actionData && actionData.notFound)}
         tooMany={Boolean(actionData && "tooMany" in actionData && actionData.tooMany)}
+        linkSent={Boolean(actionData && "linkSent" in actionData && actionData.linkSent)}
       />
     );
   }
@@ -209,11 +253,15 @@ function ManageLogin({
   submitting,
   notFound,
   tooMany,
+  linkSent,
 }: {
   params: { channelId?: string };
   submitting: boolean;
   notFound: boolean;
   tooMany: boolean;
+  /** The reference was right, but this email has more than one record here, so
+   *  the rest of them need the mailbox proved. */
+  linkSent: boolean;
 }) {
   const tr = useT();
   const s = useSlots();
@@ -226,6 +274,18 @@ function ManageLogin({
         {tr.t("manageTitle")}
       </h1>
       <p className="mb-7 text-body-lg leading-[1.6] text-secondary">{tr.t("manageIntro")}</p>
+
+      {linkSent && (
+        // Deliberately says nothing about what else is on the address: the
+        // reference proved one record, and the count that sent us here is
+        // itself information about the mailbox's owner.
+        <div className="mb-6 rounded-card border border-accent/40 bg-accent-soft p-5">
+          <div className="mb-1 font-serif text-title-sm font-semibold text-accent-deep">
+            {tr.t("manageLinkSent")}
+          </div>
+          <p className="text-body text-secondary">{tr.t("manageLinkSentBody")}</p>
+        </div>
+      )}
 
       <Form
         method="post"

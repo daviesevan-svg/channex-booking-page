@@ -417,6 +417,9 @@ const IT: Dict = {
   manageIntro: "Inserisca il numero di prenotazione e l’e-mail con cui ha prenotato.",
   manageNotFound: "Non abbiamo trovato alcuna prenotazione con questo numero e questa e-mail. Controlli i dati e riprovi.",
   manageTooMany: "Troppi tentativi. Attenda qualche minuto e riprovi.",
+  manageLinkSent: "Controlla la tua email",
+  manageLinkSentBody:
+    "A questa email corrisponde più di una prenotazione o voucher, quindi ti abbiamo inviato un link di accesso. Scade tra 15 minuti.",
   findBooking: "Trova la mia prenotazione",
   bookingReference: "Numero di prenotazione",
   emailAddress: "E-mail",
