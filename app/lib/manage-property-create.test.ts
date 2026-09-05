@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { makeTestD1, seedProperties } from "./test-d1";
+
+// The registry is D1-backed; these tests exercise property create/rename/team.
+const { d1: testD1, sqlite: testSqlite } = makeTestD1();
 
 // POST /v1/manage/properties — creating a sibling property from a management
 // key. What these pin: owner + partnerId come from the key property's registry
@@ -14,7 +18,7 @@ const kv = {
 };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { CONFIG_KV: kv },
+  env: { DB: testD1, CONFIG_KV: kv },
   waitUntil: () => {},
 }));
 
@@ -94,9 +98,12 @@ describe("management API: create property", () => {
   it("caps properties per owner", async () => {
     const { ak } = await keys;
     const route = await import("../routes/api.v1.manage.properties");
-    const list = JSON.parse(store.get("properties")!) as { id: string }[];
-    for (let i = 0; i < 50; i++) list.push({ id: `cap-${i}`, name: "x", owner: "owner@example.com" } as never);
-    store.set("properties", JSON.stringify(list));
+    // Seed the ROWS: the registry is a table now, and a legacy KV value nothing
+    // reads back would leave the owner under the cap and the assertion vacuous.
+    seedProperties(
+      testSqlite,
+      Array.from({ length: 50 }, (_, i) => ({ id: `cap-${i}`, name: "x", owner: "owner@example.com" })),
+    );
     const res = (await route.action({
       request: jsonReq("/v1/manage/properties", ak, "POST", { name: "One too many" }),
     } as never)) as Response;
