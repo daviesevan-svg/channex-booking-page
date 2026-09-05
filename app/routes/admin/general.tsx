@@ -15,6 +15,8 @@ import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { FIELD_INPUT } from "~/components/admin-form";
+import { activeGateway } from "~/lib/payments.server";
+import { currencyChanged, currencyLock, currencyLockMessage } from "~/lib/currency-lock";
 
 // A common-zone fallback for runtimes without Intl.supportedValuesOf.
 const FALLBACK_TIMEZONES = [
@@ -81,6 +83,16 @@ export async function action({ request }: Route.ActionArgs) {
   const canOwn = await isOwnerOrSuper(request, propertyId);
   // Live booking is owner-only. Teammates still save the rest of General;
   // a POST that includes liveBooking must not persist that field.
+
+  // The guest is charged in the GATEWAY's currency, not this one. Connecting
+  // checks they match; nothing used to stop them drifting apart afterwards,
+  // which is the only way a correctly set-up property reaches the
+  // charged-then-refunded-then-unbooked path. See currency-lock.ts.
+  const current = await getSettings(propertyId);
+  const lock = currencyLock((await activeGateway(propertyId, current))?.kind);
+  if (lock.locked && currencyChanged(current.currency, String(form.get("currency") ?? ""))) {
+    return { error: currencyLockMessage(lock) };
+  }
   await saveSettings(propertyId, form, { persistLive: canOwn });
   // The shortcode lives on the property registry (globally unique), not the
   // per-property settings blob — save it separately and surface any clash.
