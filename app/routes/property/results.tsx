@@ -21,6 +21,7 @@ import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, seri
 import { getActiveExtras } from "~/lib/extras.server";
 import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
+import { navCriticalPath, navStage } from "~/lib/nav-tags";
 import { getPageText } from "~/lib/overrides.server";
 
 import { queueSearchEvent } from "~/lib/search-analytics.server";
@@ -262,6 +263,7 @@ function RoomCard({
   channelId,
   qs,
   inCart,
+  critical,
 }: {
   room: EnrichedRoom;
   isBestMatch: boolean;
@@ -271,6 +273,8 @@ function RoomCard({
   channelId: string | undefined;
   qs: string;
   inCart: number;
+  /** This card's CTA is the one Google's crawler should click to advance. */
+  critical: boolean;
 }) {
   const base = useBase();
   const s = useSlots();
@@ -407,6 +411,7 @@ function RoomCard({
           <Link
             to={detailHref}
             prefetch="intent"
+            {...(critical ? navCriticalPath() : {})}
             className="w-full rounded-control bg-accent py-[11px] text-center text-body-lg font-semibold text-on-accent transition-colors hover:bg-accent-deep"
           >
             {tr.t("chooseRate")}
@@ -601,6 +606,10 @@ function MobileCartBar({
           type="button"
           onClick={onContinue}
           disabled={!covered || continuePending}
+          // Tagged only once the cart actually covers the party, because that is
+          // when this button becomes the way forward — and a disabled control
+          // marked as the critical path is a dead end for the crawler.
+          {...(covered ? navCriticalPath() : {})}
           className={cx(
             "flex-none",
             s.btnPrimary,
@@ -664,6 +673,18 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   // covering the last room card.
   const showCartBar = !singleUnit && rooms.length > 0 && cartLines.length > 0;
 
+  // Google's crawler walks this page TWICE — once to pick a room, and again
+  // after the detail page has added it to the cart — so the element it must
+  // click differs by cart state. Deciding it here, rather than tagging both and
+  // ordering them with data-nav-interactionorder, means there is only ever one
+  // critical-path element in the DOM: with nothing bookable in the cart it is
+  // the best match's "Choose rate" (also the cheapest fitting room, i.e. the
+  // price Google is validating), and once the cart covers the party it is
+  // Continue. Only the in-flow CartPanel button is tagged — MobileCartBar is
+  // the same action rendered a second time for narrow viewports, and tagging
+  // both would hand the crawler two critical paths on one page.
+  const criticalRoomId = covered ? undefined : bestMatchId;
+
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const summary = `${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
     parseISO(query.checkout),
@@ -676,6 +697,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
         "mx-auto max-w-[1160px] px-7 pt-10",
         showCartBar ? "pb-[150px] lg:pb-[72px]" : "pb-[72px]",
       )}
+      {...navStage("room-selection")}
     >
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
@@ -770,6 +792,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
                 channelId={params.channelId}
                 qs={qs}
                 inCart={counts.get(room.id) ?? 0}
+                critical={room.id === criticalRoomId}
               />
             ))}
           </div>

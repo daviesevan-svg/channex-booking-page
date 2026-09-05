@@ -33,6 +33,7 @@ import { isTagged } from "~/lib/tracking-settings";
 import { TrackCart } from "~/components/tracking-events";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
+import { navCriticalPath, navStage } from "~/lib/nav-tags";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
@@ -233,7 +234,9 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
   };
 
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+    // Reached only when the selected room has add-ons; rooms without them
+    // redirect straight back to results, so this stage is optional in the walk.
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9" {...navStage("room-selection")}>
       {tracking && <TrackCart sel={tracking.sel} lines={tracking.cart} stay={tracking.stay} />}
       <Link
         to={`${base}/rooms?${searchParams.toString()}`}
@@ -303,9 +306,12 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
             <span className="font-serif text-title-lg font-semibold">{formatMoney(extrasSum, cur)}</span>
           </div>
 
+          {/* Continue, not Skip: both return to results, but the crawler should
+              walk the path a guest who accepts the default sees priced. */}
           <button
             type="button"
             onClick={() => go(false)}
+            {...navCriticalPath()}
             className={cx("w-full", s.btnPrimary, "py-[14px] text-lead font-semibold transition-colors")}
           >
             {text.continueButton}

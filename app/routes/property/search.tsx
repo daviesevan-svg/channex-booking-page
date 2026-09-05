@@ -28,6 +28,7 @@ import { getPartner, partnerIdForAdminHost, partnerIdForGuestHost } from "~/lib/
 import { PropertyPicker } from "~/components/property-picker";
 import { useSiteStyle } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
+import { navCriticalPath, navStage } from "~/lib/nav-tags";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const lang = langFromRequest(request);
@@ -376,10 +377,17 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
           </button>
           <div className="my-2 w-px bg-line" />
           <GuestSelector value={occupancy} onChange={setOccupancy} />
+          {/* The critical path off the landing page — but only usable when the
+              URL already carried dates, since this button searches whatever the
+              picker holds and an undated arrival leaves it empty. Google should
+              be given a DATED landing URL (…/rooms?checkin=…&checkout=…), which
+              skips this stage entirely; the tag is here for the case where the
+              point-of-sale URL points at the home page instead. */}
           <button
             type="button"
             onClick={searchRooms}
             disabled={searching}
+            {...navCriticalPath()}
             className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:opacity-70"
           >
             {searching ? tr.t("searching") : searchButton}
@@ -416,7 +424,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   );
 
   return (
-    <main className={s.page}>
+    <main className={s.page} {...navStage("landing")}>
       <SectionList
         sections={sections}
         data={data}

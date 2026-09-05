@@ -5,11 +5,40 @@
 // screens (confirmation listed extras after the taxes). One implementation,
 // one order; the `variant` keeps each page's existing type scale.
 import { groupExtrasByRoom, type ResolvedExtra } from "~/lib/extras";
-import { formatMoney } from "~/lib/money";
+import { formatMoney, formatMoneyParts } from "~/lib/money";
+import { offerScope, priceSpecScope } from "~/lib/nav-tags";
 import type { Pricing } from "~/lib/pricing";
 import { useT } from "~/lib/i18n";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
+
+/**
+ * The grand total, wrapped in the Offer microdata Google's price-accuracy
+ * crawler extracts.
+ *
+ * The number is the only part inside `itemprop="price"` — the currency symbol
+ * sits outside it, and the ISO code goes in a <meta> — because a symbol inside
+ * the tagged text is one parser away from being read as part of the amount.
+ * The visible text keeps its group separators (it has to: this IS the price the
+ * guest is shown), so the unseparated value rides in `content` alongside it.
+ * Google explicitly does NOT accept a total that is only in a <meta>; this
+ * renders the same characters formatMoney would have.
+ */
+function TaggedTotal({ amount, currency }: { amount: number; currency: string }) {
+  const { before, number, after, value } = formatMoneyParts(amount, currency);
+  return (
+    <span {...offerScope}>
+      <span {...priceSpecScope}>
+        <meta itemProp="priceCurrency" content={currency} />
+        {before}
+        <span itemProp="price" content={value}>
+          {number}
+        </span>
+        {after}
+      </span>
+    </span>
+  );
+}
 
 export function PriceBreakdown({
   pricing,
@@ -20,6 +49,14 @@ export function PriceBreakdown({
   /** Confirmation's degenerate reload (no cart in the URL) hides the money
    *  rows but keeps the layout; checkout always shows them. */
   showMoney = true,
+  /** Tag the total as the schema.org Offer price Google's crawler reads.
+   *
+   * Opt-in rather than derived from `variant`, because it is a claim about the
+   * PAGE, not about the layout: only the final page before payment may carry
+   * an offer, and confirmation — same component, same numbers — is past it.
+   * The enclosing Hotel/LodgingReservation scope is the caller's to provide.
+   */
+  offerMicrodata = false,
 }: {
   pricing: Pick<Pricing, "charges" | "taxLines" | "taxIncluded">;
   extraLines: ResolvedExtra[];
@@ -27,6 +64,7 @@ export function PriceBreakdown({
   currency: string;
   variant: "checkout" | "confirmation";
   showMoney?: boolean;
+  offerMicrodata?: boolean;
 }) {
   const tr = useT();
   const s = useSlots();
@@ -86,7 +124,7 @@ export function PriceBreakdown({
         >
           <span className={co ? "text-lead font-semibold" : "text-secondary"}>{tr.t("total")}</span>
           <span className={co ? "font-serif text-display-sm font-semibold" : "font-serif text-title-lg font-semibold"}>
-            {money(grandTotal)}
+            {offerMicrodata ? <TaggedTotal amount={grandTotal} currency={currency} /> : money(grandTotal)}
           </span>
         </div>
       )}

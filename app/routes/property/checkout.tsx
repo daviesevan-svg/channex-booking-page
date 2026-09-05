@@ -47,6 +47,7 @@ import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
+import { hotelReservationScope, navStage } from "~/lib/nav-tags";
 import { formatMoney, toStripeMinor } from "~/lib/money";
 import type { Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
@@ -812,11 +813,25 @@ function Field({
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({
+  label,
+  value,
+  itemProp,
+  content,
+}: {
+  label: string;
+  value: string;
+  /** Optional schema.org property for the VALUE cell (see the date rows). */
+  itemProp?: string;
+  /** Machine-readable form of a value shown in a human one. */
+  content?: string;
+}) {
   return (
     <div className="flex justify-between">
       <span className="text-secondary">{label}</span>
-      <span className="font-semibold">{value}</span>
+      <span className="font-semibold" itemProp={itemProp} content={content}>
+        {value}
+      </span>
     </div>
   );
 }
@@ -956,8 +971,26 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const showConsentError = consentError || (!!actionData && "consentError" in actionData && actionData.consentError === true);
   const checkboxCls = "mt-0.5 h-4 w-4 flex-none rounded border-line-alt text-accent focus:ring-accent";
 
+  const childCount = stay.occ.childrenAge?.length ?? 0;
+
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9">
+    // The last page a guest reaches before payment, so this is where Google's
+    // price-accuracy crawler stops and reads the total. The whole page is the
+    // co-typed Hotel + LodgingReservation scope Google requires, because the
+    // properties it holds are spread across it: the hotel in the summary aside,
+    // the total further down inside PriceBreakdown.
+    <main
+      className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9"
+      {...hotelReservationScope}
+      {...navStage("checkout", true)}
+    >
+      {/* Identity and occupancy as <meta>: these are matching keys, not prices.
+          The identifier is the same property id the Hotel List Feed publishes,
+          which is what Google joins on. Only the PRICE has to be visible, and
+          it is (see PriceBreakdown). */}
+      <meta itemProp="identifier" content={stay.channelId} />
+      <meta itemProp="numAdults" content={String(stay.occ.adults)} />
+      <meta itemProp="numChildren" content={String(childCount)} />
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
@@ -1115,6 +1148,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           className={cx("sticky top-24 min-w-[300px] flex-1", s.strip, "p-6")}
           style={{ boxShadow: "var(--shadow-sticky)" }}
         >
+          {/* The hotel being booked, named on the page rather than only in the
+              header. Google wants `name` as visible text inside the reservation
+              scope, and the header sits outside <main>; a checkout summary that
+              says which hotel this is was worth having anyway. */}
+          <div itemProp="name" className="mb-1 text-label font-semibold uppercase tracking-wide text-muted-2">
+            {hotelName}
+          </div>
           <h3 className="mb-4 font-serif text-title-md font-semibold">
             {tr.p("yourStayRooms", lines.length)}
           </h3>
@@ -1132,8 +1172,21 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             ))}
           </div>
           <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
-            <Row label={tr.t("checkIn")} value={fmt(parseISO(stay.checkin), "EEE d MMM")} />
-            <Row label={tr.t("checkOut")} value={fmt(parseISO(stay.checkout), "EEE d MMM")} />
+            {/* Displayed in the guest's language and format; tagged with the
+                ISO date in `content`, which is how Google's guide says to
+                standardise a visible date. */}
+            <Row
+              label={tr.t("checkIn")}
+              value={fmt(parseISO(stay.checkin), "EEE d MMM")}
+              itemProp="checkinDate"
+              content={stay.checkin}
+            />
+            <Row
+              label={tr.t("checkOut")}
+              value={fmt(parseISO(stay.checkout), "EEE d MMM")}
+              itemProp="checkoutDate"
+              content={stay.checkout}
+            />
             <Row label={tr.t("nights")} value={String(nights)} />
             <Row label={tr.t("guests")} value={occLabel(tr, stay.occ.adults, stay.occ.childrenAge)} />
           </div>
@@ -1241,6 +1294,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             grandTotal={grandTotal}
             currency={currency}
             variant="checkout"
+            offerMicrodata
           />
 
           {/* § 312j(2) BGB / Art. 8(2) CRD: what the guest is agreeing to has to

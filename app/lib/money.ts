@@ -68,6 +68,61 @@ export function formatMoney(
   }
 }
 
+/** The pieces of a formatted price, split around the number.
+ *
+ * Google's price-accuracy crawler reads the total out of an
+ * `itemprop="price"` element, and that element's text should be the number
+ * ALONE — a "£" or a trailing "kr" inside it is a parse away from being read
+ * as part of the amount. Splitting here rather than at the call site keeps one
+ * formatter: `before + number + after` reassembles to exactly what
+ * formatMoney would have produced, symbol placement and per-currency digits
+ * included, so tagging a price can never change what the guest sees.
+ *
+ * `number` keeps its group separators, because it IS the visible text. The
+ * machine-readable value belongs in a `content` attribute alongside it (which
+ * is the pattern Google's own guide prescribes for dates) — that is `value`,
+ * built from the SAME parts with the group separators dropped, so the tagged
+ * number and the displayed number can never drift apart.
+ */
+export function formatMoneyParts(
+  amount: string | number,
+  currency = "USD",
+  locale: string = MONEY_LOCALE,
+): { before: string; number: string; after: string; value: string } {
+  const value = typeof amount === "string" ? Number(amount) : amount;
+  const whole = formatMoney(amount, currency, locale);
+  const plain = { before: "", number: whole, after: "", value: String(value) };
+  if (Number.isNaN(value)) return { before: "", number: whole, after: "", value: "" };
+  try {
+    const parts = new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      currencyDisplay: currencyDisplay(currency),
+    }).formatToParts(value);
+    // Everything from the first digit-ish part to the last is the number; what
+    // sits outside that run is symbol and spacing, wherever the locale put it.
+    const numeric = new Set(["integer", "group", "decimal", "fraction", "minusSign", "plusSign"]);
+    const first = parts.findIndex((p) => numeric.has(p.type));
+    if (first < 0) return plain;
+    let last = first;
+    for (let i = first; i < parts.length; i++) if (numeric.has(parts[i].type)) last = i;
+    const join = (from: number, to: number) =>
+      parts.slice(from, to).map((p) => p.value).join("");
+    return {
+      before: join(0, first),
+      number: join(first, last + 1),
+      after: join(last + 1, parts.length),
+      value: parts
+        .slice(first, last + 1)
+        .filter((p) => p.type !== "group")
+        .map((p) => (p.type === "decimal" ? "." : p.value))
+        .join(""),
+    };
+  } catch {
+    return plain;
+  }
+}
+
 // ---- Stripe minor units ----
 // Stripe takes amounts in the currency's smallest unit, which for most is 1/100
 // of the major unit — but the zero-decimal currencies ARE their smallest unit:

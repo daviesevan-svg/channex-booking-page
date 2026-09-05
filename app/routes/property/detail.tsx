@@ -11,6 +11,7 @@ import type { RoomWithRates } from "~/lib/channex/types";
 import { useProperty } from "~/lib/booking-context";
 import { getCatalogRooms } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
+import { navCriticalPath, navStage } from "~/lib/nav-tags";
 import { getPageText } from "~/lib/overrides.server";
 
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
@@ -365,7 +366,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
 
   return (
-    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-7">
+    <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-7" {...navStage("room-selection")}>
       {jsonLd && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdHtml(jsonLd) }} />
       )}
@@ -649,6 +650,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
             type="button"
             onClick={addToStay}
             disabled={adding}
+            {...navCriticalPath()}
             className={cx("w-full", s.btnPrimary, "py-[15px] text-lead font-semibold transition-colors disabled:opacity-70")}
           >
             {adding ? "…" : editIndex != null ? tr.t("updateRoom") : text.addButton}
