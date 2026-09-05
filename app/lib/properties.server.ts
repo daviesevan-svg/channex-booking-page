@@ -84,6 +84,102 @@ const ensureSchema = schemaOnce((d) => [
   d.prepare(`CREATE TABLE IF NOT EXISTS property (id TEXT PRIMARY KEY, json TEXT NOT NULL)`),
 ]);
 
+// An indexed, always-correct projection of the slug out of `json`.
+//
+// `resolvePropertyId` runs in the layout loader of every guest request and used
+// to answer by reading and parsing the WHOLE registry, so each hotel's page
+// paid for every other hotel that exists. A GENERATED column is the version of
+// this with no way to drift: SQLite derives it from `json` on read, so nothing
+// on the write path has to remember to keep it in step and there is no backfill
+// for rows written before it existed.
+//
+// It lives outside ensureSchema because ALTER TABLE has no IF NOT EXISTS, and a
+// statement that throws inside a batch takes the CREATE TABLE with it. Every
+// isolate after the first finds the column already there, which is the
+// "duplicate column" case swallowed below.
+let slugIndexReady: Promise<void> | undefined;
+
+function ensureSlugIndex(): Promise<void> {
+  slugIndexReady ??= (async () => {
+    await ensureSchema();
+    try {
+      await db()
+        .prepare(
+          `ALTER TABLE property ADD COLUMN slug TEXT GENERATED ALWAYS AS (lower(json_extract(json,'$.slug'))) VIRTUAL`,
+        )
+        .run();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/duplicate column/i.test(message)) throw error;
+    }
+    await db().prepare(`CREATE INDEX IF NOT EXISTS property_slug ON property (slug)`).run();
+  })().catch((error) => {
+    // Let the next caller retry rather than latching the failure for the life
+    // of the isolate. Lookups fall back to the full read meanwhile.
+    slugIndexReady = undefined;
+    throw error;
+  });
+  return slugIndexReady;
+}
+
+/** One property by id and/or slug, in a single round trip of indexed lookups.
+ *
+ *  `total` comes back with it so a miss can tell "no such property" — the
+ *  answer — from "the registry has no rows yet", which is the seed-on-first-run
+ *  and migrate-from-KV path and has to go through the full read. Null means D1
+ *  itself was unreachable: same, the full read owns the snapshot fallback. */
+async function lookupOne(id: string, slug: string): Promise<{ total: number; byId?: PropertyRef; bySlug?: PropertyRef } | null> {
+  const cacheKey = `${POINT_CACHE_PREFIX}${id}\u0000${slug}`;
+  const cache = requestKvCache();
+  // The whole registry may already be in hand (an admin list, the picker). It
+  // is the same data and already paid for, so don't ask the database again.
+  const whole = cache?.get(READ_CACHE_KEY);
+  if (whole) {
+    const list = JSON.parse((await whole) ?? "[]") as PropertyRef[];
+    return { total: list.length, byId: list.find((p) => p.id === id), bySlug: list.find((p) => p.slug === slug) };
+  }
+
+  const run = async (): Promise<string> => {
+    await ensureSlugIndex();
+    const row = await db()
+      .prepare(
+        `SELECT (SELECT COUNT(*) FROM property) AS total,
+                (SELECT json FROM property WHERE id = ?1) AS by_id,
+                (SELECT json FROM property WHERE slug = ?2) AS by_slug`,
+      )
+      .bind(id, slug)
+      .first<{ total: number; by_id: string | null; by_slug: string | null }>();
+    return JSON.stringify(row ?? { total: 0, by_id: null, by_slug: null });
+  };
+
+  try {
+    const hit = cache?.get(cacheKey);
+    let raw: string;
+    if (hit) {
+      raw = (await hit) ?? "";
+    } else {
+      const pending = run();
+      cache?.set(cacheKey, pending);
+      pending.catch(() => cache?.delete(cacheKey));
+      raw = await pending;
+    }
+    const row = JSON.parse(raw) as { total: number; by_id: string | null; by_slug: string | null };
+    return { total: row.total, byId: parseRef(row.by_id), bySlug: parseRef(row.by_slug) };
+  } catch {
+    return null;
+  }
+}
+
+function parseRef(json: string | null): PropertyRef | undefined {
+  if (!json) return undefined;
+  try {
+    const ref = JSON.parse(json) as PropertyRef;
+    return typeof ref?.id === "string" ? ref : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The KV snapshot: the fallback, and what a rollback would read. */
 async function readSnapshot(): Promise<PropertyRef[]> {
   const kv = getConfigKV();
@@ -131,8 +227,16 @@ async function migrateFromSnapshot(): Promise<PropertyRef[]> {
 // as the KV cache it borrows (request-cache.server.ts).
 const READ_CACHE_KEY = "d1:property-registry";
 
+/** Point lookups are cached under this prefix, one entry per (id, slug) pair. */
+const POINT_CACHE_PREFIX = "d1:property:";
+
 function dropReadCache(): void {
-  requestKvCache()?.delete(READ_CACHE_KEY);
+  const cache = requestKvCache();
+  if (!cache) return;
+  cache.delete(READ_CACHE_KEY);
+  // The point lookups are the same data under different keys — a write that
+  // left them behind would serve the pre-write row for the rest of the request.
+  for (const key of [...cache.keys()]) if (key.startsWith(POINT_CACHE_PREFIX)) cache.delete(key);
 }
 
 async function read(): Promise<PropertyRef[]> {
@@ -346,6 +450,12 @@ export async function canAccess(request: Request, id: string): Promise<boolean> 
 
 /** A single property by id (unscoped). */
 export async function getProperty(id: string): Promise<PropertyRef | undefined> {
+  // One indexed row, not the whole registry parsed to find it. The full read
+  // still owns the empty-registry cases (seed the default property, migrate the
+  // legacy KV snapshot) and the D1-outage fallback, so a miss defers to it only
+  // when there is genuinely nothing to have missed.
+  const hit = await lookupOne(id, "");
+  if (hit && (hit.byId || hit.total > 0)) return hit.byId;
   return (await getProperties()).find((p) => p.id === id);
 }
 
@@ -418,6 +528,14 @@ export function slugError(slug: string, id: string, list: PropertyRef[]): string
  *  ids behave exactly as they did before slugs existed (render defaults). */
 export async function resolvePropertyId(channelId: string): Promise<string> {
   if (!channelId) return channelId;
+  // The hottest read in the app: every guest request's layout loader lands
+  // here. Both halves are one indexed round trip — id first, so a UUID URL
+  // still wins outright and a slug can never capture it.
+  const hit = await lookupOne(channelId, channelId.toLowerCase());
+  if (hit && (hit.byId || hit.bySlug || hit.total > 0)) {
+    if (hit.byId) return channelId;
+    return hit.bySlug ? hit.bySlug.id : channelId;
+  }
   const list = await getProperties();
   if (list.some((p) => p.id === channelId)) return channelId;
   const bySlug = list.find((p) => p.slug === channelId.toLowerCase());
