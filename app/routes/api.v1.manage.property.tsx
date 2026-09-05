@@ -4,6 +4,8 @@ import { serializeManageProperty } from "~/lib/manage-serialize";
 import { validatePropertyPatch, validationError } from "~/lib/manage-validate";
 import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
+import { activeGateway } from "~/lib/payments.server";
+import { currencyChanged, currencyLock, currencyLockMessage } from "~/lib/currency-lock";
 
 // GET   /v1/manage/property — the property + settings view (manage keys only).
 // PATCH /v1/manage/property — sparse merge over the phase-A allowlist
@@ -33,6 +35,17 @@ export async function action({ request }: Route.ActionArgs) {
   if (!parsed.ok) return validationError(parsed.errors);
   const ref = await getProperty(auth.pid);
   if (!ref) return apiError(404, "not_found", "Property not found.");
+
+  // Same rule as the admin form, enforced at the other door: the guest is
+  // charged in the GATEWAY's currency, and a property whose currency drifts
+  // away from its gateway's charges the guest and then refuses the booking.
+  // Checked here rather than in the validator because it needs the gateway.
+  const current = await getSettings(auth.pid);
+  const lock = currencyLock((await activeGateway(auth.pid, current))?.kind);
+  if (lock.locked && currencyChanged(current.currency, parsed.value.currency)) {
+    return validationError({ currency: [currencyLockMessage(lock)] });
+  }
+
   const settings = await patchSettings(auth.pid, parsed.value);
   return Response.json({ data: serializeManageProperty(ref, settings) });
 }

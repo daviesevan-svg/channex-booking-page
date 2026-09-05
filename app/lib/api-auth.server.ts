@@ -93,7 +93,12 @@ export function apiError(status: number, type: string, message: string): Respons
 
 export async function listApiKeys(pid: string): Promise<ApiKeyView[]> {
   const recs = (await readJson<ApiKeyRecord[]>(keysKey(pid))) ?? [];
-  return recs.filter((r) => !r.revokedAt).map(view);
+  const live = recs.filter((r) => !r.revokedAt);
+  // Last-used now lives beside the list, not in it. Records written before that
+  // change still carry their own stamp, so fall back to it rather than showing
+  // a key as never used.
+  const stamps = await lastUsedFor(pid, live.map((r) => r.id));
+  return live.map((r) => view({ ...r, lastUsedAt: stamps[r.id] ?? r.lastUsedAt }));
 }
 
 /** Create a key. Returns the raw key ONCE (never retrievable again).
@@ -121,6 +126,42 @@ export async function issueApiKey(
   await writeJson(keysKey(pid), recs);
   await writeJson(indexKey(hash), { pid, keyId: rec.id, mode: rec.mode, scope });
   return { key: view(rec), raw };
+}
+
+/** Granularity of the last-used stamp. Coarse on purpose: this is an "is this
+ *  key still in use?" signal for the admin list, not an audit log, and every
+ *  extra write is a KV round trip on an authenticated request. */
+const LAST_USED_WINDOW_MS = 60_000;
+
+const lastUsedKey = (pid: string, keyId: string) => `apikey_used:${pid}:${keyId}`;
+
+/** Record that a key was used, in a key of its own. Never throws. */
+async function stampLastUsed(pid: string, keyId: string): Promise<void> {
+  try {
+    const kv = getConfigKV();
+    if (!kv) return;
+    const k = lastUsedKey(pid, keyId);
+    const prev = await kv.get(k);
+    if (prev && Date.now() - Date.parse(prev) < LAST_USED_WINDOW_MS) return;
+    await kv.put(k, new Date().toISOString());
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Last-used stamps for a property's keys, for the admin list. Stored per key
+ *  rather than on the record, so reading them cannot resurrect a stale list. */
+export async function lastUsedFor(pid: string, keyIds: string[]): Promise<Record<string, string>> {
+  const kv = getConfigKV();
+  if (!kv) return {};
+  const out: Record<string, string> = {};
+  await Promise.all(
+    keyIds.map(async (id) => {
+      const v = await kv.get(lastUsedKey(pid, id)).catch(() => null);
+      if (v) out[id] = v;
+    }),
+  );
+  return out;
 }
 
 export async function revokeApiKey(pid: string, keyId: string): Promise<boolean> {
@@ -205,18 +246,29 @@ export async function identifyApiKey(request: Request): Promise<ApiAuth | Respon
   // revoke that lost a KV race) must not leave a working key behind.
   if (!(await getProperty(entry.pid))) return apiError(401, "unauthorized", "Invalid or revoked API key.");
 
-  // Best-effort lastUsedAt stamp; never block the request on it.
+  // The key must still be in the property's list and not revoked. READ ONLY:
+  // this used to stamp lastUsedAt by rewriting the whole list on every single
+  // authenticated request, which raced issueApiKey — a key minted during that
+  // window vanished from the list while its index survived, so it 401'd here
+  // forever, never appeared in the admin, and revokeApiKey returned false
+  // because the record was gone. Unrevocable and undiagnosable, and the
+  // manage rate limit (300 reads / 10 min) makes the window routine.
+  //
+  // Revocation is still enforced twice: the index is deleted on revoke (which
+  // is what actually stops the key) and the record is checked here.
   try {
     const recs = (await readJson<ApiKeyRecord[]>(keysKey(entry.pid))) ?? [];
     const rec = recs.find((r) => r.id === entry.keyId);
-    if (rec && !rec.revokedAt) {
-      rec.lastUsedAt = new Date().toISOString();
-      await writeJson(keysKey(entry.pid), recs);
-    } else if (!rec || rec.revokedAt) {
+    if (!rec || rec.revokedAt) {
       return apiError(401, "unauthorized", "Invalid or revoked API key.");
     }
   } catch {
-    /* stamping is best-effort */
+    /* a KV blip must not lock out a valid key; the index is the real fence */
   }
+  // Last-used lives in its own key, so recording it can never rewrite — and so
+  // never lose — the list of keys. Best-effort and coarse: a stamp already
+  // within the window is left alone, which turns a write per request into at
+  // most one per minute per key.
+  await stampLastUsed(entry.pid, entry.keyId);
   return { pid: entry.pid, keyId: entry.keyId, mode: entry.mode, scope: entry.scope ?? "book" };
 }
