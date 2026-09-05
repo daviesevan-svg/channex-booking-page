@@ -22,6 +22,7 @@ import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import { parseExtrasState, resolveAllExtras, type ResolvedExtra } from "~/lib/extras";
 import { PriceBreakdown } from "~/components/price-breakdown";
+import { imageProps } from "~/lib/image-srcset";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -49,7 +50,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const settings = await getSettings(pid);
   const currency = settings.currency || "GBP";
 
-  let rooms: { title: string; rate: string }[] = [];
+  let rooms: { title: string; rate: string; photo?: string }[] = [];
   let lines: ResolvedLine[] = [];
   let total = 0;
   let nights = 0;
@@ -65,7 +66,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       parseCart(url.searchParams),
       { adults: occ.adults, childrenAge: occ.childrenAge },
     );
-    rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle }));
+    // The photo travels with the line — it was dropped here, so the card below
+    // fell back to its placeholder for every booking ever made, on properties
+    // whose rooms have perfectly good photos that show on every other step.
+    rooms = lines.map((l) => ({ title: l.roomTitle, rate: l.rateTitle, photo: l.photo }));
     // Stay-level, so any line carries the same list (see ResolvedLine.valueAdds).
     valueAdds = lines[0]?.valueAdds ?? [];
     if (lines.length) total = cartCoverage(lines).total;
@@ -244,7 +248,19 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
         <div className={cx("flex flex-col gap-4 border-b", s.rule, "pb-5")}>
           {rooms.map((r, i) => (
             <div key={i} className="flex items-center gap-[18px]">
-              <div className="h-16 w-[84px] flex-none rounded-card" style={{ background: stripe }} />
+              {/* alt="" on purpose: the room's name is the line of text beside
+                  it, so a screen reader announcing the photo as well would just
+                  say it twice. The stripe stays as the fallback for a room with
+                  no photo — which is what every guest saw here until now. */}
+              {r.photo ? (
+                <img
+                  {...imageProps(r.photo, "84px")}
+                  alt=""
+                  className="h-16 w-[84px] flex-none rounded-card object-cover"
+                />
+              ) : (
+                <div className="h-16 w-[84px] flex-none rounded-card" style={{ background: stripe }} />
+              )}
               <div>
                 <div className="font-serif text-title-sm font-semibold">{r.title}</div>
                 <div className="mt-[3px] text-caption text-muted-2">{r.rate}</div>
