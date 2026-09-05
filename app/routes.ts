@@ -51,6 +51,8 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
     // needs no static configuration on their side (see the route).
     r("iyzico/return", "routes/property/iyzico.return.tsx", "iyzico-return"),
     r("manage", "routes/property/manage.tsx", "manage"),
+    // Before manage/:id — same shape, and this one is a fixed word.
+    r("manage/verify", "routes/property/manage-verify.tsx", "manage-verify"),
     r("manage/voucher/:code", "routes/property/manage-voucher.tsx", "manage-voucher"),
     r("manage/:id", "routes/property/manage-booking.tsx", "manage-booking"),
     r("review/:bookingId", "routes/property/review.tsx", "review"),

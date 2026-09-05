@@ -114,6 +114,9 @@ const PT: Dict = {
   manageNotFound:
     "Não encontrámos nenhuma reserva com essa referência e esse e-mail. Verifique e tente novamente.",
   manageTooMany: "Demasiadas tentativas. Aguarde alguns minutos e tente novamente.",
+  manageLinkSent: "Verifique o seu email",
+  manageLinkSentBody:
+    "Este email tem mais do que uma reserva ou voucher connosco, por isso enviámos-lhe uma ligação de acesso. Expira em 15 minutos.",
   yourBookings: "As suas reservas",
   signOut: "Terminar sessão",
   view: "Ver",

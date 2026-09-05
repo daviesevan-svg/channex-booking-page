@@ -14,7 +14,7 @@ import { serializeBooking } from "~/lib/api-serialize";
 import { getPortalMessage, getSettings } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
 
-import { getGuestEmail } from "~/lib/guest-auth.server";
+import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
 import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
@@ -25,11 +25,21 @@ import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
-async function ownedBooking(channelId: string, id: string, request: Request) {
-  const email = await getGuestEmail(request);
-  if (!email) return null;
-  const booking = await getBooking(channelId, id);
-  if (!booking || booking.guest.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+/**
+ * The booking this request is allowed to act on, or null.
+ *
+ * Two gates, not one. The email still has to match the record — but a session
+ * proved by a booking reference alone is pinned to that reference's booking,
+ * because anyone able to make a booking can make one under someone else's
+ * address. Only a session that proved the mailbox (magic link) has no pin and
+ * may reach every booking on the address.
+ */
+async function ownedBooking(pid: string, id: string, request: Request) {
+  const session = await getGuestSession(request, pid);
+  if (!session) return null;
+  if (!sessionCanSee(session, id)) return null;
+  const booking = await getBooking(pid, id);
+  if (!booking || booking.guest.email.trim().toLowerCase() !== session.email.trim().toLowerCase()) {
     return null;
   }
   return booking;

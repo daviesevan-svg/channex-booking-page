@@ -417,6 +417,9 @@ const ES: Dict = {
   manageIntro: "Introduzca su número de reserva y el correo electrónico con el que reservó.",
   manageNotFound: "No hemos encontrado ninguna reserva con ese número y ese correo electrónico. Compruébelo e inténtelo de nuevo.",
   manageTooMany: "Demasiados intentos. Espere unos minutos e inténtelo de nuevo.",
+  manageLinkSent: "Consulte su correo electrónico",
+  manageLinkSentBody:
+    "Este correo tiene más de una reserva o vale con nosotros, así que le hemos enviado un enlace de acceso. Caduca en 15 minutos.",
   findBooking: "Buscar mi reserva",
   bookingReference: "Número de reserva",
   emailAddress: "Correo electrónico",

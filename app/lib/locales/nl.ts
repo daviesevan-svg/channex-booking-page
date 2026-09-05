@@ -417,6 +417,9 @@ const NL: Dict = {
   manageIntro: "Voer uw boekingsnummer in en het e-mailadres waarmee u hebt geboekt.",
   manageNotFound: "We konden geen boeking vinden met dit boekingsnummer en e-mailadres. Controleer de gegevens en probeer het opnieuw.",
   manageTooMany: "Te veel pogingen. Wacht een paar minuten en probeer het opnieuw.",
+  manageLinkSent: "Controleer uw e-mail",
+  manageLinkSentBody:
+    "Op dit e-mailadres staat meer dan één boeking of voucher, daarom hebben we u een inloglink gestuurd. Deze verloopt over 15 minuten.",
   findBooking: "Mijn boeking zoeken",
   bookingReference: "Boekingsnummer",
   emailAddress: "E-mail",

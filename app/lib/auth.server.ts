@@ -6,6 +6,7 @@ import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from ".
 import { brandForUser, getPartner, partnerIdForAdminHost } from "./partners.server";
 import { isOwnHost } from "./domains.server";
 import { timingSafeEqual } from "./hmac.server";
+import { tokenAudienceOk } from "./guest-session";
 import {
   generateConnectNonce,
   matchConnectState,
@@ -56,8 +57,15 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
   if (!payload || !sig) return null;
   if (!timingSafeEqual(await sign(payload, sessionSecret), sig)) return null;
   try {
-    const { email, exp, jti } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
+    const { email, exp, jti, aud } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
     if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
+    // Audience: a token minted for the GUEST portal must never open the admin.
+    // Both are signed with the same secret, and this verifier ignores unknown
+    // fields — so without this check a guest link would satisfy /admin/verify
+    // for any email that happens to be on the allowlist. Admin tokens carry no
+    // `aud` (and the ones already in flight when this shipped carry none), so
+    // undefined stays valid; anything else is somebody else's token.
+    if (!tokenAudienceOk(aud, "admin")) return null;
     // Single-use: reject a token already consumed, then mark it consumed. We track
     // *consumption* (not issuance) so KV propagation lag never blocks a first, real
     // login — only a later replay of a leaked link is refused. Legacy tokens with
@@ -71,6 +79,59 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
       }
     }
     return email.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A magic-link token for the GUEST portal, bound to one property.
+ *
+ * Lives here because this is where the signing key and the base64url helpers
+ * are, not because it has anything to do with admin sign-in — the `aud` field
+ * is what keeps the two apart, in both directions.
+ *
+ * The property is inside the signature on purpose: a link mailed for hotel A
+ * must not open hotel B's portal on the shared host, and the pid is the only
+ * thing that can say so once the link leaves our hands.
+ */
+export async function createGuestMagicToken(email: string, pid: string): Promise<string> {
+  const { sessionSecret } = getConfig();
+  const jti = crypto.randomUUID();
+  const payload = toBase64Url(
+    enc(JSON.stringify({ email, pid, aud: "guest", exp: Date.now() + TOKEN_TTL_MS, jti })),
+  );
+  return `${payload}.${await sign(payload, sessionSecret)}`;
+}
+
+/** Verify a guest link. Returns the email and the property it was minted for. */
+export async function verifyGuestMagicToken(
+  token: string,
+): Promise<{ email: string; pid: string } | null> {
+  const { sessionSecret } = getConfig();
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return null;
+  if (!timingSafeEqual(await sign(payload, sessionSecret), sig)) return null;
+  try {
+    const { email, pid, aud, exp, jti } = JSON.parse(
+      new TextDecoder().decode(fromBase64Url(payload)),
+    );
+    // No undefined-is-fine grace here: guest tokens are new, so every valid one
+    // says so. An admin token must not open the portal either.
+    if (!tokenAudienceOk(aud, "guest")) return null;
+    if (typeof email !== "string" || typeof pid !== "string" || typeof exp !== "number") return null;
+    if (Date.now() > exp) return null;
+    // Single-use, same scheme as the admin link: consumption is what's tracked,
+    // so KV lag never blocks a first real login, only a replay of a leaked link.
+    if (typeof jti === "string") {
+      const kv = getConfigKV();
+      if (kv) {
+        const usedKey = `magic_used:${jti}`;
+        if (await kv.get(usedKey)) return null;
+        await kv.put(usedKey, "1", { expirationTtl: Math.ceil(TOKEN_TTL_MS / 1000) });
+      }
+    }
+    return { email: email.toLowerCase(), pid };
   } catch {
     return null;
   }

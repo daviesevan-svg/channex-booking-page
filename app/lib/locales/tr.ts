@@ -40,6 +40,9 @@ const TR: Dict = {
   manageNotFound:
     "Bu numara ve e-posta ile bir rezervasyon bulamadık. Lütfen kontrol edip tekrar deneyin.",
   manageTooMany: "Çok fazla deneme yapıldı. Lütfen birkaç dakika bekleyip tekrar deneyin.",
+  manageLinkSent: "E-postanızı kontrol edin",
+  manageLinkSentBody:
+    "Bu e-posta adresine ait birden fazla rezervasyon veya hediye çeki bulunuyor; bu nedenle size bir giriş bağlantısı gönderdik. Bağlantı 15 dakika içinde sona erer.",
   yourBookings: "Rezervasyonlarınız",
   signOut: "Çıkış yap",
   view: "Görüntüle",
