@@ -23,6 +23,7 @@ import {
   LANG_COOKIE,
 } from "~/lib/content";
 import { formatAddress } from "~/lib/address";
+import { NAV_LOADING } from "~/lib/nav-tags";
 import { FontFaces } from "~/components/font-faces";
 import { ConsentSettingsLink, TrackingRoot } from "~/components/tracking-scripts";
 import { PageViews } from "~/components/tracking-events";
@@ -479,7 +480,12 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           wins over a white-label partner's icon on a property page, which is
           the precedence we want: the tab belongs to the hotel. */}
       {faviconImage && <link rel="icon" href={faviconImage} />}
-      {navigation.state !== "idle" && <div className="nav-progress" aria-hidden />}
+      {navigation.state !== "idle" && (
+        // Also the loading indicator Google's price-accuracy crawler waits
+        // on: it is on screen for exactly as long as the next page's loaders
+        // are running, so a click is never scored against a half-priced page.
+        <div className="nav-progress" aria-hidden {...NAV_LOADING} />
+      )}
       <header
         className="sticky top-0 z-20 border-b border-nav-border"
         style={{
