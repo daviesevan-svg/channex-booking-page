@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { dropProperty, makeTestD1 } from "./test-d1";
+
+// The registry is D1-backed; these tests exercise property create/rename/team.
+const { d1: testD1, sqlite: testSqlite } = makeTestD1();
 
 // Property registry guards from the 2026-09-02 security pass: an id can't
 // capture another hotel's slug, a deleted id can't be re-registered by a
@@ -13,7 +17,7 @@ const kv = {
 };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { CONFIG_KV: kv },
+  env: { DB: testD1, CONFIG_KV: kv },
   waitUntil: () => {},
 }));
 
@@ -96,7 +100,8 @@ describe("deletePropertyForGood", () => {
     seed();
     const { issueApiKey, identifyApiKey } = await import("./api-auth.server");
     const { raw } = await issueApiKey("hotel-code-77", { label: "t", mode: "live", scope: "book" });
-    store.set("properties", JSON.stringify([{ id: "other", name: "Other", owner: "o@example.com" }]));
+    // The property disappears from the registry — its row goes, as deletion does.
+    dropProperty(testSqlite, "hotel-code-77");
     const res = await identifyApiKey(new Request("http://localhost/v1/rooms", { headers: { Authorization: `Bearer ${raw}` } }));
     expect((res as Response).status).toBe(401);
   });

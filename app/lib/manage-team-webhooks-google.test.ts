@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { makeTestD1 } from "./test-d1";
+
+// The registry is D1-backed; these tests exercise property create/rename/team.
+const { d1: testD1 } = makeTestD1();
 
 // Team, webhooks, Google push. Pins: the invite's user-precreation rules and
 // property scoping, the visible-areas ↔ stored-complement translation, the
@@ -13,7 +17,7 @@ const kv = {
 };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { CONFIG_KV: kv },
+  env: { DB: testD1, CONFIG_KV: kv },
   waitUntil: () => {},
 }));
 

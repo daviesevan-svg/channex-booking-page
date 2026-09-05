@@ -5,6 +5,8 @@
 // every admin route flows through getVisibleProperties()/currentPropertyId().
 import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
+import { db, schemaOnce } from "./d1.server";
+import { requestKvCache } from "./request-cache.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getUser, isSuperadmin } from "./users.server";
 import { areaForPathname, type MemberArea } from "./member-areas";
@@ -51,9 +53,39 @@ export interface PropertyRef {
   partnerId?: string;
 }
 
+// ---- storage ----
+//
+// One ROW per property, not one KV key for all of them.
+//
+// The registry used to live in a single KV value that every tenant rewrote:
+// read the whole list, change one entry, put the whole list back. Two writes
+// overlapping meant the later one silently reverted the earlier — and the
+// writes here are `removePropertyMember`, `setPropertyOwner`, member area
+// grants. A lost update there is not a cosmetic glitch: it hands someone back
+// access that was just taken away, with no error anywhere and nothing in the
+// UI to suggest the change did not stick.
+//
+// KV has no compare-and-swap, so the fix is to stop writing the set. Each
+// property is its own D1 row and each mutation is an UPDATE of that row, so
+// two properties can never overwrite each other and two edits to the SAME
+// property serialise in the database.
+//
+// The list is still read whole — `resolvePropertyId` maps a slug on every
+// guest request — which is why this is a table and not per-property KV keys:
+// one SELECT, not one GET per property.
+//
+// The legacy KV key stays, written after every change as a derived snapshot.
+// It is never the source of truth; it exists so a rollback to the previous
+// code finds current data, and so a D1 outage degrades to a possibly-stale
+// registry instead of no registry at all.
 const KEY = "properties";
 
-async function read(): Promise<PropertyRef[]> {
+const ensureSchema = schemaOnce((d) => [
+  d.prepare(`CREATE TABLE IF NOT EXISTS property (id TEXT PRIMARY KEY, json TEXT NOT NULL)`),
+]);
+
+/** The KV snapshot: the fallback, and what a rollback would read. */
+async function readSnapshot(): Promise<PropertyRef[]> {
   const kv = getConfigKV();
   if (!kv) return [];
   const raw = await kv.get(KEY);
@@ -66,9 +98,100 @@ async function read(): Promise<PropertyRef[]> {
   }
 }
 
-async function write(list: PropertyRef[]): Promise<void> {
-  const kv = getConfigKV();
-  if (kv) await kv.put(KEY, JSON.stringify(list));
+/** Refresh the snapshot from the rows. Derived, so a lost write costs nothing
+ *  but freshness — never data. Failures are swallowed on purpose: the write
+ *  that matters already committed. */
+async function writeSnapshot(list: PropertyRef[]): Promise<void> {
+  try {
+    const kv = getConfigKV();
+    if (kv) await kv.put(KEY, JSON.stringify(list));
+  } catch {
+    /* derived data; the rows are the truth */
+  }
+}
+
+/** Move the old single-key registry into rows, once. INSERT OR IGNORE so two
+ *  isolates racing the migration cannot duplicate or clobber. */
+async function migrateFromSnapshot(): Promise<PropertyRef[]> {
+  const legacy = await readSnapshot();
+  if (legacy.length === 0) return [];
+  await db().batch(
+    legacy.map((p) =>
+      db().prepare(`INSERT OR IGNORE INTO property (id, json) VALUES (?, ?)`).bind(p.id, JSON.stringify(p)),
+    ),
+  );
+  return legacy;
+}
+
+// One SELECT per request, not per call. `resolvePropertyId` runs in the layout
+// loader on every guest page and the auth chain reads the registry again, so
+// without this the move from KV to D1 would trade one cached KV get for
+// several database round trips on the hot path — undoing the work that got a
+// funnel step down to six reads. Same scope and same invalidate-on-write rule
+// as the KV cache it borrows (request-cache.server.ts).
+const READ_CACHE_KEY = "d1:property-registry";
+
+function dropReadCache(): void {
+  requestKvCache()?.delete(READ_CACHE_KEY);
+}
+
+async function read(): Promise<PropertyRef[]> {
+  const cache = requestKvCache();
+  if (!cache) return loadRows();
+  const hit = cache.get(READ_CACHE_KEY);
+  if (hit) return JSON.parse((await hit) ?? "[]") as PropertyRef[];
+  const pending = loadRows().then((rows) => JSON.stringify(rows));
+  cache.set(READ_CACHE_KEY, pending);
+  return JSON.parse(await pending) as PropertyRef[];
+}
+
+async function loadRows(): Promise<PropertyRef[]> {
+  try {
+    await ensureSchema();
+    const { results } = await db().prepare(`SELECT json FROM property`).all<{ json: string }>();
+    const rows = (results ?? [])
+      .map((r) => {
+        try {
+          return JSON.parse(r.json) as PropertyRef;
+        } catch {
+          return null;
+        }
+      })
+      .filter((p): p is PropertyRef => !!p && typeof p.id === "string");
+    if (rows.length > 0) return rows;
+    return await migrateFromSnapshot();
+  } catch {
+    // D1 unreachable. The snapshot is stale at worst; an empty registry would
+    // 404 every guest page and lock every operator out of the admin.
+    return readSnapshot();
+  }
+}
+
+/** Insert or update ONE property. The whole point of this module's storage:
+ *  nothing here can touch another property's row. */
+async function putRow(ref: PropertyRef): Promise<void> {
+  await ensureSchema();
+  await db()
+    .prepare(`INSERT INTO property (id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json=excluded.json`)
+    .bind(ref.id, JSON.stringify(ref))
+    .run();
+  dropReadCache();
+  await writeSnapshot(await read());
+}
+
+async function deleteRow(id: string): Promise<void> {
+  await ensureSchema();
+  await db().prepare(`DELETE FROM property WHERE id=?`).bind(id).run();
+  dropReadCache();
+  await writeSnapshot(await read());
+}
+
+/** Persist one entry of a list the caller has already mutated in place. The
+ *  shape every mutation below had before rows existed — kept so each one reads
+ *  the same, minus the clobber. */
+async function writeOne(list: PropertyRef[], id: string): Promise<void> {
+  const ref = list.find((p) => p.id === id);
+  if (ref) await putRow(ref);
 }
 
 /** All registered properties. Auto-seeds the DEFAULT_PROPERTY_ID on first run so
@@ -80,7 +203,7 @@ export async function getProperties(): Promise<PropertyRef[]> {
   if (!def) return [];
   const ov = await getOverrides(def);
   const seeded: PropertyRef[] = [{ id: def, name: ov.hotelName || "Property 1", public: true }];
-  await write(seeded);
+  await putRow(seeded[0]);
   return seeded;
 }
 
@@ -173,7 +296,7 @@ export async function addProperty(
   }
   const ref: PropertyRef = { id, name: name.trim() || "Untitled property", owner, ...(partnerId ? { partnerId } : {}) };
   list.push(ref);
-  await write(list);
+  await putRow(ref);
   return ref;
 }
 
@@ -184,7 +307,7 @@ export async function setPropertyPartner(id: string, partnerId: string | undefin
   if (p) {
     if (partnerId) p.partnerId = partnerId;
     else delete p.partnerId;
-    await write(list);
+    await writeOne(list, id);
   }
 }
 
@@ -194,7 +317,7 @@ export async function setPropertyOwner(id: string, owner: string | undefined): P
   const p = list.find((x) => x.id === id);
   if (p) {
     p.owner = owner;
-    await write(list);
+    await writeOne(list, id);
   }
 }
 
@@ -314,7 +437,7 @@ export async function setPropertySlug(
   if (!s) {
     if (p.slug !== undefined) {
       delete p.slug;
-      await write(list);
+      await writeOne(list, id);
     }
     return { ok: true };
   }
@@ -322,7 +445,7 @@ export async function setPropertySlug(
   const err = slugError(s, id, list);
   if (err) return { error: err };
   p.slug = s;
-  await write(list);
+  await writeOne(list, id);
   return { ok: true };
 }
 
@@ -362,7 +485,7 @@ export async function addPropertyMember(id: string, email: string): Promise<void
   const members = new Set(p.members ?? []);
   members.add(e);
   p.members = [...members];
-  await write(list);
+  await writeOne(list, id);
 }
 
 /** Removes a teammate from a property's team. */
@@ -377,7 +500,7 @@ export async function removePropertyMember(id: string, email: string): Promise<v
     delete p.memberHiddenAreas[e];
     if (!Object.keys(p.memberHiddenAreas).length) delete p.memberHiddenAreas;
   }
-  await write(list);
+  await writeOne(list, id);
 }
 
 export async function renameProperty(id: string, name: string): Promise<void> {
@@ -385,7 +508,7 @@ export async function renameProperty(id: string, name: string): Promise<void> {
   const p = list.find((x) => x.id === id);
   if (p && name.trim()) {
     p.name = name.trim();
-    await write(list);
+    await writeOne(list, id);
   }
 }
 
@@ -395,7 +518,7 @@ export async function setPropertyPublic(id: string, isPublic: boolean): Promise<
   const p = list.find((x) => x.id === id);
   if (p) {
     p.public = isPublic;
-    await write(list);
+    await writeOne(list, id);
   }
 }
 
@@ -421,7 +544,7 @@ export async function removeProperty(id: string): Promise<void> {
     const grave: PropertyTombstone = { owner: ref?.owner?.toLowerCase(), deletedAt: new Date().toISOString() };
     await kv.put(tombstoneKey(id), JSON.stringify(grave));
   }
-  await write(list.filter((p) => p.id !== id));
+  await deleteRow(id);
 }
 
 /** The property the admin is currently editing: the session selection if it's
@@ -491,5 +614,5 @@ export async function setMemberHiddenAreas(id: string, email: string, hidden: Me
   else delete map[e];
   if (Object.keys(map).length) p.memberHiddenAreas = map;
   else delete p.memberHiddenAreas;
-  await write(list);
+  await writeOne(list, id);
 }

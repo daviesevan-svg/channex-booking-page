@@ -8,7 +8,7 @@
     "workers/**/*",
     "worker-configuration.d.ts"
   ],
-  "exclude": ["**/*.test.ts"],
+  "exclude": ["**/*.test.ts", "app/lib/test-d1.ts"],
   "compilerOptions": {
     "composite": true,
     "strict": true,
