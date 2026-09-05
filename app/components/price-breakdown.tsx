@@ -6,7 +6,8 @@
 // one order; the `variant` keeps each page's existing type scale.
 import { groupExtrasByRoom, type ResolvedExtra } from "~/lib/extras";
 import { formatMoney, formatMoneyParts } from "~/lib/money";
-import { offerScope, priceSpecScope } from "~/lib/nav-tags";
+import { offerScope, priceSpecScope, unitPriceScope } from "~/lib/nav-tags";
+import { priceComponents, type PriceComponent } from "~/lib/price-components";
 import type { Pricing } from "~/lib/pricing";
 import { useT } from "~/lib/i18n";
 import { useSlots } from "~/components/site-style";
@@ -24,12 +25,33 @@ import { cx } from "~/lib/site-style";
  * Google explicitly does NOT accept a total that is only in a <meta>; this
  * renders the same characters formatMoney would have.
  */
-function TaggedTotal({ amount, currency }: { amount: number; currency: string }) {
+function TaggedTotal({
+  amount,
+  currency,
+  components,
+}: {
+  amount: number;
+  currency: string;
+  components: PriceComponent[] | null;
+}) {
   const { before, number, after, value } = formatMoneyParts(amount, currency);
   return (
     <span {...offerScope}>
       <span {...priceSpecScope}>
         <meta itemProp="priceCurrency" content={currency} />
+        {/* The itemisation, as <meta>: unlike the total, the components carry
+            no visibility requirement, and the same numbers are already on
+            screen as the rows above this one. Emitting them here keeps the
+            whole CompoundPriceSpecification in one scope without wrapping the
+            visible layout in markup it doesn't need. */}
+        {components?.map((c, i) => (
+          <span key={i} {...unitPriceScope}>
+            <meta itemProp="name" content={c.name} />
+            <meta itemProp="price" content={String(c.amount)} />
+            <meta itemProp="priceCurrency" content={currency} />
+            {c.type && <meta itemProp="priceComponentType" content={c.type} />}
+          </span>
+        ))}
         {before}
         <span itemProp="price" content={value}>
           {number}
@@ -58,7 +80,7 @@ export function PriceBreakdown({
    */
   offerMicrodata = false,
 }: {
-  pricing: Pick<Pricing, "charges" | "taxLines" | "taxIncluded">;
+  pricing: Pick<Pricing, "base" | "charges" | "taxLines" | "taxIncluded">;
   extraLines: ResolvedExtra[];
   grandTotal: number;
   currency: string;
@@ -124,7 +146,15 @@ export function PriceBreakdown({
         >
           <span className={co ? "text-lead font-semibold" : "text-secondary"}>{tr.t("total")}</span>
           <span className={co ? "font-serif text-display-sm font-semibold" : "font-serif text-title-lg font-semibold"}>
-            {offerMicrodata ? <TaggedTotal amount={grandTotal} currency={currency} /> : money(grandTotal)}
+            {offerMicrodata ? (
+              <TaggedTotal
+                amount={grandTotal}
+                currency={currency}
+                components={priceComponents(pricing, extraLines, grandTotal)}
+              />
+            ) : (
+              money(grandTotal)
+            )}
           </span>
         </div>
       )}

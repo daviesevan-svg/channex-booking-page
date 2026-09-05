@@ -118,6 +118,13 @@ export interface PricingInput {
 export interface PriceLine {
   label: string;
   amount: number;
+  /** What this line IS, as opposed to what it is called.
+   *
+   * The label is operator-written and localised ("Kurtaxe", "Resort charge"),
+   * so nothing downstream can tell a tax from a fee by reading it. Google's
+   * price-component breakdown has to say which is which, and computePricing
+   * is the only place that still knows. */
+  kind?: "fee" | "tax";
 }
 
 export interface Pricing {
@@ -149,7 +156,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   // Cleaning fee — flat, per stay, always counts towards VAT (part of the room price).
   const cleaning = round2(input.cleaningFee ?? 0);
   if (cleaning > 0) {
-    charges.push({ label: "Cleaning fee", amount: cleaning });
+    charges.push({ label: "Cleaning fee", amount: cleaning, kind: "fee" });
     chargesTotal += cleaning;
     taxableExtra += cleaning;
   }
@@ -161,7 +168,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
         : (f.amount || 0) * feeUnits(f.basis, { nights, rooms, persons: adults + children }),
     );
     if (amount <= 0) continue;
-    charges.push({ label: f.kind === "percent" ? `${f.name} (${f.amount}%)` : f.name, amount });
+    charges.push({ label: f.kind === "percent" ? `${f.name} (${f.amount}%)` : f.name, amount, kind: "fee" });
     chargesTotal += amount;
     if (f.taxable) taxableExtra += amount;
   }
@@ -192,7 +199,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
             (input.checkin ? cityTaxNightlyAmount(ct, input.checkin) : ct.amount) * rooms,
     );
     if (amount > 0) {
-      charges.push({ label: ct.name || "City tax", amount });
+      charges.push({ label: ct.name || "City tax", amount, kind: "tax" });
       chargesTotal += amount;
       if (ct.taxable) taxableExtra += amount;
     }
@@ -214,7 +221,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
     } else {
       const amount = round2(taxableBase * rate);
       taxAdded += amount;
-      taxLines.push({ label: `${t.name} (${t.rate}%)`, amount });
+      taxLines.push({ label: `${t.name} (${t.rate}%)`, amount, kind: "tax" });
     }
   }
 
