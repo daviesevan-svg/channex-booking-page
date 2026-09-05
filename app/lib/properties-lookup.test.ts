@@ -19,6 +19,10 @@ let sql: string[] = [];
 /** Statements that read the registry without narrowing it — the thing this
  *  change exists to remove from the hot path. */
 const fullReads = () => sql.filter((q) => /SELECT json FROM property\s*$/i.test(q.trim()));
+/** Statements that walk every row to answer a yes/no question. The lookup only
+ *  needs to know whether the registry has anything in it at all, and COUNT(*)
+ *  reads the lot to say so. */
+const registryCounts = () => sql.filter((q) => /COUNT\(\s*\*\s*\)\s*FROM property/i.test(q));
 
 type Stmt = { sql: string; args: unknown[]; bind: (...a: unknown[]) => Stmt; first: () => Promise<unknown>; run: () => Promise<unknown>; all: () => Promise<unknown> };
 const makeStmt = (query: string): Stmt => ({
@@ -116,6 +120,26 @@ describe("property resolution", () => {
     sql = [];
     await expect(getProperty("uuid-b")).resolves.toMatchObject({ id: "uuid-b", slug: "othertown" });
     expect(fullReads()).toEqual([]);
+  });
+
+  it("tells an empty registry from a miss without counting the registry", async () => {
+    await seed([ref("uuid-a", "spilmanhotel"), ref("uuid-b", "othertown")]);
+    const { resolvePropertyId } = await import("./properties.server");
+
+    sql = [];
+    await expect(resolvePropertyId("othertown")).resolves.toBe("uuid-b");
+    expect(registryCounts()).toEqual([]);
+    expect(fullReads()).toEqual([]);
+  });
+
+  it("still defers to the full read when the registry really is empty", async () => {
+    await seed([]);
+    const { getProperty } = await import("./properties.server");
+
+    sql = [];
+    // Nothing to have missed, so the seed-on-first-run path has to get a look.
+    await expect(getProperty("uuid-a")).resolves.toBeUndefined();
+    expect(fullReads().length).toBeGreaterThan(0);
   });
 
   it("keeps the slug in step with the stored json, with nothing on the write path to remember", async () => {
