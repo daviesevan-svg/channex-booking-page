@@ -11,7 +11,7 @@
 // THEN removes the row. Rooms, texts, images and bookings stay (the same owner
 // can re-add the id and have them back; nobody else can).
 import { revokeAllApiKeys } from "./api-auth.server";
-import { clearSettingsFields, saveVivaConfig } from "./overrides.server";
+import { clearSettingsFields, saveIyzicoConfig, saveVivaConfig } from "./overrides.server";
 import { removeProperty } from "./properties.server";
 import { deleteAllWebhooks } from "./webhooks.server";
 
@@ -27,7 +27,12 @@ const CREDENTIAL_FIELDS = [
 export async function deletePropertyForGood(id: string): Promise<void> {
   await revokeAllApiKeys(id);
   await deleteAllWebhooks(id);
+  // Every gateway that stores credentials in its OWN key has to be cleared by
+  // name — clearSettingsFields below only reaches fields inside `settings`, so
+  // a gateway added later and forgotten here leaves live API keys in KV for a
+  // property the operator believes is gone. That is what happened to iyzico.
   await saveVivaConfig(id, null);
+  await saveIyzicoConfig(id, null);
   await clearSettingsFields(id, [...CREDENTIAL_FIELDS]);
   await removeProperty(id);
 }
