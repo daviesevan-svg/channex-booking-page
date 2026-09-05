@@ -211,6 +211,48 @@ describe("useCalendarWindow identity", () => {
     expect(h.value.loadedThrough).toBe("2026-12-05");
   });
 
+  it.each([
+    ["room", "success"],
+    ["room", "failure"],
+    ["property", "success"],
+    ["property", "failure"],
+  ] as const)("keeps the new %s's request and queue after an old request's %s", async (change, outcome) => {
+    const h = mount(roomA);
+    act(() => h.value.extendTo("2027-03-05"));
+    // The previous calendar also has a queued need that must not follow us.
+    act(() => h.value.extendTo("2027-09-05"));
+
+    const next = change === "room" ? { roomId: "b" } : { base: "/othertown" };
+    h.rerender({ ...roomA, ...next, initial: empty() });
+    act(() => h.value.extendTo("2027-03-05"));
+    // The new calendar can load even while the old request remains pending.
+    expect(h.calls).toHaveLength(2);
+    const url = new URL(h.calls[1].url, "https://example.com");
+    expect(url.pathname).toBe(`${change === "property" ? "/othertown" : base}/calendar`);
+    expect(url.searchParams.get("roomId")).toBe(change === "room" ? "b" : "a");
+    act(() => h.value.extendTo("2027-06-05"));
+
+    if (outcome === "success") {
+      await h.calls[0].resolve({ to: "2027-03-05", closedDates: withClosed("2027-01-10") });
+    } else {
+      await h.calls[0].reject();
+    }
+    expect(h.value.loadedThrough).toBe("2026-12-05");
+    expect(h.value.closedDates?.closed).toEqual([]);
+    // Old cleanup must neither release the new request's lock nor drop its queue.
+    // Repeat only the in-flight target so this cannot restore a lost June need.
+    act(() => h.value.extendTo("2027-03-05"));
+    expect(h.calls).toHaveLength(2);
+
+    await h.calls[1].resolve({ to: "2027-03-05", closedDates: withClosed("2027-02-14") });
+    expect(h.calls).toHaveLength(3);
+    expect(h.calls[2].url).toContain("from=2027-03-06&to=2027-06-05");
+    await h.calls[2].resolve({ to: "2027-06-05", closedDates: withClosed("2027-04-02") });
+    expect(h.value.loadedThrough).toBe("2027-06-05");
+    expect(h.value.closedDates?.closed).toEqual(["2027-02-14", "2027-04-02"]);
+    expect(h.calls).toHaveLength(3);
+  });
+
   it("resets across a property change too, where only the base differs", async () => {
     const noRoom: Props = { base, initial: withClosed("2026-10-10"), initialThrough: "2026-12-05", horizonEnd };
     const h = mount(noRoom);
