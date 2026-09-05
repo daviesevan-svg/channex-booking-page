@@ -16,6 +16,15 @@ export interface PendingBooking {
   channexPayload: unknown;
   /** Whether to push live to Channex (vs simulate). */
   live: boolean;
+  /**
+   * Made with an API TEST key — nothing about this booking is real.
+   *
+   * Deliberately separate from `live`. A real guest at a property with live
+   * bookings off is also not pushed to Channex, but everything else about them
+   * IS real; conflating the two let a test key decrement a real hotel's
+   * availability. See booking-side-effects.ts.
+   */
+  testMode?: boolean;
   /** Search params to carry onto the confirmation page after payment. */
   returnParams: string;
   /** Site origin captured at checkout, for absolute links in emails. */

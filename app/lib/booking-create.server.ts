@@ -73,6 +73,8 @@ export interface PreparePendingInput {
   attribution?: BookingRecord["attribution"];
   lang: string;
   live: boolean;
+  /** Made with an API test key — see PendingBooking.testMode. */
+  testMode?: boolean;
   /** Connected Stripe account (empty string when none). */
   account: string;
   origin: string;
@@ -229,6 +231,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     record,
     channexPayload,
     live: input.live,
+    testMode: input.testMode,
     returnParams: input.returnParams,
     origin: input.origin,
     voucherRedemption: input.voucherPayment,

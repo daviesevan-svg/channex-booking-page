@@ -319,6 +319,10 @@ export async function action({ request }: Route.ActionArgs) {
     },
     lang: "en",
     live,
+    // A test key's booking must not touch anything real. `live` alone cannot
+    // say that: a real guest at a property with live bookings off is ALSO not
+    // pushed, and everything about them is real. See booking-side-effects.ts.
+    testMode: mode === "test",
     account: settings.stripeAccountId ?? "",
     origin,
     returnParams: rp.toString(),
