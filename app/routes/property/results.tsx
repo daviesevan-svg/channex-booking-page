@@ -19,7 +19,7 @@ import {
 } from "~/lib/cart";
 import { extrasTotal, parseExtrasState, removeExtrasLine, resolveAllExtras, serializeExtrasState } from "~/lib/extras";
 import { getActiveExtras } from "~/lib/extras.server";
-import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
+import { getCatalogRooms, getStayInventory, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { catalogHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { navCriticalPath, navStage } from "~/lib/nav-tags";
 import { getPageText } from "~/lib/overrides.server";
@@ -52,6 +52,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     await requireDatedStay(params.channelId, request);
   const lang = langFromRequest(request);
 
+  // One ARI read for the page: the room list here and every cart occupancy
+  // group below price the same stay, so they share this slice.
+  const inventory = await getStayInventory(pid, checkin, checkout);
   const rooms = await getCatalogRooms(
     pid,
     {
@@ -61,7 +64,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       adults: occ.adults,
       childrenAge: childrenAgeParam(occ.childrenAge),
     },
-    { gate: true, lang },
+    { gate: true, lang, inventory },
   );
 
   const party = partySize(occ);
@@ -168,6 +171,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { checkin, checkout, currency },
     parseCart(url.searchParams),
     { adults: occ.adults, childrenAge: occ.childrenAge },
+    inventory,
   );
   const coverage = cartCoverage(cartLines);
   const covered = cartCovers(cartLines, occ);

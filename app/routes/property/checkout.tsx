@@ -54,7 +54,7 @@ import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
 import { getOverrides, getPageText, getPageTextRaw } from "~/lib/overrides.server";
 
-import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
+import { getCatalogRooms, getStayInventory, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
 import { isEuConsumerCountry, orderButtonLabel } from "~/lib/eu-consumer";
@@ -79,6 +79,9 @@ async function resolveStayCart(
   stay: Stay,
   url: URL,
 ): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
+  // One ARI read for the page: the catalog below and every cart occupancy group
+  // price the same stay, so they share this slice.
+  const inventory = await getStayInventory(stay.channelId, stay.checkin, stay.checkout);
   const rooms = await getCatalogRooms(
     stay.channelId,
     {
@@ -88,13 +91,14 @@ async function resolveStayCart(
       adults: stay.occ.adults,
       childrenAge: stay.occ.childrenAge,
     },
-    { gate: true },
+    { gate: true, inventory },
   );
   const lines = await resolveCartByOccupancy(
     stay.channelId,
     { checkin: stay.checkin, checkout: stay.checkout, currency: stay.currency },
     parseCart(url.searchParams),
     { adults: stay.occ.adults, childrenAge: stay.occ.childrenAge },
+    inventory,
   );
   return { rooms, lines };
 }
