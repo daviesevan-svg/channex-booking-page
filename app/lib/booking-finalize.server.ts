@@ -17,6 +17,7 @@ import { formatMoney, fromStripeMinor, toStripeMinor } from "./money";
 import { refundBookingCharge } from "./refunds.server";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
+import { bookingSideEffects } from "./booking-side-effects";
 import { releaseGiftHold, settleGiftHold } from "./vouchers.server";
 import { createRefund, retrieveCheckoutSession, type CheckoutSession } from "./stripe.server";
 import {
@@ -456,6 +457,11 @@ export async function finalizeBooking(
     }
   }
 
+  // What this booking may touch. A test-key booking stands as a record but
+  // consumes nothing real — see booking-side-effects.ts for why `live` alone
+  // could not decide this.
+  const effects = bookingSideEffects({ status, testMode: pending.testMode });
+
   // Persist the final state onto the row we claimed above.
   const patch: Partial<BookingRecord> = {
     status,
@@ -465,7 +471,7 @@ export async function finalizeBooking(
     // on a confirmed live booking so we can re-send it as a cancellation revision.
     // Only drop it when the rooms were gone (a retry can't recover sold inventory).
     channexPayload: unavailable ? undefined : channexPayload,
-    inventoryHeld: status !== "failed",
+    inventoryHeld: effects.holdsInventory,
     payment,
   };
   let record: BookingRecord = (await updateBooking(pid, draft.id, patch)) ?? { ...provisional, ...patch };
@@ -476,7 +482,9 @@ export async function finalizeBooking(
   if (pending.voucherRedemption) {
     const { code } = pending.voucherRedemption;
     await afterCommit(draft.reference, "gift voucher hold", () =>
-      status !== "failed"
+      // Settling SPENDS real balance. A test booking releases the hold instead:
+      // a stay that does not exist must not consume a guest's gift voucher.
+      effects.settlesVoucher
         ? settleGiftHold(pid, code, draft.reference, record.id)
         : releaseGiftHold(pid, code, draft.reference),
     );
@@ -489,19 +497,25 @@ export async function finalizeBooking(
   // their confirmed booking errored.
   if (status !== "failed") {
     const ref = draft.reference;
-    await afterCommit(ref, "inventory decrement", () =>
-      decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights)),
-    );
-    await afterCommit(ref, "booking emails", () => sendBookingEmails(pid, record, origin));
-    await afterCommit(ref, "booking.created webhook", () =>
-      dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now()),
-    );
+    if (effects.holdsInventory) {
+      await afterCommit(ref, "inventory decrement", () =>
+        decrementAvailability(pid, stayAvailabilityItems(record.rooms, record.checkin, record.nights)),
+      );
+    }
+    if (effects.sendsEmails) {
+      await afterCommit(ref, "booking emails", () => sendBookingEmails(pid, record, origin));
+    }
+    if (effects.dispatchesWebhook) {
+      await afterCommit(ref, "booking.created webhook", () =>
+        dispatchWebhook(pid, "booking.created", serializeBooking(record), Date.now()),
+      );
+    }
     // Funnel analytics: the ONE place every booking passes exactly once (the
     // claim above already de-raced Stripe-return vs webhook), so this counts
     // bookings no client-side tag can see — e.g. the guest who paid and closed
     // the tab. Web checkouts carry their visit context on the pending booking;
     // API/agent bookings have none and are reported as their own source.
-    queueFunnelEvent({
+    if (effects.logsAnalytics) queueFunnelEvent({
       propertyId: pid,
       step: "purchase",
       visitKey: pending.funnel?.visitKey ?? "",
