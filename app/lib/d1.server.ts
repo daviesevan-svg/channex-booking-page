@@ -26,12 +26,25 @@ export function db(): D1Database {
  * style choice).
  */
 export function schemaOnce(statements: (d: D1Database) => D1PreparedStatement[]): () => Promise<void> {
-  let ready = false;
-  return async () => {
-    if (ready) return;
-    const d = db();
-    await d.batch(statements(d));
-    ready = true;
+  // The PROMISE is latched, not a boolean set after the await. A boolean is
+  // only "once" for callers that arrive after the first one has finished:
+  // everything that races the first request into a cold isolate — and a
+  // deploy makes every request that — got past the flag while it was still
+  // false and sent the DDL batch again, so a burst of concurrent first calls
+  // meant a burst of identical CREATE batches.
+  let ready: Promise<void> | undefined;
+  return () => {
+    ready ??= (async () => {
+      const d = db();
+      await d.batch(statements(d));
+    })().catch((error) => {
+      // A failed create must not latch, or the isolate is stuck answering
+      // "schema ready" for a schema that was never made. Clearing it lets the
+      // next caller try again; this one still sees the error.
+      ready = undefined;
+      throw error;
+    });
+    return ready;
   };
 }
 

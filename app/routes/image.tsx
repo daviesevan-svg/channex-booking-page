@@ -14,9 +14,13 @@ import { IMAGE_WIDTHS } from "~/lib/image-srcset";
 //
 //  * `w` must be one of `IMAGE_WIDTHS` exactly. An open parameter would let
 //    anyone walk 1..2048 and run up the bill, with a cache entry each.
-//  * Results go in the Worker cache, keyed by the request URL. Keys contain a
-//    uuid and never change content, so a hit is always safe and a given
-//    (image, width) is transformed once rather than once per visitor.
+//  * Results go in the Worker cache under a CANONICAL key — origin, path and
+//    the accepted width, nothing else. The output depends on exactly those, so
+//    keying on the raw request URL split the cache on things that change
+//    nothing: a tracking parameter tagged onto the src, or `w=0300` alongside
+//    `w=300`, each paid for its own transformation. Keys contain a uuid and
+//    never change content, so a hit is always safe and a given (image, width)
+//    is transformed once rather than once per visitor.
 
 /** Formats where resizing would destroy the point of the file. */
 const NO_RESIZE = new Set(["image/svg+xml", "image/gif"]);
@@ -42,14 +46,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const bucket = getImagesBucket();
   if (!bucket || !key) throw new Response("Not found", { status: 404 });
 
-  const asked = Number(new URL(request.url).searchParams.get("w"));
+  const url = new URL(request.url);
+  const asked = Number(url.searchParams.get("w"));
   const width = IMAGE_WIDTHS.includes(asked as (typeof IMAGE_WIDTHS)[number]) ? asked : 0;
+
+  // Everything the bytes depend on, and nothing else. Origin stays in the key so
+  // one tenant's cache can't answer for another's; the width is the NUMBER we
+  // accepted, so every spelling of it lands on one entry.
+  const cacheKey = new Request(`${url.origin}${url.pathname}?w=${width}`);
 
   // Only the resized variants are worth caching in the Worker; the original is a
   // straight R2 read, which is already cheap and CDN-cacheable on its own.
   const cache = width ? await caches.open("images").catch(() => null) : null;
   if (cache) {
-    const hit = await cache.match(request).catch(() => null);
+    const hit = await cache.match(cacheKey).catch(() => null);
     if (hit) {
       const headers = new Headers(hit.headers);
       headers.set("X-Image-Transform", "hit");
@@ -87,7 +97,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       // soon as the response is returned, which aborts a bare `cache.put` and
       // leaves every visit re-transforming. That was measurably the case — the
       // X-Image-Transform header above said "miss" every time.
-      waitUntil(cache.put(request, response.clone()).catch(() => {}));
+      waitUntil(cache.put(cacheKey, response.clone()).catch(() => {}));
     }
     return response;
   } catch {
