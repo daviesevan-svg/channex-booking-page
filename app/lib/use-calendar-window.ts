@@ -59,11 +59,19 @@ export function useCalendarWindow({ base, initial, initialThrough, roomId, horiz
   // (off the queue below) before React has re-rendered with the slice that just
   // landed.
   const coverage = useRef<string | null>(null);
+  const inFlight = useRef(false);
+  /** The furthest date asked for while this calendar's fetch was running. */
+  const queued = useRef<string | null>(null);
 
   if (fetched.identity !== identity) {
     setFetched({ identity, closed: null, through: null });
     generation.current += 1;
     coverage.current = null;
+    // The new calendar must not wait for the previous room's network request.
+    // Its completion handlers are generation-guarded below, so they cannot
+    // release this calendar's lock or discard its queued extension.
+    inFlight.current = false;
+    queued.current = null;
   }
   const mine = fetched.identity === identity ? fetched : null;
 
@@ -82,10 +90,6 @@ export function useCalendarWindow({ base, initial, initialThrough, roomId, horiz
   // itself stays stable — useDateRange holds it in an effect's deps.
   const live = useRef({ base, roomId, horizonEnd });
   live.current = { base, roomId, horizonEnd };
-
-  const inFlight = useRef(false);
-  /** The furthest date asked for while a fetch was already running. */
-  const queued = useRef<string | null>(null);
 
   // Annotated because the body calls itself to drain the queue, which otherwise
   // makes the inferred type circular.
@@ -119,16 +123,18 @@ export function useCalendarWindow({ base, initial, initialThrough, roomId, horiz
         }));
       })
       .catch(() => {
+        if (gen !== generation.current) return;
         // Coverage stays where it was, so the unfetched months stay greyed —
         // the honest thing to show — and the next page-forward retries them.
         // Dropping the queue keeps a persistent failure from spinning.
         queued.current = null;
       })
       .finally(() => {
+        if (gen !== generation.current) return;
         inFlight.current = false;
         const next = queued.current;
         queued.current = null;
-        if (next && gen === generation.current) extendTo(next);
+        if (next) extendTo(next);
       });
   }, []);
 
