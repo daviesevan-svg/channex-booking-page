@@ -63,6 +63,20 @@ export const ensureSchema = schemaOnce((d) => [
     `CREATE INDEX IF NOT EXISTS ari_log_search ON ari_log (hotel_code, date, room_type_id, rate_plan_id)`,
   ),
   d.prepare(`CREATE INDEX IF NOT EXISTS ari_log_recent ON ari_log (hotel_code, ts)`),
+  // Every inventory read filters on (hotel_code, date) — see readInventory in
+  // read.server.ts — but the three primary keys above put the room/rate ids
+  // BETWEEN those two columns, so a date predicate can only use the hotel_code
+  // prefix. One property's whole stored history (we hold ~2 years) then gets
+  // scanned to answer a 8-date stay. These indexes match the predicate the
+  // reader actually issues.
+  //
+  // They pay off most where it matters: on a 20-room / 3-rate / 730-day
+  // fixture, a 7-night read went from ~1.59M SQLite VM steps to ~26k. A
+  // full-horizon calendar read is unchanged — at that width the work is
+  // fetching the rows, not finding them.
+  d.prepare(`CREATE INDEX IF NOT EXISTS availability_hotel_date ON availability (hotel_code, date)`),
+  d.prepare(`CREATE INDEX IF NOT EXISTS rate_hotel_date ON rate (hotel_code, date)`),
+  d.prepare(`CREATE INDEX IF NOT EXISTS restriction_hotel_date ON restriction (hotel_code, date)`),
 ]);
 
 export interface MappingRoomType {
