@@ -1174,17 +1174,22 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
             {/* Displayed in the guest's language and format; tagged with the
                 ISO date in `content`, which is how Google's guide says to
-                standardise a visible date. */}
+                standardise a visible date.
+                checkinTime/checkoutTime, NOT checkinDate/checkoutDate: Google
+                lists the latter as "also acceptable", but no such property
+                exists on schema.org and validator.schema.org rejects it on a
+                Hotel — verified against the live page, 2026-09-05. These are
+                also the names the JSON-LD offer already uses. */}
             <Row
               label={tr.t("checkIn")}
               value={fmt(parseISO(stay.checkin), "EEE d MMM")}
-              itemProp="checkinDate"
+              itemProp="checkinTime"
               content={stay.checkin}
             />
             <Row
               label={tr.t("checkOut")}
               value={fmt(parseISO(stay.checkout), "EEE d MMM")}
-              itemProp="checkoutDate"
+              itemProp="checkoutTime"
               content={stay.checkout}
             />
             <Row label={tr.t("nights")} value={String(nights)} />
