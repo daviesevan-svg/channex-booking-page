@@ -76,3 +76,10 @@ export const priceSpecScope = {
   itemScope: true,
   itemType: "https://schema.org/CompoundPriceSpecification",
 } as const;
+
+/** One line of the price breakdown, inside the CompoundPriceSpecification. */
+export const unitPriceScope = {
+  itemProp: "priceComponent",
+  itemScope: true,
+  itemType: "https://schema.org/UnitPriceSpecification",
+} as const;
