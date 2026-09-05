@@ -5,9 +5,18 @@ import { db } from "../d1.server";
 import { fromMinor } from "./fraction";
 import { ensureSchema, type InventoryData } from "./schema.server";
 
-/** Read the ARI for a [from, to] inclusive window, as lookup maps. */
-export async function getInventory(hotelCode: string, from: string, to: string): Promise<InventoryData> {
-  return readInventory(hotelCode, [{ where: "date>=? AND date<=?", binds: [from, to] }]);
+/** Read the ARI for a [from, to] inclusive window, as lookup maps.
+ *
+ *  `roomId` narrows the read to one room type. The room page's calendar asks
+ *  "when is THIS room free?" and used to read every room's rows for the whole
+ *  window and discard all but one in JavaScript — on a 20-room property that is
+ *  95% of the rows fetched to be thrown away. */
+export async function getInventory(hotelCode: string, from: string, to: string, roomId?: string): Promise<InventoryData> {
+  return readInventory(hotelCode, [
+    roomId
+      ? { where: "date>=? AND date<=? AND room_type_id=?", binds: [from, to, roomId] }
+      : { where: "date>=? AND date<=?", binds: [from, to] },
+  ]);
 }
 
 /** Read the ARI for exactly these dates — the sparse counterpart to getInventory.

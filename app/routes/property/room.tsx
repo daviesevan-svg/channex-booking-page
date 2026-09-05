@@ -18,10 +18,13 @@ import { GuestSelector } from "~/components/guest-selector";
 import { Diamond } from "~/components/sections";
 import { useT } from "~/lib/i18n";
 import { langFromRequest, VR_AMENITY_KEYS } from "~/lib/content";
-import { getCalendarAvailability, getRoom, getRatesForRoom, localizeRoom } from "~/lib/catalog.server";
+import { getRoom, getRatesForRoom, localizeRoom } from "~/lib/catalog.server";
+import { loadCalendarWindow } from "~/lib/calendar-window.server";
+import { calendarHorizonEnd } from "~/lib/calendar-window";
+import { useCalendarWindow } from "~/lib/use-calendar-window";
 import { getBookingCutoff, getSettings } from "~/lib/overrides.server";
 
-import { earliestCheckinDate } from "~/lib/dates";
+import { earliestCheckinDate, todayISODate } from "~/lib/dates";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { useDateRange } from "~/lib/use-date-range";
@@ -40,18 +43,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const room = localizeRoom(rawRoom, langFromRequest(request));
 
   const now = new Date();
-  const [closedDates, cutoff, rates] = await Promise.all([
+  const [calendar, cutoff, rates] = await Promise.all([
     // This room only — "when is THIS room free" is a different question from
-    // the search calendar's "when is anything free".
-    getCalendarAvailability(
-      pid,
-      format(now, "yyyy-MM-dd"),
-      format(addMonths(now, 13), "yyyy-MM-dd"),
-      { roomId: room.id },
-    ).catch(() => null),
+    // the search calendar's "when is anything free". Just the months the picker
+    // opens on; the rest is fetched as the guest pages forward.
+    loadCalendarWindow(pid, format(now, "yyyy-MM-dd"), { roomId: room.id }),
     getBookingCutoff(pid),
     getRatesForRoom(pid, room.id).catch(() => []),
   ]);
+  const { closedDates, loadedThrough } = calendar;
 
   return {
     room: {
@@ -68,6 +68,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
     rateNames: rates.filter((r) => r.active).map((r) => r.title),
     closedDates,
+    loadedThrough,
     earliestCheckin: earliestCheckinDate(cutoff, now),
     currency: settings.currency || "GBP",
   };
@@ -84,13 +85,24 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 
 export default function RoomPage({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
-  const { room, rateNames, closedDates, earliestCheckin, currency } = loaderData;
+  const { room, rateNames, closedDates: initialClosed, loadedThrough: initialThrough, earliestCheckin, currency } = loaderData;
   const tr = useT();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // The loader read the opening months for THIS room; this fetches the rest as
+  // the guest pages forward.
+  const { closedDates, loadedThrough, extendTo } = useCalendarWindow({
+    base,
+    initial: initialClosed,
+    initialThrough,
+    roomId: room.id,
+    horizonEnd: calendarHorizonEnd(todayISODate()),
+  });
   const dates = useDateRange({
     closedDates,
+    loadedThrough,
+    onExtend: extendTo,
     minCheckin: earliestCheckin,
     initialCheckin: searchParams.get("checkin") ?? undefined,
     initialCheckout: searchParams.get("checkout") ?? undefined,
