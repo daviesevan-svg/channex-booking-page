@@ -7,7 +7,7 @@ import { serializeBooking } from "~/lib/api-serialize";
 import { getConfig, getConfigKV } from "~/lib/config.server";
 import { getSettings, getBookingCutoff } from "~/lib/overrides.server";
 import { isStayBookable, isTooLastMinute } from "~/lib/dates";
-import { getCatalogRooms, resolveCartByOccupancy } from "~/lib/catalog.server";
+import { getCatalogRooms, getStayInventory, resolveCartByOccupancy } from "~/lib/catalog.server";
 import { cartCoverage, withinAvailability, serializeCart, type CartLine, type ResolvedLine } from "~/lib/cart";
 import {
   extraEligible,
@@ -201,8 +201,11 @@ export async function action({ request }: Route.ActionArgs) {
   }));
   const searched = { adults: body.rooms[0].adults ?? 2, childrenAge: body.rooms[0].children_ages ?? [] };
 
-  const rooms = await getCatalogRooms(pid, { checkinDate: checkin, checkoutDate: checkout, currency, adults: searched.adults, childrenAge: searched.childrenAge }, { gate: true });
-  const lines = await resolveCartByOccupancy(pid, { checkin, checkout, currency }, cartLines, searched);
+  // One ARI read for the request: the availability gate and every cart
+  // occupancy group price the same stay, so they share this slice.
+  const inventory = await getStayInventory(pid, checkin, checkout);
+  const rooms = await getCatalogRooms(pid, { checkinDate: checkin, checkoutDate: checkout, currency, adults: searched.adults, childrenAge: searched.childrenAge }, { gate: true, inventory });
+  const lines = await resolveCartByOccupancy(pid, { checkin, checkout, currency }, cartLines, searched, inventory);
   if (lines.length !== cartLines.length || !withinAvailability(cartLines, rooms)) {
     return apiError(422, "unavailable", "One or more of the requested rooms/rates is not available for those dates or occupancy.");
   }

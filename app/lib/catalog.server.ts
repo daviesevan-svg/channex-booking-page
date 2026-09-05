@@ -5,7 +5,7 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import { getInventory } from "./ari/read.server";
-import type { MappingRoomType } from "./ari/schema.server";
+import type { InventoryData, MappingRoomType } from "./ari/schema.server";
 import type { ClosedDates, RatePlan, RoomsQuery, RoomWithRates } from "./channex/types";
 import { getConfigKV } from "./config.server";
 import type { DeadlineUnit, PricingMode, SiteSettings } from "./content";
@@ -304,6 +304,39 @@ export interface GateReason {
   minNights?: number;
 }
 
+// ---- shared stay inventory ----
+/** One stay's ARI slice, tagged with the window it was read for.
+ *
+ *  Pricing a stay is several passes over the SAME inventory: the page's own
+ *  catalog, then one pass per distinct cart occupancy (see
+ *  resolveCartByOccupancy). Each pass used to read availability, rate and
+ *  restriction from D1 again — a checkout with three occupancy groups was four
+ *  identical reads of three tables. Loading the slice once and handing it to
+ *  every pass makes that one read.
+ *
+ *  The window travels with the data so a snapshot can only be used for the
+ *  stay it was loaded for: a caller that passes the wrong one gets a fresh
+ *  read, never someone else's dates. */
+export interface StayInventory {
+  readonly from: string;
+  readonly to: string;
+  readonly data: InventoryData;
+}
+
+const EMPTY_INVENTORY = (): InventoryData => ({ availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} });
+
+/** Load the ARI once for a stay, to share across its pricing passes. The window
+ *  is checkin..checkout inclusive — through the checkout date, so the
+ *  closed-to-departure check has the row it needs. */
+export async function getStayInventory(pid: string, checkin: string, checkout: string): Promise<StayInventory> {
+  return { from: checkin, to: checkout, data: await getInventory(pid, checkin, checkout) };
+}
+
+/** The snapshot's data if it covers exactly this window, else undefined. */
+function matchingInventory(inv: StayInventory | undefined, from: string, to: string): InventoryData | undefined {
+  return inv && inv.from === from && inv.to === to ? inv.data : undefined;
+}
+
 // ---- public read: build RoomWithRates from the catalog ----
 /** The catalog as `RoomWithRates[]` for a given stay. Each night is priced from
  *  the D1 ARI (falling back to the rate's base nightly price), and availability
@@ -315,7 +348,7 @@ export interface GateReason {
 export async function getCatalogRooms(
   pid: string,
   query: RoomsQuery = {},
-  opts: { gate?: boolean; reasons?: GateReason[]; lang?: string } = {},
+  opts: { gate?: boolean; reasons?: GateReason[]; lang?: string; inventory?: StayInventory } = {},
 ): Promise<RoomWithRates[]> {
   const gate = opts.gate ?? false;
   // Collected rather than returned: a room whose every rate is gated out is
@@ -362,9 +395,10 @@ export async function getCatalogRooms(
     ? Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkinDate), i), "yyyy-MM-dd"))
     : [];
   // Query through the checkout date too, so the CTD check below sees it.
+  const invTo = checkoutDate ?? nightDates[nightDates.length - 1];
   const inv = nightDates.length
-    ? await getInventory(pid, nightDates[0], checkoutDate ?? nightDates[nightDates.length - 1])
-    : { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
+    ? (matchingInventory(opts.inventory, nightDates[0], invTo) ?? (await getInventory(pid, nightDates[0], invTo)))
+    : EMPTY_INVENTORY();
 
   return rooms
     .map((room): RoomWithRates => {
@@ -514,12 +548,18 @@ export async function getCatalogRooms(
 /** Resolve cart lines to priced lines, honouring each line's own occupancy.
  *  Lines are grouped by occupancy and priced via getCatalogRooms once per group
  *  (so per-room party pricing, offers and ARI all apply consistently); a line
- *  with no occupancy falls back to the searched party. Order is preserved. */
+ *  with no occupancy falls back to the searched party. Order is preserved.
+ *
+ *  Every group prices the same stay, so they share one inventory snapshot and
+ *  run concurrently. Pass `inventory` when the caller has already loaded the
+ *  slice for these dates (results and checkout price the catalog first) and the
+ *  whole page settles for a single ARI read; omit it and this loads its own. */
 export async function resolveCartByOccupancy(
   pid: string,
   stay: { checkin: string; checkout: string; currency: string },
   lines: CartLine[],
   searched: { adults: number; childrenAge: number[] },
+  inventory?: StayInventory,
 ): Promise<ResolvedLine[]> {
   const occOf = (l: CartLine) => lineOccupancy(l, searched);
   const sig = (o: { adults: number; childrenAge: number[] }) =>
@@ -528,23 +568,33 @@ export async function resolveCartByOccupancy(
   const groups = new Map<string, { adults: number; childrenAge: number[] }>();
   for (const l of lines) groups.set(sig(occOf(l)), occOf(l));
 
-  const roomsByGroup = new Map<string, RoomWithRates[]>();
-  for (const [key, occ] of groups) {
-    roomsByGroup.set(
-      key,
-      await getCatalogRooms(
-        pid,
-        {
-          checkinDate: stay.checkin,
-          checkoutDate: stay.checkout,
-          currency: stay.currency,
-          adults: occ.adults,
-          childrenAge: occ.childrenAge,
-        },
-        { gate: true },
+  // Nothing to price — don't read inventory for an empty cart.
+  if (groups.size === 0) return [];
+  const inv = matchingInventory(inventory, stay.checkin, stay.checkout)
+    ? inventory!
+    : await getStayInventory(pid, stay.checkin, stay.checkout);
+
+  const roomsByGroup = new Map<string, RoomWithRates[]>(
+    await Promise.all(
+      [...groups].map(
+        async ([key, occ]) =>
+          [
+            key,
+            await getCatalogRooms(
+              pid,
+              {
+                checkinDate: stay.checkin,
+                checkoutDate: stay.checkout,
+                currency: stay.currency,
+                adults: occ.adults,
+                childrenAge: occ.childrenAge,
+              },
+              { gate: true, inventory: inv },
+            ),
+          ] as const,
       ),
-    );
-  }
+    ),
+  );
 
   const out: ResolvedLine[] = [];
   for (const l of lines) {
