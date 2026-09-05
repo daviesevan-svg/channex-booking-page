@@ -23,6 +23,11 @@ const fullReads = () => sql.filter((q) => /SELECT json FROM property\s*$/i.test(
  *  needs to know whether the registry has anything in it at all, and COUNT(*)
  *  reads the lot to say so. */
 const registryCounts = () => sql.filter((q) => /COUNT\(\s*\*\s*\)\s*FROM property/i.test(q));
+/** Schema statements. These belong to a repair the lookup should only reach for
+ *  when the database says the column isn't there — never on a warm path. */
+const ddl = () => sql.filter((q) => /^\s*(alter table|create index)/i.test(q));
+/** Set to make the next statement fail, standing in for D1 itself being down. */
+let failNextWith: string | null = null;
 
 type Stmt = { sql: string; args: unknown[]; bind: (...a: unknown[]) => Stmt; first: () => Promise<unknown>; run: () => Promise<unknown>; all: () => Promise<unknown> };
 const makeStmt = (query: string): Stmt => ({
@@ -34,6 +39,11 @@ const makeStmt = (query: string): Stmt => ({
   },
   async first() {
     sql.push(this.sql);
+    if (failNextWith) {
+      const message = failNextWith;
+      failNextWith = null;
+      throw new Error(message);
+    }
     return sqlite.prepare(this.sql).get(...(this.args as never[])) ?? null;
   },
   async run() {
@@ -142,6 +152,33 @@ describe("property resolution", () => {
     expect(fullReads().length).toBeGreaterThan(0);
   });
 
+  it("does no schema work on a cold isolate whose database already has the column", async () => {
+    await seed([ref("uuid-a", "spilmanhotel")]);
+    // A fresh isolate, with the repair latch unset — what every request is
+    // immediately after a deploy.
+    vi.resetModules();
+    const { resolvePropertyId } = await import("./properties.server");
+
+    sql = [];
+    await expect(resolvePropertyId("spilmanhotel")).resolves.toBe("uuid-a");
+    // The ALTER-that-throws and the CREATE INDEX used to run here, ahead of the
+    // query, on the first property lookup of every cold isolate.
+    expect(ddl()).toEqual([]);
+  });
+
+  it("leaves a database outage to the full read rather than treating it as a missing column", async () => {
+    await seed([ref("uuid-a", "spilmanhotel")]);
+    const { resolvePropertyId } = await import("./properties.server");
+    await resolvePropertyId("spilmanhotel");
+
+    sql = [];
+    failNextWith = "D1_ERROR: Connection closed: this D1 DB instance is no longer active.";
+    await expect(resolvePropertyId("spilmanhotel")).resolves.toBe("uuid-a");
+    // An outage must not send every request through DDL on its way to failing.
+    expect(ddl()).toEqual([]);
+    expect(fullReads().length).toBeGreaterThan(0);
+  });
+
   it("keeps the slug in step with the stored json, with nothing on the write path to remember", async () => {
     await seed([ref("uuid-a", "spilmanhotel")]);
     const { resolvePropertyId } = await import("./properties.server");
@@ -151,5 +188,32 @@ describe("property resolution", () => {
     sqlite.prepare(`UPDATE property SET json = ? WHERE id = ?`).run(JSON.stringify(ref("uuid-a", "renamed")), "uuid-a");
     await expect(resolvePropertyId("renamed")).resolves.toBe("uuid-a");
     await expect(resolvePropertyId("spilmanhotel")).resolves.toBe("spilmanhotel");
+  });
+});
+
+describe("the slug column when a database hasn't got it", () => {
+  it("adds it, and its index, on the lookup that finds it missing — then never again", async () => {
+    // A registry from before the generated column existed: the table is there,
+    // the column isn't.
+    sqlite.prepare(`DROP TABLE IF EXISTS property`).run();
+    sqlite.prepare(`CREATE TABLE property (id TEXT PRIMARY KEY, json TEXT NOT NULL)`).run();
+    sqlite
+      .prepare(`INSERT INTO property (id, json) VALUES (?, ?)`)
+      .run("uuid-a", JSON.stringify(ref("uuid-a", "spilmanhotel")));
+
+    // A cold isolate, so the repair latch is unset.
+    vi.resetModules();
+    const { resolvePropertyId } = await import("./properties.server");
+
+    sql = [];
+    await expect(resolvePropertyId("spilmanhotel")).resolves.toBe("uuid-a");
+    expect(ddl().some((q) => /ALTER TABLE property/i.test(q))).toBe(true);
+    expect(ddl().some((q) => /CREATE INDEX IF NOT EXISTS property_slug/i.test(q))).toBe(true);
+    // The repair answers the question it was asked, without falling back.
+    expect(fullReads()).toEqual([]);
+
+    sql = [];
+    await expect(resolvePropertyId("spilmanhotel")).resolves.toBe("uuid-a");
+    expect(ddl()).toEqual([]);
   });
 });

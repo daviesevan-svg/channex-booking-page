@@ -97,6 +97,15 @@ const ensureSchema = schemaOnce((d) => [
 // statement that throws inside a batch takes the CREATE TABLE with it. Every
 // isolate after the first finds the column already there, which is the
 // "duplicate column" case swallowed below.
+//
+// It is a REPAIR, not a precondition. The lookup below runs its query first and
+// only calls this if the database answers that the column (or the table) is not
+// there — which, once any isolate has been through here, it never does again.
+// Awaiting it up front instead cost three sequential D1 round trips — the schema
+// batch, the ALTER that throws, the CREATE INDEX — before the query it was
+// called for, on the first property lookup of every cold isolate. That is the
+// layout loader of every guest request, and a deploy makes every request a cold
+// one.
 let slugIndexReady: Promise<void> | undefined;
 
 function ensureSlugIndex(): Promise<void> {
@@ -143,8 +152,7 @@ async function lookupOne(id: string, slug: string): Promise<{ hasRows: boolean; 
     return { hasRows: list.length > 0, byId: list.find((p) => p.id === id), bySlug: list.find((p) => p.slug === slug) };
   }
 
-  const run = async (): Promise<string> => {
-    await ensureSlugIndex();
+  const query = async (): Promise<string> => {
     const row = await db()
       .prepare(
         `SELECT EXISTS(SELECT 1 FROM property) AS has_rows,
@@ -154,6 +162,20 @@ async function lookupOne(id: string, slug: string): Promise<{ hasRows: boolean; 
       .bind(id, slug)
       .first<{ has_rows: number; by_id: string | null; by_slug: string | null }>();
     return JSON.stringify(row ?? { has_rows: 0, by_id: null, by_slug: null });
+  };
+
+  const run = async (): Promise<string> => {
+    try {
+      return await query();
+    } catch (error) {
+      // Only a schema the database says isn't there gets a repair. Anything
+      // else — D1 unreachable, a recycled instance — is left to the caller's
+      // fallback, so an outage can't send every request through DDL.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such (column|table)/i.test(message)) throw error;
+      await ensureSlugIndex();
+      return await query();
+    }
   };
 
   try {
