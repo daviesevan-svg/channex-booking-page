@@ -14,12 +14,14 @@ import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
 import { getBookingCutoff, getSearchContent, getSettings } from "~/lib/overrides.server";
 
-import { getCalendarAvailability } from "~/lib/catalog.server";
+import { loadCalendarWindow } from "~/lib/calendar-window.server";
+import { calendarHorizonEnd } from "~/lib/calendar-window";
+import { useCalendarWindow } from "~/lib/use-calendar-window";
 import { getRenderSections } from "~/lib/site.server";
 import { loadSectionData } from "~/lib/section-data.server";
 import { settingOf } from "~/lib/sections";
 import { SectionList } from "~/components/section-list";
-import { earliestCheckinDate, firstAvailableStay } from "~/lib/dates";
+import { earliestCheckinDate, firstAvailableStay, todayISODate } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 import { useBase } from "~/lib/base";
 import { resolveRequestPropertyOrNull } from "~/lib/property-scope.server";
@@ -52,17 +54,26 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     if (await partnerIdForAdminHost(hostname)) throw redirect("/admin/login");
     return { mode: "picker" as const, picker: await loadPicker() };
   }
-  // Availability + min-stay for the calendar, from our inventory (D1). Cover the
-  // calendar's horizon (it pages up to ~12 months out).
+  // Availability + min-stay for the calendar, from our inventory (D1). Only the
+  // months the picker opens on — it pages up to a year out, and the rest is
+  // fetched as the guest gets there (see calendar-window.ts).
   const now = new Date();
-  const [content, closedDates, cutoff, settings] = await Promise.all([
+  const today = format(now, "yyyy-MM-dd");
+  const [content, cutoffEarly, settings] = await Promise.all([
     getSearchContent(pid, lang),
-    getCalendarAvailability(pid, format(now, "yyyy-MM-dd"), format(addMonths(now, 13), "yyyy-MM-dd")).catch(
-      () => null, // fail open: a calendar data hiccup shouldn't break the page
-    ),
     getBookingCutoff(pid),
     getSettings(pid),
   ]);
+  // Earliest arrival the property currently accepts (lead-time cutoff), so the
+  // calendar can grey out dates that are too last-minute to book.
+  const earliestCheckin = earliestCheckinDate(cutoffEarly, now);
+  // Preselecting the first available stay has to name a real one, so that
+  // setting — and only that setting — reads further than the opening months
+  // until it finds one.
+  const preselectOn = settings.preselectFirstAvailable ?? false;
+  const { closedDates, loadedThrough } = await loadCalendarWindow(pid, today, {
+    until: preselectOn ? (cd, through) => firstAvailableStay(cd, earliestCheckin, through) !== null : undefined,
+  });
   // With the website layer off this returns the booking page's long-standing
   // section order, so that page is exactly what it always was.
   const sections = await getRenderSections(pid, lang, settings.websiteEnabled ?? false);
@@ -75,19 +86,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     settings,
     content.heroImage || undefined,
   );
-  // Earliest arrival the property currently accepts (lead-time cutoff), so the
-  // calendar can grey out dates that are too last-minute to book.
-  const earliestCheckin = earliestCheckinDate(cutoff, now);
   return {
     mode: "property" as const,
     closedDates,
+    loadedThrough,
     content,
     earliestCheckin,
     // Opt-in: open the date picker with the earliest bookable stay filled in.
     // Pre-fills the fields only — searching stays a click the guest makes.
-    preselect: settings.preselectFirstAvailable
-      ? firstAvailableStay(closedDates, earliestCheckin)
-      : null,
+    preselect: preselectOn ? firstAvailableStay(closedDates, earliestCheckin, loadedThrough) : null,
     sections,
     data,
   };
@@ -113,7 +120,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   if (loaderData.mode === "picker") return <PropertyPicker {...loaderData.picker} />;
 
   const base = useBase();
-  const { closedDates, content, earliestCheckin, preselect, sections, data } = loaderData;
+  const { closedDates: initialClosed, loadedThrough: initialThrough, content, earliestCheckin, preselect, sections, data } = loaderData;
   const { property, currency, hotelName } = useProperty();
   const tr = useT();
   const style = useSiteStyle();
@@ -126,8 +133,18 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
   const urlCheckin = searchParams.get("checkin");
   const urlCheckout = searchParams.get("checkout");
   const hasUrlDates = Boolean(urlCheckin || urlCheckout);
+  // The loader read the opening months; this fetches the rest as the guest
+  // pages forward, and tells the picker how far the data currently goes.
+  const { closedDates, loadedThrough, extendTo } = useCalendarWindow({
+    base,
+    initial: initialClosed,
+    initialThrough: initialThrough,
+    horizonEnd: calendarHorizonEnd(todayISODate()),
+  });
   const dates = useDateRange({
     closedDates,
+    loadedThrough,
+    onExtend: extendTo,
     minCheckin: earliestCheckin,
     initialCheckin: urlCheckin ?? (hasUrlDates ? undefined : preselect?.checkin),
     initialCheckout: urlCheckout ?? (hasUrlDates ? undefined : preselect?.checkout),

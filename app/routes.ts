@@ -26,6 +26,9 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
   const r = (path: string, file: string, name: string) =>
     prefix ? route(path, file, { id: `${prefix}-${name}` }) : route(path, file);
   return [
+    // Later months of the date picker's calendar, fetched as the guest pages
+    // forward (the loaders read only the first few — see calendar-window.ts).
+    r("calendar", "routes/property/calendar.tsx", "calendar"),
     r("rooms", "routes/property/results.tsx", "rooms"),
     r("rooms/:roomId", "routes/property/detail.tsx", "detail"),
     // Website room page (no dates needed) — distinct from the dated funnel step.

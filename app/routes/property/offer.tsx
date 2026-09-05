@@ -24,7 +24,9 @@ import { GuestSelector } from "~/components/guest-selector";
 import { Diamond } from "~/components/sections";
 import { offerDate, offerHeadline, offerRules, OfferTerms } from "~/components/offers-section";
 import { useBase } from "~/lib/base";
-import { getCalendarAvailability } from "~/lib/catalog.server";
+import { loadCalendarWindow } from "~/lib/calendar-window.server";
+import { calendarHorizonEnd } from "~/lib/calendar-window";
+import { useCalendarWindow } from "~/lib/use-calendar-window";
 import { earliestCheckinDate, todayISODate } from "~/lib/dates";
 import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
@@ -50,16 +52,16 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!offer) throw new Response("Not Found", { status: 404 });
 
   const now = new Date();
-  const [closedDates, cutoff] = await Promise.all([
+  const [calendar, cutoff] = await Promise.all([
     // Property-wide: an offer applies to every room, so "when is anything free"
-    // is the right question here (the room page asks it per room).
-    getCalendarAvailability(
-      pid,
-      format(now, "yyyy-MM-dd"),
-      format(addMonths(now, 13), "yyyy-MM-dd"),
-    ).catch(() => null),
+    // is the right question here (the room page asks it per room). Just the
+    // months the picker opens on; the rest is fetched as the guest pages
+    // forward — which an offer starting months out does immediately, because
+    // the picker opens on the offer's own first eligible month.
+    loadCalendarWindow(pid, format(now, "yyyy-MM-dd")),
     getBookingCutoff(pid),
   ]);
+  const { closedDates, loadedThrough } = calendar;
 
   // Two floors, and the later wins: the hotel's booking lead-time, and the first
   // date this offer's own rules allow.
@@ -67,6 +69,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     offer,
     closedDates,
+    loadedThrough,
     earliestCheckin:
       offer.earliestCheckin > cutoffFloor ? offer.earliestCheckin : cutoffFloor,
     currency: settings.currency || "GBP",
@@ -83,7 +86,7 @@ export function meta({ matches, loaderData }: Route.MetaArgs) {
 }
 
 export default function OfferPage({ loaderData }: Route.ComponentProps) {
-  const { offer, closedDates, earliestCheckin, currency, today } = loaderData;
+  const { offer, closedDates: initialClosed, loadedThrough: initialThrough, earliestCheckin, currency, today } = loaderData;
   const base = useBase();
   const tr = useT();
   const s = useSlots();
@@ -91,8 +94,19 @@ export default function OfferPage({ loaderData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
 
   const minNights = offer.conditions?.minNights;
+  // The loader read the opening months; the picker opens on the offer's first
+  // eligible month, so this often fetches straight away — which is the point:
+  // one targeted read instead of thirteen months for every visitor.
+  const { closedDates, loadedThrough, extendTo } = useCalendarWindow({
+    base,
+    initial: initialClosed,
+    initialThrough,
+    horizonEnd: calendarHorizonEnd(today),
+  });
   const dates = useDateRange({
     closedDates,
+    loadedThrough,
+    onExtend: extendTo,
     minCheckin: earliestCheckin,
     // The offer's own ceilings. Arrivals stop at `latestCheckin`; the stay itself
     // has to be over by `stayTo`, which is later whenever a minimum stay applies.

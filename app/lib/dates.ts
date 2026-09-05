@@ -195,24 +195,33 @@ export function isTooLastMinute(checkin: string, cutoff: BookingCutoff, now: Dat
  * `null` when the availability data is missing (a pre-selection guessed off no
  * data could sit on a sold night — worse than none) or when nothing is bookable
  * inside the scan horizon.
+ *
+ * `loadedThrough` is the last date `closedDates` actually covers. The scan
+ * treats a date absent from `closed` as open, so without it a partially loaded
+ * calendar would answer with the first date past the data — exactly the sold
+ * night this returns null rather than guess at. Absent = fully loaded.
  */
 export function firstAvailableStay(
   closedDates: ClosedDates | null,
   minCheckin: string,
+  loadedThrough?: string | null,
 ): { checkin: string; checkout: string } | null {
   if (!closedDates) return null;
+  const known = (d: string) => !loadedThrough || d <= loadedThrough;
   const sold = new Set(closedDates.closed);
   const cta = new Set(closedDates.closedToArrival);
   const ctd = new Set(closedDates.closedToDeparture);
   const SCAN_DAYS = 370; // how far out to look for an arrival at all
   for (let a = 0; a < SCAN_DAYS; a++) {
     const arrival = addDaysISO(minCheckin, a);
+    if (!known(arrival)) return null; // past the loaded data — nothing to say
     if (sold.has(arrival) || cta.has(arrival)) continue;
     const need = Math.max(closedDates.minStayArrival[arrival] ?? 1, 1);
     // Walk the open run from this arrival looking for the first valid check-out.
     for (let nights = 1; nights <= MAX_STAY_NIGHTS; nights++) {
       if (sold.has(addDaysISO(arrival, nights - 1))) break; // run ended before a stay fit
       const out = addDaysISO(arrival, nights);
+      if (!known(out)) break; // can't confirm a check-out we have no data for
       if (nights >= need && !ctd.has(out)) return { checkin: arrival, checkout: out };
     }
   }

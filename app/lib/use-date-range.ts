@@ -11,8 +11,9 @@ import {
   startOfMonth,
   startOfToday,
 } from "date-fns";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { monthViewEnd } from "./calendar-window";
 import type { ClosedDates } from "./channex/types";
 import type { Translator } from "./i18n";
 
@@ -90,6 +91,24 @@ export interface UseDateRangeArgs {
   departureDays?: number[];
   initialCheckin?: string;
   initialCheckout?: string;
+  /**
+   * Last date `closedDates` actually covers (YYYY-MM-DD).
+   *
+   * The whole calendar used to be loaded before the page rendered, so every
+   * date was answerable and anything missing from `closed` was genuinely open.
+   * Now the loaders read the first few months and the rest arrives as the guest
+   * pages forward — which means "not in `closed`" no longer implies "for sale".
+   * A date past this one is UNKNOWN, and unknown is never selectable: it greys
+   * out until the slice covering it has loaded.
+   *
+   * Absent = everything is known (the widget and collection pickers, which have
+   * no availability data at all and gate on the results page instead).
+   */
+  loadedThrough?: string;
+  /** Called when the guest pages to a view this hook can't fully answer, with
+   *  the last date it needs. The owner loads that slice and passes a longer
+   *  `loadedThrough` back. */
+  onExtend?: (through: string) => void;
   tr: Translator;
 }
 
@@ -103,6 +122,8 @@ export function useDateRange({
   minNights: minNightsFloor,
   initialCheckin,
   initialCheckout,
+  loadedThrough,
+  onExtend,
   tr,
 }: UseDateRangeArgs) {
   const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
@@ -138,6 +159,10 @@ export function useDateRange({
   // hotel's 2-night minimum, and vice versa.
   const minStayFor = (d: Date) => Math.max(minStayMap[iso(d)] ?? 1, minNightsFloor ?? 1);
   const isSold = (d: Date) => soldSet.has(iso(d));
+  // Is this date's availability loaded? A date past the loaded window is
+  // unknown, NOT open — the picker infers "for sale" from absence, so treating
+  // an unloaded date as available would offer nights nobody has checked.
+  const isKnown = (d: Date) => !loadedThrough || iso(d) <= loadedThrough;
   const today = startOfToday();
   // Arrival and departure ceilings. Compared as dates rather than strings because
   // everything else in this hook is a Date.
@@ -151,9 +176,18 @@ export function useDateRange({
   const floor = isBefore(minArrival, today) ? today : minArrival;
 
   // Longest stay we'll look ahead for when testing whether an arrival is even
-  // possible. Dates with no loaded availability read as open, so the walk stops
-  // on the first sold night in practice; this only bounds the pathological case.
+  // possible. The walk stops on the first sold night, or on the edge of the
+  // loaded window, long before this in practice; it only bounds the
+  // pathological case of an entirely open year.
   const MAX_LOOKAHEAD_NIGHTS = 370;
+
+  // Ask for the slice this view needs. Runs on the first render too, which is
+  // what covers a calendar opened directly on a month past the initial window
+  // (an offer whose stay dates start in the spring).
+  const viewEnd = monthViewEnd(today, monthOffset);
+  useEffect(() => {
+    if (onExtend && loadedThrough && viewEnd > loadedThrough) onExtend(viewEnd);
+  }, [onExtend, loadedThrough, viewEnd]);
 
   // Can a guest actually ARRIVE on this date? Not the same question as "is this
   // night for sale". A date whose run of available nights is shorter than its own
@@ -170,6 +204,7 @@ export function useDateRange({
   const wrongDepartureDay = (d: Date) => !!departureDays?.length && !departureDays.includes(d.getDay());
 
   const arrivalAllowed = (date: Date) => {
+    if (!isKnown(date)) return false;
     if (isSold(date) || ctaSet.has(iso(date))) return false;
     if (afterLastArrival(date) || wrongArrivalDay(date)) return false;
     const need = minStayFor(date);
@@ -177,6 +212,11 @@ export function useDateRange({
     while (!isSold(addDays(date, nights))) {
       nights++;
       const out = addDays(date, nights);
+      // The walk has left the loaded window, so whether a check-out exists here
+      // is unanswerable. Refuse rather than assume: the date opens up on its own
+      // once the next slice arrives. Only the last night or two of the loaded
+      // window reach this, and only until the fetch lands.
+      if (!isKnown(out)) return false;
       // A stay that would have to depart past the ceiling is no use here either:
       // the last eligible arrivals of a window are exactly where this bites.
       if (afterLastDeparture(out)) return false;
@@ -191,6 +231,7 @@ export function useDateRange({
   // isn't closed-to-departure, and every night in between is available.
   const checkoutAllowed = (date: Date) => {
     if (!checkin || checkout || !isBefore(checkin, date)) return false;
+    if (!isKnown(date)) return false;
     if (ctdSet.has(iso(date)) || afterLastDeparture(date) || wrongDepartureDay(date)) return false;
     if (differenceInCalendarDays(date, checkin) < minStayFor(checkin)) return false;
     for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) if (isSold(d)) return false;
@@ -198,6 +239,9 @@ export function useDateRange({
   };
 
   function handleDay(date: Date) {
+    // Availability for this date hasn't loaded yet — it renders greyed, and a
+    // click on it can't be answered either way.
+    if (!isKnown(date)) return;
     if (!checkin || checkout || !isBefore(checkin, date)) {
       if (ctaSet.has(iso(date))) {
         setHelper(tr.t("helperClosedToArrival", { date: fmt(date, "EEE d MMM") }));
@@ -279,6 +323,11 @@ export function useDateRange({
         // Past dates and those inside the lead-time gap are both un-bookable as
         // arrivals; render them greyed.
         const tooEarly = isBefore(date, floor);
+        // Availability for this date hasn't been loaded yet. Greyed like an
+        // out-of-range date rather than struck through: nobody has said it is
+        // sold, only that we can't answer for it yet. The effect below is
+        // already fetching the slice, and the cell resolves when it lands.
+        const unknown = !isKnown(date);
         const sold = isSold(date);
         // Sold nights stay un-pickable for arrival, but open up as a check-out.
         const asCheckout = checkoutAllowed(date);
@@ -297,10 +346,10 @@ export function useDateRange({
         const tooLate = afterLastDeparture(date);
         // Greyed as out-of-range, not struck through as sold: it's a date this
         // stay can't use, which is a different thing from a night nobody can have.
-        const outOfRange = tooEarly || tooLate || (asArrival && afterLastArrival(date) && !sold);
-        const disabled = tooEarly || tooLate ? true : asCheckout ? false : sold || arrivalBlocked;
+        const outOfRange = unknown || tooEarly || tooLate || (asArrival && afterLastArrival(date) && !sold);
+        const disabled = unknown || tooEarly || tooLate ? true : asCheckout ? false : sold || arrivalBlocked;
         let title: string | undefined;
-        if (!tooEarly && !tooLate) {
+        if (!unknown && !tooEarly && !tooLate) {
           if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
           else if (afterLastArrival(date)) title = tr.t("helperMaxArrival", { date: fmt(lastArrival!, "EEE d MMM") });

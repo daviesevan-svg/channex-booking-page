@@ -647,7 +647,13 @@ export async function getCalendarAvailability(
    *  anything free?". Same gate either way, so the two can't disagree. */
   opts: { roomId?: string } = {},
 ): Promise<ClosedDates> {
-  const [allRooms, rates, inv] = await Promise.all([getRooms(pid), getRates(pid), getInventory(pid, from, to)]);
+  const [allRooms, rates, inv] = await Promise.all([
+    getRooms(pid),
+    getRates(pid),
+    // Narrowed in SQL, not after the fact: a one-room calendar has no use for
+    // the other nineteen rooms' rows.
+    getInventory(pid, from, to, opts.roomId),
+  ]);
   const rooms = opts.roomId ? allRooms.filter((r) => r.id === opts.roomId) : allRooms;
   const ratesByRoom = new Map<string, CatalogRate[]>();
   for (const r of rates) {
