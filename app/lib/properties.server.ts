@@ -97,6 +97,15 @@ const ensureSchema = schemaOnce((d) => [
 // statement that throws inside a batch takes the CREATE TABLE with it. Every
 // isolate after the first finds the column already there, which is the
 // "duplicate column" case swallowed below.
+//
+// It is a REPAIR, not a precondition. The lookup below runs its query first and
+// only calls this if the database answers that the column (or the table) is not
+// there — which, once any isolate has been through here, it never does again.
+// Awaiting it up front instead cost three sequential D1 round trips — the schema
+// batch, the ALTER that throws, the CREATE INDEX — before the query it was
+// called for, on the first property lookup of every cold isolate. That is the
+// layout loader of every guest request, and a deploy makes every request a cold
+// one.
 let slugIndexReady: Promise<void> | undefined;
 
 function ensureSlugIndex(): Promise<void> {
@@ -124,11 +133,15 @@ function ensureSlugIndex(): Promise<void> {
 
 /** One property by id and/or slug, in a single round trip of indexed lookups.
  *
- *  `total` comes back with it so a miss can tell "no such property" — the
+ *  `hasRows` comes back with it so a miss can tell "no such property" — the
  *  answer — from "the registry has no rows yet", which is the seed-on-first-run
  *  and migrate-from-KV path and has to go through the full read. Null means D1
- *  itself was unreachable: same, the full read owns the snapshot fallback. */
-async function lookupOne(id: string, slug: string): Promise<{ total: number; byId?: PropertyRef; bySlug?: PropertyRef } | null> {
+ *  itself was unreachable: same, the full read owns the snapshot fallback.
+ *
+ *  It is an EXISTS and not a COUNT deliberately: counting scans the whole slug
+ *  index on every uncached lookup, to answer a question that only ever needs the
+ *  first row. */
+async function lookupOne(id: string, slug: string): Promise<{ hasRows: boolean; byId?: PropertyRef; bySlug?: PropertyRef } | null> {
   const cacheKey = `${POINT_CACHE_PREFIX}${id}\u0000${slug}`;
   const cache = requestKvCache();
   // The whole registry may already be in hand (an admin list, the picker). It
@@ -136,20 +149,33 @@ async function lookupOne(id: string, slug: string): Promise<{ total: number; byI
   const whole = cache?.get(READ_CACHE_KEY);
   if (whole) {
     const list = JSON.parse((await whole) ?? "[]") as PropertyRef[];
-    return { total: list.length, byId: list.find((p) => p.id === id), bySlug: list.find((p) => p.slug === slug) };
+    return { hasRows: list.length > 0, byId: list.find((p) => p.id === id), bySlug: list.find((p) => p.slug === slug) };
   }
 
-  const run = async (): Promise<string> => {
-    await ensureSlugIndex();
+  const query = async (): Promise<string> => {
     const row = await db()
       .prepare(
-        `SELECT (SELECT COUNT(*) FROM property) AS total,
+        `SELECT EXISTS(SELECT 1 FROM property) AS has_rows,
                 (SELECT json FROM property WHERE id = ?1) AS by_id,
                 (SELECT json FROM property WHERE slug = ?2) AS by_slug`,
       )
       .bind(id, slug)
-      .first<{ total: number; by_id: string | null; by_slug: string | null }>();
-    return JSON.stringify(row ?? { total: 0, by_id: null, by_slug: null });
+      .first<{ has_rows: number; by_id: string | null; by_slug: string | null }>();
+    return JSON.stringify(row ?? { has_rows: 0, by_id: null, by_slug: null });
+  };
+
+  const run = async (): Promise<string> => {
+    try {
+      return await query();
+    } catch (error) {
+      // Only a schema the database says isn't there gets a repair. Anything
+      // else — D1 unreachable, a recycled instance — is left to the caller's
+      // fallback, so an outage can't send every request through DDL.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/no such (column|table)/i.test(message)) throw error;
+      await ensureSlugIndex();
+      return await query();
+    }
   };
 
   try {
@@ -163,8 +189,8 @@ async function lookupOne(id: string, slug: string): Promise<{ total: number; byI
       pending.catch(() => cache?.delete(cacheKey));
       raw = await pending;
     }
-    const row = JSON.parse(raw) as { total: number; by_id: string | null; by_slug: string | null };
-    return { total: row.total, byId: parseRef(row.by_id), bySlug: parseRef(row.by_slug) };
+    const row = JSON.parse(raw) as { has_rows: number; by_id: string | null; by_slug: string | null };
+    return { hasRows: Boolean(row.has_rows), byId: parseRef(row.by_id), bySlug: parseRef(row.by_slug) };
   } catch {
     return null;
   }
@@ -455,7 +481,7 @@ export async function getProperty(id: string): Promise<PropertyRef | undefined> 
   // legacy KV snapshot) and the D1-outage fallback, so a miss defers to it only
   // when there is genuinely nothing to have missed.
   const hit = await lookupOne(id, "");
-  if (hit && (hit.byId || hit.total > 0)) return hit.byId;
+  if (hit && (hit.byId || hit.hasRows)) return hit.byId;
   return (await getProperties()).find((p) => p.id === id);
 }
 
@@ -532,7 +558,7 @@ export async function resolvePropertyId(channelId: string): Promise<string> {
   // here. Both halves are one indexed round trip — id first, so a UUID URL
   // still wins outright and a slug can never capture it.
   const hit = await lookupOne(channelId, channelId.toLowerCase());
-  if (hit && (hit.byId || hit.bySlug || hit.total > 0)) {
+  if (hit && (hit.byId || hit.bySlug || hit.hasRows)) {
     if (hit.byId) return channelId;
     return hit.bySlug ? hit.bySlug.id : channelId;
   }
