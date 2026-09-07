@@ -8,6 +8,7 @@ import { guestHostForProperty } from "~/lib/partners.server";
 import { createPreviewToken } from "~/lib/site-preview.server";
 import { currentPropertyId, getProperty } from "~/lib/properties.server";
 import { langParam, pickLang, type SiteSettings } from "~/lib/content";
+import { checkCustomCss } from "~/lib/custom-css";
 import { getSettings, saveBrand } from "~/lib/overrides.server";
 import { HOME_PAGE_ID, PAGE_TEXT_FIELDS, pageTextKey, sectionIdFor } from "~/lib/pages";
 import {
@@ -119,6 +120,14 @@ export async function action({ request }: Route.ActionArgs) {
   // this can't touch the sections below it — and General can no longer touch
   // these, which it used to do on every save.
   if (form.get("op") === "brand") {
+    // The only rejection the stylesheet has is length; everything else is
+    // rewritten on save. Checked here so the operator sees why nothing changed,
+    // rather than saveBrand quietly keeping the old sheet.
+    const css = form.get("customCss");
+    if (css !== null) {
+      const checked = checkCustomCss(String(css));
+      if (!checked.ok) return { error: checked.reason };
+    }
     await saveBrand(propertyId, form);
     return { styled: true as const };
   }

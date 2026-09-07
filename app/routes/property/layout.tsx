@@ -25,6 +25,7 @@ import {
 import { formatAddress } from "~/lib/address";
 import { NAV_LOADING } from "~/lib/nav-tags";
 import { FontFaces } from "~/components/font-faces";
+import { CustomCss } from "~/components/custom-css";
 import { ConsentSettingsLink, TrackingRoot } from "~/components/tracking-scripts";
 import { PageViews } from "~/components/tracking-events";
 import { consentFromCookies, consentGate } from "~/lib/consent";
@@ -168,6 +169,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
+    customCss: settings.customCss ?? null,
     themeFont: preview?.font ?? settings.themeFont,
     singleUnit: settings.singleUnit ?? false,
     lang,
@@ -292,7 +294,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, analytics, consent, footerBrand, adminHref } =
+  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, customCss, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, analytics, consent, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
@@ -459,7 +461,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         to write into a rule. */}
     {parseHex(resolvedPage) && <style>{`body{background:${resolvedPage}}`}</style>}
     <div
-      className="flex min-h-screen flex-col font-sans text-ink"
+      className="ui-root flex min-h-screen flex-col font-sans text-ink"
       data-theme={isCustom ? undefined : theme}
       data-style={style.id}
       // Switches on the generic heading rule in app.css. Present only for a
@@ -472,6 +474,9 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
           see FontFaces. Rendered here rather than in `links()` because the pair
           only becomes known from loader data. */}
       <FontFaces pair={font.id} />
+      {/* The property's own stylesheet, last so it wins ties with the theme —
+          see app/components/custom-css.tsx and docs/custom-css.md. */}
+      <CustomCss css={customCss} />
       {/* The hotel's own tab icon. Rendered here, not in root: root resolves a
           favicon from the HOSTNAME (a partner's), and only this layout knows
           which property the request is for — resolving it up there would mean
@@ -487,7 +492,7 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
         <div className="nav-progress" aria-hidden {...NAV_LOADING} />
       )}
       <header
-        className="sticky top-0 z-20 border-b border-nav-border"
+        className="ui-header sticky top-0 z-20 border-b border-nav-border"
         style={{
           background: "color-mix(in oklab, var(--page) 82%, transparent)",
           backdropFilter: "blur(10px)",
@@ -500,9 +505,9 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
               // it by default; hide it (logoHideName) only for logos that already
               // read as a wordmark. Alt text keeps the name for accessibility.
               <>
-                <img src={logoImage} alt={hotelName} className="h-10 w-auto max-w-[220px] object-contain" />
+                <img src={logoImage} alt={hotelName} className="ui-logo h-10 w-auto max-w-[220px] object-contain" />
                 {!logoHideName && (
-                  <span className="wordmark font-serif text-title-md font-semibold tracking-[-0.01em]">
+                  <span className="ui-wordmark wordmark font-serif text-title-md font-semibold tracking-[-0.01em]">
                     {hotelName}
                   </span>
                 )}
@@ -510,10 +515,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
             ) : (
               <>
                 <span
-                  className="inline-block h-[13px] w-[13px] rounded-mark bg-accent"
+                  className="ui-mark inline-block h-[13px] w-[13px] rounded-mark bg-accent"
                   style={{ transform: "rotate(45deg)" }}
                 />
-                <span className="wordmark font-serif text-title-md font-semibold tracking-[-0.01em]">
+                <span className="ui-wordmark wordmark font-serif text-title-md font-semibold tracking-[-0.01em]">
                   {hotelName}
                 </span>
               </>

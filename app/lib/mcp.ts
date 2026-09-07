@@ -1008,13 +1008,14 @@ export const MANAGE_MISC_TOOLS: McpTool[] = [
   {
     name: "update_brand",
     description:
-      "Change the theme, sparsely: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb hex, null clears), font (a curated pairing id — arbitrary font families are never accepted, nobody has loaded them). Restyles every guest page immediately; confirm with the operator.",
+      "Change the theme, sparsely: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb hex, null clears), font (a curated pairing id — arbitrary font families are never accepted, nobody has loaded them), custom_css (the property's own stylesheet for the guest pages, ≤ 20000 chars, null clears — it targets CSS variables such as --accent, --radius-control, --text-body and stable hook classes such as .ui-btn-primary, .ui-card, .ui-logo; GET /v1/manage/brand-kit and docs/custom-css.md list them; rules bypass the contrast checks the colour fields apply). Restyles every guest page immediately; confirm with the operator.",
     inputSchema: {
       type: "object",
       properties: {
         theme: { type: ["string", "null"] },
         custom_color: { type: ["string", "null"], description: "#rrggbb" },
         custom_bg: { type: ["string", "null"], description: "#rrggbb" },
+        custom_css: { type: ["string", "null"], description: "Guest-page stylesheet; null clears." },
         font: { type: ["string", "null"], description: "A font pairing id from get_brand." },
       },
       additionalProperties: false,

@@ -493,6 +493,23 @@ const STYLE_DEFS: Record<
   },
 };
 
+/** Stable class hooks for a property's own stylesheet (docs/custom-css.md). */
+export const slotHookClass = (slot: string) => `ui-${slot.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+
+/**
+ * Prefix every slot with a stable `ui-*` hook class — `btnPrimary` renders as
+ * `ui-btn-primary …`. The slot strings themselves are Tailwind utilities that a
+ * refactor may rename at any time, so a property's custom CSS (SiteSettings.
+ * customCss) targets these hooks instead. Done once here rather than per
+ * definition, so a new slot or a new style gets its hook for free and none can
+ * be forgotten. The classes are inert: nothing in app.css styles them.
+ */
+function withHooks(slots: StyleSlots): StyleSlots {
+  return Object.fromEntries(
+    Object.entries(slots).map(([k, v]) => [k, `${slotHookClass(k)} ${v}`.trim()]),
+  ) as unknown as StyleSlots;
+}
+
 export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries(
   SITE_STYLE_IDS.map((id) => [
     id,
@@ -504,7 +521,7 @@ export const SITE_STYLES: Record<SiteStyleId, SiteStyleDef> = Object.fromEntries
       band: STYLE_DEFS[id].band,
       vars: STYLE_DEFS[id].vars,
       headings: STYLE_DEFS[id].headings,
-      slots: { ...CLASSIC, ...STYLE_DEFS[id].slots },
+      slots: withHooks({ ...CLASSIC, ...STYLE_DEFS[id].slots }),
     },
   ]),
 ) as Record<SiteStyleId, SiteStyleDef>;

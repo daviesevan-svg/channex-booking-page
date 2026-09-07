@@ -272,6 +272,12 @@ export const manageSchemas = {
       custom_color: { type: ["string", "null"], description: "#rrggbb" },
       custom_bg: { type: ["string", "null"], description: "#rrggbb" },
       font: { type: ["string", "null"], description: "Curated font-pairing id." },
+      custom_css: {
+        type: ["string", "null"],
+        maxLength: 20000,
+        description:
+          "The property's own stylesheet, rendered on every guest page after the theme (never on admin). Targets the CSS variables and stable `ui-*` hook classes documented in docs/custom-css.md. `<` is escaped and @import dropped on save; null clears.",
+      },
     },
   },
   ManageEmailPatch: {
@@ -652,7 +658,7 @@ export const managePaths = {
   },
   "/v1/manage/brand": {
     ...managed("Theme", "Preset or custom colors + curated font pairing, with the valid vocabularies. One theme drives the booking pages and the widget."),
-    patch: writeOp("Change the theme", "Sparse: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb | null), font (curated pairing id — arbitrary families are never accepted). Invalid values are 422s, not silently kept.", "ManageBrandPatch"),
+    patch: writeOp("Change the theme", "Sparse: theme (preset id | 'custom' | null), custom_color/custom_bg (#rrggbb | null), font (curated pairing id — arbitrary families are never accepted), custom_css (a stylesheet for the guest pages, ≤ 20000 chars, null clears; see docs/custom-css.md for the tokens and ui-* hooks it targets). Invalid values are 422s, not silently kept.", "ManageBrandPatch"),
   },
   "/v1/manage/brand-kit": managed(
     "Brand kit (derived)",

@@ -127,6 +127,36 @@ describe("brand", () => {
     expect("customColor" in settings).toBe(false);
     expect("themeFont" in settings).toBe(false);
   });
+
+  it("stores custom_css sanitised, rejects over-long, and null clears", async () => {
+    const ak = await akPromise;
+    const brand = await import("../routes/api.v1.manage.brand");
+
+    const tooLong = (await brand.action({
+      request: req("/v1/manage/brand", ak, "PATCH", { custom_css: "x".repeat(20_001) }),
+    } as never)) as Response;
+    expect(tooLong.status).toBe(422);
+    const notString = (await brand.action({ request: req("/v1/manage/brand", ak, "PATCH", { custom_css: 7 }) } as never)) as Response;
+    expect(notString.status).toBe(422);
+
+    const ok = (await brand.action({
+      request: req("/v1/manage/brand", ak, "PATCH", {
+        custom_css: `@import url("https://fonts.googleapis.com/x");\n.ui-btn-primary{background:#faa26f}</style><script>1</script>`,
+      }),
+    } as never)) as Response;
+    expect(ok.status).toBe(200);
+    const json = (await ok.json()) as { data: { custom_css: string } };
+    // The rule survives, the import and the markup do not — no `<` at all.
+    expect(json.data.custom_css).toContain(".ui-btn-primary{background:#faa26f}");
+    expect(json.data.custom_css).not.toMatch(/@import|</);
+    expect(JSON.parse(store.get("settings:p1")!).customCss).toBe(json.data.custom_css);
+
+    const shown = (await brand.loader({ request: req("/v1/manage/brand", ak, "GET") } as never)) as Response;
+    expect(((await shown.json()) as { data: { custom_css: string } }).data.custom_css).toBe(json.data.custom_css);
+
+    await brand.action({ request: req("/v1/manage/brand", ak, "PATCH", { custom_css: null }) } as never);
+    expect("customCss" in JSON.parse(store.get("settings:p1")!)).toBe(false);
+  });
 });
 
 describe("reviews", () => {
