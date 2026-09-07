@@ -9,6 +9,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getBookingsPage } from "~/lib/bookings.server";
 import { formatMoney } from "~/lib/money";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
+import { stripInternalParams } from "~/lib/internal-params";
 
 export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
@@ -23,7 +24,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
   const { bookings, total } = await getBookingsPage(propertyId, { limit, offset: (page - 1) * limit });
   const pageUrl = (n: number) => {
-    const query = new URL(request.url).searchParams;
+    // A client-side navigation's loader URL carries `_routes`; copying it into
+    // the link poisons the address bar (see internal-params.ts).
+    const query = stripInternalParams(new URL(request.url).searchParams);
     query.set("page", String(n));
     return `?${query}`;
   };

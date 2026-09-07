@@ -2,13 +2,24 @@ import { ensureSchema } from "../ari/schema.server";
 import { db, d1Retry } from "../d1.server";
 import { chunkRows, valuesTuples } from "../d1-limits";
 
+/** How long the webhook's own enqueue-and-clear gets before the minute cron
+ * may treat a marker as abandoned. The cron's repair is a scope-less FULL
+ * push, so racing the in-request clear would replace a two-date delta with
+ * the whole window; a grace of one cron period keeps that for real crashes. */
+export const REPAIR_GRACE_MS = 60_000;
+
 /** Appended to the same atomic D1 batch as ARI upserts. A Worker ending after
  * commit but before its durable enqueue cannot make the change disappear. */
-export function googleAriRepairStatements(D: D1Database, pids: Iterable<string>, revision: string): D1PreparedStatement[] {
-  return chunkRows([...pids], 2).map((chunk) => D.prepare(
-    `INSERT INTO google_ari_repair (pid, revision) VALUES ${valuesTuples(chunk.length, 2)}
-     ON CONFLICT(pid) DO UPDATE SET revision=excluded.revision, next_attempt=0`,
-  ).bind(...chunk.flatMap((pid) => [pid, revision])));
+export function googleAriRepairStatements(
+  D: D1Database,
+  pids: Iterable<string>,
+  revision: string,
+  dueAt = Date.now() + REPAIR_GRACE_MS,
+): D1PreparedStatement[] {
+  return chunkRows([...pids], 3).map((chunk) => D.prepare(
+    `INSERT INTO google_ari_repair (pid, revision, next_attempt) VALUES ${valuesTuples(chunk.length, 3)}
+     ON CONFLICT(pid) DO UPDATE SET revision=excluded.revision, next_attempt=excluded.next_attempt`,
+  ).bind(...chunk.flatMap((pid) => [pid, revision, dueAt])));
 }
 
 export async function clearGoogleAriRepair(pid: string, revision: string): Promise<void> {
@@ -28,7 +39,7 @@ export async function retryGoogleAriRepairs(now = Date.now()): Promise<void> {
   ).bind(now).all<{ pid: string; revision: string }>());
   for (const { pid, revision } of rows.results) {
     try {
-      await queueGoogleAriPush(pid, ["ari"]);
+      if (!(await queueGoogleAriPush(pid, ["ari"]))) throw new Error("durable enqueue failed");
       await clearGoogleAriRepair(pid, revision);
     } catch (error) {
       await d1Retry(() => D.prepare("UPDATE google_ari_repair SET next_attempt=? WHERE pid=? AND revision=?").bind(now + 60_000, pid, revision).run());

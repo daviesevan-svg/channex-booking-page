@@ -48,9 +48,12 @@ export async function action({ request }: Route.ActionArgs) {
     // keeps admission retryable after this response.
     for (const [code, scope] of ariScopesFromChanges(body)) {
       fireAndForget(
-        queueGoogleAriPush(code, ["ari"], scope).then(() => clearGoogleAriRepair(code, repairRevision)).catch((e) =>
-          console.log(`[ari] google forward retained for scheduled repair for ${code}: ${e instanceof Error ? e.message : e}`),
-        ),
+        queueGoogleAriPush(code, ["ari"], scope)
+          // Admission failed: leave the marker for the minute cron.
+          .then((queued) => (queued ? clearGoogleAriRepair(code, repairRevision) : undefined))
+          .catch((e) =>
+            console.log(`[ari] google forward retained for scheduled repair for ${code}: ${e instanceof Error ? e.message : e}`),
+          ),
       );
     }
     return Response.json({ success: true, ...counts });

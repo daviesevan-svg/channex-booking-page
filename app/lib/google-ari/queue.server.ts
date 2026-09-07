@@ -15,6 +15,8 @@ interface Attempt { revision: number; results: AriPushResult[] }
 const STATE = "queue";
 const SOON_MS = 1_000;
 const RECOVERY_MS = 60_000;
+// 5s·2^n backoff capped at 1h: eight attempts span roughly two hours.
+const MAX_ATTEMPTS = 8;
 
 /** Merge scopes, not captured prices: every attempt reads the latest committed
  * inventory. Explicit disable wins until an explicit enable arrives. */
@@ -42,6 +44,10 @@ export class GoogleAriQueue extends DurableObject<Env> {
     }
     const revision = await this.ctx.storage.transaction(async (tx) => {
       const state = await tx.get<State>(STATE) ?? { revision: 0, attempts: 0 };
+      // A repeat disable has nothing to add: the block is already queued or
+      // delivered, and re-posting the whole stop-sell grid per settings save
+      // would only feed Google duplicates.
+      if (work.transition === "disable" && state.disabled && !state.pending) return null;
       if (work.transition === "disable") state.disabled = true;
       if (work.transition === "enable") state.disabled = false;
       // A channel notification must never reopen an explicitly disabled hotel,
@@ -99,7 +105,16 @@ export class GoogleAriQueue extends DurableObject<Env> {
       const state = await tx.get<State>(STATE);
       if (!state) throw new Error("Google ARI queue state disappeared during delivery");
       delete state.inflight;
-      if (!ok) {
+      if (!ok && !work.transition && state.attempts + 1 >= MAX_ATTEMPTS && !state.pending) {
+        // A gate that is not going to open (push disabled, no partner key,
+        // property not yet matched by Google) looks exactly like a network
+        // failure here. After ~2h of backoff, stop: the six-hourly
+        // reconciliation re-pushes anyway, and a per-property hourly alarm
+        // forever is what this cap prevents. Explicit ON/OFF transitions are
+        // never dropped — a lost block would leave a hotel for sale on Google.
+        state.attempts = 0;
+        console.log(`[google-ari] giving up on ${work.pid} after ${MAX_ATTEMPTS} attempts: ${results.map((r) => r.detail).join("; ")}`);
+      } else if (!ok) {
         state.pending = state.pending ? mergeGoogleAriWork(work, state.pending) : work;
         state.attempts++;
       } else state.attempts = 0;

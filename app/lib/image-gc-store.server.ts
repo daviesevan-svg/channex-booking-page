@@ -1,6 +1,7 @@
 // Durable image cleanup coordination. Keep this module independent of content
 // readers: CONFIG_KV writes use it before a new image reference becomes visible.
 import { env } from "cloudflare:workers";
+import { d1Retry } from "./d1-retry";
 
 export const IMAGE_GC_GRACE_MS = 24 * 60 * 60 * 1000;
 export const IMAGE_GC_RETRY_MS = 6 * 60 * 60 * 1000;
@@ -53,7 +54,7 @@ let ready: Promise<void> | undefined;
 export async function ensureImageGcSchema(): Promise<void> {
   const d = imageGcDb();
   if (!d) return;
-  ready ??= d.batch(IMAGE_GC_SCHEMA.map((sql) => d.prepare(sql))).then(() => {}).catch((error) => {
+  ready ??= d1Retry(() => d.batch(IMAGE_GC_SCHEMA.map((sql) => d.prepare(sql)))).then(() => {}).catch((error) => {
     ready = undefined;
     throw error;
   });
@@ -110,7 +111,10 @@ export async function withImageReferenceWrite<T>(pid: string, value: unknown, wr
   const token = crypto.randomUUID();
   const now = Date.now();
   const keys = imageReferenceKeys(value);
-  await d.batch([
+  // Every D1 hop here sits in front of an admin content save or a guest
+  // voucher write that used to have no D1 dependency at all. A recycled D1
+  // instance ("no longer active") must be retried, not turned into a 500.
+  await d1Retry(() => d.batch([
     d.prepare(`INSERT INTO image_gc_write (token, pid, started_at) VALUES (?, ?, ?)`).bind(token, pid, now),
     d.prepare(`INSERT INTO image_gc_property (pid, revision) VALUES (?, 1)
       ON CONFLICT(pid) DO UPDATE SET revision=revision+1`).bind(pid),
@@ -120,25 +124,25 @@ export async function withImageReferenceWrite<T>(pid: string, value: unknown, wr
       SELECT ?, value, ? FROM json_each(?) WHERE 1
       ON CONFLICT(pid,image_key) DO UPDATE SET expires_at=MAX(expires_at,excluded.expires_at)`)
       .bind(pid, now + 2 * IMAGE_GC_GRACE_MS, JSON.stringify(keys)),
-  ]);
+  ]));
   try {
     for (let i = 0; i < keys.length; i += 90) {
       const chunk = keys.slice(i, i + 90);
-      const deleted = await d.prepare(`SELECT image_key FROM image_gc_deleted
-        WHERE image_key IN (${chunk.map(() => "?").join(",")}) LIMIT 1`).bind(...chunk).first<{ image_key: string }>();
+      const deleted = await d1Retry(() => d.prepare(`SELECT image_key FROM image_gc_deleted
+        WHERE image_key IN (${chunk.map(() => "?").join(",")}) LIMIT 1`).bind(...chunk).first<{ image_key: string }>());
       if (deleted) throw new Error("This image was removed from storage. Upload it again before saving.");
     }
     return await write();
   } finally {
     // A termination between the KV write and this batch leaves an active lease;
     // the cron recovers it only while its initial 48-hour pins still protect it.
-    await d.batch([
+    await d1Retry(() => d.batch([
       d.prepare(`UPDATE image_gc_property SET revision=revision+1 WHERE pid=?`).bind(pid),
       // Never shorten another concurrent writer's initial protection; its
       // request may terminate without reaching its own completion batch.
       d.prepare(`UPDATE image_gc_pin SET expires_at=MAX(expires_at,?) WHERE pid=? AND image_key IN (SELECT value FROM json_each(?))`)
         .bind(Date.now() + IMAGE_GC_GRACE_MS, pid, JSON.stringify(keys)),
       d.prepare(`DELETE FROM image_gc_write WHERE token=?`).bind(token),
-    ]);
+    ]));
   }
 }

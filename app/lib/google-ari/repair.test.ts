@@ -8,10 +8,10 @@ const { clearGoogleAriRepair, googleAriRepairStatements, retryGoogleAriRepairs }
 
 beforeEach(() => {
   sqlite.exec("CREATE TABLE IF NOT EXISTS google_ari_repair (pid TEXT PRIMARY KEY, revision TEXT NOT NULL, next_attempt INTEGER NOT NULL DEFAULT 0); DELETE FROM google_ari_repair;");
-  queue.mockReset().mockResolvedValue(undefined);
+  queue.mockReset().mockResolvedValue(true); // queueGoogleAriPush: true = admitted
 });
 async function marker(pid: string, revision: string) {
-  await d1.batch(googleAriRepairStatements(d1 as never, [pid], revision) as never);
+  await d1.batch(googleAriRepairStatements(d1 as never, [pid], revision, 0) as never);
 }
 
 describe("Google durable admission repair", () => {
@@ -42,7 +42,7 @@ describe("Google durable admission repair", () => {
   });
 
   it("bounds work to 25 properties per minute, then advances to the rest", async () => {
-    await d1.batch(googleAriRepairStatements(d1 as never, Array.from({ length: 30 }, (_, i) => `hotel-${i}`), "rev") as never);
+    await d1.batch(googleAriRepairStatements(d1 as never, Array.from({ length: 30 }, (_, i) => `hotel-${i}`), "rev", 0) as never);
     await retryGoogleAriRepairs(100);
     expect(queue).toHaveBeenCalledTimes(25);
     expect(sqlite.prepare("SELECT COUNT(*) AS n FROM google_ari_repair").get()).toEqual({ n: 5 });

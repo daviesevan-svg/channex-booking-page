@@ -265,11 +265,22 @@ export async function performGoogleAriSync(pid: string, kinds: SyncKind[], scope
 }
 
 /** Persist a data-change push without waiting for Google's network delivery.
- * Disabled properties need no queued work. The webhook's atomic repair marker
- * covers admission failures; admin callers await this acknowledgement. */
-export async function queueGoogleAriPush(pid: string, kinds: SyncKind[], scope?: InventoryScope): Promise<void> {
-  if (!(await getSettings(pid)).googleAriPush) return;
-  await submitGoogleAriWork({ pid, kinds, scope });
+ * Disabled properties need no queued work.
+ *
+ * Never throws: ~40 admin and /v1/manage save actions call this AFTER their
+ * KV write, and before the queue existed a Google problem could not fail a
+ * save that had already persisted. Returns false when admission failed so the
+ * webhook keeps its repair marker (and the minute cron retries); every other
+ * caller has the six-hourly reconciliation as its backstop. */
+export async function queueGoogleAriPush(pid: string, kinds: SyncKind[], scope?: InventoryScope): Promise<boolean> {
+  try {
+    if (!(await getSettings(pid)).googleAriPush) return true;
+    await submitGoogleAriWork({ pid, kinds, scope });
+    return true;
+  } catch (error) {
+    console.log(`[google-ari] enqueue failed for ${pid}: ${error instanceof Error ? error.message : error}`);
+    return false;
+  }
 }
 
 /** Persist a full resync WITHOUT the enabled check. For the OFF→ON toggle

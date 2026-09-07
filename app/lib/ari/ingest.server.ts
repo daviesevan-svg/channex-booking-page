@@ -189,7 +189,10 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
   // again. Re-applying a chunk that did commit is a no-op (upsert by PK).
   for (let i = 0; i < stmts.length; i += 100) {
     const chunk = stmts.slice(i, i + 100);
-    if (options?.repairRevision) chunk.push(...googleAriRepairStatements(D, hotels, options.repairRevision));
+    // The marker rides with the LAST chunk: once every upsert has committed,
+    // the change exists and Google must hear about it. Earlier chunks that
+    // commit before a crash are re-applied by Channex's retry of the 5xx.
+    if (options?.repairRevision && i + 100 >= stmts.length) chunk.push(...googleAriRepairStatements(D, hotels, options.repairRevision));
     await d1Retry(() => D.batch(chunk));
   }
 
