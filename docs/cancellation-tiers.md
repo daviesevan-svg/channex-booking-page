@@ -10,13 +10,19 @@ from the rate. That is already how the single deadline works
 (`CancellationSnapshot`); this extends the snapshot rather than replacing the
 idea.
 
-> **Status (2026-09-07): phase 1 built** on branch `cancellation-tiers` —
-> resolver, snapshot bands, arithmetic, mixed-cart merge, the copy on all seven
-> surfaces in ten guest languages, the rate editor's step rows, API validation,
-> API serialization. Phase 2 (self-cancel inside a paying band, partial
-> refunds) not started. The §6 decisions were taken as recommended; each is
-> reversible. One snapshot detail changed from the scope: a band carries its
-> **penalty** in money, not its refund — see §3.1.
+> **Status (2026-09-07): phase 1 merged (#558); phase 2 built** on branch
+> `cancellation-tiers-refunds`. Phase 2: one gate (`lib/cancel-gate.ts`) for
+> the guest's button, its confirmation, the action's re-check and the admin's
+> refund field; a guest may self-cancel inside a paying band and sees the
+> numbers first; `autoRefund` pays the band's amount (and makes no gateway
+> call when nothing is owed); the admin's Refund has an amount field pre-filled
+> from the policy; the cancellation email carries a "Refunded" row. The §6
+> decisions were taken as recommended; each is reversible. Two things changed
+> from the scope: a band carries its **penalty** in money, not its refund (§3.1),
+> and a partial is passed to `refundBookingCharge` in **major** units (`amount`)
+> and converted per gateway inside it, so only one place knows about minor
+> units. Still one refund per booking (§7). **Viva partial refunds are
+> unproven in sandbox** (§8) — needs Viva demo credentials to run.
 
 ---
 

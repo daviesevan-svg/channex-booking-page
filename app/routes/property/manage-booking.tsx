@@ -16,6 +16,7 @@ import { langFromRequest } from "~/lib/content";
 
 import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
 import { cancellationBandMessages, cancellationMessage, formatCancelDeadline, penaltyText } from "~/lib/cancellation";
+import { cancelGate } from "~/lib/cancel-gate";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -45,21 +46,9 @@ async function ownedBooking(pid: string, id: string, request: Request) {
   return booking;
 }
 
-type CancelReason = "ok" | "notAllowed" | "nonRefundable" | "deadline";
-
-/** Whether a guest may self-cancel right now, and if not, why (for the tooltip). */
-function cancelState(
-  booking: NonNullable<Awaited<ReturnType<typeof getBooking>>>,
-  allowCancel: boolean,
-): { canCancel: boolean; reason: CancelReason } {
-  if (!allowCancel) return { canCancel: false, reason: "notAllowed" };
-  const c = booking.cancellation;
-  if (c && c.refundable === false) return { canCancel: false, reason: "nonRefundable" };
-  if (c?.cancelByISO && Date.now() > Date.parse(c.cancelByISO)) {
-    return { canCancel: false, reason: "deadline" };
-  }
-  return { canCancel: true, reason: "ok" };
-}
+// Whether a guest may self-cancel right now, and what comes back, is cancelGate
+// (lib/cancel-gate.ts) — shared with the admin's refund field, so the button,
+// the confirmation, the action's re-check and the admin all read one answer.
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
@@ -69,11 +58,18 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!booking) throw redirect(`${base}/manage`);
 
   const settings = await getSettings(pid);
-  const { canCancel, reason } = cancelState(booking, Boolean(settings.allowCancel));
+  const gate = cancelGate(booking, Boolean(settings.allowCancel));
   return {
     booking,
-    canCancel,
-    cancelReason: reason,
+    canCancel: gate.canCancel,
+    cancelReason: gate.reason,
+    // Inside a paying band: what was paid, what comes back, and the charge —
+    // for the notice above the button and the confirmation. Null in the free
+    // window (everything comes back) and for bookings from before bands.
+    partialCancel:
+      gate.canCancel && gate.band && gate.band.penalty !== "none"
+        ? { charged: gate.charged, refund: gate.refund, penalty: gate.band.penalty, penaltyValue: gate.band.penaltyValue }
+        : null,
     // In the guest's own language, falling back to the hotel's default-language
     // text (and, if they never wrote one, to our built-in string at render).
     afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request)),
@@ -97,7 +93,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     const settings = await getSettings(pid);
     // Re-check server-side so a stale page can't cancel past the deadline.
     const active = (booking.lifecycle ?? "active") === "active";
-    if (active && cancelState(booking, Boolean(settings.allowCancel)).canCancel) {
+    // The gate is computed HERE, at submit time, from the snapshot — a guest
+    // with a stale tab open across a band boundary gets the band they are in.
+    const gate = cancelGate(booking, Boolean(settings.allowCancel));
+    if (active && gate.canCancel) {
       // Atomic: only the ONE request whose write flips active→cancelled runs
       // the side effects. A concurrent duplicate gets undefined and does
       // nothing — before this, both released inventory and both refunded.
@@ -116,12 +115,18 @@ export async function action({ params, request }: Route.ActionArgs) {
       // Cancel the reservation upstream in Channex too (best-effort), so the
       // hotel's PMS doesn't keep a live booking after the guest cancelled.
       await cancelChannexBooking(pid, booking);
-      // Auto-refund (if the property opted in): a guest cancel only succeeds inside
-      // the free window, so the full charge is owed back. Otherwise the hotel
-      // refunds manually. No-op for guarantee-card bookings (no charge taken).
+      // Auto-refund (if the property opted in): what the band the guest is in
+      // owes back — all of the charge in the free window, part of it inside a
+      // paying band, nothing when a deposit is smaller than the penalty (no
+      // gateway call at all then). Otherwise the hotel refunds manually. No-op
+      // for guarantee-card bookings (no charge taken).
       let finalBooking = updated;
-      if (settings.autoRefund) {
-        const r = await refundBookingCharge(pid, finalBooking, { by: "auto (guest cancellation)" });
+      if (settings.autoRefund && gate.refund > 0) {
+        const partial = gate.refund < gate.charged;
+        const r = await refundBookingCharge(pid, finalBooking, {
+          ...(partial ? { amount: gate.refund } : {}),
+          by: partial ? "auto (guest cancellation, partial per policy)" : "auto (guest cancellation)",
+        });
         if (r.ok) finalBooking = r.booking;
       }
       // Cancellation confirmation to the guest + (opt-in) host notification.
@@ -147,7 +152,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default function ManageBooking({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
-  const { booking: b, canCancel, cancelReason, afterDeadlineMessage } = loaderData;
+  const { booking: b, canCancel, cancelReason, afterDeadlineMessage, partialCancel } = loaderData;
   const tr = useT();
   const s = useSlots();
   const { currency } = useProperty();
@@ -336,9 +341,26 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           method="post"
           className="mt-6"
           onSubmit={(e) => {
-            if (!canCancel || !confirm(tr.t("cancelConfirm"))) e.preventDefault();
+            // Inside a paying band the confirmation carries the numbers: what
+            // was paid and what comes back. A dialog is easy to click through,
+            // so the same numbers stand above the button too.
+            const question =
+              partialCancel && partialCancel.charged > 0
+                ? tr.t("cancelConfirmPartial", { paid: formatMoney(partialCancel.charged, cur), refund: formatMoney(partialCancel.refund, cur) })
+                : tr.t("cancelConfirm");
+            if (!canCancel || !confirm(question)) e.preventDefault();
           }}
         >
+          {canCancel && partialCancel && (
+            <p className="mb-3 text-body text-secondary">
+              {(() => {
+                const penalty = penaltyText(partialCancel.penalty, partialCancel.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => formatMoney(n, cur));
+                return partialCancel.charged > 0
+                  ? tr.t("cancelPartialNotice", { penalty, refund: formatMoney(partialCancel.refund, cur), paid: formatMoney(partialCancel.charged, cur) })
+                  : tr.t("cancelPartialNoticeUnpaid", { penalty });
+              })()}
+            </p>
+          )}
           <button
             type="submit"
             name="intent"

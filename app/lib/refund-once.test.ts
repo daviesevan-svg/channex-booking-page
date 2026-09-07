@@ -145,3 +145,65 @@ describe("refundBookingCharge (Viva)", () => {
     expect(vivaCalls).toHaveLength(1);
   });
 });
+
+describe("refundBookingCharge (Viva) with an amount", () => {
+  it("refunds the given amount in the gateway's minor units, and refuses one outside (0, charged] before touching the gateway", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { refundBookingCharge } = await import("./refunds.server");
+    const draft = {
+      id: "b-partial",
+      reference: "PARTIAL1",
+      status: "confirmed",
+      createdAt: "2026-09-02T00:00:00Z",
+      checkin: "2026-10-01",
+      checkout: "2026-10-03",
+      nights: 2,
+      rooms: [],
+      total: 120,
+      currency: "EUR",
+      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
+      payment: { provider: "viva", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_2", amount: 120, currency: "EUR" },
+    } as never;
+    expect((await claimBooking(PID, draft)).won).toBe(true);
+    const booking = (await getBooking(PID, "b-partial"))!;
+
+    vivaCalls.length = 0;
+    // Refused amounts leave the claim untaken, so the corrected retry below wins it.
+    expect(await refundBookingCharge(PID, booking, { amount: 150 })).toEqual({ ok: false, reason: "invalid_amount" });
+    expect(await refundBookingCharge(PID, booking, { amount: 0 })).toEqual({ ok: false, reason: "invalid_amount" });
+    expect(vivaCalls).toHaveLength(0);
+
+    // Half the stay back — 60.00 EUR is 6000 to Viva.
+    const r = await refundBookingCharge(PID, booking, { amount: 60, by: "auto (guest cancellation, partial per policy)" });
+    expect(r.ok).toBe(true);
+    expect(vivaCalls).toHaveLength(1);
+    expect(vivaCalls[0][2]).toBe(6000);
+    // And the single slot is now taken.
+    const after = (await getBooking(PID, "b-partial"))!;
+    expect(await refundBookingCharge(PID, after, { amount: 60 })).toMatchObject({ ok: false, reason: "already_refunded" });
+  });
+
+  it("treats an amount equal to the charge as the full refund", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { refundBookingCharge } = await import("./refunds.server");
+    const draft = {
+      id: "b-full-as-amount",
+      reference: "FULLAMT1",
+      status: "confirmed",
+      createdAt: "2026-09-02T00:00:00Z",
+      checkin: "2026-10-01",
+      checkout: "2026-10-03",
+      nights: 2,
+      rooms: [],
+      total: 120,
+      currency: "EUR",
+      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
+      payment: { provider: "viva", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_3", amount: 120, currency: "EUR" },
+    } as never;
+    expect((await claimBooking(PID, draft)).won).toBe(true);
+    const booking = (await getBooking(PID, "b-full-as-amount"))!;
+    vivaCalls.length = 0;
+    expect((await refundBookingCharge(PID, booking, { amount: 120 })).ok).toBe(true);
+    expect(vivaCalls[0][2]).toBe(12000);
+  });
+});
