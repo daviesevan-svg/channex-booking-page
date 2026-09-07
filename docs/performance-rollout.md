@@ -4,13 +4,13 @@ This change reduces booking-history reads, guest JavaScript, Google ARI delivery
 
 ## Deploy in this order
 
-1. Apply the additive D1 migrations to the production `channex-ari` database before the matching Worker is deployed:
+1. No D1 step is required. Merging to `main` deploys through Workers Builds, which cannot run `wrangler d1 migrations apply`, so every new table and index is also created at runtime by the existing `schemaOnce` latches (`ari/schema.server.ts` for `google_ari_repair`, `bookings.server.ts` and `checkout-idem.server.ts` for the two new indexes, `image-gc-store.server.ts` for the cleanup tables). The files under `migrations/` describe the same DDL for anyone provisioning a database by hand and are idempotent:
 
    ```sh
    npx wrangler d1 migrations apply channex-ari --remote
    ```
 
-   `0001` adds booking-order and checkout-age indexes; `0002` creates image cleanup coordination tables; `0003` creates the Google enqueue repair table and retry index. These migrations are idempotent and leave existing business records intact. Build the indexes during deployment preparation, since existing rows require indexing. For a disposable local database, use `--local` instead of `--remote`.
+   Running them ahead of the deploy only moves the one-off index build off the first request that would otherwise trigger it.
 
 2. Deploy using the normal build/deploy pipeline (`npm run deploy` locally). Keep the `GOOGLE_ARI_QUEUE` binding, the `v1-google-ari-queue` SQLite Durable Object migration and all three cron expressions from `wrangler.jsonc`. Exporting `GoogleAriQueue` from the Worker is required. No new secrets are needed. The first deployment introducing this Durable Object must use `wrangler deploy`; `wrangler versions upload` cannot apply a new Durable Object lifecycle migration, so branch preview uploads can remain blocked until that first deployment. See [Cloudflare's migration guidance](https://developers.cloudflare.com/workers/versions-and-deployments/deployment-management/#durable-object-migrations).
 

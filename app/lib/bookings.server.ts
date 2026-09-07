@@ -191,6 +191,9 @@ const ensureBookingSchema = schemaOnce((d) => [
   ),
   d.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS booking_ref ON booking(pid, reference)`),
   d.prepare(`CREATE INDEX IF NOT EXISTS booking_email ON booking(pid, email)`),
+  // getBookingsPage orders by created_at; without this the page is a sort of
+  // the property's whole history on every admin/API listing.
+  d.prepare(`CREATE INDEX IF NOT EXISTS booking_created_at ON booking(pid, created_at)`),
 ]);
 
 type Row = { json: string };

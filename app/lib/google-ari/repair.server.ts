@@ -1,3 +1,4 @@
+import { ensureSchema } from "../ari/schema.server";
 import { db, d1Retry } from "../d1.server";
 import { chunkRows, valuesTuples } from "../d1-limits";
 
@@ -11,6 +12,7 @@ export function googleAriRepairStatements(D: D1Database, pids: Iterable<string>,
 }
 
 export async function clearGoogleAriRepair(pid: string, revision: string): Promise<void> {
+  await d1Retry(() => ensureSchema());
   await d1Retry(() => db().prepare("DELETE FROM google_ari_repair WHERE pid=? AND revision=?").bind(pid, revision).run());
 }
 
@@ -19,6 +21,7 @@ export async function clearGoogleAriRepair(pid: string, revision: string): Promi
  * Timestamped retries let healthy properties advance past a failing property. */
 export async function retryGoogleAriRepairs(now = Date.now()): Promise<void> {
   const { queueGoogleAriPush } = await import("./push.server");
+  await d1Retry(() => ensureSchema());
   const D = db();
   const rows = await d1Retry(() => D.prepare(
     "SELECT pid, revision FROM google_ari_repair WHERE next_attempt<=? ORDER BY next_attempt, pid LIMIT 25",

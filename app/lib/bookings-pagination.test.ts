@@ -27,8 +27,7 @@ const req = (path: string) => ({ request: new Request(`https://example.com${path
 beforeAll(async () => {
   const { getBookings } = await import("./bookings.server");
   await getBookings("p1");
-  // Mirrors the versioned ordering-index migration, not request-time DDL.
-  sqlite.exec("CREATE INDEX booking_created_at ON booking(pid, created_at)");
+  // booking_created_at is created by ensureBookingSchema (via the getBookings above).
 });
 beforeEach(() => {
   sqlite.exec("DELETE FROM booking");

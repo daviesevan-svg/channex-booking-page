@@ -77,6 +77,19 @@ export const ensureSchema = schemaOnce((d) => [
   d.prepare(`CREATE INDEX IF NOT EXISTS availability_hotel_date ON availability (hotel_code, date)`),
   d.prepare(`CREATE INDEX IF NOT EXISTS rate_hotel_date ON rate (hotel_code, date)`),
   d.prepare(`CREATE INDEX IF NOT EXISTS restriction_hotel_date ON restriction (hotel_code, date)`),
+  // Google ARI enqueue-repair marker (google-ari/repair.server.ts). It is
+  // written in the SAME batch as the ARI upserts in applyChanges, so it must
+  // be created by the same latch: this repo deploys on merge with no step
+  // that could run migrations/*.sql, and a missing table here would fail
+  // every Channex webhook batch, not just the Google push.
+  d.prepare(
+    `CREATE TABLE IF NOT EXISTS google_ari_repair (
+      pid TEXT PRIMARY KEY,
+      revision TEXT NOT NULL,
+      next_attempt INTEGER NOT NULL DEFAULT 0
+    )`,
+  ),
+  d.prepare(`CREATE INDEX IF NOT EXISTS google_ari_repair_due ON google_ari_repair (next_attempt, pid)`),
 ]);
 
 export interface MappingRoomType {

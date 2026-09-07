@@ -34,9 +34,11 @@ const ensureIntentSchema = schemaOnce((d) => [
         PRIMARY KEY (pid, fingerprint)
       )`,
   ),
+  // pruneCheckoutIntents deletes by age; the cron would otherwise scan the table.
+  d.prepare(`CREATE INDEX IF NOT EXISTS checkout_intent_created_at ON checkout_intent(created_at)`),
 ]);
 
-/** Bounded maintenance, with an indexed age predicate (see migrations/).
+/** Bounded maintenance, with an indexed age predicate (checkout_intent_created_at above).
  * The cutoff is checked in the DELETE itself, so refreshing a fingerprint
  * before this statement runs cannot delete the new claim. */
 export async function pruneCheckoutIntents(now = Date.now()): Promise<number> {
