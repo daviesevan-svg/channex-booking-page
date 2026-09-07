@@ -10,8 +10,13 @@ from the rate. That is already how the single deadline works
 (`CancellationSnapshot`); this extends the snapshot rather than replacing the
 idea.
 
-> **Status (2026-09-07): scoping only.** Nothing here is built. §6 lists the
-> decisions that need an answer before phase 1 starts.
+> **Status (2026-09-07): phase 1 built** on branch `cancellation-tiers` —
+> resolver, snapshot bands, arithmetic, mixed-cart merge, the copy on all seven
+> surfaces in ten guest languages, the rate editor's step rows, API validation,
+> API serialization. Phase 2 (self-cancel inside a paying band, partial
+> refunds) not started. The §6 decisions were taken as recommended; each is
+> reversible. One snapshot detail changed from the scope: a band carries its
+> **penalty** in money, not its refund — see §3.1.
 
 ---
 
@@ -90,15 +95,26 @@ interface CancellationSnapshot {
   bands?: CancelBand[];
 }
 interface CancelBand {
-  untilISO: string;
-  untilLocal: string;
+  /** null = this band runs to arrival (the last one). */
+  untilISO: string | null;
+  untilLocal?: string;
   penalty: PenaltyType;
   penaltyValue?: number;
-  /** Major units, computed at booking time from the stay total and the amount
-   *  actually charged. This is the number the refund path uses. */
-  refund: number;
+  /** The penalty in major units against the stay total, computed at booking
+   *  time. The refund is derived from it when the cancellation happens:
+   *  clamp(charged − penaltyAmount, 0, charged) — see §3.2. */
+  penaltyAmount?: number;
 }
 ```
+
+Built as `app/lib/cancel-bands.ts`; the types live in `cancellation.ts` beside
+`CancellationLike`. N tiers make N+1 bands: the free band first (`penalty:
+"none"`, ending at the first tier's deadline — which is `cancelByISO`), then
+each tier's penalty running until the next tier's deadline, the last to
+arrival. The scope had a `refund` field here; it became `penaltyAmount`
+because the amount actually charged is not known when the snapshot is taken
+(payment is decided at finalize, after the record is built), while the stay
+total is. `bandRefund(band, charged)` does the subtraction at cancel time.
 
 `cancelByISO` keeps its meaning so all seven existing readers keep working
 untouched until they are upgraded (§4). A booking from before this shipped has
@@ -116,10 +132,14 @@ Penalties are stated against the **stay total** (`booking.total`); refunds come
 out of the **amount actually charged** (`payment.amount`).
 
 ```
-penalty(band) = none → 0 | percent p → total·p/100 | fixed f → f
-              | first_night → total/nights | full_stay → total
-refund(band)  = clamp(charged − penalty, 0, charged)
+penaltyAmount(band) = none → 0 | percent p → total·p/100 | fixed f → min(f, total)
+                    | first_night → total/nights | full_stay → total   (at booking)
+refund(band)        = clamp(charged − penaltyAmount, 0, charged)       (at cancel)
 ```
+
+(`penaltyAmount` in `cancel-bands.ts`; `bandRefund` for the second line.
+Without a known amount — the checkout preview — `bandRefund` is conservative:
+everything for a free band, nothing for a charging one.)
 
 So a 30% deposit with a 50% penalty refunds nothing; full prepayment with a 50%
 penalty refunds half. Pay-at-hotel bookings (`payment.mode === "setup"`) have
