@@ -361,7 +361,8 @@ const ratePolicySchema = {
         refundable: { type: "boolean" },
         tiers: {
           type: "array",
-          description: "Free→penalty windows; empty = free cancellation with no deadline. deadline_value 0 means 'until the anchor time on arrival day'.",
+          description:
+            "Free→penalty windows; empty = free cancellation with no deadline. Several make a schedule (e.g. 50% until 7 days before, the full stay after): most generous first, each deadline closer to arrival than the last, each penalty at least as harsh, at most 4, none 'none'. deadline_value 0 means 'until the anchor time on arrival day'.",
           items: {
             type: "object",
             properties: {

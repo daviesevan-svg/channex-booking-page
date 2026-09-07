@@ -1528,6 +1528,12 @@ const TR: Record<string, string> = {
     "Rezervasyon sayfasında gösterilen koşul metninin canlı önizlemesi (misafir bunu kendi dilinde ve gerçek tutarlarla görür).",
   rtOverrideNote: "Özel not",
   rtOverrideNoteHint: "(isteğe bağlı — yukarıdaki tüm politika metninin yerine geçer)",
+  rtLateChargeHintSteps: "(sonraki adıma kadar)",
+  rtTiersIntro: "Varış yaklaştıkça değişen bir politika için adım ekleyin — örn. 7 gün öncesine kadar %50, sonrasında tüm konaklama.",
+  rtTierAdd: "Adım ekle",
+  rtTierRemove: "Son adımı kaldır",
+  rtTierFrom: "Sonraki adım — şu kadar önce:",
+  rtTierCharge: "Bu noktadan itibaren tahsil et",
   rtOverrideNotePlaceholder:
     "Yukarıdaki alanlardan oluşturulan koşulları göstermek için boş bırakın.",
   rtCreate: "Fiyat planı oluştur",
