@@ -174,6 +174,13 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     });
     text(money(x.amount), { rightAt: PAGE_W - MARGIN, size: 10 });
     y -= 15;
+    // Guest-entered details (flight number, arrival time) — same line the
+    // confirmation page and the emails show.
+    if (x.infoLine) {
+      ensure(13);
+      text(x.infoLine, { size: 9, color: MUTED });
+      y -= 13;
+    }
   }
 
   // ---- taxes & fees charged on top (snapshotted at booking time) ----
