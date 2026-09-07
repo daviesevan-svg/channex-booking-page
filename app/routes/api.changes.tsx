@@ -4,7 +4,6 @@ import { fireAndForget, isTransientD1Error } from "~/lib/d1.server";
 import { isChannexConnected } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { clearGoogleAriRepair } from "~/lib/google-ari/repair.server";
-import { ariScopesFromChanges } from "~/lib/google-ari/scope";
 import { requestFullSyncOnce } from "~/lib/open-channel.server";
 
 // POST /api/changes — Channex pushes availability/rate/restriction changes.
@@ -38,7 +37,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   try {
     const repairRevision = crypto.randomUUID();
-    const counts = await applyChanges(body, { repairRevision });
+    const { counts, scopes } = await applyChanges(body, { repairRevision });
     // Forward the fresh ARI on to Google (rates/availability/inventory) for any
     // ARI-enabled property in this batch; a no-op when the property isn't
     // pushing to Google.
@@ -46,7 +45,7 @@ export async function action({ request }: Route.ActionArgs) {
     // Delivery has its own error handler. A downstream KV or queue failure
     // must not tell Channex that committed inventory failed; the repair marker
     // keeps admission retryable after this response.
-    for (const [code, scope] of ariScopesFromChanges(body)) {
+    for (const [code, scope] of scopes) {
       fireAndForget(
         queueGoogleAriPush(code, ["ari"], scope)
           // Admission failed: leave the marker for the minute cron.

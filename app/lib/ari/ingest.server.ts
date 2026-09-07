@@ -2,6 +2,7 @@
 // changes_notification pushes, and the "have we ever / when did we last
 // receive ARI" reads that describe ingest state.
 import { googleAriRepairStatements } from "../google-ari/repair.server";
+import { boundAriScope } from "../google-ari/scope";
 import { getConfig, getConfigKV } from "../config.server";
 import { d1Retry, db } from "../d1.server";
 import { timingSafeEqual } from "../hmac.server";
@@ -66,20 +67,32 @@ export async function getLastAriReceivedAt(hotelCode: string): Promise<number | 
 }
 
 /** Apply one or more changes_notification messages. Returns counts by type. */
-export async function applyChanges(body: unknown, options?: { repairRevision: string }): Promise<{ availability: number; rates: number; restrictions: number }> {
+export interface ApplyChangesResult {
+  counts: { availability: number; rates: number; restrictions: number };
+  /** Per hotel, the exact cells this body changed — what Google must re-read.
+   *  `undefined` = too large to carry, push the full window instead. Hotels
+   *  with nothing applied are absent, and get no repair marker either. */
+  scopes: Map<string, InventoryScope | undefined>;
+}
+
+export async function applyChanges(body: unknown, options?: { repairRevision: string }): Promise<ApplyChangesResult> {
   await d1Retry(() => ensureSchema());
   const notifications = (body as { data?: unknown })?.data;
   if (!Array.isArray(notifications)) throw new Error("Expected { data: [...] }");
 
   const counts = { availability: 0, rates: 0, restrictions: 0 };
   const hotels = new Set<string>();
-  // Only availability and displayed prices are audited. Keep the exact
-  // room/product cells so concurrent writes elsewhere cannot enter this diff.
+  // The body is walked ONCE and projected twice. `touched` is the audit scope:
+  // only availability and displayed prices are audited, so a stop-sell-only
+  // change reads no snapshot (see audit-scope.test). `changed` is the Google
+  // scope: every cell whose sellability moved, stop-sells included — a second
+  // parser for that used to live in google-ari/scope.ts and had already
+  // drifted from this one on exactly those restriction-only changes.
   const touched = new Map<string, InventoryScope>();
-  const touch = (hotel: string, roomId: string, rateId: string | null, dates: string[]) => {
-    if (!hotel || !dates.length) return;
-    let scope = touched.get(hotel);
-    if (!scope) touched.set(hotel, (scope = { availability: [], products: [] }));
+  const changed = new Map<string, InventoryScope>();
+  const addCell = (map: Map<string, InventoryScope>, hotel: string, roomId: string, rateId: string | null, dates: string[]) => {
+    let scope = map.get(hotel);
+    if (!scope) map.set(hotel, (scope = { availability: [], products: [] }));
     if (rateId === null) {
       let cell = scope.availability.find((c) => c.roomId === roomId);
       if (!cell) scope.availability.push((cell = { roomId, dates: [] }));
@@ -89,6 +102,11 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
       if (!cell) scope.products.push((cell = { roomId, rateId, dates: [] }));
       cell.dates = [...new Set([...cell.dates, ...dates])];
     }
+  };
+  const touch = (hotel: string, roomId: string, rateId: string | null, dates: string[], opts: { audit: boolean }) => {
+    if (!hotel || !dates.length) return;
+    addCell(changed, hotel, roomId, rateId, dates);
+    if (opts.audit) addCell(touched, hotel, roomId, rateId, dates);
   };
   const D = db();
 
@@ -116,7 +134,7 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
 
 
       if (type === "availability_changes") {
-        touch(hotel, room, null, dates);
+        touch(hotel, room, null, dates, { audit: true });
         const avail = Number(a.availability) || 0;
         for (const d of dates) {
           availRows.push([hotel, room, d, avail]);
@@ -124,7 +142,7 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
         }
       } else if (type === "restriction_changes") {
         const rates = (Array.isArray(a.rates) ? a.rates : []) as RateIn[];
-        if (rates.length) touch(hotel, room, plan, dates);
+        touch(hotel, room, plan, dates, { audit: rates.length > 0 });
         // Fields absent from this change bind the ABSENT sentinel → preserved
         // by the upsert. A rate-only change writes no restriction row at all.
         // Channex is configured to send ONE min-stay field, the generic
@@ -192,7 +210,9 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
     // The marker rides with the LAST chunk: once every upsert has committed,
     // the change exists and Google must hear about it. Earlier chunks that
     // commit before a crash are re-applied by Channex's retry of the 5xx.
-    if (options?.repairRevision && i + 100 >= stmts.length) chunk.push(...googleAriRepairStatements(D, hotels, options.repairRevision));
+    // Only hotels with a changed cell: a marker for a hotel that gets no
+    // enqueue would make the minute cron push its whole window for nothing.
+    if (options?.repairRevision && i + 100 >= stmts.length) chunk.push(...googleAriRepairStatements(D, changed.keys(), options.repairRevision));
     await d1Retry(() => D.batch(chunk));
   }
 
@@ -221,7 +241,7 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
       [...hotels].map((h) => getConfigKV().put(lastAriKey(h), now).catch(() => {})),
     );
   }
-  return counts;
+  return { counts, scopes: new Map([...changed].map(([h, scope]) => [h, boundAriScope(scope)])) };
 }
 
 /** True once we've actually received an ARI push for this hotel — i.e. Channex
