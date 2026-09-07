@@ -36,7 +36,15 @@ export function schemaOnce(statements: (d: D1Database) => D1PreparedStatement[])
   return () => {
     ready ??= (async () => {
       const d = db();
-      await d.batch(statements(d));
+      // Bounded, because a latched promise that never settles wedges the whole
+      // isolate: every later caller awaits the same pending batch, nothing is
+      // ever logged (no request completes), and the isolate stays warm on the
+      // very traffic that is hanging. That is what took every ARI-reading
+      // guest page down on 2026-09-07 while D1 itself answered in under a
+      // millisecond — one lost response to the DDL batch, latched for the
+      // lifetime of the isolate. A rejection clears the latch (below); a hang
+      // never reached that code, so it is turned into one here.
+      await withTimeout(d.batch(statements(d)), SCHEMA_TIMEOUT_MS, "D1 schema batch");
     })().catch((error) => {
       // A failed create must not latch, or the isolate is stuck answering
       // "schema ready" for a schema that was never made. Clearing it lets the
@@ -46,6 +54,20 @@ export function schemaOnce(statements: (d: D1Database) => D1PreparedStatement[])
     });
     return ready;
   };
+}
+
+/** Generous for DDL that is a no-op once the tables exist (sub-second), tight
+ *  enough that a lost response costs one request an error, not the isolate. */
+export const SCHEMA_TIMEOUT_MS = 10_000;
+
+/** Settle with `work`, or reject after `ms` — the timer is cleared either way so
+ *  it never keeps an isolate alive on its own. */
+export function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} did not respond within ${ms} ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
