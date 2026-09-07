@@ -22,6 +22,8 @@ import type { Locale } from "date-fns";
 import { useRouteLoaderData } from "react-router";
 
 import EN from "./admin-locales/en";
+import { registeredAdminDict } from "./admin-dict-registry";
+export { registerAdminDict } from "./admin-dict-registry";
 
 export type AdminLang = "en" | "de" | "pt" | "el" | "th" | "tr";
 /** Flags are spelled out here rather than read from `LANGUAGES` in content.ts:
@@ -60,23 +62,8 @@ export function adminLangFromRequest(request: Request): AdminLang {
 
 export type AdminT = (key: string, vars?: Record<string, string | number>) => string;
 
-/**
- * Dictionaries available to `adminT` right now. English is always here. On the
- * server, admin-i18n-locales.server.ts fills in the rest at module load. In the
- * browser only the admin's own language is ever added, so a miss means "not
- * this admin's language" and the per-key English fallback is the right answer.
- */
-const DICTS = new Map<string, Record<string, string>>([["en", EN]]);
-
-/** Register one language's labels. Idempotent — called on every render of
- *  root's Layout, which is what keeps a client-side language switch working. */
-export function registerAdminDict(lang: string, dict: Record<string, string> | null | undefined): void {
-  if (!dict || !lang || lang === "en") return;
-  DICTS.set(lang, dict);
-}
-
 export function adminT(lang: AdminLang): AdminT {
-  const dict = lang === "en" ? undefined : DICTS.get(lang);
+  const dict = lang === "en" ? undefined : registeredAdminDict(lang);
   return (key, vars) => {
     let s = dict?.[key] ?? EN[key] ?? key;
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));

@@ -258,6 +258,60 @@ export async function getBookings(pid: string): Promise<BookingRecord[]> {
   return parseRows(results ?? []);
 }
 
+export interface BookingPageOptions {
+  limit: number;
+  offset: number;
+  status?: BookingStatus;
+  lifecycle?: BookingLifecycle;
+  checkinFrom?: string;
+  checkinTo?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  /** The management API historically returned older inserts first on equal
+   *  timestamps; other booking lists return newer inserts first. */
+  oldestFirstAtSameTime?: boolean;
+}
+
+/** Decode only the requested page. Both queries run in one D1 batch so the
+ *  count and page observe the same state if another booking arrives. Filters
+ *  without dedicated columns remain SQLite JSON predicates, avoiding transfer
+ *  and JS decoding of the entire property's history. */
+export async function getBookingsPage(
+  pid: string,
+  options: BookingPageOptions,
+): Promise<{ bookings: BookingRecord[]; total: number }> {
+  if (!Number.isSafeInteger(options.limit) || options.limit < 1 || options.limit > 200 ||
+      !Number.isSafeInteger(options.offset) || options.offset < 0) {
+    throw new RangeError("Booking page requires an integer limit (1–200) and non-negative safe offset.");
+  }
+  await ready(pid);
+  const clauses = ["pid=?"];
+  const values: (string | number)[] = [pid];
+  const filter = (sql: string, value: string | undefined) => {
+    if (value != null) { clauses.push(sql); values.push(value); }
+  };
+  filter("json_extract(json, '$.status')=?", options.status);
+  filter("lifecycle=?", options.lifecycle);
+  filter("json_extract(json, '$.checkin')>=?", options.checkinFrom);
+  filter("json_extract(json, '$.checkin')<=?", options.checkinTo);
+  filter("created_at>=?", options.createdFrom);
+  // The upper bound includes every ISO timestamp on the requested day, as
+  // well as legacy records that store only the date. It stays an index range.
+  filter("created_at<?", options.createdTo == null ? undefined : `${options.createdTo}\uffff`);
+  const where = clauses.join(" AND ");
+  const tieOrder = options.oldestFirstAtSameTime ? "ASC" : "DESC";
+  const d = db();
+  const [page, count] = await d.batch([
+    d.prepare(`SELECT json FROM booking WHERE ${where} ORDER BY created_at DESC, rowid ${tieOrder} LIMIT ? OFFSET ?`)
+      .bind(...values, options.limit, options.offset),
+    d.prepare(`SELECT COUNT(*) AS total FROM booking WHERE ${where}`).bind(...values),
+  ]);
+  return {
+    bookings: parseRows((page.results ?? []) as Row[]),
+    total: Number((count.results?.[0] as { total: number } | undefined)?.total ?? 0),
+  };
+}
+
 export async function getBooking(pid: string, id: string): Promise<BookingRecord | undefined> {
   await ready(pid);
   const row = await db().prepare(`SELECT json FROM booking WHERE pid=? AND id=?`).bind(pid, id).first<Row>();

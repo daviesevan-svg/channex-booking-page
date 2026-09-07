@@ -1,9 +1,9 @@
 import type { Route } from "./+types/api.v1.manage.bookings";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
-import { getBookings } from "~/lib/bookings.server";
+import { getBookingsPage, type BookingStatus, type BookingLifecycle } from "~/lib/bookings.server";
 import { serializeManageBooking } from "~/lib/manage-serialize";
+import { bookingPageParams, isCalendarDate } from "~/lib/api-query";
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_LIMIT = 200;
 
 // GET /v1/manage/bookings — read-only booking list. There are deliberately no
@@ -21,7 +21,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   for (const p of ["checkin_from", "checkin_to", "created_from", "created_to"]) {
     const v = q.get(p);
-    if (v && !DATE.test(v)) return apiError(422, "validation_error", `\`${p}\` must be YYYY-MM-DD.`);
+    if (v && !isCalendarDate(v)) return apiError(422, "validation_error", `\`${p}\` must be a real calendar date (YYYY-MM-DD).`);
   }
   const status = q.get("status");
   if (status && !["confirmed", "simulated", "failed"].includes(status)) {
@@ -31,22 +31,23 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (lifecycle && !["active", "cancelled"].includes(lifecycle)) {
     return apiError(422, "validation_error", "`lifecycle` must be active or cancelled.");
   }
-  const limit = Math.min(Math.max(Number(q.get("limit")) || 50, 1), MAX_LIMIT);
-  const offset = Math.max(Number(q.get("offset")) || 0, 0);
-
-  const all = await getBookings(auth.pid);
-  const filtered = all
-    .filter((b) => !status || b.status === status)
-    .filter((b) => !lifecycle || (b.lifecycle ?? "active") === lifecycle)
-    .filter((b) => !q.get("checkin_from") || b.checkin >= q.get("checkin_from")!)
-    .filter((b) => !q.get("checkin_to") || b.checkin <= q.get("checkin_to")!)
-    .filter((b) => !q.get("created_from") || b.createdAt.slice(0, 10) >= q.get("created_from")!)
-    .filter((b) => !q.get("created_to") || b.createdAt.slice(0, 10) <= q.get("created_to")!)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  const page = bookingPageParams(q, MAX_LIMIT);
+  if ("error" in page) return apiError(422, "validation_error", page.error);
+  const { limit, offset } = page;
+  const { bookings, total } = await getBookingsPage(auth.pid, {
+    limit, offset,
+    status: (status || undefined) as BookingStatus | undefined,
+    lifecycle: (lifecycle || undefined) as BookingLifecycle | undefined,
+    checkinFrom: q.get("checkin_from") || undefined,
+    checkinTo: q.get("checkin_to") || undefined,
+    createdFrom: q.get("created_from") || undefined,
+    createdTo: q.get("created_to") || undefined,
+    oldestFirstAtSameTime: true,
+  });
 
   return Response.json({
-    data: filtered.slice(offset, offset + limit).map(serializeManageBooking),
-    total: filtered.length,
+    data: bookings.map(serializeManageBooking),
+    total,
     limit,
     offset,
   });

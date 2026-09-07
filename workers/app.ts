@@ -1,6 +1,8 @@
 import { createRequestHandler } from "react-router";
 
 import { scheduledGoogleAriSync } from "../app/lib/google-ari/push.server";
+import { retryGoogleAriRepairs } from "../app/lib/google-ari/repair.server";
+import { processImageCleanup } from "../app/lib/image-gc.server";
 import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "../app/lib/google-merged-vr-feed.server";
 import { scheduledReviewRequests } from "../app/lib/review-requests.server";
@@ -9,12 +11,14 @@ import { pruneAri } from "../app/lib/ari/admin.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
 import { pruneCollectionEvents } from "../app/lib/collection-analytics.server";
+import { pruneCheckoutIntents } from "../app/lib/checkout-idem.server";
 import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
 import { httpsRedirect, withHsts } from "../app/lib/https-redirect";
 import { hasInternalParams, stripInternalParams } from "../app/lib/internal-params";
 import { runWithRequestCache } from "../app/lib/request-cache.server";
 
+export { GoogleAriQueue } from "../app/lib/google-ari/queue.server";
 
 const requestHandler = createRequestHandler(
   () => import("virtual:react-router/server-build"),
@@ -103,7 +107,16 @@ export default {
   // and keeps the previous snapshot if Channex can't be reached; (3) prune ARI
   // rows outside the useful window (past dates + >730 days out) so D1 stays
   // bounded.
-  async scheduled(_controller, _env, ctx) {
+  async scheduled(controller, _env, ctx) {
+    if (controller.cron === "* * * * *") {
+      ctx.waitUntil(retryGoogleAriRepairs().catch((e) => console.error("[cron] Google ARI repair failed", e)));
+      return;
+    }
+    if (controller.cron === "*/15 * * * *") {
+      ctx.waitUntil(processImageCleanup().catch((e) => console.error("[cron] image cleanup failed", e)));
+      return;
+    }
+    ctx.waitUntil(pruneCheckoutIntents().catch((e) => console.log(`[cron] pruneCheckoutIntents failed: ${e}`)));
     ctx.waitUntil(scheduledGoogleAriSync());
     ctx.waitUntil(refreshMergedGoogleFeed());
     ctx.waitUntil(refreshMergedVrFeed());

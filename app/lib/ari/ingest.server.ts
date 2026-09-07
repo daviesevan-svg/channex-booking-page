@@ -1,12 +1,13 @@
 // The Channex webhook ingest surface: the api-key gate, applying
 // changes_notification pushes, and the "have we ever / when did we last
 // receive ARI" reads that describe ingest state.
+import { googleAriRepairStatements } from "../google-ari/repair.server";
 import { getConfig, getConfigKV } from "../config.server";
 import { d1Retry, db } from "../d1.server";
 import { timingSafeEqual } from "../hmac.server";
 import { toMinor } from "./fraction";
 import { CHANNEX_ACTOR } from "./log.server";
-import { getInventoryOn } from "./read.server";
+import { getInventoryForScope, type InventoryScope } from "./read.server";
 import { ensureSchema, type InventoryData } from "./schema.server";
 import { AVAIL_UPSERT, RATE_UPSERT, RESTR_ENSURE, RESTR_UPSERT, diffInventory, insertAriLog, packUpserts } from "./write.server";
 
@@ -65,25 +66,29 @@ export async function getLastAriReceivedAt(hotelCode: string): Promise<number | 
 }
 
 /** Apply one or more changes_notification messages. Returns counts by type. */
-export async function applyChanges(body: unknown): Promise<{ availability: number; rates: number; restrictions: number }> {
+export async function applyChanges(body: unknown, options?: { repairRevision: string }): Promise<{ availability: number; rates: number; restrictions: number }> {
   await d1Retry(() => ensureSchema());
   const notifications = (body as { data?: unknown })?.data;
   if (!Array.isArray(notifications)) throw new Error("Expected { data: [...] }");
 
   const counts = { availability: 0, rates: 0, restrictions: 0 };
   const hotels = new Set<string>();
-  // Per-hotel affected DATES, so we can snapshot/diff for the audit log. A set
-  // rather than a {from,to} window: one notification body routinely carries
-  // scattered dates, and widening to cover them meant snapshotting — and then
-  // diffing — everything in between. With a 730-day horizon that turned a
-  // two-date push into a two-year comparison, which is both a large read and a
-  // way to attribute another writer's concurrent change to Channex.
-  const touched = new Map<string, Set<string>>();
-  const touch = (hotel: string, dates: string[]) => {
+  // Only availability and displayed prices are audited. Keep the exact
+  // room/product cells so concurrent writes elsewhere cannot enter this diff.
+  const touched = new Map<string, InventoryScope>();
+  const touch = (hotel: string, roomId: string, rateId: string | null, dates: string[]) => {
     if (!hotel || !dates.length) return;
-    let set = touched.get(hotel);
-    if (!set) touched.set(hotel, (set = new Set<string>()));
-    for (const d of dates) set.add(d);
+    let scope = touched.get(hotel);
+    if (!scope) touched.set(hotel, (scope = { availability: [], products: [] }));
+    if (rateId === null) {
+      let cell = scope.availability.find((c) => c.roomId === roomId);
+      if (!cell) scope.availability.push((cell = { roomId, dates: [] }));
+      cell.dates = [...new Set([...cell.dates, ...dates])];
+    } else {
+      let cell = scope.products.find((c) => c.roomId === roomId && c.rateId === rateId);
+      if (!cell) scope.products.push((cell = { roomId, rateId, dates: [] }));
+      cell.dates = [...new Set([...cell.dates, ...dates])];
+    }
   };
   const D = db();
 
@@ -108,9 +113,10 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
       const room = String(a.room_type_id ?? "");
       const plan = String(a.rate_plan_id ?? "");
       const dates = eachDate(String(a.date_from), String(a.date_to));
-      touch(hotel, dates);
+
 
       if (type === "availability_changes") {
+        touch(hotel, room, null, dates);
         const avail = Number(a.availability) || 0;
         for (const d of dates) {
           availRows.push([hotel, room, d, avail]);
@@ -118,6 +124,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
         }
       } else if (type === "restriction_changes") {
         const rates = (Array.isArray(a.rates) ? a.rates : []) as RateIn[];
+        if (rates.length) touch(hotel, room, plan, dates);
         // Fields absent from this change bind the ABSENT sentinel → preserved
         // by the upsert. A rate-only change writes no restriction row at all.
         // Channex is configured to send ONE min-stay field, the generic
@@ -166,9 +173,9 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // window as newly set. The write below does not depend on this, so a D1
   // failure here costs an audit entry, never an availability update.
   const before = new Map<string, InventoryData>();
-  for (const [h, ds] of touched) {
+  for (const [h, scope] of touched) {
     try {
-      before.set(h, await d1Retry(() => getInventoryOn(h, ds)));
+      before.set(h, await d1Retry(() => getInventoryForScope(h, scope, false)));
     } catch (e) {
       console.log(`[ari] pre-change snapshot failed for ${h}: ${e instanceof Error ? e.message : e}`);
     }
@@ -182,6 +189,7 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // again. Re-applying a chunk that did commit is a no-op (upsert by PK).
   for (let i = 0; i < stmts.length; i += 100) {
     const chunk = stmts.slice(i, i + 100);
+    if (options?.repairRevision) chunk.push(...googleAriRepairStatements(D, hotels, options.repairRevision));
     await d1Retry(() => D.batch(chunk));
   }
 
@@ -190,12 +198,12 @@ export async function applyChanges(body: unknown): Promise<{ availability: numbe
   // by this point, so a failure here must not be reported to Channex as a failed
   // push (which would leave us holding data we told them we had not stored).
   const ts = Date.now();
-  for (const [h, ds] of touched) {
+  for (const [h, scope] of touched) {
     const snapshot = before.get(h);
     if (!snapshot) continue;
     try {
-      const after = await d1Retry(() => getInventoryOn(h, ds));
-      await d1Retry(() => insertAriLog(h, CHANNEX_ACTOR, diffInventory(snapshot, after, ds), ts));
+      const after = await d1Retry(() => getInventoryForScope(h, scope, false));
+      await d1Retry(() => insertAriLog(h, CHANNEX_ACTOR, diffInventory(snapshot, after), ts));
     } catch (e) {
       console.log(`[ari] audit log failed for ${h}: ${e instanceof Error ? e.message : e}`);
     }

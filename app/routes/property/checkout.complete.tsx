@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/checkout.complete";
-import { getBookings, type BookingRecord } from "~/lib/bookings.server";
+import { getBookingByReference, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
 import { finalizeFromStripeSession } from "~/lib/booking-finalize.server";
 import { SessionBindError } from "~/lib/stripe-session-bind";
@@ -44,7 +44,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   };
 
   // Webhook already finalized it → straight to the matching outcome.
-  const already = (await getBookings(pid)).find((b) => b.reference === ref);
+  const already = await getBookingByReference(pid, ref);
   if (already) {
     await deletePending(ref);
     throw redirect(outcomeUrl(already));

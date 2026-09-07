@@ -252,12 +252,13 @@ export const openApiSpec = {
       get: {
         tags: ["Catalog"],
         summary: "Priced, bookable rooms and rates for a stay",
+        description: "Requires real calendar dates and a stay of 1–60 nights. Invalid dates or occupancy return HTTP 400 before inventory is loaded.",
         parameters: [
           { name: "checkin", in: "query", required: true, schema: date },
           { name: "checkout", in: "query", required: true, schema: date },
-          { name: "adults", in: "query", schema: { type: "integer", minimum: 1, default: 2 } },
-          { name: "children", in: "query", schema: { type: "integer", minimum: 0 }, description: "Child count (use children_ages for exact ages)." },
-          { name: "children_ages", in: "query", schema: { type: "string", pattern: "^\\d{1,2}(,\\d{1,2})*$" }, description: "Comma-separated child ages, e.g. 4,9." },
+          { name: "adults", in: "query", schema: { type: "integer", minimum: 1, maximum: 25, default: 2 } },
+          { name: "children", in: "query", schema: { type: "integer", minimum: 0, maximum: 25 }, description: "Child count (use children_ages for exact ages)." },
+          { name: "children_ages", in: "query", schema: { type: "string", pattern: "^\\d{1,2}(,\\d{1,2})*$" }, description: "At most 25 comma-separated child ages, each 0–17, e.g. 4,9. Takes precedence over children; both supplied inputs must be valid." },
         ],
         responses: {
           "200": {

@@ -65,7 +65,7 @@ export function ratePlansForParty(room: RoomWithRates, party: number): RatePlan[
  *  Stripe amounts. Underpay is already blocked by cartCovers + capacity.
  *  Clamp — do not 500. Children ages are left uncapped: no matching product
  *  ceiling on this reader (guest-selector MAX_CHILDREN is UI-only). */
-const MAX_ADULTS = 25;
+export const MAX_ADULTS = 25;
 
 /** Read occupancy from URL search params (adults + comma-separated childrenAge). */
 export function readOccupancy(sp: URLSearchParams): Occupancy {

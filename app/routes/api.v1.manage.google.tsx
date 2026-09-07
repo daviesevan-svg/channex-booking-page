@@ -1,6 +1,6 @@
 import type { Route } from "./+types/api.v1.manage.google";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
-import { ALL_SYNC_KINDS, queueGoogleAriBlock, queueGoogleAriResync } from "~/lib/google-ari/push.server";
+import { ALL_SYNC_KINDS, queueGoogleAriBlock, queueGoogleAriResync, queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { getSettings, saveGoogleAriSettings } from "~/lib/overrides.server";
 
 const view = (s: Awaited<ReturnType<typeof getSettings>>) => ({
@@ -52,8 +52,12 @@ export async function action({ request }: Route.ActionArgs) {
     windowDays: body.window_days === null ? undefined : ((body.window_days as number | undefined) ?? existing.googleAriWindowDays),
     program: (body.program as "hotels" | "vacation_rentals" | undefined) ?? existing.googleProgram,
   });
-  if (wasOn && !push) queueGoogleAriBlock(auth.pid);
-  else if (!wasOn && push) queueGoogleAriResync(auth.pid, ALL_SYNC_KINDS);
+  // Repeat the explicitly requested state even when KV already has it: if the
+  // previous save committed but enqueue failed, retry must repair admission.
+  // A settings-only PATCH does not override the durable OFF/ON authority.
+  if (body.push === false) await queueGoogleAriBlock(auth.pid);
+  else if (body.push === true) await queueGoogleAriResync(auth.pid, ALL_SYNC_KINDS);
+  else if (push) await queueGoogleAriPush(auth.pid, ALL_SYNC_KINDS);
 
   return Response.json({ data: view(settings) });
 }

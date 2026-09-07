@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTestD1, seedProperties } from "./test-d1";
+const { sqlite, d1 } = makeTestD1();
 
 // The GC may only delete what the editing property uploaded. Before this, any
 // `/images/…` url a save dropped was a candidate, spared only if some property
@@ -12,12 +14,18 @@ const kv = {
   get: async (k: string) => store.get(k) ?? null,
   put: async (k: string, v: string) => void store.set(k, v),
   delete: async (k: string) => void store.delete(k),
+  list: async ({ prefix, cursor, limit }: { prefix: string; cursor?: string; limit: number }) => {
+    const keys = [...store.keys()].filter((k) => k.startsWith(prefix)).sort();
+    const offset = Number(cursor || 0);
+    const page = keys.slice(offset, offset + limit).map((name) => ({ name }));
+    return { keys: page, list_complete: offset + limit >= keys.length, cursor: String(offset + limit) };
+  },
 };
 const deleted: string[] = [];
 const bucket = { delete: async (key: string) => void deleted.push(key) };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { CONFIG_KV: kv, IMAGES: bucket },
+  env: { CONFIG_KV: kv, IMAGES: bucket, DB: d1 },
   waitUntil: () => {},
 }));
 vi.mock("./catalog.server", () => ({ getRooms: async () => [] }));
@@ -26,13 +34,10 @@ vi.mock("./gallery.server", () => ({ getGallery: async () => ({ images: [] }) })
 vi.mock("./site.server", () => ({ siteImageUrls: async () => [] }));
 vi.mock("./vouchers.server", () => ({ getVoucherProducts: async () => [], voucherSnapshotImages: async () => [] }));
 
-store.set(
-  "properties",
-  JSON.stringify([
+seedProperties(sqlite, [
     { id: "A", name: "A", owner: "a@example.com" },
     { id: "B", name: "B", owner: "b@example.com" },
-  ]),
-);
+  ]);
 
 describe("image-paths", () => {
   it("knows which keys a property owns and which urls a payload may reference", async () => {
@@ -53,8 +58,15 @@ describe("image-paths", () => {
 });
 
 describe("deleteUnreferencedImages", () => {
+  beforeEach(async () => {
+    const { ensureImageGcSchema } = await import("./image-gc-store.server");
+    await ensureImageGcSchema();
+    for (const table of ["image_gc_candidate", "image_gc_scan", "image_gc_seen", "image_gc_deleted", "image_gc_property", "image_gc_write", "image_gc_pin"]) sqlite.exec(`DELETE FROM ${table}`);
+    store.clear();
+    deleted.length = 0;
+  });
   it("deletes only the editing property's own unreferenced keys", async () => {
-    const { deleteUnreferencedImages } = await import("./image-gc.server");
+    const { deleteUnreferencedImages, processImageCleanup } = await import("./image-gc.server");
     deleted.length = 0;
     await deleteUnreferencedImages("A", [
       "/images/gallery/A/mine.jpg", // A's own orphan → deleted
@@ -64,15 +76,20 @@ describe("deleteUnreferencedImages", () => {
       "/images/legacy-no-owner.jpg", // pre-prefix key → never
       "https://cdn.example/pasted.jpg", // not ours at all
     ]);
+    expect(deleted).toEqual([]); // grace, then the durable processor
+    sqlite.exec("UPDATE image_gc_candidate SET due_at=0");
+    await processImageCleanup();
     expect(deleted).toEqual(["gallery/A/mine.jpg"]);
   });
 
   it("still spares the property's own key when another property references it", async () => {
-    const { deleteUnreferencedImages } = await import("./image-gc.server");
+    const { deleteUnreferencedImages, processImageCleanup } = await import("./image-gc.server");
     // B (a clone of A) points at A's upload via its settings.
     store.set("settings:B", JSON.stringify({ coverImage: "/images/cover/A/shared.jpg" }));
     deleted.length = 0;
     await deleteUnreferencedImages("A", ["/images/cover/A/shared.jpg"]);
+    sqlite.exec("UPDATE image_gc_candidate SET due_at=0");
+    await processImageCleanup();
     expect(deleted).toEqual([]);
   });
 });

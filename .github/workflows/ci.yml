@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      # postinstall runs `wrangler types && react-router build`; CI=true keeps it non-interactive.
+      # postinstall generates binding types; the explicit build below runs once.
       - name: Install dependencies
         run: npm ci
 
@@ -38,3 +38,6 @@ jobs:
       # (e.g. a server-only import leaking into the client bundle).
       - name: Build
         run: npm run build
+
+      - name: Check guest bundle
+        run: node scripts/check-guest-bundle.mjs

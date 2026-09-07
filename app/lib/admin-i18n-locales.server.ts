@@ -10,7 +10,7 @@
 // language and SSR has no chance to await a chunk mid-render. Registering at
 // module load is free: this is one server bundle, already in memory.
 
-import { registerAdminDict } from "./admin-i18n";
+import { registerAdminDict } from "./admin-dict-registry";
 import de from "./admin-locales/de";
 import el from "./admin-locales/el";
 import pt from "./admin-locales/pt";

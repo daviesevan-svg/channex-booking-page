@@ -50,11 +50,12 @@ export const TOOLS: McpTool[] = [
       type: "object",
       properties: {
         checkin: { ...dateStr, description: "Arrival date, YYYY-MM-DD" },
-        checkout: { ...dateStr, description: "Departure date, YYYY-MM-DD (must be after checkin)" },
-        adults: { type: "integer", minimum: 1, default: 2 },
+        checkout: { ...dateStr, description: "Departure date, YYYY-MM-DD (1–60 nights after checkin)" },
+        adults: { type: "integer", minimum: 1, maximum: 25, default: 2 },
         children_ages: {
           type: "array",
-          items: { type: "integer", minimum: 0 },
+          maxItems: 25,
+          items: { type: "integer", minimum: 0, maximum: 17 },
           description: "One age per child. Ages affect price and whether a child counts as an infant.",
         },
       },

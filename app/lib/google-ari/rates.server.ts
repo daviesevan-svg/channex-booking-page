@@ -8,7 +8,7 @@
 // matches the site's for the same party.
 import { addDays, format, parseISO } from "date-fns";
 
-import { getInventory } from "../ari/read.server";
+import { getInventory, getInventoryForScope, type InventoryScope } from "../ari/read.server";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
@@ -44,7 +44,7 @@ function groupRuns<T>(
   for (const date of dates) {
     const value = valueAt(date);
     const last = runs[runs.length - 1];
-    if (last && eq(last.value, value)) last.end = date;
+    if (last && format(addDays(parseISO(last.end), 1), "yyyy-MM-dd") === date && eq(last.value, value)) last.end = date;
     else runs.push({ start: date, end: date, value });
   }
   return runs;
@@ -75,12 +75,17 @@ export interface AriPayload {
   inventory: InvEntry[];
 }
 
-export async function collectAri(pid: string, window: AriWindow): Promise<AriPayload> {
+export async function collectAri(pid: string, window: AriWindow, scope?: InventoryScope): Promise<AriPayload> {
+  const withinWindow = (dates: string[]) => [...new Set(dates)].filter((d) => d >= window.from && d <= window.to).sort();
+  const selected = scope && {
+    availability: scope.availability.map((c) => ({ ...c, dates: withinWindow(c.dates) })),
+    products: scope.products.map((c) => ({ ...c, dates: withinWindow(c.dates) })),
+  };
   const [rooms, allRates, settings, inv] = await Promise.all([
     getRooms(pid),
     getRates(pid),
     getSettings(pid),
-    getInventory(pid, window.from, window.to),
+    selected ? getInventoryForScope(pid, selected) : getInventory(pid, window.from, window.to),
   ]);
   const currency = settings.currency || "GBP";
   const vat = vatRate(settings);
@@ -101,7 +106,7 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
 
     // Inventory is per room type (not per rate).
     for (const run of groupRuns(
-      dates,
+      selected ? selected.availability.filter((c) => c.roomId === room.id).flatMap((c) => c.dates).sort() : dates,
       (d) => inv.availability[`${room.id}|${d}`] ?? 0,
       (a, b) => a === b,
     )) {
@@ -114,6 +119,10 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       // ARI (and Google) key by the room's real Channex rate id, which differs
       // from our single `rate.id` for a consolidated imported rate.
       const rid = rateChannexId(rate, room.id);
+      const productDates = selected
+        ? [...new Set(selected.products.filter((c) => c.roomId === room.id && c.rateId === rid).flatMap((c) => c.dates))].sort()
+        : dates;
+      if (!productDates.length) continue;
 
       // Per-occupancy nightly amounts (net + VAT-inclusive) for a given date.
       // A per-person rate prices each guest count from its own per-occupancy ARI
@@ -144,8 +153,8 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       const sameAmounts = (
         a: { guests: number; net: number; gross: number }[],
         b: { guests: number; net: number; gross: number }[],
-      ) => a.length === b.length && a.every((x, i) => x.net === b[i].net && x.gross === b[i].gross);
-      for (const run of groupRuns(dates, amountsAt, sameAmounts)) {
+      ) => a.length === b.length && a.every((x, i) => x.guests === b[i].guests && x.net === b[i].net && x.gross === b[i].gross);
+      for (const run of groupRuns(productDates, amountsAt, sameAmounts)) {
         // A run with no priced guest count sends no rate at all — the stop-sell
         // below is what tells Google the dates are closed.
         if (run.value.length === 0) continue;
@@ -167,7 +176,7 @@ export async function collectAri(pid: string, window: AriWindow): Promise<AriPay
       };
       const sameCell = (a: ReturnType<typeof cellAt>, b: ReturnType<typeof cellAt>) =>
         a.stopSell === b.stopSell && a.cta === b.cta && a.ctd === b.ctd && a.minStay === b.minStay;
-      for (const run of groupRuns(dates, cellAt, sameCell)) {
+      for (const run of groupRuns(productDates, cellAt, sameCell)) {
         avail.push({ roomId: room.id, rateId: rate.id, start: run.start, end: run.end, ...run.value });
       }
     }

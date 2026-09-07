@@ -68,6 +68,8 @@ the Cloudflare dashboard in production). No rebuild needed to change them.
 
 ## Deploy to Cloudflare
 
+Before deploying the speed/storage update, apply its additive D1 migrations and keep the new Durable Object binding and cron schedules. Follow the [rollout instructions](docs/performance-rollout.md), including when using automatic Git deployments.
+
 ### One-click
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/daviesevan-svg/channex-booking-page)

@@ -83,10 +83,18 @@
 	"d1_databases": [
 		{ "binding": "DB", "database_name": "channex-ari", "database_id": "36c91859-bf71-43af-a8f0-9b6fcadeb132" }
 	],
-	// Google Hotels ARI re-sync: every 6h, re-push all ARI-enabled properties
-	// (backstop to the change-driven + admin-edit pushes). See workers/app.ts.
+	// One persistent delivery queue per property serializes Google updates and
+	// coalesces bursts. Alarms retain failed deliveries across Worker restarts.
+	"durable_objects": {
+		"bindings": [{ "name": "GOOGLE_ARI_QUEUE", "class_name": "GoogleAriQueue" }]
+	},
+	"migrations": [
+		{ "tag": "v1-google-ari-queue", "new_sqlite_classes": ["GoogleAriQueue"] }
+	],
+	// Separate bounded recovery/cleanup ticks from the existing six-hour jobs.
+	// Most minute ticks only check for failed Google queue admissions in D1.
 	"triggers": {
-		"crons": ["0 */6 * * *"]
+		"crons": ["* * * * *", "*/15 * * * *", "0 */6 * * *"]
 	},
 	"observability": {
 		"enabled": true

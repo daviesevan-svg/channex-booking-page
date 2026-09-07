@@ -3,6 +3,8 @@ import { applyChanges, checkApiKey } from "~/lib/ari/ingest.server";
 import { fireAndForget, isTransientD1Error } from "~/lib/d1.server";
 import { isChannexConnected } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
+import { clearGoogleAriRepair } from "~/lib/google-ari/repair.server";
+import { ariScopesFromChanges } from "~/lib/google-ari/scope";
 import { requestFullSyncOnce } from "~/lib/open-channel.server";
 
 // POST /api/changes — Channex pushes availability/rate/restriction changes.
@@ -35,20 +37,19 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   try {
-    const counts = await applyChanges(body);
+    const repairRevision = crypto.randomUUID();
+    const counts = await applyChanges(body, { repairRevision });
     // Forward the fresh ARI on to Google (rates/availability/inventory) for any
     // ARI-enabled property in this batch; a no-op when the property isn't
     // pushing to Google.
     //
-    // Deliberately OUTSIDE the try that decides what we tell Channex, and not
-    // awaited: this used to run inside it, so a KV hiccup reading the Google
-    // settings reported the whole push as failed to Channex — for ARI that was
-    // already committed to D1. What Channex hears must describe our own store
-    // and nothing downstream of it.
-    for (const code of hotelCodes) {
+    // Delivery has its own error handler. A downstream KV or queue failure
+    // must not tell Channex that committed inventory failed; the repair marker
+    // keeps admission retryable after this response.
+    for (const [code, scope] of ariScopesFromChanges(body)) {
       fireAndForget(
-        queueGoogleAriPush(code, ["ari"]).catch((e) =>
-          console.log(`[ari] google forward failed for ${code}: ${e instanceof Error ? e.message : e}`),
+        queueGoogleAriPush(code, ["ari"], scope).then(() => clearGoogleAriRepair(code, repairRevision)).catch((e) =>
+          console.log(`[ari] google forward retained for scheduled repair for ${code}: ${e instanceof Error ? e.message : e}`),
         ),
       );
     }

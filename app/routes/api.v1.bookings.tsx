@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import type { Route } from "./+types/api.v1.bookings";
 import { authenticateApiKey, apiError } from "~/lib/api-auth.server";
-import { getBookings, generateReference } from "~/lib/bookings.server";
+import { getBookingsPage, generateReference } from "~/lib/bookings.server";
+import { bookingPageParams } from "~/lib/api-query";
 import { serializeBooking } from "~/lib/api-serialize";
 import { getConfig, getConfigKV } from "~/lib/config.server";
 import { getSettings, getBookingCutoff } from "~/lib/overrides.server";
@@ -47,11 +48,11 @@ const NO_CARD_WINDOW_SEC = 3600;
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request);
   if (auth instanceof Response) return auth;
-  const url = new URL(request.url);
-  const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get("limit") ?? "50", 10) || 50));
-  const offset = Math.max(0, parseInt(url.searchParams.get("offset") ?? "0", 10) || 0);
-  const all = await getBookings(auth.pid);
-  return Response.json({ data: all.slice(offset, offset + limit).map(serializeBooking), total: all.length, limit, offset });
+  const page = bookingPageParams(new URL(request.url).searchParams, 100);
+  if ("error" in page) return apiError(422, "invalid_request", page.error);
+  const { limit, offset } = page;
+  const { bookings, total } = await getBookingsPage(auth.pid, { limit, offset });
+  return Response.json({ data: bookings.map(serializeBooking), total, limit, offset });
 }
 
 // An add-on selection. Only ids/qty/info travel — prices are always resolved

@@ -11,7 +11,7 @@
     "deploy": "npm run build && wrangler deploy",
     "preview": "npm run build && vite preview",
     "cf-typegen": "wrangler types",
-    "postinstall": "wrangler types && react-router build"
+    "postinstall": "wrangler types"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",

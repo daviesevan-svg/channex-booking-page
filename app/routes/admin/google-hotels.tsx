@@ -95,16 +95,17 @@ export async function action({ request }: Route.ActionArgs) {
     const windowDays = Number(form.get("windowDays"));
     const program = form.get("program") === "vacation_rentals" ? "vacation_rentals" : "hotels";
     const push = form.get("push") === "on";
-    const wasOn = (await getSettings(propertyId)).googleAriPush === true;
     await saveGoogleAriSettings(propertyId, { push, windowDays, program });
     // Toggling the push changes what Google should sell: turning it OFF wipes
     // the property there (zero inventory + stop-sell everything, then an empty
     // room/rate overlay), turning it back ON re-pushes the full setup like a
-    // new connection. Both run in the background.
+    // new connection. Both await durable admission; delivery runs in the background.
     // The re-push must not re-read the flag it just wrote (a stale KV read
     // made it silently no-op) — the transition itself is the authority.
-    if (wasOn && !push) queueGoogleAriBlock(propertyId);
-    else if (!wasOn && push) queueGoogleAriResync(propertyId, ALL_SYNC_KINDS);
+    // Re-submit on repeated saves too: a previous KV write can have succeeded
+    // while durable admission failed, and retrying must repair that state.
+    if (!push) await queueGoogleAriBlock(propertyId);
+    else await queueGoogleAriResync(propertyId, ALL_SYNC_KINDS);
     return { ok: true as const };
   }
   if (intent === "push") {
