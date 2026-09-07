@@ -28,7 +28,7 @@ import {
 import { getProperties } from "../properties.server";
 import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
 import { googlePromotions } from "./promotions.server";
-import { getGoogleMatchStatus } from "./status.server";
+import { gateMatchStatus } from "./status.server";
 
 /** Google upload paths (joined onto `googleAriBaseUrl`). */
 export const ARI_PATHS = {
@@ -124,7 +124,9 @@ async function envelopeFor(
   // Don't push to a property Google explicitly hasn't matched — wasted messages.
   // Fail-open: only block on a confident NOT_MATCHED; unknown/overlap/error/no
   // creds all fall through and push, so the status check can never stall ARI.
-  const status = await getGoogleMatchStatus(pid).catch(() => null);
+  // Cached for an hour per property (gateMatchStatus): a delivery is not the
+  // moment to ask Google a question whose answer changes over days.
+  const status = await gateMatchStatus(pid).catch(() => null);
   if (status && status.state === "not_matched") {
     const why = status.reasons.length ? ` (${status.reasons.join("; ")})` : "";
     return { ok: false, result: { kind, ok: false, detail: `Google hasn't matched this property yet${why}. It'll push once matched.` } };

@@ -131,3 +131,15 @@ Original shape notes:
 - `matchStatus` can lag feed ingestion by Google's own schedule, so the gate
   should be advisory (fail-open) rather than a hard stop that could indefinitely
   block a legitimately-fed property.
+
+## How often we ask (2026-09-07)
+
+The push gate (`envelopeFor` → `gateMatchStatus`) makes **at most one live
+`hotelViews` call per property per hour**, whatever the outcome. A cached status
+under an hour old is used as-is; otherwise one live check runs and, if it
+succeeds, refreshes the same `google:match:{id}` KV value the admin page reads
+and the daily cron maintains. A failed or empty check still spends the hour's
+attempt (`google:match-attempt:{id}`, one-hour TTL), and the gate falls back to
+the last-known-good status or to null, which never blocks a push. Before this,
+every queued delivery and every repair retry asked Google live — about 2,000
+calls an hour for a few dozen properties.
