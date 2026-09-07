@@ -10,8 +10,9 @@ import { parseISO } from "date-fns";
 import { cartCoverage, type ResolvedLine } from "./cart";
 import { taxableExtrasTotal, untaxedExtrasTotal, type ResolvedExtra } from "./extras";
 import { computePricing, type Pricing, type TaxConfig } from "./pricing";
+import { bandAt, isPartialBand } from "./cancel-bands";
 import { policyToCancellation, type CancelAnchor } from "./policy-copy";
-import type { CancellationLike } from "./cancellation";
+import type { CancelBand, CancellationLike } from "./cancellation";
 import type { RatePolicy } from "./rate-policy";
 
 export function round2(n: number): number {
@@ -73,7 +74,11 @@ export interface ConsentGate {
   nonRefundable: boolean;
   /** Money really leaves the card today (not a prepay policy with no payments set up). */
   chargedToday: boolean;
-  /** Whether the distinct non-refundable/charged acknowledgment is required. */
+  /** The free window has closed but a band that refunds PART of the stay is
+   *  open. The acknowledgment then names that charge instead of calling the
+   *  booking non-refundable, which it isn't. Null otherwise. */
+  partialBand: CancelBand | null;
+  /** Whether the distinct non-refundable/partial/charged acknowledgment is required. */
   needAck: boolean;
 }
 
@@ -93,12 +98,22 @@ export function consentGate(opts: {
   collectsCard: boolean;
   now?: number;
 }): ConsentGate {
+  const now = opts.now ?? Date.now();
   const cancelInfo = policyToCancellation(opts.policy, opts.checkin, opts.anchor);
   const freeWindowClosed =
-    cancelInfo.refundable &&
-    cancelInfo.cancelByISO != null &&
-    (opts.now ?? Date.now()) > parseISO(cancelInfo.cancelByISO).getTime();
-  const nonRefundable = !opts.policy.cancellation.refundable || freeWindowClosed;
+    cancelInfo.refundable && cancelInfo.cancelByISO != null && now > parseISO(cancelInfo.cancelByISO).getTime();
+  // Past the free window the guest is either in a band that still refunds
+  // something — a distinct acknowledgment — or effectively non-refundable.
+  const current = cancelInfo.bands ? bandAt(cancelInfo.bands, now) : undefined;
+  const partialBand = freeWindowClosed && isPartialBand(current) ? current : null;
+  const nonRefundable = !opts.policy.cancellation.refundable || (freeWindowClosed && !partialBand);
   const chargedToday = opts.collectsCard && opts.dueNow > 0;
-  return { cancelInfo, freeWindowClosed, nonRefundable, chargedToday, needAck: nonRefundable || chargedToday };
+  return {
+    cancelInfo,
+    freeWindowClosed,
+    nonRefundable,
+    chargedToday,
+    partialBand,
+    needAck: nonRefundable || partialBand !== null || chargedToday,
+  };
 }

@@ -178,7 +178,9 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     ...(services.length ? { services } : {}),
   };
 
-  const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), checkin);
+  // With the stay known, each band of the schedule carries its penalty in money —
+  // the number a later refund is computed against.
+  const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), checkin, { total: grandTotal, nights });
 
   // The record, built but not yet created. status/channexId/payment are decided at finalize.
   const record: PendingBooking["record"] = {
