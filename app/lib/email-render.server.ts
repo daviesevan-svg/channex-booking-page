@@ -4,7 +4,7 @@
 import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
-import { formatCancelDeadline } from "./cancellation";
+import { cancellationBandMessages, formatCancelDeadline, penaltyText } from "./cancellation";
 import type { EmailDef, LegalLink, SiteSettings } from "./content";
 import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
 // Side effect: registers every guest dictionary so makeTranslator can serve
@@ -202,6 +202,17 @@ function detailsHtml(
           tr.t("freeCancellationUntil", { date: fmtDeadline(cancel, tr) })
         : tr.t("freeCancellationAnytime")
       : tr.t("nonRefundableBooking");
+  // A multi-step policy: the bands still ahead, then what follows the last.
+  // Single-tier bookings get nothing extra here, exactly as before.
+  const bandLines = cancellationBandMessages(cancel, Date.now())
+    .map((m) => {
+      const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => tr.t(k as never, v as never), money);
+      if (!penalty) return "";
+      return m.key === "cancelBandUntil"
+        ? tr.t("cancelBandUntil", { date: fmtDeadline({ cancelByISO: m.iso, cancelByLocal: m.local }, tr), penalty })
+        : tr.t("afterDeadlineCharge", { penalty });
+    })
+    .filter(Boolean);
 
   const manageBtn =
     opts.recipient === "guest" && opts.manageUrl
@@ -240,6 +251,7 @@ function detailsHtml(
       </table>
       ${taxIncluded > 0 ? `<p style="margin:4px 0 0;color:#8a8a8a;font-size:11px;text-align:right;">${esc(tr.t("includesTaxes", { amount: money(taxIncluded) }))}</p>` : ""}
       ${cancelLine ? `<p style="margin:12px 0 0;color:#8a8a8a;font-size:12px;">${esc(cancelLine)}</p>` : ""}
+      ${bandLines.map((l) => `<p style="margin:4px 0 0;color:#8a8a8a;font-size:12px;">${esc(l)}</p>`).join("")}
       ${contactBlock}
       ${manageBtn}
     </td></tr>

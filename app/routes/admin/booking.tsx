@@ -3,7 +3,7 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/booking";
 import { adminMeta } from "~/lib/admin-meta";
 import { BookingStatusBadge } from "~/components/booking-status";
-import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
+import { cancellationBandMessages, cancellationMessage, formatCancelDeadline, penaltyText } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { makeTranslator } from "~/lib/i18n";
 import { useAdminLang, useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
@@ -200,6 +200,16 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const cancellationText = msg
     ? gt.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", dl) } : undefined)
     : "";
+  // A multi-step policy: the bands still ahead, then what follows the last.
+  const bandLines = cancellationBandMessages(b.cancellation, Date.now())
+    .map((m) => {
+      const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => gt.t(k as never, v as never), (n) => formatMoney(n, b.currency));
+      if (!penalty) return "";
+      return m.key === "cancelBandUntil"
+        ? gt.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", dl), penalty })
+        : gt.t("afterDeadlineCharge", { penalty });
+    })
+    .filter(Boolean);
 
   return (
     <div>
@@ -510,6 +520,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         <section className="mt-5 rounded-[14px] border border-line bg-surface p-5">
           <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("bkdCancellationPolicy")}</h2>
           <p className="text-[14px] text-secondary">{cancellationText}</p>
+          {bandLines.map((line, i) => (
+            <p key={i} className="mt-1 text-[14px] text-muted">
+              {line}
+            </p>
+          ))}
         </section>
       )}
 
