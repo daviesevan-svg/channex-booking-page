@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      # postinstall generates binding types; the explicit build below runs once.
+      # Normal CI installation generates types; the build below runs once.
       - name: Install dependencies
         run: npm ci
 
@@ -34,10 +34,16 @@ jobs:
       - name: Test
         run: npm test
 
-      # Full production build — also surfaces client/server bundle breaks
-      # (e.g. a server-only import leaking into the client bundle).
+      # Exercise the same build hook used by Cloudflare's install→upload flow.
+      # This is the sole production build in GitHub CI, and also catches
+      # client/server bundle breaks and missing generated deployment artifacts.
       - name: Build
-        run: npm run build
+        run: node scripts/build-on-workers-ci.mjs
+        env:
+          WORKERS_CI: "1"
 
       - name: Check guest bundle
         run: node scripts/check-guest-bundle.mjs
+
+      - name: Check Cloudflare upload artifacts
+        run: npx wrangler versions upload --dry-run
