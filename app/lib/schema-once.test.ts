@@ -11,12 +11,14 @@ import { describe, expect, it, vi } from "vitest";
 
 let batches = 0;
 let fail = false;
+let hang = false;
 
 const fakeD1 = {
   prepare: (sql: string) => ({ sql }),
   batch: async () => {
     batches++;
     // Resolve on a later tick, which is the window the boolean left open.
+    if (hang) return new Promise(() => {}); // a response that never arrives
     await new Promise((r) => setTimeout(r, 5));
     if (fail) throw new Error("D1 unavailable");
     return [];
@@ -53,5 +55,36 @@ describe("schemaOnce", () => {
     fail = false;
     await expect(ensure()).resolves.toBeUndefined();
     expect(batches).toBe(2);
+  });
+
+  it("does not latch a batch that never responds — it times out and the next caller retries", async () => {
+    // 2026-09-07: one lost D1 response to the ARI DDL batch left the promise
+    // pending for the life of a warm isolate, and every guest page that reads
+    // availability waited on it forever while D1 answered everything else in
+    // under a millisecond. Nothing was logged, because nothing completed.
+    vi.useFakeTimers();
+    try {
+      const { schemaOnce, SCHEMA_TIMEOUT_MS } = await import("./d1.server");
+      batches = 0;
+      hang = true;
+      const ensure = schemaOnce((d) => [d.prepare(`CREATE TABLE IF NOT EXISTS t (a TEXT)`)]);
+
+      const first = ensure();
+      const second = ensure(); // arrives while the first is still pending: same batch
+      const settled = expect(first).rejects.toThrow(/did not respond within/);
+      await vi.advanceTimersByTimeAsync(SCHEMA_TIMEOUT_MS + 1);
+      await settled;
+      await expect(second).rejects.toThrow(/did not respond within/);
+      expect(batches).toBe(1);
+
+      // The latch is clear: the next caller sends a fresh batch and succeeds.
+      hang = false;
+      const third = ensure();
+      await vi.advanceTimersByTimeAsync(10);
+      await expect(third).resolves.toBeUndefined();
+      expect(batches).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
