@@ -15,6 +15,10 @@ import { SavedPill } from "~/components/admin-page-header";
 import { DEFAULT_THEME, FONT_PAIRS, THEMES } from "~/lib/content";
 import type { SiteSettings } from "~/lib/content";
 import { useAdminT } from "~/lib/admin-i18n";
+import { CUSTOM_CSS_MAX } from "~/lib/custom-css";
+
+/** The token + hook reference the hotel (or its AI) writes the sheet from. Public repo. */
+const CUSTOM_CSS_DOCS = "https://github.com/daviesevan-svg/channex-booking-page/blob/main/docs/custom-css.md";
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -177,6 +181,42 @@ export function BrandPanel({
           </label>
         ))}
       </div>
+
+      {/* Advanced: the property's own stylesheet. Collapsed by default — most
+          hotels never need it, and the pickers above are the supported surface.
+          A single textarea rather than pickers for button, card, border and
+          radius: every guest surface reads CSS variables and carries `ui-*`
+          hook classes, so a sheet (typically written by the hotel's AI from the
+          reference linked here) can restyle any of them, and the admin never
+          grows a control per token. Same form, so one Save writes everything. */}
+      <details className="mb-4 rounded-[12px] border border-line-alt" open={Boolean(settings.customCss)}>
+        <summary className="cursor-pointer px-3.5 py-2.5 text-[13px] font-semibold text-secondary">
+          {t("brandCss")}
+        </summary>
+        <div className="px-3.5 pb-3.5">
+          <p className="mb-2 text-[12px] leading-[1.55] text-muted">
+            {t("brandCssIntro")}{" "}
+            <a
+              href={CUSTOM_CSS_DOCS}
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold text-accent hover:underline"
+            >
+              {t("brandCssDocs")}
+            </a>
+          </p>
+          <textarea
+            name="customCss"
+            defaultValue={settings.customCss ?? ""}
+            maxLength={CUSTOM_CSS_MAX}
+            rows={8}
+            spellCheck={false}
+            placeholder={".ui-btn-primary { border-radius: 9999px; }"}
+            className="w-full rounded-[10px] border border-line-alt bg-surface-alt px-3.5 py-2.5 font-mono text-[12px] leading-[1.5] text-ink outline-none focus:border-accent"
+          />
+          <p className="mt-1.5 text-[12px] text-muted">{t("brandCssNote")}</p>
+        </div>
+      </details>
 
       <button
         type="submit"

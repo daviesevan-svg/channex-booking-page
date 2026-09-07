@@ -1,6 +1,7 @@
 import { Outlet } from "react-router";
 
 import type { Route } from "./+types/embed.$channelId";
+import { CustomCss } from "~/components/custom-css";
 import { FontFaces } from "~/components/font-faces";
 import { accentColors, mixWithWhite } from "~/lib/accessible-accent";
 import type { PropertyOutletContext } from "~/lib/booking-context";
@@ -32,6 +33,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     theme: settings.theme ?? DEFAULT_THEME,
     customColor: settings.customColor,
     customBg: settings.customBg,
+    customCss: settings.customCss ?? null,
     themeFont: settings.themeFont,
     lang,
   };
@@ -44,7 +46,7 @@ export function headers() {
 }
 
 export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
-  const { currency, hotelName, theme, customColor, customBg, themeFont, lang } = loaderData;
+  const { currency, hotelName, theme, customColor, customBg, customCss, themeFont, lang } = loaderData;
   const font = fontPair(themeFont);
 
   const isCustom = theme === "custom" && !!customColor;
@@ -77,11 +79,12 @@ export default function EmbedLayout({ loaderData }: Route.ComponentProps) {
   };
 
   return (
-    <div className="font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
+    <div className="ui-root font-sans text-ink" data-theme={isCustom ? undefined : theme} style={themeStyle}>
       {/* Inline @font-face for the chosen pair, served from our own origin —
           see FontFaces. Rendered here rather than in `links()` because the pair
           only becomes known from loader data. */}
       <FontFaces pair={font.id} />
+      <CustomCss css={customCss} />
       <Outlet context={context} />
     </div>
   );

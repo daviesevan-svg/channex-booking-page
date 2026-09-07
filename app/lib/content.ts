@@ -335,6 +335,11 @@ export interface SiteSettings {
   customBg?: string;
   /** Curated Google-Font pairing id (see FONT_PAIRS). Unset = default fonts. */
   themeFont?: string;
+  /** The property's own stylesheet, rendered inside the guest wrapper (booking
+   *  pages, website, voucher and manage pages, the embed widget). Sanitised on
+   *  save AND render by app/lib/custom-css.ts; the vocabulary of tokens and
+   *  `ui-*` hook classes is in docs/custom-css.md. Never on admin pages. */
+  customCss?: string;
   /** Property cover photo (/images/… path). Used as the property's image on the
    *  Collections cards; falls back to the cheapest room's photo when unset. */
   coverImage?: string;

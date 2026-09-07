@@ -278,6 +278,12 @@ const EN: Record<string, string> = {
   brandTypeface: "Typeface",
   brandTypeSample: "Reserve your stay",
   brandSave: "Save colour & type",
+  brandCss: "Advanced: custom CSS",
+  brandCssIntro:
+    "Your own stylesheet, applied to every guest page after the theme — buttons, cards, type sizes, logo size. Every colour, corner and size is a CSS variable, and each element carries a stable ui- class, so paste the reference into your AI assistant and describe the look you want.",
+  brandCssDocs: "Token and class reference",
+  brandCssNote:
+    "Rules here bypass the contrast checks the colour pickers apply — check text on buttons and cards stays readable. Up to 20,000 characters; @import is not supported (fonts come from the typeface picker).",
   secTemplate: "Template",
   secTemplateIntro:
     "How your pages look. Your sections, photos and words stay exactly as they are — only the design changes, and you can switch back at any time.",

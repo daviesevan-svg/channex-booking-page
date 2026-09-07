@@ -37,7 +37,7 @@ export function SiteFooterBlock({
   if (!hasContact && !hasLinks && !hasSocial && !footer.blurb) return null;
 
   return (
-    <div className="border-t border-nav-border bg-surface-alt">
+    <div className="ui-footer border-t border-nav-border bg-surface-alt">
       <div className="mx-auto grid max-w-[1160px] grid-cols-1 gap-10 px-7 py-12 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <div className="mb-2.5 font-serif text-title-sm font-semibold">{hotelName}</div>

@@ -1,6 +1,7 @@
 import type { Route } from "./+types/api.v1.manage.brand";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
 import { FONT_PAIRS, THEMES, isFontPairId, isThemeId } from "~/lib/content";
+import { CUSTOM_CSS_MAX, checkCustomCss } from "~/lib/custom-css";
 import { getSettings, patchSettings } from "~/lib/overrides.server";
 
 const HEX = /^#?[0-9a-fA-F]{6}$/;
@@ -11,6 +12,7 @@ const view = (s: Awaited<ReturnType<typeof getSettings>>) => ({
   custom_color: s.customColor ?? null,
   custom_bg: s.customBg ?? null,
   font: s.themeFont ?? "default",
+  custom_css: s.customCss ?? null,
   themes: THEMES.map((t) => ({ id: t.id, label: t.label, accent: t.accent })),
   fonts: FONT_PAIRS.map((f) => ({ id: f.id, label: f.label })),
 });
@@ -20,6 +22,9 @@ const view = (s: Awaited<ReturnType<typeof getSettings>>) => ({
 //       nobody has loaded them).
 // PATCH — sparse: theme (a preset id, "custom", or null for default),
 //       custom_color/custom_bg (#rrggbb, null clears), font (a pairing id).
+//       custom_css (a stylesheet for the guest pages, ≤ CUSTOM_CSS_MAX chars,
+//       null clears; `<` is escaped and @import dropped — see custom-css.ts and
+//       docs/custom-css.md for the token/hook vocabulary it targets).
 //       Unlike the admin form, invalid values are 422s, never silently kept.
 //       One theme drives BOTH the booking pages and the embeddable widget.
 export async function loader({ request }: Route.LoaderArgs) {
@@ -51,6 +56,14 @@ export async function action({ request }: Route.ActionArgs) {
       if (v === null) patch[field] = null as never;
       else if (typeof v !== "string" || !HEX.test(v.trim())) return apiError(422, "validation_error", `${k} must be a hex color like #7a4a2b, or null.`);
       else patch[field] = norm(v.trim()) as never;
+    } else if (k === "custom_css") {
+      if (v === null || v === "") patch.customCss = null as never;
+      else if (typeof v !== "string") return apiError(422, "validation_error", "custom_css must be a string, or null to clear.");
+      else {
+        const checked = checkCustomCss(v);
+        if (!checked.ok) return apiError(422, "validation_error", `${checked.reason} (limit ${CUSTOM_CSS_MAX}).`);
+        patch.customCss = checked.css || (null as never);
+      }
     } else if (k === "font") {
       if (v === null || v === "default") patch.themeFont = null as never;
       else if (typeof v !== "string" || !isFontPairId(v)) {

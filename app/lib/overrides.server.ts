@@ -1,5 +1,6 @@
 import { getConfigKV } from "./config.server";
 import { isSupportedCurrency } from "./currencies";
+import { checkCustomCss } from "./custom-css";
 import { parseHHMM } from "./dates";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
@@ -456,6 +457,15 @@ export async function saveBrand(pid: string, form: FormData): Promise<SiteSettin
     // arbitrary family, which would be a font nobody has loaded.
     themeFont: isFontPairId(font) && font !== "default" ? font : undefined,
   };
+  // The advanced stylesheet travels in the same form. Absent field = untouched
+  // (an older form, or the API), so this save can't wipe a sheet it never saw;
+  // present and blank = cleared. The action has already rejected an over-long
+  // one, so a failed check here keeps what was stored rather than guessing.
+  const cssField = form.get("customCss");
+  if (cssField !== null) {
+    const checked = checkCustomCss(String(cssField));
+    if (checked.ok) next.customCss = checked.css || undefined;
+  }
   await writeJson(settingsKey(pid), next);
   return next;
 }

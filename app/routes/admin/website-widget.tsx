@@ -10,6 +10,7 @@ import { getConfig } from "~/lib/config.server";
 import { getSettings, saveThemeTokens } from "~/lib/overrides.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { FONT_PAIRS, fontPair } from "~/lib/content";
+import { customCssVersion } from "~/lib/custom-css";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
@@ -42,7 +43,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     themeName: settings.theme ?? "terracotta",
     fontLabel: fontPair(settings.themeFont).label,
     // Versions the preview iframe so it reloads when the theme changes.
-    themeVersion: `${settings.customColor ?? settings.theme ?? ""}-${settings.themeFont ?? ""}-${settings.customBg ?? ""}`,
+    themeVersion: `${settings.customColor ?? settings.theme ?? ""}-${settings.themeFont ?? ""}-${settings.customBg ?? ""}-${customCssVersion(settings.customCss)}`,
   };
 }
 
