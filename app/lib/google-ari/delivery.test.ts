@@ -8,7 +8,7 @@ vi.mock("../overrides.server", () => ({ getSettings: async () => ({ googleAriPus
 vi.mock("../properties.server", () => ({ getProperties: async () => [{ id: "hotel" }] }));
 vi.mock("./rates.server", () => ({ ariWindow: () => ({ from: "2026-10-01", to: "2026-10-03" }), collectAri: mocks.collect, googleTaxLines: () => ({ taxes: [], fees: [] }) }));
 vi.mock("./promotions.server", () => ({ googlePromotions: async () => [] }));
-vi.mock("./status.server", () => ({ getGoogleMatchStatus: async () => ({ state: "matched" }) }));
+vi.mock("./status.server", () => ({ gateMatchStatus: async () => ({ state: "matched" }) }));
 vi.mock("./queue-client.server", () => ({ submitGoogleAriWork: mocks.submit }));
 import { scheduledGoogleAriSync, syncAri } from "./push.server";
 let transport: ReturnType<typeof vi.fn>;

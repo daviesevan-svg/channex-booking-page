@@ -211,6 +211,57 @@ export async function refreshMatchStatus(hotelId: string): Promise<boolean> {
   }
 }
 
+/**
+ * The match status for the PUSH GATE: at most one live Travel Partner call per
+ * property per hour, whatever the outcome.
+ *
+ * Every delivery used to call Google live — the queue retries, the minute
+ * repair cron and the six-hourly sweep together made ~2,000 hotelViews calls
+ * an hour for a few dozen properties, to learn a fact that changes over days.
+ * Now: a cached value under an hour old is the answer; otherwise ONE live
+ * check, whose success refreshes the same cache the admin page and the daily
+ * cron use. A failed or empty check still counts as this hour's attempt (a
+ * short-lived KV marker), so a Google hiccup cannot turn into a call per
+ * delivery either — the caller gets the last-known-good status, or null,
+ * which the gate treats as "don't block".
+ *
+ * `live` is injectable for tests; production always uses getGoogleMatchStatus.
+ */
+export const MATCH_GATE_MAX_AGE_MS = 60 * 60 * 1000;
+const matchAttemptKey = (hotelId: string) => `google:match-attempt:${hotelId}`;
+
+export async function gateMatchStatus(
+  hotelId: string,
+  live: (hotelId: string) => Promise<GoogleMatchStatus | null> = getGoogleMatchStatus,
+): Promise<GoogleMatchStatus | null> {
+  if (!hotelId) return null;
+  const cached = await readCachedMatchStatus(hotelId);
+  const now = Date.now();
+  if (cached && now - cached.checkedAt < MATCH_GATE_MAX_AGE_MS) return cached.status;
+  let kv: KVNamespace | null = null;
+  try {
+    kv = getConfigKV();
+    if (await kv.get(matchAttemptKey(hotelId))) return cached?.status ?? null; // this hour's check already happened
+    // Marked BEFORE the call, so concurrent deliveries in the same hour share
+    // one attempt rather than each making their own. (KV's edge cache can lag
+    // a put by up to a minute, so a burst inside that window may still make a
+    // few calls — bounded by the burst, not by the retry schedule.)
+    await kv.put(matchAttemptKey(hotelId), String(now), { expirationTtl: Math.ceil(MATCH_GATE_MAX_AGE_MS / 1000) });
+  } catch {
+    // No KV: fall through to a live check, as before.
+  }
+  const fresh = await live(hotelId).catch(() => null);
+  if (fresh && kv) {
+    try {
+      const value: CachedMatchStatus = { status: fresh, checkedAt: now };
+      await kv.put(matchCacheKey(hotelId), JSON.stringify(value));
+    } catch {
+      // Cache write failure only costs the next hour one more call.
+    }
+  }
+  return fresh ?? cached?.status ?? null;
+}
+
 /** Cron entry point: refresh the match status for every registered property
  *  whose cached value is older than ~a day. No-op when Travel Partner creds
  *  aren't configured. Self-throttled so the 6h cron effectively checks daily. */
