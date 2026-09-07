@@ -1,3 +1,4 @@
+import { withImageReferenceWrite } from "./image-gc-store.server";
 // Voucher storage. Two stores, deliberately different:
 //
 // - CATALOG (what a hotel offers for sale): KV blob `voucher_products:{pid}`,
@@ -101,7 +102,7 @@ export async function claimVoucher(
   record: VoucherRecord,
 ): Promise<{ won: boolean; existing?: VoucherRecord }> {
   await ensureSchema();
-  const res = await db()
+  const res = await withImageReferenceWrite(pid, record, () => db()
     .prepare(
       `INSERT INTO voucher (pid, code, id, product_id, kind, status, created_at, expires_at, json)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -118,7 +119,7 @@ export async function claimVoucher(
       record.expiresAt,
       JSON.stringify(record),
     )
-    .run();
+    .run());
   if (res.meta.changes === 1) return { won: true };
   return { won: false, existing: (await getVoucherByCode(pid, record.code)) ?? undefined };
 }
@@ -216,10 +217,10 @@ export async function casUpdateVoucher(
   next: VoucherRecord,
 ): Promise<VoucherRecord | null> {
   await ensureSchema();
-  const res = await db()
+  const res = await withImageReferenceWrite(pid, next, () => db()
     .prepare(`UPDATE voucher SET status = ?, expires_at = ?, json = ? WHERE pid = ? AND code = ? AND json = ?`)
     .bind(next.status, next.expiresAt, JSON.stringify(next), pid, next.code, JSON.stringify(prev))
-    .run();
+    .run());
   return res.meta.changes === 1 ? next : null;
 }
 

@@ -16,6 +16,12 @@ import { getPending } from "./pending-bookings.server";
 const TTL_SECONDS = 3 * 3600;
 const TTL_MS = TTL_SECONDS * 1000;
 
+// Keep an additional margin beyond the three-hour pending/replay lifetime.
+// Permanent booking and refund claims live in other tables and are untouched.
+export const CHECKOUT_INTENT_RETENTION_MS = 24 * 3600 * 1000;
+const PRUNE_BATCH_SIZE = 1000;
+const PRUNE_MAX_BATCHES = 5;
+
 const idemKey = (pid: string, fingerprint: string) => `idem:web:${pid}:${fingerprint}`;
 
 const ensureIntentSchema = schemaOnce((d) => [
@@ -28,7 +34,30 @@ const ensureIntentSchema = schemaOnce((d) => [
         PRIMARY KEY (pid, fingerprint)
       )`,
   ),
+  // pruneCheckoutIntents deletes by age; the cron would otherwise scan the table.
+  d.prepare(`CREATE INDEX IF NOT EXISTS checkout_intent_created_at ON checkout_intent(created_at)`),
 ]);
+
+/** Bounded maintenance, with an indexed age predicate (checkout_intent_created_at above).
+ * The cutoff is checked in the DELETE itself, so refreshing a fingerprint
+ * before this statement runs cannot delete the new claim. */
+export async function pruneCheckoutIntents(now = Date.now()): Promise<number> {
+  if (!getDB()) return 0;
+  await ensureIntentSchema();
+  const cutoff = new Date(now - CHECKOUT_INTENT_RETENTION_MS).toISOString();
+  let deleted = 0;
+  for (let batch = 0; batch < PRUNE_MAX_BATCHES; batch++) {
+    const result = await db().prepare(
+      `DELETE FROM checkout_intent WHERE created_at < ? AND rowid IN (
+        SELECT rowid FROM checkout_intent WHERE created_at < ? ORDER BY created_at LIMIT ?
+      )`,
+    ).bind(cutoff, cutoff, PRUNE_BATCH_SIZE).run();
+    const count = result.meta.changes ?? 0;
+    deleted += count;
+    if (count < PRUNE_BATCH_SIZE) break;
+  }
+  return deleted;
+}
 
 export async function readWebCheckoutIdem(
   pid: string,
@@ -89,7 +118,11 @@ export async function claimCheckoutReference(pid: string, fingerprint: string): 
     .prepare(`SELECT reference FROM checkout_intent WHERE pid = ? AND fingerprint = ?`)
     .bind(pid, fingerprint)
     .first<{ reference: string }>();
-  return row?.reference ?? reference;
+  if (row) return row.reference;
+  // Maintenance may have removed an expired row between our conflicting
+  // INSERT and the UPDATE/SELECT. Retry the claim rather than hand out an
+  // unpersisted reference: concurrent submits must still share one reference.
+  return claimCheckoutReference(pid, fingerprint);
 }
 
 /** Drop a failed attempt so the guest's next submit is a new intent, not a

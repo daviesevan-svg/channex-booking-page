@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/iyzico.return";
-import { getBookings, type BookingRecord } from "~/lib/bookings.server";
+import { getBookingByReference, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromIyzico, rejectMismatchedIyzicoPayment } from "~/lib/booking-finalize.server";
 import { SessionBindError } from "~/lib/stripe-session-bind";
@@ -52,7 +52,7 @@ async function handle(request: Request, params: { channelId?: string }): Promise
 
   // Already finalized (a retry, a refresh, a second delivery) → the matching
   // outcome, not a second charge.
-  const already = (await getBookings(pid)).find((b) => b.reference === ref);
+  const already = await getBookingByReference(pid, ref);
   if (already) {
     await deletePending(ref);
     throw redirect(outcomeUrl(already));

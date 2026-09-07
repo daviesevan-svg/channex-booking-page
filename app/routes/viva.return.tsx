@@ -1,7 +1,7 @@
 import { redirect } from "react-router";
 
 import type { Route } from "./+types/viva.return";
-import { getBookings, type BookingRecord } from "~/lib/bookings.server";
+import { getBookingByReference, type BookingRecord } from "~/lib/bookings.server";
 import { deletePending, getPending, getVivaOrder } from "~/lib/pending-bookings.server";
 import { finalizeBooking, paymentFromVivaTransaction, rejectMismatchedVivaPayment } from "~/lib/booking-finalize.server";
 import { SessionBindError } from "~/lib/stripe-session-bind";
@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 
   // Webhook already finalized it → straight to the matching outcome.
-  const already = (await getBookings(order.pid)).find((b) => b.reference === order.ref);
+  const already = await getBookingByReference(order.pid, order.ref);
   if (already) {
     await deletePending(order.ref);
     throw redirect(outcomeUrl(already));

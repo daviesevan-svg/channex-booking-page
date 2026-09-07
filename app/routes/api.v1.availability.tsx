@@ -3,6 +3,7 @@ import { authenticateApiKey, apiError } from "~/lib/api-auth.server";
 import { getCatalogRooms, getRates, type GateReason } from "~/lib/catalog.server";
 import { getSettings } from "~/lib/overrides.server";
 import { policyMap, serializeAvailabilityRoom, serializeGateReason } from "~/lib/api-serialize";
+import { availabilityInput } from "~/lib/api-availability-input";
 import { taxConfigFrom } from "~/lib/pricing";
 
 // GET /v1/availability?checkin=&checkout=&adults=&children_ages=
@@ -12,26 +13,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request);
   if (auth instanceof Response) return auth;
 
-  const url = new URL(request.url);
-  const checkin = url.searchParams.get("checkin") ?? "";
-  const checkout = url.searchParams.get("checkout") ?? "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(checkin) || !/^\d{4}-\d{2}-\d{2}$/.test(checkout)) {
-    return apiError(400, "invalid_request", "`checkin` and `checkout` are required (YYYY-MM-DD).");
-  }
-  const adults = Math.max(1, parseInt(url.searchParams.get("adults") ?? "2", 10) || 2);
-  // children_ages takes precedence (ages affect pricing/infants); else a plain count.
-  const agesParam = url.searchParams.get("children_ages");
-  const childrenAge = agesParam
-    ? agesParam.split(",").map((a) => parseInt(a.trim(), 10)).filter((n) => Number.isFinite(n) && n >= 0)
-    : Array.from({ length: Math.max(0, parseInt(url.searchParams.get("children") ?? "0", 10) || 0) }, () => 8);
+  const input = availabilityInput(new URL(request.url).searchParams);
+  if ("error" in input) return apiError(400, "invalid_request", input.error);
+  const { checkin, checkout, nights, adults, childrenAge } = input;
 
   // Currency is the property's own (no conversion); never a client param.
   const settings = await getSettings(auth.pid);
   const currency = settings.currency || "GBP";
-  const nights = Math.max(
-    1,
-    Math.round((Date.parse(`${checkout}T00:00:00Z`) - Date.parse(`${checkin}T00:00:00Z`)) / 86_400_000),
-  );
+
 
   // Collect why anything was withheld, so an absent room is explained rather
   // than just missing.

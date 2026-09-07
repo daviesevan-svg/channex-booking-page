@@ -9,6 +9,16 @@ const { d1: testD1 } = makeTestD1();
 // webhook SSRF gate + secret-shown-once rule, and the Google toggle computing
 // its side effect from the PRE-write value.
 
+const queued: { transition?: string; kinds: string[] }[] = [];
+let rejectEnqueue = false;
+const queueNamespace = {
+  idFromName: (id: string) => id,
+  get: () => ({ fetch: async (_url: string, init: RequestInit) => {
+    if (rejectEnqueue) throw new Error("queue unavailable");
+    queued.push(JSON.parse(String(init.body)));
+    return Response.json({ queued: true });
+  } }),
+};
 const store = new Map<string, string>();
 const kv = {
   get: async (k: string) => store.get(k) ?? null,
@@ -17,7 +27,7 @@ const kv = {
 };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { DB: testD1, CONFIG_KV: kv },
+  env: { DB: testD1, CONFIG_KV: kv, GOOGLE_ARI_QUEUE: queueNamespace },
   waitUntil: () => {},
 }));
 
@@ -122,7 +132,7 @@ describe("webhooks", () => {
 });
 
 describe("google push", () => {
-  it("validates and flips with the transition computed pre-write", async () => {
+  it("validates and persists the explicitly requested transition", async () => {
     const ak = await akPromise;
     const google = await import("../routes/api.v1.manage.google");
 
@@ -136,5 +146,23 @@ describe("google push", () => {
 
     const off = (await google.action({ request: req("/v1/manage/google", ak, "PATCH", { push: false }) } as never)) as Response;
     expect(((await off.json()) as { data: { push: boolean } }).data.push).toBe(false);
+    expect(queued.slice(-2).map((work) => work.transition)).toEqual(["enable", "disable"]);
+  });
+});
+
+describe("Google toggle admission retries", () => {
+  it.each([true, false])("retries explicit push=%s after the settings write succeeded but queue admission failed", async (push) => {
+    const ak = await akPromise;
+    const google = await import("../routes/api.v1.manage.google");
+    rejectEnqueue = true;
+    try {
+      await expect(google.action({ request: req("/v1/manage/google", ak, "PATCH", { push }) } as never)).rejects.toThrow("queue unavailable");
+      expect(JSON.parse(store.get("settings:p1")!).googleAriPush).toBe(push);
+    } finally { rejectEnqueue = false; }
+    const previous = queued.length;
+    const retried = await google.action({ request: req("/v1/manage/google", ak, "PATCH", { push }) } as never) as Response;
+    expect(retried.status).toBe(200);
+    expect(queued).toHaveLength(previous + 1);
+    expect(queued.at(-1)?.transition).toBe(push ? "enable" : "disable");
   });
 });

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { makeTestD1, seedProperties } from "./test-d1";
+const { sqlite, d1 } = makeTestD1();
 
 // Photos are stored one request at a time now (routes/admin/room-photo.tsx), so
 // bytes reach R2 BEFORE the room is saved. That creates an orphan the old
@@ -16,6 +18,12 @@ const kv = {
   get: async (k: string) => store.get(k) ?? null,
   put: async (k: string, v: string) => void store.set(k, v),
   delete: async (k: string) => void store.delete(k),
+  list: async ({ prefix, cursor, limit }: { prefix: string; cursor?: string; limit: number }) => {
+    const keys = [...store.keys()].filter((k) => k.startsWith(prefix)).sort();
+    const offset = Number(cursor || 0);
+    const page = keys.slice(offset, offset + limit).map((name) => ({ name }));
+    return { keys: page, list_complete: offset + limit >= keys.length, cursor: String(offset + limit) };
+  },
 };
 const deleted: string[] = [];
 const bucket = {
@@ -24,7 +32,7 @@ const bucket = {
 };
 
 vi.mock("cloudflare:workers", () => ({
-  env: { CONFIG_KV: kv, IMAGES: bucket },
+  env: { CONFIG_KV: kv, IMAGES: bucket, DB: d1 },
   // Real, so the fire-and-forget sweep is awaited rather than dropped.
   waitUntil: (work: Promise<unknown>) => void pending.push(work),
 }));
@@ -68,7 +76,12 @@ async function saveRoomForm(roomId: string, form: FormData) {
 }
 
 describe("a room save after per-file photo uploads", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    const { ensureImageGcSchema } = await import("./image-gc-store.server");
+    await ensureImageGcSchema();
+    for (const table of ["image_gc_candidate", "image_gc_scan", "image_gc_seen", "image_gc_deleted", "image_gc_property", "image_gc_write", "image_gc_pin"]) sqlite.exec(`DELETE FROM ${table}`);
+    seedProperties(sqlite, [{ id: "P1" }]);
     store.clear();
     deleted.length = 0;
     pending.length = 0;
@@ -83,7 +96,15 @@ describe("a room save after per-file photo uploads", () => {
     const rooms = JSON.parse(store.get("catalog_rooms:P1") ?? "[]");
     expect(rooms).toHaveLength(1);
     expect(rooms[0].images).toEqual([KEPT]);
-    // The dropped upload is gone from the bucket; the kept one is untouched.
+    expect(deleted).toEqual([]);
+    expect(sqlite.prepare("SELECT image_key FROM image_gc_candidate").all()).toEqual([{ image_key: "catalog/P1/new/dropped-800x600.jpg" }]);
+    const { processImageCleanup } = await import("./image-gc.server");
+    await processImageCleanup();
+    expect(deleted).toEqual([]); // still within grace
+    const later = Date.now() + 24 * 3600 * 1000 + 1;
+    vi.spyOn(Date, "now").mockReturnValue(later);
+    await processImageCleanup();
+    // The dropped upload is gone; strict reads preserve the kept room image.
     expect(deleted).toEqual(["catalog/P1/new/dropped-800x600.jpg"]);
   });
 
@@ -122,6 +143,12 @@ describe("a room save after per-file photo uploads", () => {
 
     const rooms = JSON.parse(store.get("catalog_rooms:P1") ?? "[]");
     expect(rooms[0].images).toEqual([KEPT]);
+    expect(deleted).toEqual([]);
+    expect(sqlite.prepare("SELECT image_key FROM image_gc_candidate").all()).toEqual([{ image_key: "catalog/P1/r1/old-800x600.jpg" }]);
+    const later = Date.now() + 24 * 3600 * 1000 + 1;
+    vi.spyOn(Date, "now").mockReturnValue(later);
+    const { processImageCleanup } = await import("./image-gc.server");
+    await processImageCleanup();
     expect(deleted).toEqual(["catalog/P1/r1/old-800x600.jpg"]);
   });
 });

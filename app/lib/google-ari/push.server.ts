@@ -6,6 +6,8 @@
 // never throw into callers; every push returns a structured result and the
 // outcome is recorded on the property so the admin can show it.
 import { getConfig } from "../config.server";
+import type { InventoryScope } from "../ari/read.server";
+import { submitGoogleAriWork } from "./queue-client.server";
 import { getRooms, getRates, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { checkGoogleReadiness } from "../google-readiness.server";
@@ -24,7 +26,6 @@ import {
   type PropertyRoom,
 } from "./xml";
 import { getProperties } from "../properties.server";
-import { fireAndForget } from "../d1.server";
 import { ariWindow, collectAri, googleTaxLines } from "./rates.server";
 import { googlePromotions } from "./promotions.server";
 import { getGoogleMatchStatus } from "./status.server";
@@ -70,6 +71,7 @@ export async function postToGoogleAri(kind: string, path: string, xml: string): 
         ...(googleAriProxyKey ? { "X-Ari-Proxy-Key": googleAriProxyKey } : {}),
       },
       body: xml,
+      signal: AbortSignal.timeout(15_000),
     });
     const body = (await res.text().catch(() => "")).trim();
     // Google replies with an OTA <Errors>/<Error> block or, on the proprietary
@@ -172,11 +174,11 @@ export async function syncPropertyData(pid: string): Promise<AriPushResult> {
 
 /** Rates + availability/restrictions + inventory counts. These three are pushed
  *  together (one inventory read) since they describe the same product grid. */
-export async function syncAri(pid: string): Promise<AriPushResult[]> {
+export async function syncAri(pid: string, scope?: InventoryScope): Promise<AriPushResult[]> {
   const gate = await envelopeFor(pid, "ari");
   if (!gate.ok) return [gate.result];
   const window = ariWindow(gate.settings.googleAriWindowDays ?? 365);
-  const { rates, avail, inventory } = await collectAri(pid, window);
+  const { rates, avail, inventory } = await collectAri(pid, window, scope);
   // Google Vacation Rentals expects a binary count per unit: 1 if the unit is
   // free on a date, 0 if it's booked — not a physical room count.
   const invCounts =
@@ -184,9 +186,22 @@ export async function syncAri(pid: string): Promise<AriPushResult[]> {
       ? inventory.map((e) => ({ ...e, count: e.count > 0 ? 1 : 0 }))
       : inventory;
   const out: AriPushResult[] = [];
-  out.push(await postToGoogleAri("rate", ARI_PATHS.rate, buildRateAmountXml(gate.env("rate"), rates)));
-  out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(gate.env("avail"), avail)));
-  out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), invCounts)));
+  // Deliver closures first, but publish prices before any reopening. Failed
+  // prices must not reopen a product at the last rate Google happened to hold.
+  // Sparse changes omit empty message types (Google rejects empty OTA XML).
+  const closes = avail.filter((entry) => entry.stopSell);
+  const opens = avail.filter((entry) => !entry.stopSell);
+  const zeroCounts = invCounts.filter((entry) => entry.count <= 0);
+  const positiveCounts = invCounts.filter((entry) => entry.count > 0);
+  if (closes.length) out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(gate.env("avail"), closes)));
+  if (zeroCounts.length) out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), zeroCounts)));
+  const priceResult = rates.length ? await postToGoogleAri("rate", ARI_PATHS.rate, buildRateAmountXml(gate.env("rate"), rates)) : undefined;
+  if (priceResult) out.push(priceResult);
+  if (!priceResult || priceResult.ok) {
+    if (opens.length) out.push(await postToGoogleAri("avail", ARI_PATHS.avail, buildAvailXml(gate.env("avail"), opens)));
+    if (positiveCounts.length) out.push(await postToGoogleAri("inventory", ARI_PATHS.inventory, buildInvCountXml(gate.env("inventory"), positiveCounts)));
+  }
+  if (!out.length) out.push({ kind: "ari", ok: true, detail: "No affected products in the configured ARI window." });
   return out;
 }
 
@@ -232,10 +247,16 @@ export const ALL_SYNC_KINDS: SyncKind[] = ["property_data", "ari", "taxes", "pro
 /** Run the given syncs, record the combined outcome on the property, and return
  *  the per-message results. */
 export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriPushResult[]> {
+  return submitGoogleAriWork({ pid, kinds }, true);
+}
+
+/** Delivery primitive: only GoogleAriQueue calls this, so manual, change-driven
+ * and reconciliation pushes share one per-property order. */
+export async function performGoogleAriSync(pid: string, kinds: SyncKind[], scope?: InventoryScope): Promise<AriPushResult[]> {
   const results: AriPushResult[] = [];
   for (const kind of kinds) {
     if (kind === "property_data") results.push(await syncPropertyData(pid));
-    else if (kind === "ari") results.push(...(await syncAri(pid)));
+    else if (kind === "ari") results.push(...(await syncAri(pid, scope)));
     else if (kind === "taxes") results.push(await syncTaxes(pid));
     else if (kind === "promotions") results.push(await syncPromotions(pid));
   }
@@ -243,25 +264,31 @@ export async function runAndRecord(pid: string, kinds: SyncKind[]): Promise<AriP
   return results;
 }
 
-/** Fire-and-forget push after a data change: no-op unless the property has ARI
- *  push enabled, and never blocks the caller — the work is kept alive past the
- *  response via waitUntil (falling back to a floating promise if unavailable, e.g.
- *  dev). Used by the Channex change webhook and admin edits. */
-export async function queueGoogleAriPush(pid: string, kinds: SyncKind[]): Promise<void> {
-  if (!(await getSettings(pid)).googleAriPush) return;
-  queueGoogleAriResync(pid, kinds);
+/** Persist a data-change push without waiting for Google's network delivery.
+ * Disabled properties need no queued work.
+ *
+ * Never throws: ~40 admin and /v1/manage save actions call this AFTER their
+ * KV write, and before the queue existed a Google problem could not fail a
+ * save that had already persisted. Returns false when admission failed so the
+ * webhook keeps its repair marker (and the minute cron retries); every other
+ * caller has the six-hourly reconciliation as its backstop. */
+export async function queueGoogleAriPush(pid: string, kinds: SyncKind[], scope?: InventoryScope): Promise<boolean> {
+  try {
+    if (!(await getSettings(pid)).googleAriPush) return true;
+    await submitGoogleAriWork({ pid, kinds, scope });
+    return true;
+  } catch (error) {
+    console.log(`[google-ari] enqueue failed for ${pid}: ${error instanceof Error ? error.message : error}`);
+    return false;
+  }
 }
 
-/** Fire-and-forget push WITHOUT the enabled check. For the OFF→ON toggle
+/** Persist a full resync WITHOUT the enabled check. For the OFF→ON toggle
  *  transition: the flag was written in this same request, and re-reading it is
  *  a KV read-after-write that can return the stale "off" value — which made the
  *  re-push silently no-op. The caller just decided the flag's value; trust it. */
-export function queueGoogleAriResync(pid: string, kinds: SyncKind[]): void {
-  fireAndForget(
-    runAndRecord(pid, kinds).catch((e) =>
-      console.log(`[google-ari] push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
-    ),
-  );
+export async function queueGoogleAriResync(pid: string, kinds: SyncKind[]): Promise<void> {
+  await submitGoogleAriWork({ pid, kinds, transition: "enable" });
 }
 
 /** Block the property on Google: zero inventory for every room plus stop-sell
@@ -320,14 +347,10 @@ export async function blockOnGoogle(pid: string): Promise<AriPushResult[]> {
   return record(out);
 }
 
-/** Fire-and-forget wrapper for blockOnGoogle — used by the settings save so
- *  turning the toggle off doesn't block the response on Google's round-trip. */
-export function queueGoogleAriBlock(pid: string): void {
-  fireAndForget(
-    blockOnGoogle(pid).catch((e) =>
-      console.log(`[google-ari] block push failed for ${pid}: ${e instanceof Error ? e.message : e}`),
-    ),
-  );
+/** Persist the OFF transition in the same actor as all inventory deliveries.
+ * The caller waits for durable admission, not Google's network round-trip. */
+export async function queueGoogleAriBlock(pid: string): Promise<void> {
+  await submitGoogleAriWork({ pid, kinds: [], transition: "disable" });
 }
 
 /** Cron entry: push everything for every property that has ARI push enabled.
@@ -337,7 +360,7 @@ export async function scheduledGoogleAriSync(): Promise<void> {
   for (const p of properties) {
     if (!(await getSettings(p.id)).googleAriPush) continue;
     try {
-      await runAndRecord(p.id, ALL_SYNC_KINDS);
+      await submitGoogleAriWork({ pid: p.id, kinds: ALL_SYNC_KINDS });
     } catch (e) {
       console.log(`[google-ari] scheduled sync failed for ${p.id}: ${e instanceof Error ? e.message : e}`);
     }

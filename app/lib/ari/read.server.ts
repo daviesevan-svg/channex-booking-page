@@ -55,6 +55,34 @@ export async function getInventoryOn(hotelCode: string, dates: Iterable<string>)
   );
 }
 
+/** Exact cells for a write or an incremental channel delivery. Rates always
+ * include every occupancy row so the displayed-price winner is unchanged. */
+export interface InventoryScope {
+  availability: { roomId: string; dates: string[] }[];
+  products: { roomId: string; rateId: string; dates: string[] }[];
+}
+
+export async function getInventoryForScope(
+  hotelCode: string,
+  scope: InventoryScope,
+  includeRestrictions = true,
+): Promise<InventoryData> {
+  const parts: QueryPart[] = [];
+  for (const cell of scope.availability) {
+    for (const dates of chunkForBinds([...new Set(cell.dates)].sort(), 2)) {
+      parts.push({ table: "availability", where: `room_type_id=? AND date IN (${placeholders(dates.length)})`, binds: [cell.roomId, ...dates] });
+    }
+  }
+  for (const cell of scope.products) {
+    for (const dates of chunkForBinds([...new Set(cell.dates)].sort(), 3)) {
+      const part = { where: `room_type_id=? AND rate_plan_id=? AND date IN (${placeholders(dates.length)})`, binds: [cell.roomId, cell.rateId, ...dates] };
+      parts.push({ table: "rate", ...part });
+      if (includeRestrictions) parts.push({ table: "restriction", ...part });
+    }
+  }
+  return readParts(hotelCode, parts);
+}
+
 /** One date predicate and its bound values. Each `where` is built from fixed
  *  literals and placeholders only — never from caller text. */
 interface DatePart {
@@ -78,32 +106,36 @@ type RestrRow = {
  *  single `batch()`, so the cost is one round trip regardless of how many parts
  *  the date list had to be split into. */
 async function readInventory(hotelCode: string, parts: DatePart[]): Promise<InventoryData> {
+  return readParts(hotelCode, parts.flatMap((part) =>
+    (["availability", "rate", "restriction"] as const).map((table) => ({ table, ...part })),
+  ));
+}
+
+interface QueryPart extends DatePart { table: "availability" | "rate" | "restriction" }
+
+async function readParts(hotelCode: string, parts: QueryPart[]): Promise<InventoryData> {
+  if (!parts.length) return { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
   await ensureSchema();
   const D = db();
-  if (parts.length === 0) return { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };
-
-  const stmts = parts.flatMap((p) => [
-    D.prepare(`SELECT room_type_id, date, avail FROM availability WHERE hotel_code=? AND ${p.where}`).bind(hotelCode, ...p.binds),
-    D.prepare(`SELECT room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size FROM rate WHERE hotel_code=? AND ${p.where}`).bind(
-      hotelCode,
-      ...p.binds,
-    ),
-    D.prepare(
-      `SELECT room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure
-       FROM restriction WHERE hotel_code=? AND ${p.where}`,
-    ).bind(hotelCode, ...p.binds),
-  ]);
-
-  const res = await D.batch(stmts);
-
-  // Results come back in the order the statements went out: three per part.
+  const columns = {
+    availability: "room_type_id, date, avail",
+    rate: "room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size",
+    restriction: "room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure",
+  };
+  const stmts = parts.map((p) => D.prepare(
+    `SELECT ${columns[p.table]} FROM ${p.table} WHERE hotel_code=? AND ${p.where}`,
+  ).bind(hotelCode, ...p.binds));
   const av: AvailRow[] = [];
   const rt: RateRow[] = [];
   const rs: RestrRow[] = [];
-  for (let i = 0; i < res.length; i += 3) {
-    av.push(...((res[i]?.results ?? []) as AvailRow[]));
-    rt.push(...((res[i + 1]?.results ?? []) as RateRow[]));
-    rs.push(...((res[i + 2]?.results ?? []) as RestrRow[]));
+  for (let offset = 0; offset < stmts.length; offset += 100) {
+    const res = await D.batch(stmts.slice(offset, offset + 100));
+    for (let i = 0; i < res.length; i++) {
+      const rows = res[i]?.results ?? [];
+      if (parts[offset + i].table === "availability") av.push(...rows as AvailRow[]);
+      else if (parts[offset + i].table === "rate") rt.push(...rows as RateRow[]);
+      else rs.push(...rows as RestrRow[]);
+    }
   }
 
   const data: InventoryData = { availability: {}, prices: {}, pricesByOcc: {}, restrictions: {} };

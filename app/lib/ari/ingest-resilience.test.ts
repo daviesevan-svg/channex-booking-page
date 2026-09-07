@@ -20,7 +20,8 @@ const kv = {
 };
 
 const sqlite = new DatabaseSync(":memory:");
-type Stmt = { sql: string; args: unknown[]; bind: (...a: unknown[]) => Stmt; first: () => Promise<unknown> };
+sqlite.exec("CREATE TABLE google_ari_repair (pid TEXT PRIMARY KEY, revision TEXT NOT NULL, next_attempt INTEGER NOT NULL DEFAULT 0)");
+type Stmt = { sql: string; args: unknown[]; bind: (...a: unknown[]) => Stmt; first: () => Promise<unknown>; run: () => Promise<unknown> };
 const exec = (s: Stmt) => {
   const p = sqlite.prepare(s.sql);
   if (/^\s*(select|with)/i.test(s.sql)) return { results: p.all(...(s.args as never[])) };
@@ -34,6 +35,7 @@ const makeStmt = (sql: string): Stmt => ({
     this.args = a;
     return this;
   },
+  run: async function () { return exec(this as unknown as Stmt); },
   first: async function () {
     const r = exec(this as unknown as Stmt) as { results: unknown[] };
     return r.results[0] ?? null;

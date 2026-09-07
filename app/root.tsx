@@ -12,7 +12,8 @@ import {
 import type { Route } from "./+types/root";
 import { langFromRequest } from "./lib/content";
 import { DefaultFontFaces } from "./components/font-faces";
-import { adminLangFromRequest, registerAdminDict } from "./lib/admin-i18n";
+import { adminLangFromRequest } from "./lib/admin-i18n";
+import { registerAdminDict } from "./lib/admin-dict-registry";
 import { adminDictFor } from "./lib/admin-i18n-locales.server";
 import { isOwnHost } from "./lib/domains.server";
 import { getPartner, partnerIdForAdminHost, partnerIdForGuestHost } from "./lib/partners.server";

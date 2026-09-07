@@ -1,3 +1,4 @@
+import { imageReferenceProperty, withImageReferenceWrite } from "./image-gc-store.server";
 import { env } from "cloudflare:workers";
 
 import { requestKvCache } from "./request-cache.server";
@@ -179,7 +180,7 @@ export function getConfig(): AppConfig {
 export function getConfigKV(): KVNamespace {
   const kv = (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
   const cache = requestKvCache();
-  if (!kv || !cache) return kv;
+  if (!kv) return kv;
   return new Proxy(kv, {
     get(target, prop, receiver) {
       const v = Reflect.get(target, prop, receiver);
@@ -187,7 +188,7 @@ export function getConfigKV(): KVNamespace {
       const fn = v as (...a: unknown[]) => unknown;
       if (prop === "get") {
         return (key: unknown, ...rest: unknown[]) => {
-          if (typeof key !== "string" || rest.length > 0) return fn.call(target, key, ...rest);
+          if (!cache || typeof key !== "string" || rest.length > 0) return fn.call(target, key, ...rest);
           const hit = cache.get(key);
           if (hit) return hit;
           const read = fn.call(target, key) as Promise<string | null>;
@@ -203,7 +204,15 @@ export function getConfigKV(): KVNamespace {
       if (prop === "put" || prop === "delete") {
         return (key: unknown, ...rest: unknown[]) => {
           if (typeof key !== "string") return fn.call(target, key, ...rest);
-          const write = fn.call(target, key, ...rest) as Promise<unknown>;
+          const pid = imageReferenceProperty(key);
+          if (pid && prop === "put" && typeof rest[0] !== "string") {
+            throw new Error("Image-bearing content must be stored as JSON text.");
+          }
+          const perform = () => fn.call(target, key, ...rest) as Promise<unknown>;
+          const write = pid
+            ? withImageReferenceWrite(pid, prop === "delete" ? null : rest[0], perform)
+            : perform();
+          if (!cache) return write;
           if (prop === "put" && typeof rest[0] !== "string") {
             // Can't mirror a stream/buffer value — just stop serving the old read.
             cache.delete(key);
