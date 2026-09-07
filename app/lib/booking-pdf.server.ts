@@ -10,7 +10,8 @@ import { PDFDocument, PDFFont, PDFPage, rgb, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { format, parseISO } from "date-fns";
 
-import { formatCancelDeadline } from "./cancellation";
+import { cancellationBandMessages, formatCancelDeadline } from "./cancellation";
+import { describePenalty } from "./rate-policy";
 
 import type { BookingRecord } from "./bookings.server";
 import { formatMoney } from "./money";
@@ -216,6 +217,18 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     ensure(15);
     y -= 4;
     text(cancelLine, { size: 9.5, color: MUTED });
+    y -= 15;
+  }
+  // A multi-step policy: the bands still ahead, then what follows the last.
+  // English like the rest of the PDF; a fixed fee in the booking's currency.
+  for (const m of cancellationBandMessages(cancel, Date.now())) {
+    const penalty = m.penalty === "fixed" && m.penaltyValue ? money(m.penaltyValue) : describePenalty(m.penalty, m.penaltyValue);
+    const line =
+      m.key === "cancelBandUntil"
+        ? `Until ${formatCancelDeadline({ iso: m.iso, local: m.local }, "d MMM yyyy")}, ${penalty} is charged if you cancel.`
+        : `After that, ${penalty} is charged if you cancel.`;
+    ensure(15);
+    text(line, { size: 9.5, color: MUTED });
     y -= 15;
   }
 

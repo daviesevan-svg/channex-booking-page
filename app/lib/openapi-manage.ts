@@ -192,7 +192,8 @@ export const manageSchemas = {
       occupancy_pricing_by_room: { type: ["object", "null"] },
       policy: {
         type: "object",
-        description: "payment {timing, card, deposit?} + cancellation {refundable, tiers[]} + no_show {penalty, penalty_value?} + override_note?. tier.deadline_value 0 = the anchor time on arrival day.",
+        description:
+          "payment {timing, card, deposit?} + cancellation {refundable, tiers[]} + no_show {penalty, penalty_value?} + override_note?. A tier reads 'free until this deadline; after it, this penalty' — several tiers make a schedule: ordered most generous first, each deadline closer to arrival than the last, each penalty at least as harsh, at most 4, none of them 'none'. tier.deadline_value 0 = the anchor time on arrival day.",
       },
       inclusions: { type: "array", items: { type: "string" } },
     },

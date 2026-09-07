@@ -317,7 +317,24 @@ export function serializeBooking(b: BookingRecord) {
      *  Not re-derived from the current offers, so it stays true after one is
      *  edited or withdrawn. */
     value_adds: (b.valueAdds ?? []).map((va) => ({ name: va.name, inclusions: va.inclusions })),
-    cancellation: b.cancellation ? { refundable: b.cancellation.refundable, cancel_by: b.cancellation.cancelByISO } : null,
+    /** `cancel_by` is the end of the free window, as always. `bands` is the whole
+     *  schedule when the rate had one — most generous first, the last running to
+     *  arrival (`until` null), each with its penalty priced against this stay.
+     *  Null on bookings made before multi-tier shipped. */
+    cancellation: b.cancellation
+      ? {
+          refundable: b.cancellation.refundable,
+          cancel_by: b.cancellation.cancelByISO,
+          bands:
+            b.cancellation.bands?.map((band) => ({
+              until: band.untilISO,
+              until_local: band.untilLocal ?? null,
+              penalty: band.penalty,
+              penalty_value: band.penaltyValue ?? null,
+              penalty_amount: band.penaltyAmount ?? null,
+            })) ?? null,
+        }
+      : null,
     voucher: b.voucher
       ? { code: b.voucher.code, title: b.voucher.title ?? null, amount: b.voucher.amount ?? null }
       : null,

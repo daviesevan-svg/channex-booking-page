@@ -75,3 +75,43 @@ describe("describePolicy without an override note", () => {
     expect(describePolicy({ ...base, cancellation: { refundable: false, tiers: [] } }).cancellation).toBe("Non-refundable.");
   });
 });
+
+describe("describePolicy with several tiers", () => {
+  const two: RatePolicy = {
+    ...base,
+    cancellation: {
+      refundable: true,
+      tiers: [
+        { deadlineValue: 14, deadlineUnit: "days", penalty: "percent", penaltyValue: 50 },
+        { deadlineValue: 7, deadlineUnit: "days", penalty: "full_stay" },
+      ],
+    },
+  };
+
+  it("walks the schedule: free until, each band until the next deadline, then the last", () => {
+    expect(describePolicy(two, "18:00").cancellation).toBe(
+      "Free cancellation until 18:00, 14 days before arrival. Until 18:00, 7 days before arrival, 50% of the stay is charged; after that, the full stay is charged.",
+    );
+  });
+
+  it("keeps going for three", () => {
+    const three: RatePolicy = {
+      ...two,
+      cancellation: {
+        refundable: true,
+        tiers: [
+          { deadlineValue: 30, deadlineUnit: "days", penalty: "first_night" },
+          { deadlineValue: 14, deadlineUnit: "days", penalty: "percent", penaltyValue: 50 },
+          { deadlineValue: 2, deadlineUnit: "days", penalty: "full_stay" },
+        ],
+      },
+    };
+    expect(describePolicy(three, "18:00").cancellation).toBe(
+      "Free cancellation until 18:00, 30 days before arrival. Until 18:00, 14 days before arrival, the first night is charged; until 18:00, 2 days before arrival, 50% of the stay is charged; after that, the full stay is charged.",
+    );
+  });
+
+  it("leaves the single-tier sentence exactly as it was", () => {
+    expect(describePolicy(base, "18:00").cancellation).toBe("Free cancellation until 18:00, 21 days before arrival, then the full stay is charged.");
+  });
+});

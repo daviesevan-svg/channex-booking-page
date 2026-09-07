@@ -192,15 +192,27 @@ export function describePolicy(
   if (!p.cancellation.refundable) {
     cancellation = "Non-refundable.";
   } else {
-    const t = p.cancellation.tiers[0];
-    if (!t) {
+    const tiers = p.cancellation.tiers;
+    const [first, ...rest] = tiers;
+    if (!first) {
       cancellation = "Free cancellation any time before arrival.";
-    } else {
+    } else if (rest.length === 0) {
       // Named as the wall-clock it resolves to, not as a bare offset: "0 hours
       // before arrival" is unreadable, and "24 hours before arrival" invites the
       // reader to assume midnight. `anchor` is the property's cut-off time.
-      cancellation = `Free cancellation until ${describeDeadline(t, anchor)}`;
-      cancellation += t.penalty === "none" ? "." : `, then ${describePenalty(t.penalty, t.penaltyValue)} is charged.`;
+      cancellation = `Free cancellation until ${describeDeadline(first, anchor)}`;
+      cancellation += first.penalty === "none" ? "." : `, then ${describePenalty(first.penalty, first.penaltyValue)} is charged.`;
+    } else {
+      // Several steps: each tier's charge runs until the next tier's deadline,
+      // the last to arrival. "Free until D1. Until D2, X is charged; after that,
+      // Y is charged."
+      cancellation = `Free cancellation until ${describeDeadline(first, anchor)}.`;
+      tiers.forEach((t, i) => {
+        const next = tiers[i + 1];
+        const charge = describePenalty(t.penalty, t.penaltyValue);
+        const until = i === 0 ? "Until" : "until";
+        cancellation += next ? ` ${until} ${describeDeadline(next, anchor)}, ${charge} is charged;` : ` after that, ${charge} is charged.`;
+      });
     }
   }
 

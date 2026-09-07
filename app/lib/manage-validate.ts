@@ -17,6 +17,7 @@ import { normalizeCode, type PromoConditions, type Promotion } from "./promotion
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import type { OccupancyPricing } from "./rate-pricing";
 import type { CancelTier, RatePolicy } from "./rate-policy";
+import { validateTiers } from "./cancel-bands";
 
 export type Errors = Record<string, string[]>;
 export type Validated<T> = { ok: true; value: T } | { ok: false; errors: Errors };
@@ -278,6 +279,12 @@ function validatePolicy(ctx: Ctx, v: unknown): RatePolicy | undefined {
     if (pv !== undefined && (typeof pv !== "number" || !Number.isFinite(pv) || pv < 0)) return ctx.fail("policy", "tier.penalty_value must be a number ≥ 0.");
     tiers.push({ deadlineValue: t.deadline_value, deadlineUnit: t.deadline_unit as DeadlineUnit, penalty: t.penalty as never, penaltyValue: pv as number | undefined });
   }
+  // Shape, not just types: each tier closer to arrival than the last, each at
+  // least as harsh, values where the penalty type needs them, at most four.
+  // The same check the rate editor runs, so a schedule is either right
+  // everywhere or refused everywhere.
+  const tierProblem = validateTiers(tiers);
+  if (tierProblem) return ctx.fail("policy", `cancellation.tiers: ${tierProblem}`);
   if (typeof noShow.penalty !== "string" || !PENALTIES.has(noShow.penalty)) return ctx.fail("policy", "no_show.penalty must be none, first_night, percent, fixed or full_stay.");
   const nv = noShow.penalty_value;
   if (nv !== undefined && (typeof nv !== "number" || !Number.isFinite(nv) || nv < 0)) return ctx.fail("policy", "no_show.penalty_value must be a number ≥ 0.");

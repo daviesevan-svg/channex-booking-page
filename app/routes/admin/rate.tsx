@@ -22,6 +22,7 @@ import {
 import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { activeGateway } from "~/lib/payments.server";
+import { MAX_CANCEL_TIERS, validateTiers } from "~/lib/cancel-bands";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { getSettings } from "~/lib/overrides.server";
 
@@ -52,17 +53,32 @@ function buildPolicy(get: (name: string) => string): RatePolicy {
   const rawUnit = get("cancelDeadlineUnit");
   const cdu = isDeadlineUnit(rawUnit) ? rawUnit : "hours";
   const latePenalty = pick(get("latePenalty"), PENALTY_TYPES, "full_stay");
-  const tiers: CancelTier[] =
-    refundable && cdv != null
-      ? [
-          {
-            deadlineValue: cdv,
-            deadlineUnit: cdu,
-            penalty: latePenalty,
-            penaltyValue: latePenalty === "percent" || latePenalty === "fixed" ? num(get("latePenaltyValue")) : undefined,
-          },
-        ]
-      : [];
+  const tiers: CancelTier[] = [];
+  if (refundable && cdv != null) {
+    tiers.push({
+      deadlineValue: cdv,
+      deadlineUnit: cdu,
+      penalty: latePenalty,
+      penaltyValue: latePenalty === "percent" || latePenalty === "fixed" ? num(get("latePenaltyValue")) : undefined,
+    });
+    // Further steps (multi-tier): each row is a later deadline and the charge
+    // that applies from it. A row left blank is simply not a step. Ordering and
+    // harshness are checked by validateTiers, in the action and in the preview.
+    for (let k = 1; k < MAX_CANCEL_TIERS; k++) {
+      const raw = get(`tierDeadlineValue_${k}`).trim();
+      if (raw === "") continue;
+      const dv = nonNegInt(raw);
+      if (dv == null) continue;
+      const rawUnitK = get(`tierDeadlineUnit_${k}`);
+      const penalty = pick(get(`tierPenalty_${k}`), PENALTY_TYPES, "full_stay");
+      tiers.push({
+        deadlineValue: dv,
+        deadlineUnit: isDeadlineUnit(rawUnitK) ? rawUnitK : "days",
+        penalty,
+        penaltyValue: penalty === "percent" || penalty === "fixed" ? num(get(`tierPenaltyValue_${k}`)) : undefined,
+      });
+    }
+  }
   const payTiming = pick(get("payTiming"), PAYMENT_TIMINGS, "pay_at_hotel");
   const depositValue = num(get("depositValue"));
   const noShowPenalty = pick(get("noShowPenalty"), PENALTY_TYPES, "first_night");
@@ -168,6 +184,9 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   // Payment + cancellation + no-show policy (same builder the live preview uses).
   const policy = buildPolicy((n) => String(form.get(n) ?? ""));
+  // The same check the editor shows live — the server is the one that counts.
+  const tierProblem = validateTiers(policy.cancellation.tiers);
+  if (tierProblem) return { error: tierProblem };
   // On a translation tab the override-note field holds THAT language's text, so
   // it goes into translations[lang] below — the default-language note isn't in
   // the form and must be carried over onto the policy untouched.
@@ -303,6 +322,13 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [latePenalty, setLatePenalty] = useState<string>(tier0?.penalty ?? "full_stay");
   const [noShowPenalty, setNoShowPenalty] = useState<string>(pol.noShow.penalty);
   const [refundable, setRefundable] = useState<boolean>(pol.cancellation.refundable);
+  // The steps after the first deadline (multi-tier). One penalty select per row,
+  // held here so its value input can be gated like the first tier's. Rows are
+  // only ever added and removed at the end, so the uncontrolled inputs keep
+  // their positions.
+  const [extraTiers, setExtraTiers] = useState<string[]>(pol.cancellation.tiers.slice(1).map((x) => x.penalty));
+  // What the action would reject, shown as the admin types rather than on save.
+  const [tierProblem, setTierProblem] = useState<string | null>(() => validateTiers(pol.cancellation.tiers));
   const needsValue = (p: string) => p === "percent" || p === "fixed";
   const disabledInput = `${FIELD_INPUT} disabled:cursor-not-allowed disabled:opacity-50`;
 
@@ -311,7 +337,10 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
   const [preview, setPreview] = useState(() => describePolicy(pol, cancelAnchor));
   const refreshPreview = () => {
     const el = formRef.current;
-    if (el) setPreview(describePolicy(buildPolicy((n) => String(new FormData(el).get(n) ?? "")), cancelAnchor));
+    if (!el) return;
+    const built = buildPolicy((n) => String(new FormData(el).get(n) ?? ""));
+    setPreview(describePolicy(built, cancelAnchor));
+    setTierProblem(validateTiers(built.cancellation.tiers));
   };
 
   // Per-room occupancy pricing: a table of editable rows, one per room, gated by
@@ -660,7 +689,8 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
               </p>
               <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="block text-[13px] font-semibold text-secondary">
-                  {t("rtLateCharge")} <span className="font-normal text-faint">{t("rtLateChargeHint")}</span>
+                  {t("rtLateCharge")}{" "}
+                  <span className="font-normal text-faint">{extraTiers.length ? t("rtLateChargeHintSteps") : t("rtLateChargeHint")}</span>
                   <select name="latePenalty" value={latePenalty} onChange={(e) => setLatePenalty(e.target.value)} className={FIELD_INPUT}>
                     {PENALTY_TYPES.map((p) => (
                       <option key={p} value={p}>{t(`rtOptPenalty_${p}`)}</option>
@@ -672,6 +702,70 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                   <input name="latePenaltyValue" type="number" min={0} step="0.01" defaultValue={tier0?.penaltyValue ?? ""} placeholder={t("rtEg", { v: 50 })} disabled={!needsValue(latePenalty)} className={disabledInput} />
                 </label>
               </div>
+              {/* Further steps: each is a later deadline and the charge from it.
+                  The live preview below is what makes this legible — the admin
+                  reads the sentence the guest will read. */}
+              {extraTiers.map((penalty, i) => {
+                const k = i + 1;
+                const saved = pol.cancellation.tiers[k];
+                return (
+                  <div key={k} className="mt-4 rounded-[12px] border border-line bg-surface-alt/50 p-4">
+                    <div className="text-[13px] font-semibold text-secondary">{t("rtTierFrom")}</div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <input
+                        name={`tierDeadlineValue_${k}`}
+                        type="number"
+                        min={0}
+                        defaultValue={saved?.deadlineValue ?? ""}
+                        placeholder="7"
+                        className="w-24 rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[10px] text-[15px] text-ink outline-none focus:border-accent"
+                      />
+                      <select
+                        name={`tierDeadlineUnit_${k}`}
+                        defaultValue={saved?.deadlineUnit ?? "days"}
+                        className="rounded-[10px] border border-line-alt bg-surface-alt px-3 py-[11px] text-[15px] text-ink outline-none focus:border-accent"
+                      >
+                        <option value="hours">{t("rtHours")}</option>
+                        <option value="days">{t("rtDays")}</option>
+                      </select>
+                      <span className="text-[13px] text-muted-2">{t("rtBeforeArrival")}</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <label className="block text-[13px] font-semibold text-secondary">
+                        {t("rtTierCharge")}
+                        <select
+                          name={`tierPenalty_${k}`}
+                          value={penalty}
+                          onChange={(e) => setExtraTiers((rows) => rows.map((r, j) => (j === i ? e.target.value : r)))}
+                          className={FIELD_INPUT}
+                        >
+                          {PENALTY_TYPES.filter((p) => p !== "none").map((p) => (
+                            <option key={p} value={p}>{t(`rtOptPenalty_${p}`)}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block text-[13px] font-semibold text-secondary">
+                        {t("rtChargeValue")} <span className="font-normal text-faint">{t("rtChargeValueHint")}</span>
+                        <input name={`tierPenaltyValue_${k}`} type="number" min={0} step="0.01" defaultValue={saved?.penaltyValue ?? ""} placeholder={t("rtEg", { v: 50 })} disabled={!needsValue(penalty)} className={disabledInput} />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+              <div className="mt-3 flex items-center gap-4 text-[13px] font-semibold">
+                {extraTiers.length < MAX_CANCEL_TIERS - 1 && (
+                  <button type="button" onClick={() => setExtraTiers((rows) => [...rows, "full_stay"])} className="text-accent hover:underline">
+                    + {t("rtTierAdd")}
+                  </button>
+                )}
+                {extraTiers.length > 0 && (
+                  <button type="button" onClick={() => setExtraTiers((rows) => rows.slice(0, -1))} className="text-muted hover:underline">
+                    {t("rtTierRemove")}
+                  </button>
+                )}
+              </div>
+              {extraTiers.length === 0 && <p className="mt-2 text-[12px] text-faint">{t("rtTiersIntro")}</p>}
+              {tierProblem && <p className="mt-2 text-[13px] text-red-600">{tierProblem}</p>}
             </>
           ) : (
             <p className="text-[13px] text-muted">{t("rtNonRefundableNote")}</p>

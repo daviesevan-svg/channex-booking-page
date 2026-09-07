@@ -29,7 +29,7 @@ import {
 import { cancellationVaries, resolveBookingCancellation, resolveBookingPolicy } from "~/lib/policy.server";
 import { dueNow } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
-import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
+import { cancellationBandMessages, cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { consentGate, stayTotals } from "~/lib/checkout-totals";
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
@@ -925,7 +925,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   };
   // Cancellation + consent, from the same gate the action rejects on.
   // atBooking → a free window that's already closed reads as non-refundable, not a past date.
-  const { cancelInfo, freeWindowClosed, nonRefundable, chargedToday, needAck } = consentGate({
+  const { cancelInfo, nonRefundable, chargedToday, partialBand, needAck } = consentGate({
     policy,
     checkin: stay.checkin,
     anchor: cancelAnchor,
@@ -941,19 +941,22 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           "iso" in cancelMsg ? { date: formatCancelDeadline(cancelMsg, "EEE d MMM yyyy", tr.locale) } : undefined,
         )
       : "");
-  // The cancellation + withdrawal group above the order button. It carries the
-  // rule that separates the summary from the consent ticks, so the ticks only
-  // draw their own when the group isn't there.
-  const cancellationOnPage = mixedCancellation || Boolean(cancellationText);
-  const legalAbove = cancellationOnPage || euConsumer;
-  const consentTop = legalAbove ? "pt-3.5" : cx("border-t", s.rule, "pt-4");
-  const tier0 = policy.cancellation.tiers[0];
-  // The "after the deadline …" line only makes sense while the deadline is still
-  // ahead — once it's passed the lead line already reads "non-refundable".
-  const latePhrase =
-    policy.cancellation.refundable && !freeWindowClosed && tier0 && tier0.penalty !== "none" && !policy.overrideNote
-      ? penaltyPhrase(tier0.penalty, tier0.penaltyValue)
-      : "";
+  // The schedule after the free window — "Until D, X is charged" for each band
+  // still ahead, then "After that, Y". Only while something is still ahead: once
+  // the last deadline has passed the lead line already reads "non-refundable".
+  // Silenced by an override note: the hotel's own text already states what
+  // happens, and ours contradicted it.
+  const bandLines = policy.overrideNote
+    ? []
+    : cancellationBandMessages(cancelInfo, Date.now(), { alwaysFinal: true })
+        .map((m) => {
+          const penalty = penaltyPhrase(m.penalty, m.penaltyValue);
+          if (!penalty) return "";
+          return m.key === "cancelBandUntil"
+            ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", tr.locale), penalty })
+            : tr.t("afterDeadlineCharge", { penalty });
+        })
+        .filter(Boolean);
   // Silenced by an override note for the same reason as latePhrase above: the
   // hotel's own text already states what happens, and ours contradicted it.
   const noShowPhrase =
@@ -961,12 +964,29 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       ? penaltyPhrase(policy.noShow.penalty, policy.noShow.penaltyValue)
       : "";
 
+  // The cancellation + withdrawal group above the order button. It carries the
+  // rule that separates the summary from the consent ticks, so the ticks only
+  // draw their own when the group isn't there.
+  const cancellationOnPage = mixedCancellation || Boolean(cancellationText) || bandLines.length > 0;
+  const legalAbove = cancellationOnPage || euConsumer;
+  const consentTop = legalAbove ? "pt-3.5" : cx("border-t", s.rule, "pt-4");
+
   // ---- consent ----
+  // Three distinct acknowledgments: the booking is non-refundable; or the free
+  // window has closed but a band that still refunds part of the stay is open
+  // (name the charge, don't call it non-refundable); or simply that the card is
+  // charged today.
+  const amountToday = formatMoney(dueShown, currency);
+  const partialPenalty = partialBand ? penaltyPhrase(partialBand.penalty, partialBand.penaltyValue) : "";
   const ackText = nonRefundable
     ? chargedToday
-      ? tr.t("ackNonRefundableCharged", { amount: formatMoney(dueShown, currency) })
+      ? tr.t("ackNonRefundableCharged", { amount: amountToday })
       : tr.t("ackNonRefundable")
-    : tr.t("ackCharged", { amount: formatMoney(dueShown, currency) });
+    : partialBand && partialPenalty
+      ? chargedToday
+        ? tr.t("ackPartialCharged", { amount: amountToday, penalty: partialPenalty })
+        : tr.t("ackPartial", { penalty: partialPenalty })
+      : tr.t("ackCharged", { amount: amountToday });
   const [agree, setAgree] = useState(false);
   const [accepted, setAccepted] = useState<string[]>([]);
   const [ack, setAck] = useState(false);
@@ -1136,10 +1156,14 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 {tr.t("cancellationVariesByRoom")}
               </div>
             ) : (
-              (cancellationText || latePhrase || noShowPhrase) && (
+              (cancellationText || bandLines.length > 0 || noShowPhrase) && (
                 <div className={cx("mb-[18px] flex flex-col gap-1.5 border-t", s.rule, "pt-3.5 text-caption text-secondary")}>
                   {cancellationText && <div>{cancellationText}</div>}
-                  {latePhrase && <div className="text-muted-2">{tr.t("afterDeadlineCharge", { penalty: latePhrase })}</div>}
+                  {bandLines.map((line, i) => (
+                    <div key={i} className="text-muted-2">
+                      {line}
+                    </div>
+                  ))}
                   {noShowPhrase && <div className="text-muted-2">{tr.t("noShowCharge", { penalty: noShowPhrase })}</div>}
                 </div>
               )

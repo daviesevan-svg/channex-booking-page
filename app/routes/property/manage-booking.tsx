@@ -15,7 +15,7 @@ import { getPortalMessage, getSettings } from "~/lib/overrides.server";
 import { langFromRequest } from "~/lib/content";
 
 import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
-import { cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
+import { cancellationBandMessages, cancellationMessage, formatCancelDeadline, penaltyText } from "~/lib/cancellation";
 import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -169,6 +169,16 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   const cancellationText = msg
     ? tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", tr.locale) } : undefined)
     : "";
+  // A multi-step policy: the bands still ahead, then what follows the last.
+  const bandLines = cancellationBandMessages(b.cancellation, Date.now())
+    .map((m) => {
+      const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => formatMoney(n, cur));
+      if (!penalty) return "";
+      return m.key === "cancelBandUntil"
+        ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", tr.locale), penalty })
+        : tr.t("afterDeadlineCharge", { penalty });
+    })
+    .filter(Boolean);
 
   return (
     <main className="mx-auto max-w-[660px] px-7 pb-20 pt-12">
@@ -308,6 +318,11 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         <section className={cx("mt-5", s.panel, "p-5")}>
           <h2 className="mb-2 font-serif text-title-sm font-semibold">{tr.t("cancellationPolicy")}</h2>
           <p className="text-body text-secondary">{cancellationText}</p>
+          {bandLines.map((line, i) => (
+            <p key={i} className="mt-1 text-body text-muted-2">
+              {line}
+            </p>
+          ))}
         </section>
       )}
 
