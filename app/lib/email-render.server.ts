@@ -214,6 +214,10 @@ function detailsHtml(
     })
     .filter(Boolean);
 
+  // Money already sent back — the cancellation email after a refund, full or
+  // partial. Says what actually went, not what the policy promised.
+  const refundRow = booking.payment?.refund ? ROW(tr.t("refundedLabel"), money(booking.payment.refund.amount)) : "";
+
   const manageBtn =
     opts.recipient === "guest" && opts.manageUrl
       ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:${opts.brand.radiusButton}px;background:${opts.brand.accent};">
@@ -243,6 +247,7 @@ function detailsHtml(
       ${includedBlock}
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
       ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
+      ${refundRow ? `<table role="presentation" width="100%" style="margin-top:6px;">${refundRow}</table>` : ""}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
         ${ROW(tr.t("total"), money(booking.total), true)}
         ${booking.voucher?.amount ? ROW(tr.t("giftVoucher", { code: booking.voucher.code }), `−${money(booking.voucher.amount)}`) : ""}
