@@ -158,10 +158,16 @@ function detailsHtml(
     )
     .join("");
 
+  // The guest's answers to the extra's info fields (flight number, arrival
+  // time…) ride under the name. Without them a "Private transfer" line tells
+  // reception nothing they can act on — this is the line the hotel reads on
+  // the morning of arrival, so it must say what the confirmation page says.
   const extraRows = (booking.extras ?? [])
     .map(
       (x) =>
-        `<tr><td style="padding:4px 0;${LABEL}">${esc(x.name)}${x.optionName ? ` — ${esc(x.optionName)}` : ""}${x.qty > 1 ? ` ×${x.qty}` : ""}</td><td style="padding:4px 0;${VALUE}">${esc(money(x.amount))}</td></tr>`,
+        `<tr><td style="padding:4px 0;${LABEL}">${esc(x.name)}${x.optionName ? ` — ${esc(x.optionName)}` : ""}${x.qty > 1 ? ` ×${x.qty}` : ""}${
+          x.infoLine ? `<div style="color:#1f1f1f;font-size:12px;padding-top:2px;">${esc(x.infoLine)}</div>` : ""
+        }</td><td style="padding:4px 0;${VALUE}">${esc(money(x.amount))}</td></tr>`,
     )
     .join("");
 
@@ -502,7 +508,9 @@ export function sampleBooking(currency = "GBP"): BookingRecord {
     rooms: [
       { roomId: "r1", roomTitle: "Garden Suite", rateId: "rt1", rateTitle: "Bed & Breakfast", adults: 2, children: 1, total: 480 },
     ],
-    extras: [{ id: "x1", name: "Airport transfer", unit: "trip", unitPrice: 60, qty: 1, amount: 60 }],
+    extras: [
+      { id: "x1", name: "Airport transfer", unit: "trip", unitPrice: 60, qty: 1, amount: 60, infoLine: "Flight EI 462 · Arr 14:30" },
+    ],
     // Shows the hotelier what an included-extras block looks like in the editor
     // preview, the same reason the sample carries an extra and a cancellation
     // deadline. It is sample data only — a real email renders this block from the

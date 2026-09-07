@@ -145,6 +145,13 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
     // 2 arriving after dinner" parses as 02:00), so the hotel must always
     // see the guest's own words next to the time we derived.
     ...(guest.arrival?.trim() !== arrivalHour ? guestNoteLine("Arrival", guest.arrival) : []),
+    // What the guest typed into an extra's info fields (flight number, arrival
+    // time). The service line carries only the name and price, so this is the
+    // only way the transfer desk reading the PMS learns which flight to meet.
+    // Guest text, so it goes through guestNoteLine like the rest.
+    ...input.extraLines.flatMap((x) =>
+      guestNoteLine(x.optionName ? `${x.name} — ${x.optionName}` : x.name, x.infoLine),
+    ),
   ];
 
   const channexPayload = {
