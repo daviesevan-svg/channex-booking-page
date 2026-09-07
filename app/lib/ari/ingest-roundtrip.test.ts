@@ -67,7 +67,7 @@ describe("Channex ARI push round trip", () => {
     const { applyChanges } = await import("./ingest.server");
     const { getInventoryOn } = await import("./read.server");
 
-    const counts = await applyChanges(push({ rate: "500000", currency: "VND", fraction_size: 0 }, "2026-09-01"));
+    const { counts } = await applyChanges(push({ rate: "500000", currency: "VND", fraction_size: 0 }, "2026-09-01"));
     expect(counts.rates).toBe(1);
 
     const row = sqlite
@@ -124,7 +124,7 @@ describe("Channex ARI push round trip", () => {
 
     const room = "5bbcc52f-5f59-4242-bdca-93e0eee291f9";
     const plan = "480324cb-e07a-4374-a943-4e9fbf5dd576";
-    const counts = await applyChanges({
+    const { counts } = await applyChanges({
       data: [
         {
           type: "changes_notification",

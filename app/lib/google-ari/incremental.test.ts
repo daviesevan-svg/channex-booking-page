@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { makeTestD1 } from "../test-d1";
 import { buildRateAmountXml } from "./xml";
-import { ariScopesFromChanges, mergeAriScopes } from "./scope";
+import { boundAriScope, mergeAriScopes } from "./scope";
 const { sqlite, d1 } = makeTestD1();
 const rooms = [{ id: "room", maxAdults: 2, maxGuests: 2 }, { id: "other", maxAdults: 2, maxGuests: 2 }];
 const rates = [{ id: "local", channexRateIds: { room: "remote" }, active: true, prices: { room: 100, other: 150 } }];
@@ -62,12 +62,20 @@ describe("incremental Google ARI payloads", () => {
     expect(payload.rates).toHaveLength(1);
   });
 
-  it("deduplicates notification cells and bounds durable scope size with a full-reconcile fallback", () => {
-    const changes = ["2026-10-01", "2026-10-03"].map((date) => ({ type: "restriction_changes", attributes: { room_type_id: "room", rate_plan_id: "remote", date_from: date, date_to: date, stop_sell: true } }));
-    const scope = ariScopesFromChanges({ data: [{ attributes: { hotel_code: "hotel", changes: [...changes, changes[0]] } }] }).get("hotel");
-    expect(scope).toEqual({ availability: [], products: [{ roomId: "room", rateId: "remote", dates: ["2026-10-01", "2026-10-03"] }] });
+  it("the ingest returns deduplicated Google scopes, stop-sell-only changes included, and bounds their size", async () => {
+    const { applyChanges } = await import("../ari/ingest.server");
+    const changes = ["2026-10-03", "2026-10-01"].map((date) => ({ type: "restriction_changes", attributes: { room_type_id: "room", rate_plan_id: "remote", date_from: date, date_to: date, stop_sell: true } }));
+    const { scopes } = await applyChanges({ data: [
+      { attributes: { hotel_code: "hotel", changes: [...changes, changes[0]] } },
+      // Nothing applied for this hotel: it must not appear (no enqueue, no repair marker).
+      { attributes: { hotel_code: "idle", changes: [{ type: "something_else", attributes: {} }] } },
+    ] });
+    expect([...scopes.keys()]).toEqual(["hotel"]);
+    // A stop-sell moves what Google may sell even though it is not audited.
+    expect(scopes.get("hotel")).toEqual({ availability: [], products: [{ roomId: "room", rateId: "remote", dates: ["2026-10-01", "2026-10-03"] }] });
     const huge = { availability: Array.from({ length: 2000 }, (_, i) => ({ roomId: `room-${i}`, dates: ["2026-10-01", "2026-10-03"] })), products: [] };
+    expect(boundAriScope(huge)).toBeUndefined();
     expect(mergeAriScopes(huge, huge)).toBeUndefined();
-    expect(mergeAriScopes(scope, undefined)).toBeUndefined();
+    expect(mergeAriScopes(scopes.get("hotel"), undefined)).toBeUndefined();
   });
 });
