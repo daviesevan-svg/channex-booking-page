@@ -19,6 +19,13 @@ import {
   type SyncKind,
 } from "~/lib/google-ari/push.server";
 import { readCachedMatchStatus } from "~/lib/google-ari/status.server";
+import {
+  googleAdsLinkingAvailable,
+  linkGoogleAds,
+  refreshGoogleAdsLink,
+  unlinkGoogleAds,
+} from "~/lib/google-ari/account-link.server";
+import { blockedByMatchState, formatGoogleAdsCustomerId, linkStateOf } from "~/lib/google-ari/account-link";
 import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -66,6 +73,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     superadmin,
     matchStatus: cachedMatch?.status ?? null,
     matchCheckedAt: cachedMatch?.checkedAt ?? null,
+    // The hotel's own Google Ads account, linked to our Hotel Center account for
+    // paid Hotel campaigns. Status is whatever Google last told us (refreshed by
+    // the cron and the Check status button) — never a live call on page load.
+    adsLink: settings.googleAdsLink ?? null,
+    adsLinkAvailable: googleAdsLinkingAvailable(),
+    hotelCenterAccountId: getConfig().googleTravelPartnerAccountId ?? null,
   };
 }
 
@@ -111,6 +124,20 @@ export async function action({ request }: Route.ActionArgs) {
     else if (!wasOn && push) await queueGoogleAriResync(propertyId, ALL_SYNC_KINDS);
     return { ok: true as const };
   }
+  // Google Ads link: owner/manager actions, one Travel Partner round-trip each.
+  if (intent === "linkAds") {
+    const res = await linkGoogleAds(propertyId, form.get("customerId"));
+    return res.ok ? { adsLinked: true as const } : { error: res.error };
+  }
+  if (intent === "refreshAdsLink") {
+    const res = await refreshGoogleAdsLink(propertyId);
+    if (!res.ok) return { error: res.error };
+    return res.link ? { adsChecked: true as const } : { adsRemoved: true as const };
+  }
+  if (intent === "unlinkAds") {
+    const res = await unlinkGoogleAds(propertyId);
+    return res.ok ? { adsUnlinked: true as const } : { error: res.error };
+  }
   if (intent === "push") {
     // Manual pushes are internal plumbing — mirror the UI's superadmin gate.
     if (!(await isSuperadmin(email))) return { error: "Only a superadmin can push to Google manually." };
@@ -154,8 +181,10 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
     );
   }
 
-  const { partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl } =
-    loaderData;
+  const {
+    partnerConfigured, push, windowDays, lastSync, readiness, matchStatus, matchConfigured, superadmin, program, singleUnit, vrFeedUrl,
+    adsLink, adsLinkAvailable, hotelCenterAccountId, propertyId,
+  } = loaderData;
   const isVr = program === "vacation_rentals";
   const programName = isVr ? t("ghTitleVr") : t("ghTitle");
   const input =
@@ -264,6 +293,116 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
           </button>
         </Form>
       </section>
+
+      {/* Google Ads — the hotel's OWN Ads account, linked to our Hotel Center
+          account and scoped to this hotel id, so it can run paid Hotel campaigns
+          that land here. Hotel Center program only (VR has no Hotel campaigns). */}
+      {!isVr && (
+        <section className="rounded-[14px] border border-line bg-surface p-6">
+          <h2 className="mb-2 font-serif text-[18px] font-semibold">{t("ghAdsTitle")}</h2>
+          <p className="mb-4 max-w-2xl text-[13px] text-muted">{t("ghAdsIntro")}</p>
+
+          {actionData && "adsLinked" in actionData && (
+            <p className="mb-3 rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">
+              {t("ghAdsRequested")}
+            </p>
+          )}
+          {actionData && "adsRemoved" in actionData && (
+            <p className="mb-3 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+              {t("ghAdsRemoved")}
+            </p>
+          )}
+          {actionData && "adsUnlinked" in actionData && (
+            <p className="mb-3 rounded-[10px] border border-[#cfe3cf] bg-[#f2f8f1] px-4 py-2.5 text-[13px] text-[#3f7a52]">
+              {t("ghAdsUnlinked")}
+            </p>
+          )}
+
+          {adsLink ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2 text-[14px]">
+                <span className="font-semibold text-ink">
+                  {t("ghAdsLinkedTo", { id: formatGoogleAdsCustomerId(adsLink.customerId) })}
+                </span>
+                <AdsLinkBadge status={adsLink.status} />
+              </div>
+              <p className="max-w-2xl text-[13px] text-secondary">
+                {linkStateOf(adsLink.status) === "approved"
+                  ? t("ghAdsApprovedNext")
+                  : linkStateOf(adsLink.status) === "pending_ads"
+                    ? t("ghAdsApproveHow", { account: hotelCenterAccountId ?? "" })
+                    : null}
+              </p>
+              <p className="text-[12px] text-muted">
+                {t("ghAdsHotelId", { id: propertyId })}
+                {" · "}
+                {t("ghAdsChecked", { when: new Date(adsLink.checkedAt).toLocaleString() })}
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                <Form method="post">
+                  <input type="hidden" name="intent" value="refreshAdsLink" />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                  >
+                    {t("ghAdsCheckStatus")}
+                  </button>
+                </Form>
+                <Form
+                  method="post"
+                  onSubmit={(e) => {
+                    if (!confirm(t("ghAdsUnlinkConfirm"))) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="intent" value="unlinkAds" />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="rounded-[10px] border border-red-200 bg-surface px-4 py-2.5 text-[14px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {t("ghAdsUnlink")}
+                  </button>
+                </Form>
+              </div>
+            </div>
+          ) : !adsLinkAvailable ? (
+            <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+              {t("ghAdsUnavailable")}
+            </p>
+          ) : blockedByMatchState(matchStatus?.state) ? (
+            // Not on Google yet: no form. The action refuses the same states, so
+            // this is the friendly face of the gate, not the gate itself.
+            <p className="max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+              {t("ghAdsNotOnGoogle")}
+            </p>
+          ) : (
+            <Form method="post" className="space-y-3">
+              <input type="hidden" name="intent" value="linkAds" />
+              <label className="block max-w-xs">
+                <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("ghAdsCustomerId")}</span>
+                <input
+                  type="text"
+                  name="customerId"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  placeholder="123-456-7890"
+                  required
+                  className={`${input} w-full`}
+                />
+                <span className="mt-1 block text-[12px] text-muted">{t("ghAdsCustomerIdHint")}</span>
+              </label>
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-[10px] bg-accent px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-accent-deep disabled:opacity-60"
+              >
+                {busy ? t("ghAdsLinking") : t("ghAdsLinkButton")}
+              </button>
+            </Form>
+          )}
+        </section>
+      )}
 
       {/* VR list feed — Google ingests a property's content from this feed before
           ARI prices attach. Internal plumbing (the feed is handed to Google's
@@ -452,4 +591,25 @@ function MatchStatusBadges({ status }: { status: GoogleMatchStatus }) {
       )}
     </>
   );
+}
+
+/** Google Ads link status pill. */
+function AdsLinkBadge({ status }: { status: string }) {
+  const t = useAdminT();
+  const state = linkStateOf(status);
+  const cls =
+    state === "approved"
+      ? "bg-[#e8f0e6] text-[#3f7a52]"
+      : state === "unknown"
+        ? "bg-chip text-muted"
+        : "bg-amber-50 text-amber-800";
+  const label =
+    state === "approved"
+      ? t("ghAdsStatusApproved")
+      : state === "pending_ads"
+        ? t("ghAdsStatusPending")
+        : state === "pending_hotel_center"
+          ? t("ghAdsStatusPendingHc")
+          : t("ghAdsStatusUnknown", { status });
+  return <span className={`rounded-full px-2.5 py-0.5 text-[13px] font-semibold ${cls}`}>{label}</span>;
 }
