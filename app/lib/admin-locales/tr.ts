@@ -147,7 +147,7 @@ const TR: Record<string, string> = {
   homePromoPlaceholder: "Promosyon kodu kutusu ipucu metni",
   homePromoPlaceholderHint: "Promosyon kodu kutusunun içindeki soluk örnek metin (ör. YAZ10).",
   homeHighlights: "Öne çıkanlar",
-  homeHighlightsHint: "Arama kutusunun altında gösterilen üç kısa güvence. Varsayılan metni kullanmak için satırı boş bırakın.",
+  homeHighlightsHint: "Arama kutusunun altında gösterilen en fazla üç kısa güvence — yalnızca gerçekten tuttuğunuz sözler, örneğin gerçek iptal koşullarınız, otopark veya kahvaltı. Siz yazmadan hiçbir şey gösterilmez.",
   homeHighlightTitle: "{n}. öne çıkan başlığı",
   homeHighlightDesc: "Açıklama",
   homeFeatureImage: "Öne çıkan görsel",

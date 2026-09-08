@@ -182,7 +182,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightTitle"
                     defaultValue={content.highlights?.[i]?.title}
-                    placeholder={isBase ? d.highlights[i].title : undefined}
+                    placeholder={isBase ? d.highlights[i]?.title : undefined}
                     className={FIELD_INPUT}
                   />
                 </label>
@@ -191,7 +191,7 @@ export default function AdminHome({ loaderData, actionData }: Route.ComponentPro
                   <input
                     name="highlightDesc"
                     defaultValue={content.highlights?.[i]?.description}
-                    placeholder={isBase ? d.highlights[i].description : undefined}
+                    placeholder={isBase ? d.highlights[i]?.description : undefined}
                     className={FIELD_INPUT}
                   />
                 </label>

@@ -157,7 +157,7 @@ const TH: Record<string, string> = {
   homePromoPlaceholder: "ข้อความตัวอย่างในช่องรหัสส่วนลด",
   homePromoPlaceholderHint: "ข้อความตัวอย่างสีจางในช่องรหัสส่วนลด (เช่น SUMMER10)",
   homeHighlights: "จุดเด่น",
-  homeHighlightsHint: "จุดเด่นสั้น ๆ สามข้อที่แสดงใต้ช่องค้นหา เว้นแถวว่างไว้เพื่อใช้ข้อความเริ่มต้น",
+  homeHighlightsHint: "จุดเด่นสั้น ๆ ไม่เกินสามข้อที่แสดงใต้ช่องค้นหา ระบุเฉพาะสิ่งที่คุณทำได้จริง เช่น เงื่อนไขการยกเลิกจริง ที่จอดรถ หรืออาหารเช้า จะไม่แสดงอะไรจนกว่าคุณจะกรอก",
   homeHighlightTitle: "หัวเรื่องจุดเด่นที่ {n}",
   homeHighlightDesc: "คำอธิบาย",
   homeFeatureImage: "ภาพหลัก",

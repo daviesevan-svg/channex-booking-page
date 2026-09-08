@@ -156,7 +156,7 @@ const PT: Record<string, string> = {
   homePromoPlaceholder: "Texto de exemplo do campo de código promocional",
   homePromoPlaceholderHint: "O texto de exemplo esbatido dentro do campo de código promocional (por ex. SUMMER10).",
   homeHighlights: "Destaques",
-  homeHighlightsHint: "Três garantias curtas mostradas sob a caixa de pesquisa. Deixe uma linha vazia para usar o texto predefinido.",
+  homeHighlightsHint: "Até três garantias curtas mostradas sob a caixa de pesquisa — apenas promessas que cumpre de facto, como as suas condições reais de cancelamento, estacionamento ou pequeno-almoço. Nada é mostrado até as escrever.",
   homeHighlightTitle: "Título do destaque {n}",
   homeHighlightDesc: "Descrição",
   homeFeatureImage: "Imagem de destaque",

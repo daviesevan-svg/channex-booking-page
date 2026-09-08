@@ -157,7 +157,7 @@ const EN: Record<string, string> = {
   homePromoPlaceholder: "Promo code box placeholder",
   homePromoPlaceholderHint: "The faint example text inside the promo-code box (e.g. SUMMER10).",
   homeHighlights: "Highlights",
-  homeHighlightsHint: "Three short reassurances shown under the search box. Leave a row empty to use the default.",
+  homeHighlightsHint: "Up to three short reassurances shown under the search box — only promises you actually keep, such as your real cancellation terms, parking or breakfast. Nothing is shown until you write them.",
   homeHighlightTitle: "Highlight {n} title",
   homeHighlightDesc: "Description",
   homeFeatureImage: "Feature image",
