@@ -8,22 +8,12 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
-import {
-  UNIT_LABEL,
-  isConfigurable,
-  scopeOf,
-  type Extra,
-  type ExtraField,
-  type ExtraOption,
-  type ExtraScope,
-  type ExtraUnit,
-} from "~/lib/extras";
+import { UNITS, UNIT_LABEL, isConfigurable, parseExtraUnit, scopeOf, type Extra, type ExtraField, type ExtraOption, type ExtraScope, type ExtraUnit } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { resolveImageField, uploadExtraImage } from "~/lib/images.server";
 import { getRates, getRooms } from "~/lib/catalog.server";
 
-const UNITS: ExtraUnit[] = ["stay", "night", "person", "person_night", "trip"];
 
 function slug(s: string): string {
   return (
@@ -42,8 +32,10 @@ function parseOptionLine(line: string, used: Set<string>): ExtraOption | null {
   const price = Math.round(Number(parts[1]) * 100) / 100;
   if (!name || !Number.isFinite(price) || price <= 0) return null;
   const rest = parts.slice(2);
+  // A unit id or a plain-English alias ("each") — an unrecognised third part
+  // is the start of the description, as before.
   let unit: ExtraUnit | undefined;
-  if (rest[0] && (UNITS as string[]).includes(rest[0])) unit = rest.shift() as ExtraUnit;
+  if (rest[0] && parseExtraUnit(rest[0])) unit = parseExtraUnit(rest.shift()!);
   const desc = rest.join(" | ").trim() || undefined;
   let id = slug(name);
   while (used.has(id)) id = `${id}-x`;
@@ -114,7 +106,7 @@ export async function action({ request }: Route.ActionArgs) {
   const id = String(form.get("id") || "").trim();
   const name = String(form.get("name") ?? "").trim();
   const desc = String(form.get("desc") ?? "").trim() || undefined;
-  const unit = (UNITS as string[]).includes(String(form.get("unit"))) ? (form.get("unit") as ExtraUnit) : "stay";
+  const unit = parseExtraUnit(form.get("unit")) ?? "stay";
   const priceRaw = String(form.get("price") ?? "").trim();
   const optionsText = String(form.get("options") ?? "");
   const fieldsText = String(form.get("fields") ?? "");

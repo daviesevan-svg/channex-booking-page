@@ -6,7 +6,35 @@
 // flight number). Prices scale by unit: per stay/trip ×1, per night ×nights,
 // per person ×guests; quantity multiplies on top.
 
-export type ExtraUnit = "stay" | "night" | "person" | "person_night" | "trip";
+/** How a price scales. `item` is per unit sold — a propane tank, a bike, a
+ *  bottle: ×1 like `stay`, so the guest's quantity is the whole multiplier.
+ *  It exists for the LABEL: "$35.00 each" says what "$35.00 per stay" cannot. */
+export type ExtraUnit = "stay" | "night" | "person" | "person_night" | "trip" | "item";
+
+/** Every unit, in the order the admin's Charged menu shows them. */
+export const UNITS: readonly ExtraUnit[] = ["stay", "night", "person", "person_night", "trip", "item"];
+
+/** Words an operator may type for a unit in an option line ("Name | price |
+ *  unit"), beside the unit ids themselves. "each" was what a hotel wrote for a
+ *  per-tank option — and was silently dropped, so every option fell back to
+ *  "per stay". Case-insensitive. */
+const UNIT_ALIASES: Record<string, ExtraUnit> = {
+  each: "item",
+  "per item": "item",
+  "per stay": "stay",
+  "per night": "night",
+  "per person": "person",
+  "per person/night": "person_night",
+  "per trip": "trip",
+};
+
+/** A unit id or alias → the unit, else undefined. */
+export function parseExtraUnit(raw: unknown): ExtraUnit | undefined {
+  if (typeof raw !== "string") return undefined;
+  const v = raw.trim().toLowerCase();
+  if ((UNITS as readonly string[]).includes(v)) return v as ExtraUnit;
+  return UNIT_ALIASES[v];
+}
 
 /** Where an extra is offered:
  *  - "room": attaches to each room, chosen on that room's "enhance" step.
@@ -89,6 +117,7 @@ export const UNIT_LABEL: Record<ExtraUnit, string> = {
   person: "per person",
   person_night: "per person/night",
   trip: "per trip",
+  item: "each",
 };
 
 export function isConfigurable(e: Extra): boolean {
@@ -100,7 +129,7 @@ export function unitMultiplier(unit: ExtraUnit, nights: number, guests: number):
   if (unit === "night") return Math.max(1, nights);
   if (unit === "person") return Math.max(1, guests);
   if (unit === "person_night") return Math.max(1, nights) * Math.max(1, guests);
-  return 1; // stay, trip
+  return 1; // stay, trip, item — quantity is the only multiplier
 }
 
 /** The "from" price shown on a configurable extra's card (cheapest option). */

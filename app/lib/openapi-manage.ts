@@ -316,7 +316,7 @@ export const manageSchemas = {
       name: { type: "string" },
       description: nullableStr,
       image: nullableStr,
-      unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip"] },
+      unit: { type: "string", enum: ["stay", "night", "person", "person_night", "trip", "item"], description: "How the price scales. `item` is per unit sold (×1, the guest picks a quantity) and is labelled \"each\" to guests." },
       price: { type: ["number", "null"], minimum: 0 },
       options: { type: "array", items: { type: "object" } },
       fields: { type: "array", items: { type: "object" } },

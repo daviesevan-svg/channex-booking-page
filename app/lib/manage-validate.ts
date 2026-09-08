@@ -736,7 +736,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
 // ── Extras ───────────────────────────────────────────────────────────────────
 
 const EXTRA_FIELDS = new Set(["name", "description", "image", "unit", "price", "options", "fields", "info_title", "scope", "taxable", "exclude_rooms", "exclude_rates", "active", "position"]);
-const EXTRA_UNITS = new Set(["stay", "night", "person", "person_night", "trip"]);
+const EXTRA_UNITS = new Set(["stay", "night", "person", "person_night", "trip", "item"]);
 
 export interface ExtraInput {
   name?: string;
@@ -779,7 +779,7 @@ export function validateExtraInput(body: unknown, opts: { create: boolean; roomI
 
   const unit = body.unit;
   if (unit !== undefined) {
-    if (typeof unit !== "string" || !EXTRA_UNITS.has(unit)) ctx.fail("unit", "Must be stay, night, person, person_night or trip.");
+    if (typeof unit !== "string" || !EXTRA_UNITS.has(unit)) ctx.fail("unit", "Must be stay, night, person, person_night, trip or item.");
     else out.unit = unit as Extra["unit"];
   } else if (opts.create) ctx.fail("unit", "Required.");
 
@@ -795,7 +795,7 @@ export function validateExtraInput(body: unknown, opts: { create: boolean; roomI
         const o = options[i];
         if (!isObj(o) || typeof o.name !== "string" || !o.name.trim()) ctx.fail(`options[${i}]`, "Needs a non-empty name.");
         else if (typeof o.price !== "number" || !Number.isFinite(o.price) || o.price < 0) ctx.fail(`options[${i}]`, "price must be a number ≥ 0.");
-        else if (o.unit !== undefined && (typeof o.unit !== "string" || !EXTRA_UNITS.has(o.unit))) ctx.fail(`options[${i}]`, "unit must be stay, night, person, person_night or trip.");
+        else if (o.unit !== undefined && (typeof o.unit !== "string" || !EXTRA_UNITS.has(o.unit))) ctx.fail(`options[${i}]`, "unit must be stay, night, person, person_night, trip or item.");
         else {
           list.push({
             id: typeof o.id === "string" && o.id.trim() ? o.id.trim() : rid(),
