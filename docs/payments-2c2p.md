@@ -65,8 +65,13 @@ IDR rule), not minor units.
   first. `refundBookingCharge` returns `unsupported` for 2C2P bookings; the
   admin booking page says to refund in the 2C2P merchant portal instead of
   showing the refund button; auto-refund on guest cancellation is a no-op
-  (the hotel refunds by hand). Follow-up: implement the keyed variant, with
-  the key material as an optional second credential set.
+  (the hotel refunds by hand). The hotel's cancellation email carries a
+  system-rendered **"Refund owed to guest: <amount>"** row whenever a charged
+  booking is cancelled and no refund is recorded — with "issue it in the 2C2P
+  merchant portal" for 2C2P, and "from the booking page" for any other
+  gateway whose automatic refund didn't happen (`email-render.server.ts`,
+  `policyRefundNow` at the cancellation moment). Follow-up: implement the
+  keyed variant, with the key material as an optional second credential set.
 - **A mismatched charge is held, not refunded.** If finalize refuses the
   payment (amount/currency don't match the pending — near-impossible here,
   since we set both and look the invoice up by our own reference), the
