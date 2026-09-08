@@ -11,6 +11,7 @@ import { getC2pConfig, getIyzicoConfig, getSettings, getVivaConfig, savePaymentS
 import { getProperty } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
+import { encodeConnectState } from "~/lib/stripe-connect-state";
 import { runVivaDiagnostics, verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
 import { IYZICO_CURRENCIES, verifyIyzicoConfig } from "~/lib/iyzico.server";
 import { verifyC2pConfig } from "~/lib/2c2p.server";
@@ -116,9 +117,19 @@ export async function action({ request }: Route.ActionArgs) {
     // One-time nonce in the admin session, bound to this property. The raw
     // property id is not secret and must not be OAuth `state` — SameSite=Lax
     // sends the session cookie on the top-level GET callback.
-    const redirectUri = `${new URL(request.url).origin}/admin/payments/callback`;
+    //
+    // The redirect URI is always on the canonical host: Stripe only accepts
+    // URIs registered on our platform account, and a white-label partner's
+    // admin domain (admin.<partner>.com) is not one of them — every partner
+    // got "Invalid redirect URI" until 2026-09-08. The nonce lives in THIS
+    // host's session, so off the canonical host the origin rides along in
+    // `state` and the canonical callback hands Stripe's answer back here.
+    const canonicalOrigin = new URL(getConfig().appUrl).origin;
+    const hereOrigin = new URL(request.url).origin;
+    const redirectUri = `${canonicalOrigin}/admin/payments/callback`;
     const { nonce, cookie } = await stampStripeConnectState(request, propertyId);
-    throw redirect(oauthAuthorizeUrl(nonce, redirectUri), {
+    const state = encodeConnectState(nonce, hereOrigin === canonicalOrigin ? undefined : hereOrigin);
+    throw redirect(oauthAuthorizeUrl(state, redirectUri), {
       headers: { "Set-Cookie": cookie },
     });
   }

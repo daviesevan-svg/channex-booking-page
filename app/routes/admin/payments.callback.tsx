@@ -3,7 +3,10 @@ import { redirect } from "react-router";
 import type { Route } from "./+types/payments.callback";
 import { consumeStripeConnectState, requireAdmin } from "~/lib/auth.server";
 import { canAccess, hiddenMemberAreasFor } from "~/lib/properties.server";
+import { isOwnHost } from "~/lib/domains.server";
 import { savePaymentSettings } from "~/lib/overrides.server";
+import { partnerIdForAdminHost } from "~/lib/partners.server";
+import { decodeConnectState } from "~/lib/stripe-connect-state";
 import { oauthToken, retrieveAccount } from "~/lib/stripe.server";
 
 function paymentsRedirect(notice: string, cookie?: string) {
@@ -11,10 +14,37 @@ function paymentsRedirect(notice: string, cookie?: string) {
 }
 
 // Stripe redirects here after the operator authorises the Connect OAuth flow.
+//
+// Declared OUTSIDE the admin layout in routes.ts: the layout's loader requires
+// a session, and the partner-host hop below arrives without one on this host.
+// Everything past the hop still runs requireAdmin itself.
 export async function loader({ request }: Route.LoaderArgs) {
-  await requireAdmin(request);
   const url = new URL(request.url);
-  const state = url.searchParams.get("state");
+  const decoded = decodeConnectState(url.searchParams.get("state"));
+
+  // Partner-host round trip (see payments.tsx `connect`). Stripe could only
+  // send the admin back to the canonical host, but their session — and the
+  // one-time nonce in it — live on the partner's admin host. Hand Stripe's
+  // answer on, untouched, and let THAT host's callback do every check. Not an
+  // open redirect: the target must be a host that serves an admin of ours (our
+  // own, or a registered partner admin host). The forwarded state is the bare
+  // nonce, so the hop happens once and the receiving side is unchanged.
+  if (decoded?.returnOrigin && decoded.returnOrigin !== url.origin) {
+    const host = new URL(decoded.returnOrigin).hostname;
+    if (isOwnHost(host) || (await partnerIdForAdminHost(host))) {
+      const onward = new URL("/admin/payments/callback", decoded.returnOrigin);
+      for (const key of ["code", "error", "error_description"]) {
+        const value = url.searchParams.get(key);
+        if (value) onward.searchParams.set(key, value);
+      }
+      onward.searchParams.set("state", decoded.nonce);
+      return redirect(onward.toString());
+    }
+    console.log(`[stripe] oauth return origin is not an admin host of ours: ${decoded.returnOrigin}`);
+  }
+
+  await requireAdmin(request);
+  const state = decoded?.nonce ?? null;
 
   if (url.searchParams.get("error")) {
     // Burn a matching nonce so a denied round-trip can't be replayed.
