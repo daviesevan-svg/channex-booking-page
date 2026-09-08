@@ -14,8 +14,9 @@
 import { getConfig, getConfigKV } from "../config.server";
 import { getProperties } from "../properties.server";
 import { clearSettingsFields, getSettings, patchSettings } from "../overrides.server";
-import { getAccessToken, TRAVEL_PARTNER_API } from "./status.server";
+import { getAccessToken, readCachedMatchStatus, TRAVEL_PARTNER_API } from "./status.server";
 import {
+  blockedByMatchState,
   linkStateOf,
   normalizeGoogleAdsCustomerId,
   type GoogleAdsLinkRecord,
@@ -33,6 +34,10 @@ interface AccountLink {
 export type LinkResult =
   | { ok: true; link: GoogleAdsLinkRecord }
   | { ok: false; error: string };
+
+export const NOT_ON_GOOGLE_ERROR =
+  "Google hasn't matched this property yet, so there is nothing for a Google Ads account to bid on. " +
+  "Complete the readiness list and wait for the status to read Matched, then link.";
 
 export type RefreshResult =
   | { ok: true; link: GoogleAdsLinkRecord }
@@ -158,6 +163,11 @@ export async function linkGoogleAds(propertyId: string, rawCustomerId: unknown):
   if (settings.googleProgram === "vacation_rentals") {
     return { ok: false, error: "Google Ads linking is for the Hotel Center program; this property pushes to Vacation Rentals." };
   }
+  // The property must be on Google (matched) before an Ads account is pointed at
+  // it; linking an unmatched hotel id only sets the hotel up to wait for a
+  // campaign type that never appears. Reads the cached status — never a live call.
+  const match = await readCachedMatchStatus(propertyId);
+  if (blockedByMatchState(match?.status.state)) return { ok: false, error: NOT_ON_GOOGLE_ERROR };
 
   // Another of this customer's properties may already hold the link: extend it.
   const existingName = await registryGet(customerId);

@@ -15,6 +15,12 @@ Hotel Center Points of Sale and cannot be changed from Google Ads.
 owner/manager). The hotel pastes its 10-digit Google Ads customer id
 (`123-456-7890`, the advertising account — not a manager/MCC account).
 
+0. **Gate:** the property must be **on Google** first. The cached Travel Partner
+   match status (`google:match:{id}`, refreshed by the cron) must not read
+   `not_found` / `not_matched` / `overlap`; `matched` passes, and so does a
+   never-checked or unrecognised status (fail-open, like the ARI push gate — the
+   check is best-effort and must not lock an owner out). The page hides the form
+   and the action refuses in the same states (`blockedByMatchState`).
 1. **Link** → `POST accounts/{hotelCenter}/accountLinks` with
    `googleAdsCustomerName: customers/{id}` and
    `accountLinkTarget.hotelList.partnerHotelIds: [propertyId]`

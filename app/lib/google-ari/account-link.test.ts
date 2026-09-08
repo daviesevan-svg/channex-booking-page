@@ -22,9 +22,13 @@ vi.mock("../config.server", () => ({
   }),
   getConfigKV: () => kv,
 }));
+const matchState = vi.hoisted(() => ({ current: null as string | null }));
 vi.mock("./status.server", () => ({
   TRAVEL_PARTNER_API: "https://travelpartner.googleapis.com/v3",
   getAccessToken: async () => "tok",
+  // The cached Google match status the link gate reads; null = never checked.
+  readCachedMatchStatus: async () =>
+    matchState.current ? { status: { state: matchState.current }, checkedAt: 1 } : null,
 }));
 // Settings live in KV too — a tiny in-memory stand-in with the real semantics.
 vi.mock("../overrides.server", () => {
@@ -60,6 +64,7 @@ let google: (c: Call) => { status: number; body?: unknown };
 beforeEach(() => {
   store.clear();
   settings.clear();
+  matchState.current = null;
   calls = [];
   google = () => ({ status: 500, body: { error: { message: "unscripted" } } });
   vi.stubGlobal(
@@ -155,6 +160,28 @@ describe("linkGoogleAds", () => {
       expect(res.error).toContain("The caller does not have permission");
     }
     expect(settings.get("h1")?.googleAdsLink).toBeUndefined();
+  });
+
+  it("refuses a property Google hasn't matched, without calling Google", async () => {
+    for (const state of ["not_found", "not_matched", "overlap"]) {
+      matchState.current = state;
+      const res = await linkGoogleAds("h1", "2783530096");
+      expect(res.ok).toBe(false);
+      if (!res.ok) expect(res.error).toMatch(/hasn't matched/);
+    }
+    expect(calls).toHaveLength(0);
+    expect(settings.get("h1")?.googleAdsLink).toBeUndefined();
+  });
+
+  it("links a matched property, and one whose status was never checked (fail-open)", async () => {
+    google = (c) => (c.method === "POST" ? { status: 200, body: { name: LINK, status: "REQUESTED_FROM_HOTEL_CENTER" } } : { status: 404 });
+    matchState.current = "matched";
+    expect((await linkGoogleAds("h1", "2783530096")).ok).toBe(true);
+    matchState.current = null;
+    expect((await linkGoogleAds("h2", "1112223334")).ok).toBe(true);
+    matchState.current = "unknown";
+    settings.delete("h2");
+    expect((await linkGoogleAds("h2", "1112223334")).ok).toBe(true);
   });
 
   it("refuses when the property is already linked", async () => {

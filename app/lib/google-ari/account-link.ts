@@ -53,3 +53,14 @@ export function normalizeGoogleAdsCustomerId(input: unknown): string | null {
 export function formatGoogleAdsCustomerId(id: string): string {
   return /^\d{10}$/.test(id) ? `${id.slice(0, 3)}-${id.slice(3, 6)}-${id.slice(6)}` : id;
 }
+
+/** Google match states in which the property is NOT on Google, so there is
+ *  nothing an Ads account could bid on — the link is refused. `matched` passes;
+ *  a never-checked (null) or unrecognised status passes too: the match check is
+ *  best-effort and must never lock an owner out (same fail-open rule as the ARI
+ *  push gate). Lives here (not in the .server module) because the admin page
+ *  component uses it to hide the form — the action refuses the same states. */
+export const NOT_ON_GOOGLE_STATES = ["not_found", "not_matched", "overlap"] as const;
+export function blockedByMatchState(state: string | null | undefined): boolean {
+  return (NOT_ON_GOOGLE_STATES as readonly string[]).includes(state ?? "");
+}

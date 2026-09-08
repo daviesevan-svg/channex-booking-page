@@ -25,7 +25,7 @@ import {
   refreshGoogleAdsLink,
   unlinkGoogleAds,
 } from "~/lib/google-ari/account-link.server";
-import { formatGoogleAdsCustomerId, linkStateOf } from "~/lib/google-ari/account-link";
+import { blockedByMatchState, formatGoogleAdsCustomerId, linkStateOf } from "~/lib/google-ari/account-link";
 import { refreshMergedGoogleFeed } from "~/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "~/lib/google-merged-vr-feed.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -370,14 +370,15 @@ export default function AdminGoogleHotels({ loaderData, actionData }: Route.Comp
             <p className="rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
               {t("ghAdsUnavailable")}
             </p>
+          ) : blockedByMatchState(matchStatus?.state) ? (
+            // Not on Google yet: no form. The action refuses the same states, so
+            // this is the friendly face of the gate, not the gate itself.
+            <p className="max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
+              {t("ghAdsNotOnGoogle")}
+            </p>
           ) : (
             <Form method="post" className="space-y-3">
               <input type="hidden" name="intent" value="linkAds" />
-              {matchStatus && matchStatus.state !== "matched" && (
-                <p className="max-w-2xl rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800">
-                  {t("ghAdsMatchHint")}
-                </p>
-              )}
               <label className="block max-w-xs">
                 <span className="mb-1.5 block text-[13px] font-semibold text-secondary">{t("ghAdsCustomerId")}</span>
                 <input

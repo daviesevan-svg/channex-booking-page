@@ -1317,7 +1317,7 @@ const EN: Record<string, string> = {
   ghAdsLinkButton: "Link Google Ads account",
   ghAdsLinking: "Linking…",
   ghAdsUnavailable: "Linking isn’t available yet — Hotel Center access isn’t configured on this server.",
-  ghAdsMatchHint: "Google hasn’t matched this property yet. You can link now, but campaigns can only run once the status above reads Matched.",
+  ghAdsNotOnGoogle: "Google hasn’t matched this property yet, so there is nothing for a Google Ads account to bid on. Complete the readiness list above; linking unlocks once the status reads Matched.",
   ghAdsLinkedTo: "Linked to Google Ads account {id}",
   ghAdsStatusPending: "Waiting for your approval in Google Ads",
   ghAdsStatusPendingHc: "Requested from Google Ads — waiting for Hotel Center approval",

@@ -1314,7 +1314,7 @@ const DE: Record<string, string> = {
   ghAdsLinkButton: "Google Ads-Konto verknüpfen",
   ghAdsLinking: "Wird verknüpft…",
   ghAdsUnavailable: "Die Verknüpfung ist noch nicht verfügbar — der Hotel Center-Zugang ist auf diesem Server nicht eingerichtet.",
-  ghAdsMatchHint: "Google hat diese Unterkunft noch nicht zugeordnet. Sie können jetzt verknüpfen, Kampagnen laufen aber erst, wenn der Status oben „Zugeordnet“ lautet.",
+  ghAdsNotOnGoogle: "Google hat diese Unterkunft noch nicht zugeordnet, daher gibt es nichts, worauf ein Google Ads-Konto bieten könnte. Erledigen Sie die Voraussetzungen oben; die Verknüpfung wird freigeschaltet, sobald der Status „Zugeordnet“ lautet.",
   ghAdsLinkedTo: "Verknüpft mit Google Ads-Konto {id}",
   ghAdsStatusPending: "Wartet auf Ihre Freigabe in Google Ads",
   ghAdsStatusPendingHc: "Von Google Ads angefragt — wartet auf Freigabe im Hotel Center",

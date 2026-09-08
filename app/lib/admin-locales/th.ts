@@ -1306,7 +1306,7 @@ const TH: Record<string, string> = {
   ghAdsLinkButton: "เชื่อมต่อบัญชี Google Ads",
   ghAdsLinking: "กำลังเชื่อมต่อ…",
   ghAdsUnavailable: "ยังเชื่อมต่อไม่ได้ — ยังไม่ได้ตั้งค่าการเข้าถึง Hotel Center บนเซิร์ฟเวอร์นี้",
-  ghAdsMatchHint: "Google ยังไม่ได้จับคู่ที่พักนี้ คุณเชื่อมต่อได้เลย แต่แคมเปญจะทำงานได้เมื่อสถานะด้านบนเป็น จับคู่แล้ว",
+  ghAdsNotOnGoogle: "Google ยังไม่ได้จับคู่ที่พักนี้ จึงยังไม่มีสิ่งใดให้บัญชี Google Ads เสนอราคา กรุณาทำรายการความพร้อมด้านบนให้ครบ การเชื่อมต่อจะเปิดใช้เมื่อสถานะเป็น จับคู่แล้ว",
   ghAdsLinkedTo: "เชื่อมต่อกับบัญชี Google Ads {id}",
   ghAdsStatusPending: "รอการอนุมัติของคุณใน Google Ads",
   ghAdsStatusPendingHc: "ขอจาก Google Ads — รอการอนุมัติใน Hotel Center",

@@ -1310,7 +1310,7 @@ const PT: Record<string, string> = {
   ghAdsLinkButton: "Ligar conta Google Ads",
   ghAdsLinking: "A ligar…",
   ghAdsUnavailable: "A ligação ainda não está disponível — o acesso ao Hotel Center não está configurado neste servidor.",
-  ghAdsMatchHint: "A Google ainda não fez a correspondência desta propriedade. Pode ligar agora, mas as campanhas só correm quando o estado acima indicar Correspondida.",
+  ghAdsNotOnGoogle: "A Google ainda não fez a correspondência desta propriedade, por isso não há nada em que uma conta Google Ads possa licitar. Complete a lista de requisitos acima; a ligação fica disponível quando o estado indicar Correspondida.",
   ghAdsLinkedTo: "Ligada à conta Google Ads {id}",
   ghAdsStatusPending: "A aguardar a sua aprovação no Google Ads",
   ghAdsStatusPendingHc: "Pedida a partir do Google Ads — a aguardar aprovação no Hotel Center",

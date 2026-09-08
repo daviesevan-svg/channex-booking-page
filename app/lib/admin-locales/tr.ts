@@ -1349,7 +1349,7 @@ const TR: Record<string, string> = {
   ghAdsLinkButton: "Google Ads hesabını bağla",
   ghAdsLinking: "Bağlanıyor…",
   ghAdsUnavailable: "Bağlama henüz kullanılamıyor — bu sunucuda Hotel Center erişimi yapılandırılmamış.",
-  ghAdsMatchHint: "Google bu tesisi henüz eşleştirmedi. Şimdi bağlayabilirsiniz, ancak kampanyalar yalnızca yukarıdaki durum Eşleşti olduğunda çalışır.",
+  ghAdsNotOnGoogle: "Google bu tesisi henüz eşleştirmedi; bu yüzden bir Google Ads hesabının teklif verebileceği bir şey yok. Yukarıdaki hazırlık listesini tamamlayın; durum Eşleşti olduğunda bağlama açılır.",
   ghAdsLinkedTo: "{id} Google Ads hesabına bağlı",
   ghAdsStatusPending: "Google Ads’te onayınız bekleniyor",
   ghAdsStatusPendingHc: "Google Ads’ten istendi — Hotel Center onayı bekleniyor",
