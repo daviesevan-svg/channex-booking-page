@@ -7,6 +7,7 @@ import { sendReviewRequestEmail } from "./email.server";
 import { getReviewByBooking } from "./reviews.server";
 import { getProperty } from "./properties.server";
 import { getSettings } from "./overrides.server";
+import { reviewsOn } from "./reviews";
 import { addDaysISO, localTimeToUtcMs } from "./dates";
 
 /** Days after checkout each attempt is due. Three asks, then silence. */
@@ -69,6 +70,7 @@ export async function scheduledReviewRequests(): Promise<void> {
       const count = booking.reviewRequests?.count ?? 0;
       if (count >= ATTEMPT_DAYS.length) continue;
       const settings = await getSettings(row.pid);
+      if (!reviewsOn(settings)) continue; // the property switched reviews off
       if (now < dueAt(booking, settings.timezone)) continue;
       if (await getReviewByBooking(row.pid, row.id)) continue; // already reviewed
 

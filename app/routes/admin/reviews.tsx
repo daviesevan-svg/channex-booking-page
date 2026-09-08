@@ -9,8 +9,9 @@ import type { Route } from "./+types/reviews";
 import { adminMeta } from "~/lib/admin-meta";
 import { getAdminEmail, requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId, isOwnerOrSuper } from "~/lib/properties.server";
+import { getSettings, patchSettings } from "~/lib/overrides.server";
 import { listReviews, setReviewResponse } from "~/lib/reviews.server";
-import { REVIEW_CATEGORIES } from "~/lib/reviews";
+import { REVIEW_CATEGORIES, reviewsOn } from "~/lib/reviews";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
 import { fmtDate } from "~/lib/dates";
 
@@ -18,7 +19,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   await requireAdmin(request);
   const propertyId = await currentPropertyId(request);
   if (!propertyId) return { configured: false as const };
-  return { configured: true as const, reviews: await listReviews(propertyId) };
+  const [reviews, settings] = await Promise.all([listReviews(propertyId), getSettings(propertyId)]);
+  return { configured: true as const, reviews, enabled: reviewsOn(settings) };
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -35,6 +37,12 @@ export async function action({ request }: Route.ActionArgs) {
   const intent = String(form.get("intent") ?? "");
   const bookingId = String(form.get("bookingId") ?? "");
 
+  // The on/off switch for the whole feature: request emails, the website
+  // section and the guest review page. Reviews already written are kept.
+  if (intent === "toggle") {
+    await patchSettings(propertyId, { reviewsEnabled: form.get("enabled") === "1" });
+    return { ok: true as const };
+  }
   if (intent === "respond") {
     const by = (await getAdminEmail(request)) ?? undefined;
     await setReviewResponse(propertyId, bookingId, String(form.get("text") ?? ""), by);
@@ -71,7 +79,7 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
     );
   }
 
-  const { reviews } = loaderData;
+  const { reviews, enabled } = loaderData;
   const average = reviews.length
     ? Math.round((reviews.reduce((s, r) => s + r.stars, 0) / reviews.length) * 10) / 10
     : null;
@@ -87,6 +95,29 @@ export default function AdminReviews({ loaderData, actionData }: Route.Component
           </span>
         )}
       </div>
+
+      {/* Feature switch. Owner/manager only (the action enforces it), so a
+          teammate sees the state but not a working button. */}
+      <Form
+        method="post"
+        className={`flex flex-wrap items-center justify-between gap-3 rounded-[14px] border p-4 ${
+          enabled ? "border-line bg-surface" : "border-[#e6dcc4] bg-[#fbf6ea]"
+        }`}
+      >
+        <input type="hidden" name="intent" value="toggle" />
+        <input type="hidden" name="enabled" value={enabled ? "0" : "1"} />
+        <div className="text-[13px] leading-[1.55] text-secondary">
+          <span className="font-semibold text-ink">{enabled ? t("rvOnTitle") : t("rvOffTitle")}</span>{" "}
+          {enabled ? t("rvOnIntro") : t("rvOffIntro")}
+        </div>
+        <button
+          type="submit"
+          disabled={busy}
+          className="cursor-pointer rounded-[10px] border border-line-alt bg-surface-alt px-4 py-2 text-[13px] font-semibold text-ink hover:border-accent disabled:opacity-60"
+        >
+          {enabled ? t("rvTurnOff") : t("rvTurnOn")}
+        </button>
+      </Form>
 
       {actionData && "error" in actionData && actionData.error && (
         <p className="rounded-[10px] border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] text-red-700">

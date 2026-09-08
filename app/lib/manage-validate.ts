@@ -371,7 +371,7 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 const PROPERTY_FIELDS = new Set([
   "currency", "pricing_mode", "languages", "single_unit", "facilities",
   "checkin_time", "checkin_until", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
-  "address", "portal", "terms_url", "privacy_url", "emails", "website_enabled",
+  "address", "portal", "terms_url", "privacy_url", "emails", "website_enabled", "reviews_enabled",
 ]);
 const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES as readonly string[]);
 
@@ -439,6 +439,10 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
   // the read-only block once the MCP dogfood hit it (PR500 follow-up).
   const websiteEnabled = optBool(ctx, body, "website_enabled");
   if (websiteEnabled !== undefined) out.websiteEnabled = websiteEnabled;
+  // Content-safe like website_enabled: off stops request emails, hides the
+  // website section and 404s the guest review page; existing reviews stay.
+  const reviewsEnabled = optBool(ctx, body, "reviews_enabled");
+  if (reviewsEnabled !== undefined) out.reviewsEnabled = reviewsEnabled;
 
   const facilities = strList(ctx, body, "facilities");
   if (facilities) {

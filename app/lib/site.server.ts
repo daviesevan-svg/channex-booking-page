@@ -9,6 +9,8 @@
 
 import { getConfigKV } from "./config.server";
 import { DEFAULT_LANG } from "./content";
+import { getSettings } from "./overrides.server";
+import { reviewsOn } from "./reviews";
 import {
   FOOTER_COPY_ID,
   footerBlurbKey,
@@ -165,15 +167,23 @@ function pageText(
  * so that page is exactly what it always was — one renderer, no second code
  * path to drift.
  */
+/** A section the property's settings switch off, whatever the page layout
+ *  says. The layout keeps the section (and its position, heading and count),
+ *  so turning the feature back on restores it as it was. */
+function shown(type: string, settings: Parameters<typeof reviewsOn>[0]): boolean {
+  if (type === "reviews") return reviewsOn(settings);
+  return true;
+}
+
 export async function getRenderSections(
   pid: string,
   lang: string,
   websiteEnabled: boolean,
 ): Promise<ResolvedSection[]> {
   if (!websiteEnabled) return legacySections();
-  const config = await read(pid);
+  const [config, settings] = await Promise.all([read(pid), getSettings(pid)]);
   const home = pagesOf(config).find(isHome)!;
-  return resolveText(config, lang, home.sections.filter((s) => !s.hidden));
+  return resolveText(config, lang, home.sections.filter((s) => !s.hidden && shown(s.type, settings)));
 }
 
 function legacySections(): ResolvedSection[] {
@@ -211,7 +221,7 @@ export async function getRenderPage(
 ): Promise<RenderPage | null> {
   const wanted = normalizePageSlug(slug);
   if (!wanted) return null;
-  const config = await read(pid);
+  const [config, settings] = await Promise.all([read(pid), getSettings(pid)]);
   const page = pagesOf(config).find((p) => p.slug === wanted);
   if (!page) return null;
   return {
@@ -219,7 +229,7 @@ export async function getRenderPage(
     slug: page.slug,
     title: pageText(config, lang, page.id, "title"),
     metaDescription: pageText(config, lang, page.id, "metaDescription"),
-    sections: resolveText(config, lang, page.sections.filter((s) => !s.hidden)),
+    sections: resolveText(config, lang, page.sections.filter((s) => !s.hidden && shown(s.type, settings))),
   };
 }
 

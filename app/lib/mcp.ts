@@ -418,7 +418,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
     name: "update_property_settings",
     description:
-      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkin_until/checkout_time (HH:MM; checkin_until is the latest check-in and clips the guest's arrival-time choices at checkout), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle).",
+      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkin_until/checkout_time (HH:MM; checkin_until is the latest check-in and clips the guest's arrival-time choices at checkout), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle), and so is reviews_enabled (guest reviews on/off; off = no request emails, no website Reviews section, review links 404; existing reviews kept).",
     inputSchema: {
       type: "object",
       properties: {
@@ -427,6 +427,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
         languages: { type: "array", items: { type: "string" }, description: "Guest languages; must include the default language." },
         single_unit: { type: "boolean" },
         website_enabled: { type: "boolean", description: "Turn the website layer on/off. Content-safe: pages and text are kept either way." },
+        reviews_enabled: { type: "boolean", description: "Guest reviews on/off (default true). Off: no review-request emails, the website's Reviews section is not rendered, guest review links answer 404. Reviews already written are kept and still readable via list_reviews." },
         facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only — free-text facilities are per-language content." },
         checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
         checkin_until: { type: ["string", "null"], description: '"HH:MM" 24h — latest check-in; when set, checkout only offers arrival times between checkin_time and this. null = every half hour.' },
