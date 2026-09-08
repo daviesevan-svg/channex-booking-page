@@ -370,7 +370,7 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 
 const PROPERTY_FIELDS = new Set([
   "currency", "pricing_mode", "languages", "single_unit", "facilities",
-  "checkin_time", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
+  "checkin_time", "checkin_until", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
   "address", "portal", "terms_url", "privacy_url", "emails", "website_enabled",
 ]);
 const FACILITY_KEYS = new Set<string>(PROPERTY_FACILITIES as readonly string[]);
@@ -449,6 +449,8 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
 
   const checkin = optHHMM(ctx, body, "checkin_time");
   if (checkin !== undefined) out.checkinTime = checkin as never;
+  const checkinUntil = optHHMM(ctx, body, "checkin_until");
+  if (checkinUntil !== undefined) out.checkinUntil = checkinUntil as never;
   const checkout = optHHMM(ctx, body, "checkout_time");
   if (checkout !== undefined) out.checkoutTime = checkout as never;
 

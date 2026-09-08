@@ -3,6 +3,7 @@ import { format, parseISO } from "date-fns";
 import { useState } from "react";
 import { Form, Link, redirect, redirectDocument, useNavigation, useSearchParams } from "react-router";
 import { jsonLdHtml } from "~/lib/jsonld";
+import { arrivalTimes } from "~/lib/arrival-times";
 import { z } from "zod";
 
 import type { Route } from "./+types/checkout";
@@ -274,6 +275,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     // default anchor while the server used the property's would put two different
     // dates in front of the same guest.
     cancelAnchor: { time: settings.cancelAnchorTime, timezone: settings.timezone },
+    // The arrival times the guest may pick — clipped to the reception window
+    // when the property has set a latest check-in (arrival-times.ts).
+    arrivalTimes: arrivalTimes({ from: settings.checkinTime, until: settings.checkinUntil }),
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
     // Only the rows the hotel marked as requiring acceptance — the rest are
@@ -772,13 +776,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   return redirectDocument(`${base}/confirmation/${reference}?${next.toString()}`);
 }
 
-// Channex validates arrival_hour as strict HH:MM — offer a fixed list of times
-// instead of free text, so what the guest picks is exactly what the PMS gets.
-const ARRIVAL_TIMES = Array.from(
-  { length: 48 },
-  (_, i) => `${String(Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`,
-);
-
 function Field({
   name,
   label,
@@ -866,7 +863,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, euConsumer, tracking, notice } = loaderData;
+  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, arrivalTimes: arrivalOptions, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, euConsumer, tracking, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -1086,7 +1083,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                   className={cx("mt-[7px] block w-full", s.field, "px-3.5 py-[13px] text-body-lg text-ink outline-none focus:border-accent")}
                 >
                   <option value="">{tr.t("arrivalUnknown")}</option>
-                  {ARRIVAL_TIMES.map((t) => (
+                  {arrivalOptions.map((t) => (
                     <option key={t} value={t}>
                       {t}
                     </option>

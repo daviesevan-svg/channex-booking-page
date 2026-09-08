@@ -504,6 +504,7 @@ export async function savePropertyMeta(pid: string, form: FormData): Promise<Sit
   const next: SiteSettings = {
     ...existing,
     checkinTime: cleanTime(form.get("checkinTime")),
+    checkinUntil: cleanTime(form.get("checkinUntil")),
     checkoutTime: cleanTime(form.get("checkoutTime")),
     addressCity: String(form.get("addressCity") ?? "").trim() || undefined,
     addressRegion: String(form.get("addressRegion") ?? "").trim() || undefined,

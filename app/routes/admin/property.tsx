@@ -490,6 +490,13 @@ export default function AdminProperty({ loaderData, actionData }: Route.Componen
               {t("propCheckinFrom")}
               <input type="time" name="checkinTime" defaultValue={settings.checkinTime || "15:00"} className={FIELD_INPUT} />
             </label>
+            {/* Optional: the end of the reception window. Blank keeps the
+                checkout arrival list at every half hour of the day. */}
+            <label className="block text-[13px] font-semibold text-secondary">
+              {t("propCheckinUntil")}
+              <input type="time" name="checkinUntil" defaultValue={settings.checkinUntil || ""} className={FIELD_INPUT} />
+              <span className="mt-1 block text-[12px] font-normal text-muted">{t("propCheckinUntilHint")}</span>
+            </label>
             <label className="block text-[13px] font-semibold text-secondary">
               {t("propCheckoutBy")}
               <input type="time" name="checkoutTime" defaultValue={settings.checkoutTime || "11:00"} className={FIELD_INPUT} />

@@ -443,6 +443,7 @@ export const openApiSpec = {
           currency,
           timezone: { type: ["string", "null"], description: "IANA timezone, e.g. Europe/London." },
           checkin_time: { type: ["string", "null"], description: "e.g. \"15:00\"." },
+          checkin_until: { type: ["string", "null"], description: "Latest check-in, e.g. \"18:00\"; null when the property has no reception window." },
           checkout_time: { type: ["string", "null"], description: "e.g. \"11:00\"." },
           languages: { type: "array", items: { type: "string" }, description: "Enabled content languages (usable as `?lang=`)." },
           terms_url: { type: ["string", "null"], format: "uri" },

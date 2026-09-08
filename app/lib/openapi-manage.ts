@@ -113,6 +113,7 @@ export const manageSchemas = {
       website_enabled: { type: "boolean", description: "Content-safe website-layer toggle." },
       facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only." },
       checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h.' },
+      checkin_until: { type: ["string", "null"], description: '"HH:MM" 24h — latest check-in. When set, guests may only choose an arrival time between checkin_time and this at checkout; null offers every half hour.' },
       checkout_time: { type: ["string", "null"] },
       timezone: { type: ["string", "null"], description: "IANA timezone." },
       booking_cutoff_days: { type: ["integer", "null"], minimum: 0, maximum: 7 },
