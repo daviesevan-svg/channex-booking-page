@@ -443,6 +443,11 @@ export interface SiteSettings {
    *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
   checkinTime?: string;
   checkoutTime?: string;
+  /** Guest reviews on/off for this property. Unset = ON (the long-standing
+   *  behaviour). OFF: no review-request emails go out, the website's reviews
+   *  section is not rendered, and the guest review link answers Not found.
+   *  Existing reviews are kept and stay visible in the admin. See reviewsOn(). */
+  reviewsEnabled?: boolean;
   /** "HH:MM" LATEST check-in (end of the reception window). When set, the
    *  checkout page offers arrival times only between checkinTime and this, so
    *  a guest can't self-select an hour nobody is at the desk (see

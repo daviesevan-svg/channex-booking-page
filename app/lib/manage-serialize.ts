@@ -153,6 +153,7 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
       notify_host_on_cancel: s.notifyHostOnCancel ?? true,
     },
     website_enabled: s.websiteEnabled ?? false,
+    reviews_enabled: s.reviewsEnabled ?? true,
     // Read-only context (writes are UI-only or a later phase; see the spec).
     connected_system: s.connectedSystem ?? null,
     live_booking: s.liveBooking ?? null,

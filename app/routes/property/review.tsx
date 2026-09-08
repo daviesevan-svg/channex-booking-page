@@ -9,9 +9,10 @@ import { Form, useNavigation } from "react-router";
 import type { Route } from "./+types/review";
 import { pageMeta } from "~/lib/page-meta";
 import { getBooking } from "~/lib/bookings.server";
+import { getSettings } from "~/lib/overrides.server";
 import { SAMPLE_BOOKING_ID, sampleBooking } from "~/lib/email-render.server";
 import { getReviewByBooking, upsertReview } from "~/lib/reviews.server";
-import { REVIEW_CATEGORIES, type ReviewCategory } from "~/lib/reviews";
+import { REVIEW_CATEGORIES, type ReviewCategory, reviewsOn } from "~/lib/reviews";
 
 import { useProperty } from "~/lib/booking-context";
 import { fmtDate } from "~/lib/dates";
@@ -27,6 +28,11 @@ const clampStars = (v: unknown): number | undefined => {
 
 export async function loader({ params, request }: Route.LoaderArgs) {
   const pid = await resolveRequestProperty(params.channelId, request);
+  // A property with reviews switched off has no review page — only the email
+  // editor's sample link still renders, so a test send never looks broken.
+  if (params.bookingId !== SAMPLE_BOOKING_ID && !reviewsOn(await getSettings(pid))) {
+    throw new Response("Not found", { status: 404 });
+  }
   const booking = await getBooking(pid, params.bookingId);
   const url = new URL(request.url);
   // The email editor previews and test-sends the review request against the
@@ -65,6 +71,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  // Same gate as the loader: a review can't be posted to a property that has
+  // switched reviews off, even from a link that predates the switch.
+  const gatePid = await resolveRequestProperty(params.channelId, request);
+  if (!reviewsOn(await getSettings(gatePid))) throw new Response("Not found", { status: 404 });
   const pid = await resolveRequestProperty(params.channelId, request);
   const booking = await getBooking(pid, params.bookingId);
   // No booking, no review — the sample id gets a rendered page from the loader

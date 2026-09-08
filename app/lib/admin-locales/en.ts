@@ -1981,6 +1981,14 @@ const EN: Record<string, string> = {
   vdManageOnly: "Redeeming, deducting, cancelling and refunding are limited to owners and managers.",
   rvTitle: "Reviews",
   rvAddPropertyFirst: "Add a property first.",
+  rvOnTitle: "Reviews are on.",
+  rvOnIntro:
+    "Guests are emailed a review request after checkout, published reviews show in your website's Reviews section, and review links work.",
+  rvOffTitle: "Reviews are off.",
+  rvOffIntro:
+    "No review requests are sent, the Reviews section is not shown on your website, and review links answer Not found. Reviews already written are kept and stay listed here.",
+  rvTurnOff: "Turn reviews off",
+  rvTurnOn: "Turn reviews on",
   rvReviewsCount_one: "{n} review",
   rvReviewsCount_other: "{n} reviews",
   rvEmpty: "No reviews yet. Guests are emailed a review request on the evening of their checkout day (with up to two reminders), so reviews appear here automatically after real stays.",

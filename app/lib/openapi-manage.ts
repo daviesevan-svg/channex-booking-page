@@ -111,6 +111,7 @@ export const manageSchemas = {
       languages: { type: "array", items: { type: "string" }, description: "Must include the default language." },
       single_unit: { type: "boolean" },
       website_enabled: { type: "boolean", description: "Content-safe website-layer toggle." },
+      reviews_enabled: { type: "boolean", description: "Guest reviews on/off (default true). Off: no review-request emails, no website Reviews section, guest review links 404. Existing reviews are kept." },
       facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only." },
       checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h.' },
       checkin_until: { type: ["string", "null"], description: '"HH:MM" 24h — latest check-in. When set, guests may only choose an arrival time between checkin_time and this at checkout; null offers every half hour.' },

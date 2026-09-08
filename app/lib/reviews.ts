@@ -27,3 +27,9 @@ export interface ReviewRecord {
   /** The hotel's public response. */
   response?: { text: string; at: string; by?: string };
 }
+
+/** Whether a property takes guest reviews. Unset means on: the setting was
+ *  added after reviews shipped, so every existing property keeps them. */
+export function reviewsOn(settings: { reviewsEnabled?: boolean } | null | undefined): boolean {
+  return settings?.reviewsEnabled !== false;
+}
