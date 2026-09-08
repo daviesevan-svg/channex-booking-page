@@ -447,6 +447,9 @@ const EN: Record<string, string> = {
   propCheckinTitle: "Check-in & check-out",
   propCheckinIntro: "Shown to guests and used in Google structured data. Defaults to 3:00 PM / 11:00 AM.",
   propCheckinFrom: "Check-in from",
+  propCheckinUntil: "Latest check-in (optional)",
+  propCheckinUntilHint:
+    "Set this and the checkout page only offers arrival times between check-in and this hour. Leave blank to offer every half hour.",
   propCheckoutBy: "Check-out by",
   propLocationTitle: "Location",
   propLocationIntro: "The address guests see and the map coordinates used to match this property in the Google Hotel List Feed.",

@@ -443,6 +443,12 @@ export interface SiteSettings {
    *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
   checkinTime?: string;
   checkoutTime?: string;
+  /** "HH:MM" LATEST check-in (end of the reception window). When set, the
+   *  checkout page offers arrival times only between checkinTime and this, so
+   *  a guest can't self-select an hour nobody is at the desk (see
+   *  arrival-times.ts). Unset = every half hour, the long-standing behaviour.
+   *  Display-only otherwise: not in structured data, not sent to Channex. */
+  checkinUntil?: string;
   // ----- Structured location (Google Hotel List Feed + structured data) -----
   /** Street line falls back to the localized PropertyOverrides.address. These
    *  structured parts + geo power the Google Hotel List Feed matching. */

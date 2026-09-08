@@ -111,6 +111,7 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
     single_unit: s.singleUnit ?? false,
     facilities: s.facilities ?? [],
     checkin_time: s.checkinTime ?? null,
+    checkin_until: s.checkinUntil ?? null,
     checkout_time: s.checkoutTime ?? null,
     timezone: s.timezone ?? null,
     booking_cutoff_days: s.bookingCutoffDays ?? null,

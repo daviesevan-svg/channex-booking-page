@@ -418,7 +418,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
     name: "update_property_settings",
     description:
-      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkout_time (HH:MM), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle).",
+      "Edit the property's configuration — sparse: omitted fields stay, null clears. Writable: currency (ISO code), pricing_mode (per_room|per_person), languages (must include the default), single_unit, facilities (curated keys from get_property_settings), checkin_time/checkin_until/checkout_time (HH:MM; checkin_until is the latest check-in and clips the guest's arrival-time choices at checkout), timezone (IANA), booking cutoffs, address {city, region, postal_code, country, latitude, longitude}, portal (cancellation/modification policy) and terms/privacy URLs. NOT writable here: connectivity, payments, custom website domain, live-booking — say so if asked. website_enabled IS writable (content-safe toggle).",
     inputSchema: {
       type: "object",
       properties: {
@@ -429,6 +429,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
         website_enabled: { type: "boolean", description: "Turn the website layer on/off. Content-safe: pages and text are kept either way." },
         facilities: { type: "array", items: { type: "string" }, description: "Curated facility keys only — free-text facilities are per-language content." },
         checkin_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
+        checkin_until: { type: ["string", "null"], description: '"HH:MM" 24h — latest check-in; when set, checkout only offers arrival times between checkin_time and this. null = every half hour.' },
         checkout_time: { type: ["string", "null"], description: '"HH:MM" 24h' },
         timezone: { type: ["string", "null"], description: "IANA timezone, e.g. Asia/Ho_Chi_Minh" },
         booking_cutoff_days: { type: ["integer", "null"], minimum: 0, maximum: 7 },

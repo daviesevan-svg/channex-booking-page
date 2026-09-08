@@ -46,6 +46,7 @@ export function serializePropertyContent(
     currency: settings.currency || "GBP",
     timezone: settings.timezone ?? null,
     checkin_time: settings.checkinTime ?? null,
+    checkin_until: settings.checkinUntil ?? null,
     checkout_time: settings.checkoutTime ?? null,
     languages: settings.languages?.length ? settings.languages : ["en"],
     terms_url: settings.termsUrl ?? null,
