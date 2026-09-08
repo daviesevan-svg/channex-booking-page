@@ -11,7 +11,8 @@ import { getProperties } from "../properties.server";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPE = "https://www.googleapis.com/auth/travelpartner";
-const API = "https://travelpartner.googleapis.com/v3";
+export const TRAVEL_PARTNER_API = "https://travelpartner.googleapis.com/v3";
+const API = TRAVEL_PARTNER_API;
 
 /** Coarse state for the UI/gate:
  *  - not_found : Google returned no view for this hotel id (not uploaded yet).
@@ -70,7 +71,10 @@ function pemToDer(pem: string): ArrayBuffer {
 // Cached access token (per isolate) until shortly before expiry.
 let cached: { token: string; exp: number } | null = null;
 
-async function getAccessToken(): Promise<string | null> {
+/** Short-lived Travel Partner bearer token (cached per isolate), or null when the
+ *  service-account secrets aren't configured or the exchange fails. Shared with
+ *  account-link.server.ts. */
+export async function getAccessToken(): Promise<string | null> {
   const { googleTravelPartnerSaEmail: email, googleTravelPartnerSaKey: key } = getConfig();
   if (!email || !key) return null;
   const now = Math.floor(Date.now() / 1000);

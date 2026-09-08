@@ -2,6 +2,7 @@
 // the admin editor so defaults stay in one place.
 
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
+import type { GoogleAdsLinkRecord } from "./google-ari/account-link";
 
 export interface Highlight {
   title: string;
@@ -509,6 +510,11 @@ export interface SiteSettings {
    *  (The last-sync status lives in its own KV key — see GoogleAriSyncStatus in
    *  overrides.server — so automated status writes can't clobber settings.) */
   googleAriWindowDays?: number;
+  /** The hotel's own Google Ads account, linked to OUR Hotel Center account and
+   *  scoped to this property's hotel id, so it can run paid Hotel campaigns that
+   *  land on these booking pages. Absent = not linked. See
+   *  google-ari/account-link.server.ts + docs/google-ads-link.md. */
+  googleAdsLink?: GoogleAdsLinkRecord;
 }
 
 /** Lead-time cutoff in the shape the client-safe date helpers consume. */

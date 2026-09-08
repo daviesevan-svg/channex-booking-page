@@ -7,6 +7,7 @@ import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
 import { refreshMergedVrFeed } from "../app/lib/google-merged-vr-feed.server";
 import { scheduledReviewRequests } from "../app/lib/review-requests.server";
 import { refreshAllMatchStatuses } from "../app/lib/google-ari/status.server";
+import { refreshPendingGoogleAdsLinks } from "../app/lib/google-ari/account-link.server";
 import { pruneAri } from "../app/lib/ari/admin.server";
 import { pruneSearchEvents } from "../app/lib/search-analytics.server";
 import { pruneFunnelEvents } from "../app/lib/funnel-analytics.server";
@@ -130,6 +131,9 @@ export default {
     // Refresh the Google match status ~daily (self-throttled) so the admin page
     // reads it from KV instead of calling the slow Travel Partner API on load.
     ctx.waitUntil(refreshAllMatchStatuses().catch((e) => console.log(`[cron] refreshAllMatchStatuses failed: ${e}`)));
+    // Google Ads links: pick up the hotel's approval in Google Ads (or a revoke)
+    // so the admin page shows it without anyone pressing "Check status".
+    ctx.waitUntil(refreshPendingGoogleAdsLinks().catch((e) => console.log(`[cron] refreshPendingGoogleAdsLinks failed: ${e}`)));
     // Review requests: checkout-evening ask + up to two reminders per booking.
     ctx.waitUntil(scheduledReviewRequests().catch((e) => console.log(`[cron] scheduledReviewRequests failed: ${e}`)));
     // Custom domains: switch on any hostname Cloudflare has since verified. The
