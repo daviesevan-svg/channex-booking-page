@@ -157,7 +157,7 @@ const DE: Record<string, string> = {
   homePromoPlaceholder: "Platzhalter im Promo-Code-Feld",
   homePromoPlaceholderHint: "Der blasse Beispieltext im Promo-Code-Feld (z. B. SOMMER10).",
   homeHighlights: "Highlights",
-  homeHighlightsHint: "Drei kurze Argumente unter dem Suchfeld. Leere Zeilen verwenden den Standardtext.",
+  homeHighlightsHint: "Bis zu drei kurze Argumente unter dem Suchfeld – nur Zusagen, die Sie wirklich einhalten, etwa Ihre tatsächlichen Stornobedingungen, Parkplätze oder Frühstück. Bis Sie etwas eintragen, wird nichts angezeigt.",
   homeHighlightTitle: "Titel von Highlight {n}",
   homeHighlightDesc: "Beschreibung",
   homeFeatureImage: "Großes Bild",

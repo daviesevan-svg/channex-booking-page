@@ -595,17 +595,17 @@ export function normalizeHex(value: string): string | undefined {
   return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s.toLowerCase() : undefined;
 }
 
+// Defaults are deliberately free of promises. Until 2026-09-08 a property that
+// had not written its own copy showed "Free cancellation up to 24h before
+// arrival" and "Best rate, guaranteed" to every guest — claims the hotel never
+// made, and for one customer the opposite of its real terms (7 days free, then
+// 50%). A blank highlights list hides the section; the hotel writes its own.
 export const DEFAULT_SEARCH = {
   heading: "Reserve your stay",
-  intro:
-    "Book direct for our best available rates, free cancellation on flexible bookings, and absolutely no booking fees — every time.",
+  intro: "Check live availability and book your stay directly with us.",
   promoText: "Add a promo or corporate code",
   searchButton: "Search rooms",
-  highlights: [
-    { title: "Free cancellation", description: "On all flexible rates, up to 24h before arrival." },
-    { title: "Best rate, guaranteed", description: "Lower price elsewhere? We'll match it." },
-    { title: "No booking fees", description: "The price you see is the price you pay." },
-  ] as Highlight[],
+  highlights: [] as Highlight[],
 };
 
 // ---- Translations of the built-in defaults ----
@@ -616,111 +616,66 @@ type SearchDefaults = typeof DEFAULT_SEARCH;
 const SEARCH_TRANSLATIONS: Record<string, SearchDefaults> = {
   fr: {
     heading: "Réservez votre séjour",
-    intro:
-      "Réservez en direct pour profiter de nos meilleurs tarifs, de l'annulation gratuite sur les réservations flexibles et d'aucuns frais de réservation — à chaque fois.",
+    intro: "Consultez les disponibilités en temps réel et réservez votre séjour directement auprès de nous.",
     promoText: "Ajouter un code promo ou entreprise",
     searchButton: "Rechercher",
-    highlights: [
-      { title: "Annulation gratuite", description: "Sur tous les tarifs flexibles, jusqu'à 24h avant l'arrivée." },
-      { title: "Meilleur tarif garanti", description: "Un prix plus bas ailleurs ? Nous l'alignons." },
-      { title: "Aucuns frais de réservation", description: "Le prix que vous voyez est le prix que vous payez." },
-    ],
+    highlights: [],
   },
   de: {
     heading: "Reservieren Sie Ihren Aufenthalt",
-    intro:
-      "Buchen Sie direkt für unsere besten verfügbaren Preise, kostenlose Stornierung bei flexiblen Buchungen und absolut keine Buchungsgebühren – jedes Mal.",
+    intro: "Prüfen Sie die aktuelle Verfügbarkeit und buchen Sie Ihren Aufenthalt direkt bei uns.",
     promoText: "Promo- oder Firmencode hinzufügen",
     searchButton: "Zimmer suchen",
-    highlights: [
-      { title: "Kostenlose Stornierung", description: "Bei allen flexiblen Tarifen, bis 24 Std. vor Anreise." },
-      { title: "Bestpreisgarantie", description: "Woanders günstiger? Wir ziehen mit." },
-      { title: "Keine Buchungsgebühren", description: "Der angezeigte Preis ist der Preis, den Sie zahlen." },
-    ],
+    highlights: [],
   },
   es: {
     heading: "Reserve su estancia",
-    intro:
-      "Reserve directamente para obtener nuestras mejores tarifas disponibles, cancelación gratuita en reservas flexibles y sin gastos de reserva, siempre.",
+    intro: "Consulte la disponibilidad en tiempo real y reserve su estancia directamente con nosotros.",
     promoText: "Añadir un código promocional o corporativo",
     searchButton: "Buscar habitaciones",
-    highlights: [
-      { title: "Cancelación gratuita", description: "En todas las tarifas flexibles, hasta 24 h antes de la llegada." },
-      { title: "Mejor tarifa garantizada", description: "¿Precio más bajo en otro sitio? Lo igualamos." },
-      { title: "Sin gastos de reserva", description: "El precio que ve es el precio que paga." },
-    ],
+    highlights: [],
   },
   it: {
     heading: "Prenota il tuo soggiorno",
-    intro:
-      "Prenota direttamente per le nostre migliori tariffe disponibili, cancellazione gratuita sulle prenotazioni flessibili e nessun costo di prenotazione — ogni volta.",
+    intro: "Verifica la disponibilità in tempo reale e prenota il tuo soggiorno direttamente con noi.",
     promoText: "Aggiungi un codice promozionale o aziendale",
     searchButton: "Cerca camere",
-    highlights: [
-      { title: "Cancellazione gratuita", description: "Su tutte le tariffe flessibili, fino a 24 ore prima dell'arrivo." },
-      { title: "Miglior tariffa garantita", description: "Prezzo più basso altrove? Lo pareggiamo." },
-      { title: "Nessun costo di prenotazione", description: "Il prezzo che vedi è il prezzo che paghi." },
-    ],
+    highlights: [],
   },
   pt: {
     heading: "Reserve a sua estadia",
-    intro:
-      "Reserve diretamente para obter as nossas melhores tarifas disponíveis, cancelamento gratuito em reservas flexíveis e sem taxas de reserva — sempre.",
+    intro: "Consulte a disponibilidade em tempo real e reserve a sua estadia diretamente connosco.",
     promoText: "Adicionar um código promocional ou empresarial",
     searchButton: "Procurar quartos",
-    highlights: [
-      { title: "Cancelamento gratuito", description: "Em todas as tarifas flexíveis, até 24h antes da chegada." },
-      { title: "Melhor tarifa garantida", description: "Preço mais baixo noutro lado? Nós igualamos." },
-      { title: "Sem taxas de reserva", description: "O preço que vê é o preço que paga." },
-    ],
+    highlights: [],
   },
   nl: {
     heading: "Reserveer uw verblijf",
-    intro:
-      "Boek rechtstreeks voor onze beste beschikbare tarieven, gratis annulering bij flexibele boekingen en helemaal geen boekingskosten — elke keer.",
+    intro: "Bekijk de actuele beschikbaarheid en boek uw verblijf rechtstreeks bij ons.",
     promoText: "Voeg een promo- of bedrijfscode toe",
     searchButton: "Zoek kamers",
-    highlights: [
-      { title: "Gratis annulering", description: "Op alle flexibele tarieven, tot 24 uur voor aankomst." },
-      { title: "Beste prijsgarantie", description: "Elders goedkoper? Wij passen het aan." },
-      { title: "Geen boekingskosten", description: "De prijs die u ziet, is de prijs die u betaalt." },
-    ],
+    highlights: [],
   },
   el: {
     heading: "Κλείστε τη διαμονή σας",
-    intro:
-      "Κάντε κράτηση απευθείας για τις καλύτερες διαθέσιμες τιμές μας, δωρεάν ακύρωση στις ευέλικτες κρατήσεις και καθόλου χρεώσεις κράτησης — κάθε φορά.",
+    intro: "Δείτε τη διαθεσιμότητα σε πραγματικό χρόνο και κλείστε τη διαμονή σας απευθείας σε εμάς.",
     promoText: "Προσθέστε κωδικό προσφοράς ή εταιρικό κωδικό",
     searchButton: "Αναζήτηση δωματίων",
-    highlights: [
-      { title: "Δωρεάν ακύρωση", description: "Σε όλες τις ευέλικτες τιμές, έως 24 ώρες πριν την άφιξη." },
-      { title: "Εγγυημένα η καλύτερη τιμή", description: "Βρήκατε φθηνότερη τιμή αλλού; Την εξισώνουμε." },
-      { title: "Χωρίς χρεώσεις κράτησης", description: "Η τιμή που βλέπετε είναι η τιμή που πληρώνετε." },
-    ],
+    highlights: [],
   },
   th: {
     heading: "จองการเข้าพักของคุณ",
-    intro:
-      "จองตรงกับเราเพื่อรับราคาที่ดีที่สุด ยกเลิกฟรีสำหรับการจองแบบยืดหยุ่น และไม่มีค่าธรรมเนียมการจองทุกครั้ง",
+    intro: "เช็คห้องว่างแบบเรียลไทม์และจองการเข้าพักของคุณกับเราโดยตรง",
     promoText: "ใส่รหัสส่วนลดหรือรหัสองค์กร",
     searchButton: "ค้นหาห้องพัก",
-    highlights: [
-      { title: "ยกเลิกฟรี", description: "สำหรับราคาแบบยืดหยุ่นทุกรายการ จนถึง 24 ชั่วโมงก่อนวันเข้าพัก" },
-      { title: "การันตีราคาดีที่สุด", description: "เจอราคาถูกกว่าที่อื่น? เราจะปรับให้เท่ากัน" },
-      { title: "ไม่มีค่าธรรมเนียมการจอง", description: "ราคาที่คุณเห็นคือราคาที่คุณจ่าย" },
-    ],
+    highlights: [],
   },
   tr: {
     heading: "Konaklamanızı ayırtın",
-    intro:
-      "En iyi güncel fiyatlarımız, esnek rezervasyonlarda ücretsiz iptal ve hiçbir zaman rezervasyon ücreti olmaması için doğrudan bizden rezervasyon yapın.",
+    intro: "Güncel müsaitlik durumunu görün ve konaklamanızı doğrudan bizden ayırtın.",
     promoText: "Promosyon veya kurumsal kod ekleyin",
     searchButton: "Oda ara",
-    highlights: [
-      { title: "Ücretsiz iptal", description: "Tüm esnek fiyat planlarında, girişten 24 saat öncesine kadar." },
-      { title: "En iyi fiyat garantisi", description: "Başka bir yerde daha ucuzunu mu buldunuz? Aynı fiyatı uygularız." },
-      { title: "Rezervasyon ücreti yok", description: "Gördüğünüz fiyat, ödeyeceğiniz fiyattır." },
-    ],
+    highlights: [],
   },
 };
 
