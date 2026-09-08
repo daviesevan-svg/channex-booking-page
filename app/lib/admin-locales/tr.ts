@@ -2254,6 +2254,23 @@ const TR: Record<string, string> = {
   payIyzicoCurrency: "iyzico, bu tesisin para birimi olan {currency} birimini kabul etmiyor. TRY, USD, EUR, GBP, NOK ve CHF kabul ediliyor.",
   payIyzicoNoGuarantee: "iyzico ödeme tahsil eder, kartı teminat olarak saklayamaz. Kart isteyip tahsilat yapmayan fiyatlar, hiçbir ödeme altyapısı bağlı değilmiş gibi kartsız rezerve edilir.",
 
+  // -- payments: 2C2P --
+  pay2c2pDesc: "Güneydoğu Asya'da kartlar, cüzdanlar ve yerel ödeme yöntemleri, 2C2P'nin ödeme sayfasında.",
+  pay2c2pSetupHelp: "2C2P üye iş yeri portalınızdan: Merchant ID ve gizli anahtar (2C2P buna SHA key de der). 2C2P tarafına hiçbir şey yapıştırmanız gerekmez — iki dönüş adresi de her ödemeyle birlikte gönderilir. Kaydederken, bilgileri ve para birimini doğrulamak için hiç tahsil edilmeyen küçük bir ödeme token'ı oluşturulur.",
+  pay2c2pMerchantId: "Merchant ID",
+  pay2c2pSecretKey: "Gizli anahtar",
+  pay2c2pConnect: "2C2P'yi bağla",
+  pay2c2pVerifying: "2C2P ile doğrulanıyor…",
+  pay2c2pSandboxToggle: "Bunlar sandbox bilgileridir",
+  pay2c2pConnectedSandbox: "Bağlandı (sandbox)",
+  pay2c2pNoGuarantee: "2C2P ödeme tahsil eder, kartı teminat olarak saklayamaz. Kart isteyip tahsilat yapmayan fiyatlar, hiçbir ödeme altyapısı bağlı değilmiş gibi kartsız rezerve edilir.",
+  pay2c2pNoRefunds: "İadeler henüz buradan yapılmıyor: 2C2P rezervasyonunu burada her zamanki gibi iptal edin, sonra 2C2P üye iş yeri portalından iade edin. Misafir iptalinde otomatik iade bu altyapı için geçerli değildir.",
+  bkdPaidVia2c2p: "2C2P ile {amount} ödendi",
+  bkd2c2pTranRef: "2C2P işlem referansı",
+  bkd2c2pMerchant: "2C2P üye iş yeri",
+  bkd2c2pInvoice: "2C2P fatura numarası",
+  bkd2c2pRefundManual: "Bu ödeme 2C2P üzerinden tahsil edildi. İadeyi 2C2P üye iş yeri portalından yapın — bu altyapı için buradan iade yapılamaz.",
+
 };
 
 export default TR;

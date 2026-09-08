@@ -23,6 +23,7 @@ import {
 import { withEmailDefaults } from "./email-defaults.server";
 import { vivaConfigured, type VivaConfig } from "./viva.server";
 import { iyzicoConfigured, type IyzicoConfig } from "./iyzico.server";
+import { c2pConfigured, type C2pConfig } from "./2c2p.server";
 import { ownerOnlyValue } from "./property-access";
 
 // Localized content is stored per language: KV value is { [lang]: data }.
@@ -406,6 +407,22 @@ export async function saveIyzicoConfig(pid: string, config: IyzicoConfig | null)
   if (!kv) return;
   if (config) await writeJson(iyzicoKey(pid), config);
   else await kv.delete(iyzicoKey(pid));
+}
+const c2pKey = (pid: string) => `c2p_config:${pid}`;
+
+export async function getC2pConfig(pid: string): Promise<C2pConfig | null> {
+  const c = await readJson<C2pConfig>(c2pKey(pid));
+  return c2pConfigured(c) ? c : null;
+}
+
+/** Store (or, with null, disconnect) the property's 2C2P credentials. Own KV
+ *  key, same reason as Viva's and iyzico's: the secret key must never ride
+ *  along with a settings read. */
+export async function saveC2pConfig(pid: string, config: C2pConfig | null): Promise<void> {
+  const kv = getConfigKV();
+  if (!kv) return;
+  if (config) await writeJson(c2pKey(pid), config);
+  else await kv.delete(c2pKey(pid));
 }
 
 /** Accept only http(s) URLs; otherwise drop (so a bad value never becomes a link). */

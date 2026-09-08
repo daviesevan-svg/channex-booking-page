@@ -16,16 +16,17 @@ export function apiBookingChargePath(input: {
    *  the property has live bookings on AND Channex is the connected system. */
   live: boolean;
   due: number;
-  gatewayKind: "stripe" | "viva" | "iyzico" | undefined;
+  gatewayKind: "stripe" | "viva" | "iyzico" | "2c2p" | undefined;
 }): ApiChargePath {
   // Simulated bookings never charge — same rule as the hosted checkout.
   if (!input.live) return "uncarded";
   if (input.due > 0 && !input.gatewayKind) return "not_configured";
   if (input.gatewayKind === "viva" && input.due > 0) return "viva";
   if (input.gatewayKind === "stripe") return "stripe";
-  // iyzico is wired for the hosted checkout only. Refusing is the point: the
-  // fall-through below books an UNCARDED stay, so a paid rate on an iyzico
-  // property would otherwise be confirmed without taking the money.
-  if (input.gatewayKind === "iyzico" && input.due > 0) return "not_configured";
+  // iyzico and 2C2P are wired for the hosted checkout only. Refusing is the
+  // point: the fall-through below books an UNCARDED stay, so a paid rate on
+  // one of those properties would otherwise be confirmed without taking the
+  // money.
+  if ((input.gatewayKind === "iyzico" || input.gatewayKind === "2c2p") && input.due > 0) return "not_configured";
   return "uncarded";
 }

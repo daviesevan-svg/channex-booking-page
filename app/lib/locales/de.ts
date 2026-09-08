@@ -449,6 +449,9 @@ const DE: Dict = {
   cancelPartialNoticeUnpaid: "Bei einer Stornierung jetzt wird {penalty} berechnet.",
   cancelConfirmPartial: "Sie haben {paid} gezahlt. Bei einer Stornierung jetzt werden {refund} erstattet. Buchung stornieren? Dies kann nicht rückgängig gemacht werden.",
   refundedLabel: "Erstattet",
+  refundOwedLabel: "Dem Gast geschuldete Erstattung",
+  refundOwedManual2c2p: "Veranlassen Sie diese Erstattung im 2C2P-Händlerportal – für dieses Gateway sind automatische Erstattungen nicht möglich.",
+  refundOwedManual: "Noch nicht erstattet – veranlassen Sie diese Erstattung über die Buchungsseite in Ihrem Admin.",
   cancelBandUntil: "Bis {date} berechnen wir bei Stornierung {penalty}.",
   ackPartial: "Ich verstehe, dass bei einer Stornierung ab jetzt {penalty} berechnet wird.",
   ackPartialCharged: "Ich verstehe, dass meine Karte heute mit {amount} belastet wird und bei einer Stornierung ab jetzt {penalty} berechnet wird.",
@@ -495,6 +498,7 @@ const DE: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Erforderlich",
   paymentRefundedNotice: "Ihre Zahlung konnte diesem Aufenthalt nicht zugeordnet werden, daher haben wir sie vollständig erstattet — es wurde nichts gebucht. Bitte prüfen Sie Ihre Angaben und versuchen Sie es erneut, oder kontaktieren Sie uns, wenn Sie Hilfe brauchen.",
+  paymentHeldNotice: "Ihre Zahlung ist eingegangen, konnte aber diesem Aufenthalt nicht zugeordnet werden – es wurde nichts gebucht. Das Hotel wurde benachrichtigt und wird den Betrag erstatten. Bitte zahlen Sie nicht erneut, bevor Sie vom Hotel gehört haben.",
   paymentStartFailed: "Wir konnten die sichere Zahlung gerade nicht starten. Bitte versuchen Sie es in einem Moment erneut — wenn es weiterhin auftritt, kontaktieren Sie uns und wir helfen Ihnen, die Buchung abzuschließen.",
   paymentNotConfigured: "Für diese Rate ist eine Online-Zahlung erforderlich, aber Kartenzahlungen sind für diese Unterkunft noch nicht eingerichtet. Bitte kontaktieren Sie uns, um die Buchung abzuschließen.",
 

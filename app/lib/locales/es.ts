@@ -449,6 +449,9 @@ const ES: Dict = {
   cancelPartialNoticeUnpaid: "Si cancelas ahora se cobra {penalty}.",
   cancelConfirmPartial: "Has pagado {paid}. Si cancelas ahora se reembolsan {refund}. ¿Cancelar esta reserva? No se puede deshacer.",
   refundedLabel: "Reembolsado",
+  refundOwedLabel: "Reembolso pendiente al huésped",
+  refundOwedManual2c2p: "Realice este reembolso desde el portal de comercio de 2C2P; con esta pasarela no es posible reembolsar automáticamente.",
+  refundOwedManual: "Aún sin reembolsar; realice este reembolso desde la página de la reserva en su panel de administración.",
   cancelBandUntil: "Hasta el {date}, si cancelas cobramos {penalty}.",
   ackPartial: "Entiendo que si cancelo a partir de ahora se cobra {penalty}.",
   ackPartialCharged: "Entiendo que hoy se cargará {amount} en mi tarjeta y que si cancelo a partir de ahora se cobra {penalty}.",
@@ -495,6 +498,7 @@ const ES: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Obligatorio",
   paymentRefundedNotice: "No se pudo aplicar su pago a esta estancia, así que lo hemos reembolsado íntegramente: no se ha reservado nada. Revise sus datos e inténtelo de nuevo, o contáctenos si necesita ayuda.",
+  paymentHeldNotice: "Su pago se realizó, pero no pudo asociarse a esta estancia, así que no se ha reservado nada. El hotel ha sido avisado y le devolverá el importe; por favor, no vuelva a pagar hasta que le contacten.",
   paymentStartFailed: "No hemos podido iniciar el pago seguro en este momento. Inténtelo de nuevo en unos instantes: si sigue ocurriendo, póngase en contacto con nosotros y le ayudaremos a completar la reserva.",
   paymentNotConfigured: "Esta tarifa requiere un pago en línea, pero los pagos con tarjeta aún no están configurados para este alojamiento. Póngase en contacto con nosotros para completar la reserva.",
 

@@ -89,6 +89,9 @@ const TR: Dict = {
   cancelPartialNoticeUnpaid: "Şimdi iptal ederseniz {penalty} tahsil edilir.",
   cancelConfirmPartial: "{paid} ödediniz. Şimdi iptal ederseniz {refund} iade edilir. Bu rezervasyon iptal edilsin mi? Bu işlem geri alınamaz.",
   refundedLabel: "İade edildi",
+  refundOwedLabel: "Misafire ödenecek iade",
+  refundOwedManual2c2p: "Bu iadeyi 2C2P üye iş yeri portalından yapın — bu altyapıda otomatik iade yapılamaz.",
+  refundOwedManual: "Henüz iade edilmedi — bu iadeyi yönetim panelindeki rezervasyon sayfasından yapın.",
   cancelBandUntil: "{date} tarihine kadar iptal ederseniz {penalty} tahsil edilir.",
   ackPartial: "Bundan sonra iptal edersem {penalty} tahsil edileceğini anlıyorum.",
   ackPartialCharged: "Bugün kartımdan {amount} çekileceğini ve bundan sonra iptal edersem {penalty} tahsil edileceğini anlıyorum.",
@@ -520,6 +523,7 @@ const TR: Dict = {
   reviewStarsRequired: "Lütfen bir genel puan seçin.",
   fieldRequired: "Zorunlu",
   paymentRefundedNotice: "Ödemeniz bu konaklamaya uygulanamadı, bu nedenle tamamını iade ettik — hiçbir şey rezerve edilmedi. Lütfen bilgilerinizi kontrol edip tekrar deneyin veya yardıma ihtiyacınız olursa bize ulaşın.",
+  paymentHeldNotice: "Ödemeniz alındı ancak bu konaklamayla eşleştirilemedi; bu nedenle rezervasyon yapılmadı. Otel bilgilendirildi ve tutarı iade edecek — otelden haber almadan lütfen yeniden ödeme yapmayın.",
   paymentStartFailed:
     "Güvenli ödemeyi şu anda başlatamadık. Lütfen birazdan tekrar deneyin — sorun devam ederse bizimle iletişime geçin, rezervasyonunuzu tamamlamanıza yardımcı olalım.",
   paymentNotConfigured:

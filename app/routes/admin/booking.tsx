@@ -165,7 +165,9 @@ export async function action({ params, request }: Route.ActionArgs) {
             ? "There's no charge on this booking to refund."
             : r.reason === "invalid_amount"
               ? "Enter an amount above 0 and no more than what was charged."
-              : "The refund couldn't be processed — check your payment provider and try again.",
+              : r.reason === "unsupported"
+                ? "Refunds for 2C2P bookings are issued in the 2C2P merchant portal, not from here."
+                : "The refund couldn't be processed — check your payment provider and try again.",
     };
   }
   return { error: "Unknown action." };
@@ -330,7 +332,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                   ? "bkdPaidWithVoucher"
                   : b.payment.provider === "viva"
                     ? "bkdPaidViaViva"
-                    : "bkdPaidViaStripe",
+                    : b.payment.provider === "2c2p"
+                      ? "bkdPaidVia2c2p"
+                      : "bkdPaidViaStripe",
                 { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) },
               )}
             />
@@ -550,7 +554,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               <>
                 <dt className="text-muted">{t("bkdStatus")}</dt>
                 <dd className={b.payment.refund ? "font-semibold text-ink" : "font-semibold text-[#3f7a52]"}>
-                  {t(b.payment.provider === "viva" ? "bkdPaidViaViva" : "bkdPaidViaStripe", {
+                  {t(b.payment.provider === "viva" ? "bkdPaidViaViva" : b.payment.provider === "2c2p" ? "bkdPaidVia2c2p" : "bkdPaidViaStripe", {
                     amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency),
                   })}
                 </dd>
@@ -574,7 +578,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 )}
                 {b.payment.transactionId && (
                   <>
-                    <dt className="text-muted">{t("bkdVivaTransaction")}</dt>
+                    <dt className="text-muted">{t(b.payment.provider === "2c2p" ? "bkd2c2pTranRef" : "bkdVivaTransaction")}</dt>
                     <dd className="font-mono text-[12px] text-ink">{b.payment.transactionId}</dd>
                   </>
                 )}
@@ -597,16 +601,22 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 <dd className="text-secondary">{t("bkdPayAtHotel")}</dd>
               </>
             )}
-            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaMerchant" : "bkdStripeAccount")}</dt>
+            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaMerchant" : b.payment.provider === "2c2p" ? "bkd2c2pMerchant" : "bkdStripeAccount")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.accountId}</dd>
-            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaOrder" : "bkdCheckoutSession")}</dt>
+            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaOrder" : b.payment.provider === "2c2p" ? "bkd2c2pInvoice" : "bkdCheckoutSession")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.sessionId}</dd>
           </dl>
         ) : (
           <p className="text-[14px] text-muted-2">{t("bkdNoPaymentInfo")}</p>
         )}
 
-        {b.payment?.mode === "payment" && !b.payment.refund && canRefund && (
+        {/* 2C2P has no refund API wired (refunds.server.ts): say where the
+            refund happens instead of offering a button that would refuse. */}
+        {b.payment?.mode === "payment" && b.payment.provider === "2c2p" && !b.payment.refund && (
+          <p className="mt-4 border-t border-divider pt-4 text-[13px] leading-[1.6] text-secondary">{t("bkd2c2pRefundManual")}</p>
+        )}
+
+        {b.payment?.mode === "payment" && b.payment.provider !== "2c2p" && !b.payment.refund && canRefund && (
           <Form
             method="post"
             className="mt-4 border-t border-divider pt-4"

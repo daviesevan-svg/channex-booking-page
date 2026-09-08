@@ -16,6 +16,7 @@ vi.mock("./properties.server", () => ({
 vi.mock("./overrides.server", () => ({
   saveVivaConfig: async (id: string, c: unknown) => void calls.push(`viva:${id}:${c}`),
   saveIyzicoConfig: async (id: string, c: unknown) => void calls.push(`iyzico:${id}:${c}`),
+  saveC2pConfig: async (id: string, c: unknown) => void calls.push(`2c2p:${id}:${c}`),
   clearSettingsFields: async (id: string, f: string[]) => void calls.push(`settings:${id}:${f.join(",")}`),
 }));
 
@@ -29,6 +30,7 @@ describe("deletePropertyForGood", () => {
     // cannot reach them and each needs its own call.
     expect(calls).toContain("viva:p1:null");
     expect(calls).toContain("iyzico:p1:null");
+    expect(calls).toContain("2c2p:p1:null");
   });
 
   it("clears Stripe and the live-traffic switches from settings", async () => {

@@ -449,6 +449,9 @@ const NL: Dict = {
   cancelPartialNoticeUnpaid: "Bij annulering nu wordt {penalty} in rekening gebracht.",
   cancelConfirmPartial: "Je hebt {paid} betaald. Bij annulering nu wordt {refund} terugbetaald. Deze boeking annuleren? Dit kan niet ongedaan worden gemaakt.",
   refundedLabel: "Terugbetaald",
+  refundOwedLabel: "Aan de gast verschuldigde terugbetaling",
+  refundOwedManual2c2p: "Voer deze terugbetaling uit in het 2C2P-merchantportaal — automatische terugbetalingen zijn met deze gateway niet mogelijk.",
+  refundOwedManual: "Nog niet terugbetaald — voer deze terugbetaling uit via de boekingspagina in uw beheer.",
   cancelBandUntil: "Tot {date} brengen wij bij annulering {penalty} in rekening.",
   ackPartial: "Ik begrijp dat bij annulering vanaf nu {penalty} in rekening wordt gebracht.",
   ackPartialCharged: "Ik begrijp dat vandaag {amount} van mijn kaart wordt afgeschreven en dat bij annulering vanaf nu {penalty} in rekening wordt gebracht.",
@@ -495,6 +498,7 @@ const NL: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Verplicht",
   paymentRefundedNotice: "Uw betaling kon niet aan dit verblijf worden gekoppeld, dus we hebben deze volledig terugbetaald — er is niets geboekt. Controleer uw gegevens en probeer het opnieuw, of neem contact met ons op als u hulp nodig heeft.",
+  paymentHeldNotice: "Uw betaling is gelukt, maar kon niet aan dit verblijf worden gekoppeld, dus er is niets geboekt. Het hotel is op de hoogte gebracht en zal het bedrag terugbetalen — betaal niet opnieuw voordat u iets van hen hebt gehoord.",
   paymentStartFailed: "We konden de beveiligde betaling nu niet starten. Probeer het over een moment opnieuw — als het blijft gebeuren, neem contact met ons op en we helpen u de boeking af te ronden.",
   paymentNotConfigured: "Voor dit tarief is een online betaling nodig, maar kaartbetalingen zijn nog niet ingesteld voor deze accommodatie. Neem contact met ons op om de boeking af te ronden.",
 

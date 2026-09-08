@@ -2191,6 +2191,23 @@ const EN: Record<string, string> = {
   payIyzicoCurrency: "iyzico doesn't accept {currency}, which is this property's currency. It takes TRY, USD, EUR, GBP, NOK and CHF.",
   payIyzicoNoGuarantee: "iyzico takes payment; it can't hold a card as a guarantee. Rates that ask for a card without charging it will book without one, as they do with no gateway connected.",
 
+  // -- payments: 2C2P --
+  pay2c2pDesc: "Cards, wallets and local payment methods across South-East Asia, on 2C2P's hosted page.",
+  pay2c2pSetupHelp: "From your 2C2P merchant portal: the Merchant ID and the secret key (2C2P also calls it the SHA key). Nothing needs pasting into 2C2P — both return addresses are sent with every payment. Saving mints a small payment token that is never charged, to prove the credentials and the currency.",
+  pay2c2pMerchantId: "Merchant ID",
+  pay2c2pSecretKey: "Secret key",
+  pay2c2pConnect: "Connect 2C2P",
+  pay2c2pVerifying: "Checking with 2C2P…",
+  pay2c2pSandboxToggle: "These are sandbox credentials",
+  pay2c2pConnectedSandbox: "Connected (sandbox)",
+  pay2c2pNoGuarantee: "2C2P takes payment; it can't hold a card as a guarantee. Rates that ask for a card without charging it will book without one, as they do with no gateway connected.",
+  pay2c2pNoRefunds: "Refunds aren't issued from here yet: cancel a 2C2P booking here as usual, then refund it in the 2C2P merchant portal. Automatic refunds on guest cancellation don't apply to this gateway.",
+  bkdPaidVia2c2p: "Paid {amount} via 2C2P",
+  bkd2c2pTranRef: "2C2P transaction ref",
+  bkd2c2pMerchant: "2C2P merchant",
+  bkd2c2pInvoice: "2C2P invoice number",
+  bkd2c2pRefundManual: "This payment was taken by 2C2P. Refund it in the 2C2P merchant portal — refunds can't be issued from here for this gateway.",
+
 };
 
 export default EN;

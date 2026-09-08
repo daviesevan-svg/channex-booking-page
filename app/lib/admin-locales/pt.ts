@@ -2174,6 +2174,23 @@ const PT: Record<string, string> = {
   payIyzicoCurrency: "A iyzico não aceita {currency}, que é a moeda desta propriedade. Aceita TRY, USD, EUR, GBP, NOK e CHF.",
   payIyzicoNoGuarantee: "A iyzico cobra pagamentos, mas não guarda um cartão como garantia. As tarifas que pedem cartão sem cobrar ficam reservadas sem cartão, como acontece sem nenhum gateway ligado.",
 
+  // -- payments: 2C2P --
+  pay2c2pDesc: "Cartões, carteiras digitais e métodos de pagamento locais no Sudeste Asiático, na página alojada da 2C2P.",
+  pay2c2pSetupHelp: "No seu portal de comerciante 2C2P: o Merchant ID e a chave secreta (a 2C2P também lhe chama SHA key). Não é preciso colar nada na 2C2P — ambos os endereços de retorno seguem em cada pagamento. Ao guardar é criado um pequeno token de pagamento, nunca cobrado, para comprovar as credenciais e a moeda.",
+  pay2c2pMerchantId: "Merchant ID",
+  pay2c2pSecretKey: "Chave secreta",
+  pay2c2pConnect: "Ligar a 2C2P",
+  pay2c2pVerifying: "A verificar na 2C2P…",
+  pay2c2pSandboxToggle: "Estas são credenciais de sandbox",
+  pay2c2pConnectedSandbox: "Ligado (sandbox)",
+  pay2c2pNoGuarantee: "A 2C2P cobra pagamentos, mas não guarda um cartão como garantia. As tarifas que pedem cartão sem cobrar ficam reservadas sem cartão, como acontece sem nenhum gateway ligado.",
+  pay2c2pNoRefunds: "Os reembolsos ainda não são feitos a partir daqui: cancele a reserva 2C2P aqui como habitualmente e reembolse-a depois no portal de comerciante da 2C2P. Os reembolsos automáticos em cancelamentos de hóspedes não se aplicam a este gateway.",
+  bkdPaidVia2c2p: "Pago {amount} via 2C2P",
+  bkd2c2pTranRef: "Referência de transação 2C2P",
+  bkd2c2pMerchant: "Comerciante 2C2P",
+  bkd2c2pInvoice: "Número de fatura 2C2P",
+  bkd2c2pRefundManual: "Este pagamento foi cobrado pela 2C2P. Reembolse-o no portal de comerciante da 2C2P — para este gateway não é possível reembolsar a partir daqui.",
+
 };
 
 export default PT;

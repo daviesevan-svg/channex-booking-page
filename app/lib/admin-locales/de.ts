@@ -2180,6 +2180,23 @@ const DE: Record<string, string> = {
   payIyzicoCurrency: "iyzico akzeptiert {currency} nicht – die Währung dieser Unterkunft. Möglich sind TRY, USD, EUR, GBP, NOK und CHF.",
   payIyzicoNoGuarantee: "iyzico zieht Zahlungen ein, kann aber keine Karte als Garantie hinterlegen. Tarife, die eine Karte ohne Belastung verlangen, werden ohne Karte gebucht – wie ohne verbundenes Zahlungssystem.",
 
+  // -- payments: 2C2P --
+  pay2c2pDesc: "Karten, Wallets und lokale Zahlungsmethoden in Südostasien, auf der Zahlungsseite von 2C2P.",
+  pay2c2pSetupHelp: "Aus Ihrem 2C2P-Händlerportal: die Händler-ID und der Secret-Schlüssel (bei 2C2P auch SHA-Schlüssel genannt). Bei 2C2P muss nichts hinterlegt werden – beide Rückkehradressen werden mit jeder Zahlung übermittelt. Beim Speichern wird ein kleines Zahlungstoken erzeugt, das nie belastet wird, um Zugangsdaten und Währung zu prüfen.",
+  pay2c2pMerchantId: "Händler-ID",
+  pay2c2pSecretKey: "Secret-Schlüssel",
+  pay2c2pConnect: "2C2P verbinden",
+  pay2c2pVerifying: "Wird bei 2C2P geprüft…",
+  pay2c2pSandboxToggle: "Dies sind Sandbox-Zugangsdaten",
+  pay2c2pConnectedSandbox: "Verbunden (Sandbox)",
+  pay2c2pNoGuarantee: "2C2P zieht Zahlungen ein, kann aber keine Karte als Garantie hinterlegen. Raten, die eine Karte ohne Belastung verlangen, werden ohne Karte gebucht – wie ohne verbundenes Gateway.",
+  pay2c2pNoRefunds: "Erstattungen erfolgen noch nicht von hier aus: Stornieren Sie eine 2C2P-Buchung hier wie gewohnt und erstatten Sie sie dann im 2C2P-Händlerportal. Automatische Erstattungen bei Gaststornierung gelten nicht für dieses Gateway.",
+  bkdPaidVia2c2p: "{amount} über 2C2P bezahlt",
+  bkd2c2pTranRef: "2C2P-Transaktionsreferenz",
+  bkd2c2pMerchant: "2C2P-Händler",
+  bkd2c2pInvoice: "2C2P-Rechnungsnummer",
+  bkd2c2pRefundManual: "Diese Zahlung wurde über 2C2P eingezogen. Erstatten Sie sie im 2C2P-Händlerportal – für dieses Gateway sind Erstattungen von hier aus nicht möglich.",
+
 };
 
 export default DE;

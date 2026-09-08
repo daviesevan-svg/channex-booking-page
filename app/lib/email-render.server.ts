@@ -4,6 +4,7 @@
 import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
+import { policyRefundNow } from "./cancel-gate";
 import { cancellationBandMessages, formatCancelDeadline, penaltyText } from "./cancellation";
 import type { EmailDef, LegalLink, SiteSettings } from "./content";
 import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
@@ -224,6 +225,23 @@ function detailsHtml(
   // partial. Says what actually went, not what the policy promised.
   const refundRow = booking.payment?.refund ? ROW(tr.t("refundedLabel"), money(booking.payment.refund.amount)) : "";
 
+  // Cancelled, charged, and nothing sent back yet: tell the HOTEL what the
+  // policy owes the guest and where to issue it. An automatic refund records
+  // payment.refund before this email is composed, so this row only appears when
+  // the refund still has to be made by hand — always for 2C2P, which has no
+  // refund API wired, and for any gateway when automatic refunds are off or
+  // failed. Measured at the moment of cancellation, not at send time, so a
+  // delayed email can't slide the booking into a later, stricter band.
+  const owed =
+    opts.recipient === "host" && booking.lifecycle === "cancelled" && !booking.payment?.refund
+      ? policyRefundNow(booking, booking.cancelledAt ? Date.parse(booking.cancelledAt) : Date.now())
+      : null;
+  const owedBlock =
+    owed && owed.refund > 0
+      ? `<table role="presentation" width="100%" style="margin-top:6px;">${ROW(tr.t("refundOwedLabel"), money(owed.refund), true)}</table>
+         <p style="margin:4px 0 0;color:#9a6a1e;font-size:12px;">${esc(tr.t(booking.payment?.provider === "2c2p" ? "refundOwedManual2c2p" : "refundOwedManual"))}</p>`
+      : "";
+
   const manageBtn =
     opts.recipient === "guest" && opts.manageUrl
       ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;"><tr><td style="border-radius:${opts.brand.radiusButton}px;background:${opts.brand.accent};">
@@ -254,6 +272,7 @@ function detailsHtml(
       ${extraRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${extraRows}</table>` : ""}
       ${pricingRows ? `<table role="presentation" width="100%" style="margin-top:6px;">${pricingRows}</table>` : ""}
       ${refundRow ? `<table role="presentation" width="100%" style="margin-top:6px;">${refundRow}</table>` : ""}
+      ${owedBlock}
       <table role="presentation" width="100%" style="margin-top:6px;border-top:2px solid #e2e2e2;">
         ${ROW(tr.t("total"), money(booking.total), true)}
         ${booking.voucher?.amount ? ROW(tr.t("giftVoucher", { code: booking.voucher.code }), `−${money(booking.voucher.amount)}`) : ""}

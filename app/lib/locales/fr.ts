@@ -449,6 +449,9 @@ const FR: Dict = {
   cancelPartialNoticeUnpaid: "En annulant maintenant, {penalty} est facturé.",
   cancelConfirmPartial: "Vous avez payé {paid}. En annulant maintenant, {refund} vous seront remboursés. Annuler cette réservation ? Cette action est irréversible.",
   refundedLabel: "Remboursé",
+  refundOwedLabel: "Remboursement dû au client",
+  refundOwedManual2c2p: "Effectuez ce remboursement depuis le portail marchand 2C2P — les remboursements automatiques ne sont pas possibles avec cette passerelle.",
+  refundOwedManual: "Pas encore remboursé — effectuez ce remboursement depuis la page de la réservation dans votre admin.",
   cancelBandUntil: "Jusqu’au {date}, nous facturons {penalty} en cas d’annulation.",
   ackPartial: "Je comprends qu’une annulation à partir de maintenant entraîne la facturation de {penalty}.",
   ackPartialCharged: "Je comprends que ma carte sera débitée de {amount} aujourd’hui et qu’une annulation à partir de maintenant entraîne la facturation de {penalty}.",
@@ -495,6 +498,7 @@ const FR: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Obligatoire",
   paymentRefundedNotice: "Votre paiement n'a pas pu être appliqué à ce séjour, nous l'avons donc intégralement remboursé — rien n'a été réservé. Vérifiez vos informations et réessayez, ou contactez-nous si vous avez besoin d'aide.",
+  paymentHeldNotice: "Votre paiement a été accepté, mais il n'a pas pu être rattaché à ce séjour ; rien n'a donc été réservé. L'hôtel a été prévenu et vous remboursera — merci de ne pas payer à nouveau avant d'avoir eu de ses nouvelles.",
   paymentStartFailed: "Nous n’avons pas pu lancer le paiement sécurisé à l’instant. Merci de réessayer dans un moment — si cela persiste, contactez-nous et nous vous aiderons à finaliser votre réservation.",
   paymentNotConfigured: "Ce tarif nécessite un paiement en ligne, mais les paiements par carte ne sont pas encore configurés pour cet établissement. Merci de nous contacter pour finaliser votre réservation.",
 

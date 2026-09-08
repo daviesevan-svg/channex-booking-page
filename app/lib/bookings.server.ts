@@ -30,17 +30,19 @@ export type BookingLifecycle = "active" | "cancelled";
  *  (Stripe only — Viva has no card-on-file mode). */
 export interface PaymentInfo {
   /** "voucher" = the stay was prepaid by redeeming a package voucher. */
-  provider: "stripe" | "viva" | "iyzico" | "voucher";
+  provider: "stripe" | "viva" | "iyzico" | "2c2p" | "voucher";
   mode: "payment" | "setup";
-  /** Stripe: the connected account id. Viva: the merchant id. */
+  /** Stripe: the connected account id. Viva/iyzico/2C2P: the merchant id. */
   accountId: string;
-  /** Stripe: the Checkout Session id. Viva: the payment order code. */
+  /** Stripe: the Checkout Session id. Viva: the payment order code. 2C2P: the
+   *  invoice number (= our reference). */
   sessionId: string;
   /** Amount captured in major units (mode: payment). */
   amount?: number;
   currency?: string;
   paymentIntentId?: string;
-  /** Viva transaction id (uuid) — what refunds are issued against. */
+  /** Viva transaction id (uuid) — what refunds are issued against. iyzico:
+   *  the payment id. 2C2P: tranRef, for their support desk. */
   transactionId?: string;
   /** Guarantee card on file (mode: setup) — for charging a no-show later. */
   customerId?: string;

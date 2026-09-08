@@ -80,6 +80,9 @@ const EN: Dict = {
   cancelPartialNoticeUnpaid: "Cancelling now means {penalty} is charged.",
   cancelConfirmPartial: "You paid {paid}. Cancelling now refunds {refund}. Cancel this booking? This can't be undone.",
   refundedLabel: "Refunded",
+  refundOwedLabel: "Refund owed to guest",
+  refundOwedManual2c2p: "Issue this refund in the 2C2P merchant portal — refunds can't be issued automatically for this gateway.",
+  refundOwedManual: "Not yet refunded — issue this refund from the booking page in your admin.",
   cancelBandUntil: "Until {date}, {penalty} is charged if you cancel.",
   ackPartial: "I understand that cancelling from now on means {penalty} is charged.",
   ackPartialCharged: "I understand my card will be charged {amount} today, and that cancelling from now on means {penalty} is charged.",
@@ -499,6 +502,7 @@ const EN: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Required",
   paymentRefundedNotice: "Your payment couldn't be applied to this stay, so we've refunded it in full — nothing has been booked. Please check your details and try again, or contact us if you need help.",
+  paymentHeldNotice: "Your payment went through, but it couldn't be matched to this stay, so nothing has been booked. The hotel has been notified and will refund it — please don't pay again until you've heard from them.",
   paymentStartFailed: "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking.",
   paymentNotConfigured: "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking.",
 
