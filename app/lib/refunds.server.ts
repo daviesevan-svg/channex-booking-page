@@ -1,5 +1,6 @@
-// Issue a refund for a booking's charge and record it on the booking — Stripe
-// or Viva, depending on which gateway took the payment. Guarded so it only ever
+// Issue a refund for a booking's charge and record it on the booking — Stripe,
+// Viva or iyzico, depending on which gateway took the payment (2C2P: refused,
+// see below). Guarded so it only ever
 // refunds a real charge once; guarantee-card (setup) bookings have no charge to
 // refund.
 //
@@ -16,7 +17,7 @@ import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 
 export type RefundOutcome =
   | { ok: true; booking: BookingRecord; amount: number }
-  | { ok: false; reason: "no_charge" | "already_refunded" | "invalid_amount" | "error" };
+  | { ok: false; reason: "no_charge" | "already_refunded" | "invalid_amount" | "unsupported" | "error" };
 
 /** Refund a booking's charge. `amount` (MAJOR units, the booking's currency)
  *  refunds that much of it; omitted = the whole charge. Idempotent per booking
@@ -31,6 +32,11 @@ export async function refundBookingCharge(
   const p = booking.payment;
   if (!p || p.mode !== "payment") return { ok: false, reason: "no_charge" };
   if (p.refund) return { ok: false, reason: "already_refunded" };
+  // 2C2P refunds live behind a separate API with its own RSA key exchange
+  // (see 2c2p.server.ts). Until that is wired, the hotel refunds in the 2C2P
+  // merchant portal — and every caller (guest self-cancel with autoRefund, the
+  // admin button) already treats a not-ok outcome as "the hotel handles it".
+  if (p.provider === "2c2p") return { ok: false, reason: "unsupported" };
   if (p.provider === "viva" && !p.transactionId) return { ok: false, reason: "no_charge" };
   if (p.provider !== "viva" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
 

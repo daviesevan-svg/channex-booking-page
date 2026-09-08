@@ -7,12 +7,13 @@ import { SavedPill } from "~/components/admin-page-header";
 import { requireAdmin, stampStripeConnectState } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getConfig } from "~/lib/config.server";
-import { getIyzicoConfig, getSettings, getVivaConfig, savePaymentSettings, saveIyzicoConfig, saveVivaConfig } from "~/lib/overrides.server";
+import { getC2pConfig, getIyzicoConfig, getSettings, getVivaConfig, savePaymentSettings, saveC2pConfig, saveIyzicoConfig, saveVivaConfig } from "~/lib/overrides.server";
 import { getProperty } from "~/lib/properties.server";
 import { guestHostForProperty } from "~/lib/partners.server";
 import { deauthorize, oauthAuthorizeUrl, retrieveAccount } from "~/lib/stripe.server";
 import { runVivaDiagnostics, verifyVivaConfig, VIVA_CURRENCIES } from "~/lib/viva.server";
 import { IYZICO_CURRENCIES, verifyIyzicoConfig } from "~/lib/iyzico.server";
+import { verifyC2pConfig } from "~/lib/2c2p.server";
 import { saveVivaDiagnostics } from "~/lib/viva-diag.server";
 import { redirect } from "react-router";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -42,6 +43,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Viva connection status — only non-secret fields ever leave the loader.
   const viva = await getVivaConfig(propertyId);
   const iyzico = await getIyzicoConfig(propertyId);
+  const c2p = await getC2pConfig(propertyId);
   // The URLs the operator pastes into their Viva account. They follow the
   // PROPERTY's guest host (a partner's hotel lives on the partner's domain);
   // /viva/return|failure are root-level and find the checkout by order code,
@@ -75,6 +77,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     // secret key is write-only from here: it goes in, it never comes back out.
     iyzico: iyzico ? { merchantId: iyzico.merchantId ?? "", sandbox: Boolean(iyzico.sandbox) } : null,
     iyzicoCurrencyOk: IYZICO_CURRENCIES.has(currency),
+    c2p: c2p ? { merchantId: c2p.merchantId, sandbox: Boolean(c2p.sandbox) } : null,
   };
 }
 
@@ -109,6 +112,7 @@ export async function action({ request }: Route.ActionArgs) {
     // before Stripe takes over, so charges never silently switch rails.
     if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
     if (await getIyzicoConfig(propertyId)) return { error: "Disconnect iyzico first — a property charges through one gateway." };
+    if (await getC2pConfig(propertyId)) return { error: "Disconnect 2C2P first — a property charges through one gateway." };
     // One-time nonce in the admin session, bound to this property. The raw
     // property id is not secret and must not be OAuth `state` — SameSite=Lax
     // sends the session cookie on the top-level GET callback.
@@ -123,6 +127,7 @@ export async function action({ request }: Route.ActionArgs) {
     const settings = await getSettings(propertyId);
     if (settings.stripeAccountId) return { error: "Disconnect Stripe first — a property charges through one gateway." };
     if (await getIyzicoConfig(propertyId)) return { error: "Disconnect iyzico first — a property charges through one gateway." };
+    if (await getC2pConfig(propertyId)) return { error: "Disconnect 2C2P first — a property charges through one gateway." };
     const currency = (settings.currency || "GBP").toUpperCase();
     if (!VIVA_CURRENCIES.has(currency)) {
       return { error: `Viva Smart Checkout doesn't support ${currency}. Supported: ${[...VIVA_CURRENCIES].join(", ")}.` };
@@ -165,6 +170,7 @@ export async function action({ request }: Route.ActionArgs) {
     const settings = await getSettings(propertyId);
     if (settings.stripeAccountId) return { error: "Disconnect Stripe first — a property charges through one gateway." };
     if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
+    if (await getC2pConfig(propertyId)) return { error: "Disconnect 2C2P first — a property charges through one gateway." };
     const currency = (settings.currency || "GBP").toUpperCase();
     if (!IYZICO_CURRENCIES.has(currency)) {
       return { error: `iyzico doesn't support ${currency}. Supported: ${[...IYZICO_CURRENCIES].join(", ")}.` };
@@ -188,6 +194,34 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === "iyzico-disconnect") {
     await saveIyzicoConfig(propertyId, null);
+    return { ok: true };
+  }
+
+  if (intent === "2c2p-connect") {
+    const settings = await getSettings(propertyId);
+    if (settings.stripeAccountId) return { error: "Disconnect Stripe first — a property charges through one gateway." };
+    if (await getVivaConfig(propertyId)) return { error: "Disconnect Viva first — a property charges through one gateway." };
+    if (await getIyzicoConfig(propertyId)) return { error: "Disconnect iyzico first — a property charges through one gateway." };
+    const currency = (settings.currency || "GBP").toUpperCase();
+    const config = {
+      merchantId: String(form.get("merchantId") ?? "").trim(),
+      secretKey: String(form.get("secretKey") ?? "").trim(),
+      sandbox: form.get("sandbox") === "on",
+    };
+    if (!config.merchantId || !config.secretKey) return { error: "Both the merchant ID and the secret key are required." };
+    // Exercised against 2C2P before anything is stored — a real (never-paid)
+    // payment token in the property's currency, so a wrong secret, a wrong
+    // environment or an unsupported currency fails here and not at a guest's
+    // first checkout. No static currency list: 2C2P's coverage is per merchant
+    // account, and the probe asks the account itself.
+    const problem = await verifyC2pConfig(config, currency);
+    if (problem) return { error: problem };
+    await saveC2pConfig(propertyId, config);
+    return { ok: true };
+  }
+
+  if (intent === "2c2p-disconnect") {
+    await saveC2pConfig(propertyId, null);
     return { ok: true };
   }
   return { error: "Unknown action." };
@@ -291,13 +325,14 @@ function Panel({
   );
 }
 
-type ProviderId = "stripe" | "viva" | "iyzico";
+type ProviderId = "stripe" | "viva" | "iyzico" | "2c2p";
 
 /** Name and blurb per provider. Order is the order of the chooser. */
 const PROVIDERS: { id: ProviderId; name: string; descKey: string }[] = [
   { id: "stripe", name: "Stripe", descKey: "payStripeDesc" },
   { id: "viva", name: "Viva", descKey: "payVivaDesc" },
   { id: "iyzico", name: "iyzico", descKey: "payIyzicoDesc" },
+  { id: "2c2p", name: "2C2P", descKey: "pay2c2pDesc" },
 ];
 
 /** One provider in the chooser. A radio, not a button: a property charges
@@ -358,10 +393,10 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     );
   }
 
-  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk } = loaderData;
+  const { propertyName, platformReady, secretReady, accountId, chargesEnabled, account, notice, viva, vivaUrls, currency, vivaCurrencyOk, iyzico, iyzicoCurrencyOk, c2p } = loaderData;
 
   // Exactly one of these can be set: the action refuses a second gateway.
-  const active: ProviderId | null = accountId ? "stripe" : viva ? "viva" : iyzico ? "iyzico" : null;
+  const active: ProviderId | null = accountId ? "stripe" : viva ? "viva" : iyzico ? "iyzico" : c2p ? "2c2p" : null;
 
   // Which provider's setup form is open. Nothing is open until the operator
   // picks one — three credential forms stacked open was the whole problem.
@@ -372,6 +407,8 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
     stripe: platformReady ? undefined : t("payPlatformMissing"),
     viva: vivaCurrencyOk ? undefined : t("payVivaCurrency", { currency }),
     iyzico: iyzicoCurrencyOk ? undefined : t("payIyzicoCurrency", { currency }),
+    // No static currency gate: the connect probe asks the merchant account.
+    "2c2p": undefined,
   };
 
   const NOTICES: Record<string, { ok: boolean; text: string }> = {
@@ -531,6 +568,26 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
           </Panel>
         )}
 
+        {active === "2c2p" && c2p && (
+          <Panel
+            name="2C2P"
+            desc={t("pay2c2pDesc")}
+            badge={<OkBadge>{c2p.sandbox ? t("pay2c2pConnectedSandbox") : t("payConnected")}</OkBadge>}
+          >
+            <dl className={DETAIL_LIST}>
+              <DetailRow label={t("pay2c2pMerchantId")}>
+                <span className="font-mono text-[12px]">{c2p.merchantId}</span>
+              </DetailRow>
+              <DetailRow label={t("payVivaEnvironment")}>
+                {c2p.sandbox ? t("payIyzicoEnvSandbox") : t("payVivaEnvLive")}
+              </DetailRow>
+            </dl>
+            <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("pay2c2pNoGuarantee")}</p>
+            <Note>{t("pay2c2pNoRefunds")}</Note>
+            <div className="mt-5">{disconnect("2c2p-disconnect")}</div>
+          </Panel>
+        )}
+
         {/* Said once, under the live gateway, instead of once per card that
             can't be used. */}
         {active && <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payOneGateway")}</p>}
@@ -538,7 +595,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
         {/* ---- Nothing connected: pick one, then set that one up ---- */}
         {!active && (
           <>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {PROVIDERS.map((p) => (
                 <ProviderTile
                   key={p.id}
@@ -614,6 +671,31 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                     <div className="mt-1">
                       <button type="submit" disabled={busy || !iyzicoCurrencyOk} className={PRIMARY_BUTTON}>
                         {busy ? t("payIyzicoVerifying") : t("payIyzicoConnect")}
+                      </button>
+                    </div>
+                  </Form>
+                </Panel>
+              </div>
+            )}
+
+            {choice === "2c2p" && (
+              <div className="mt-4">
+                <Panel name="2C2P" desc={t("pay2c2pDesc")}>
+                  <Form method="post" className="mt-4 flex flex-col gap-3 border-t border-divider pt-4">
+                    <input type="hidden" name="intent" value="2c2p-connect" />
+                    <p className="text-[12px] leading-[1.5] text-muted">{t("pay2c2pSetupHelp")}</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <CredField name="merchantId" label={t("pay2c2pMerchantId")} placeholder="JT01" />
+                      <CredField name="secretKey" label={t("pay2c2pSecretKey")} />
+                    </div>
+                    <label className="mt-1 flex items-center gap-2 text-[13px] text-secondary">
+                      <input type="checkbox" name="sandbox" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
+                      {t("pay2c2pSandboxToggle")}
+                    </label>
+                    <p className="text-[12px] leading-[1.5] text-muted">{t("pay2c2pNoRefunds")}</p>
+                    <div className="mt-1">
+                      <button type="submit" disabled={busy} className={PRIMARY_BUTTON}>
+                        {busy ? t("pay2c2pVerifying") : t("pay2c2pConnect")}
                       </button>
                     </div>
                   </Form>

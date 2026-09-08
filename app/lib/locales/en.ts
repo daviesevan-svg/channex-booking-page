@@ -499,6 +499,7 @@ const EN: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Required",
   paymentRefundedNotice: "Your payment couldn't be applied to this stay, so we've refunded it in full — nothing has been booked. Please check your details and try again, or contact us if you need help.",
+  paymentHeldNotice: "Your payment went through, but it couldn't be matched to this stay, so nothing has been booked. The hotel has been notified and will refund it — please don't pay again until you've heard from them.",
   paymentStartFailed: "We couldn’t start the secure payment just now. Please try again in a moment — if it keeps happening, contact us and we’ll help complete your booking.",
   paymentNotConfigured: "This rate needs an online payment, but card payments aren’t set up for this property yet. Please contact us to complete your booking.",
 

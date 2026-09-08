@@ -484,6 +484,7 @@ const PT: Dict = {
   // component, so they showed in English whatever the guest picked)
   fieldRequired: "Obrigatório",
   paymentRefundedNotice: "Não foi possível aplicar o seu pagamento a esta estadia, por isso reembolsámo-lo na totalidade — nada foi reservado. Verifique os seus dados e tente novamente, ou contacte-nos se precisar de ajuda.",
+  paymentHeldNotice: "O seu pagamento foi efetuado, mas não pôde ser associado a esta estadia, por isso nada foi reservado. O hotel foi avisado e irá reembolsá-lo — por favor, não pague de novo até ter notícias do hotel.",
   paymentStartFailed: "Não foi possível iniciar o pagamento seguro neste momento. Tente novamente dentro de instantes — se continuar a acontecer, contacte-nos e ajudamos a concluir a sua reserva.",
   paymentNotConfigured: "Esta tarifa exige pagamento online, mas os pagamentos com cartão ainda não estão configurados para este alojamento. Contacte-nos para concluir a sua reserva.",
 

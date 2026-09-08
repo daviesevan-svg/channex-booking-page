@@ -4,21 +4,23 @@ import { SessionBindError } from "./stripe-session-bind";
 const mocks = vi.hoisted(() => ({
   getBookingByReference: vi.fn(), getPending: vi.fn(), deletePending: vi.fn(),
   getVivaOrder: vi.fn(), finalizeBooking: vi.fn(), finalizeFromStripeSession: vi.fn(),
-  paymentFromIyzico: vi.fn(), paymentFromVivaTransaction: vi.fn(),
-  rejectMismatchedIyzicoPayment: vi.fn(), rejectMismatchedVivaPayment: vi.fn(),
-  retrieveCheckoutForm: vi.fn(), retrieveVivaTransaction: vi.fn(),
+  paymentFromIyzico: vi.fn(), paymentFromVivaTransaction: vi.fn(), paymentFromC2p: vi.fn(),
+  rejectMismatchedIyzicoPayment: vi.fn(), rejectMismatchedVivaPayment: vi.fn(), rejectMismatchedC2pPayment: vi.fn(),
+  retrieveCheckoutForm: vi.fn(), retrieveVivaTransaction: vi.fn(), inquireC2pPayment: vi.fn(),
 }));
 vi.mock("./bookings.server", () => ({ getBookingByReference: mocks.getBookingByReference }));
 vi.mock("./pending-bookings.server", () => ({ getPending: mocks.getPending, deletePending: mocks.deletePending, getVivaOrder: mocks.getVivaOrder }));
-vi.mock("./booking-finalize.server", () => ({ finalizeBooking: mocks.finalizeBooking, finalizeFromStripeSession: mocks.finalizeFromStripeSession, paymentFromIyzico: mocks.paymentFromIyzico, paymentFromVivaTransaction: mocks.paymentFromVivaTransaction, rejectMismatchedIyzicoPayment: mocks.rejectMismatchedIyzicoPayment, rejectMismatchedVivaPayment: mocks.rejectMismatchedVivaPayment }));
+vi.mock("./booking-finalize.server", () => ({ finalizeBooking: mocks.finalizeBooking, finalizeFromStripeSession: mocks.finalizeFromStripeSession, paymentFromIyzico: mocks.paymentFromIyzico, paymentFromVivaTransaction: mocks.paymentFromVivaTransaction, rejectMismatchedIyzicoPayment: mocks.rejectMismatchedIyzicoPayment, rejectMismatchedVivaPayment: mocks.rejectMismatchedVivaPayment, paymentFromC2p: mocks.paymentFromC2p, rejectMismatchedC2pPayment: mocks.rejectMismatchedC2pPayment }));
 vi.mock("./property-scope.server", () => ({ resolveRequestProperty: async () => "p1" }));
-vi.mock("./overrides.server", () => ({ getIyzicoConfig: async () => ({ key: "iyzico" }), getVivaConfig: async () => ({ key: "viva" }) }));
+vi.mock("./overrides.server", () => ({ getIyzicoConfig: async () => ({ key: "iyzico" }), getVivaConfig: async () => ({ key: "viva" }), getC2pConfig: async () => ({ key: "2c2p" }) }));
+vi.mock("./2c2p.server", () => ({ inquireC2pPayment: mocks.inquireC2pPayment }));
 vi.mock("./iyzico.server", () => ({ retrieveCheckoutForm: mocks.retrieveCheckoutForm }));
 vi.mock("./viva.server", () => ({ retrieveVivaTransaction: mocks.retrieveVivaTransaction }));
 
 import { loader as stripe } from "../routes/property/checkout.complete";
 import { loader as iyzico } from "../routes/property/iyzico.return";
 import { loader as viva } from "../routes/viva.return";
+import { loader as c2p } from "../routes/property/2c2p.return";
 
 const pending = { pid: "p1", origin: "https://example.com", returnParams: "checkin=2028-02-01&checkout=2028-02-03&sim=0" };
 const payment = { provider: "viva", amount: 100, currency: "GBP" };
@@ -26,6 +28,8 @@ const providers = [
   { name: "stripe", run: () => stripe({ params: { channelId: "hotel-slug" }, request: new Request("https://example.com/hotel-slug/checkout/complete?ref=REF1&session_id=cs_1&_routes=abc") } as never) },
   { name: "iyzico", run: () => iyzico({ params: { channelId: "hotel-slug" }, request: new Request("https://example.com/hotel-slug/iyzico/return?ref=REF1&token=tok_1") } as never) },
   { name: "viva", run: () => viva({ request: new Request("https://example.com/viva/return?s=123&t=tx_1") } as never) },
+  // 2C2P: nothing but the reference is read from the return — the outcome comes from the inquiry.
+  { name: "2c2p", run: () => c2p({ params: { channelId: "hotel-slug" }, request: new Request("https://example.com/hotel-slug/2c2p/return?ref=REF1&respCode=0000") } as never) },
 ];
 async function redirectOf(run: () => Promise<unknown>) {
   try { await run(); } catch (response) {
@@ -44,6 +48,7 @@ beforeEach(() => {
   mocks.finalizeFromStripeSession.mockResolvedValue({ status: "confirmed" });
   mocks.paymentFromIyzico.mockReturnValue(payment);
   mocks.paymentFromVivaTransaction.mockReturnValue(payment);
+  mocks.paymentFromC2p.mockReturnValue(payment);
 });
 
 for (const provider of providers) {
@@ -64,6 +69,7 @@ for (const provider of providers) {
       expect(mocks.finalizeFromStripeSession).not.toHaveBeenCalled();
       expect(mocks.retrieveCheckoutForm).not.toHaveBeenCalled();
       expect(mocks.retrieveVivaTransaction).not.toHaveBeenCalled();
+      expect(mocks.inquireC2pPayment).not.toHaveBeenCalled();
     });
 
     it("preserves provider verification and finalization when the reference is pending", async () => {
@@ -74,6 +80,7 @@ for (const provider of providers) {
       else {
         expect(mocks.finalizeBooking).toHaveBeenCalledWith(pending, payment, pending.origin);
         if (provider.name === "iyzico") expect(mocks.retrieveCheckoutForm).toHaveBeenCalledWith({ key: "iyzico" }, "tok_1");
+        else if (provider.name === "2c2p") expect(mocks.inquireC2pPayment).toHaveBeenCalledWith({ key: "2c2p" }, "REF1");
         else expect(mocks.retrieveVivaTransaction).toHaveBeenCalledWith({ key: "viva" }, "tx_1");
       }
     });
@@ -90,6 +97,7 @@ for (const provider of providers) {
       mocks.finalizeFromStripeSession.mockResolvedValue(undefined);
       mocks.paymentFromIyzico.mockReturnValue(undefined);
       mocks.paymentFromVivaTransaction.mockReturnValue(undefined);
+      mocks.paymentFromC2p.mockReturnValue(undefined);
       const url = await redirectOf(provider.run);
       expect(url.pathname).toBe("/hotel-slug/checkout");
       expect(url.searchParams.has("sim")).toBe(false);

@@ -36,8 +36,9 @@ import {
   type VivaTransaction,
 } from "./viva.server";
 import { iyzicoPaid, iyzicoRefund, type IyzicoConfig, type IyzicoPaymentResult } from "./iyzico.server";
+import { c2pPaid, inquireC2pPayment, type C2pConfig, type C2pInquiry } from "./2c2p.server";
 import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
-import { getVivaConfig } from "./overrides.server";
+import { getC2pConfig, getVivaConfig } from "./overrides.server";
 import { getVivaOrder } from "./pending-bookings.server";
 import { dispatchWebhook } from "./webhooks.server";
 import { queueFunnelEvent } from "./funnel-analytics.server";
@@ -160,6 +161,96 @@ export async function rejectMismatchedIyzicoPayment(
   console.error(`[finalize] reject ${ref}: ${err.message}`);
 }
 
+/**
+ * A verified 2C2P payment, as a PaymentInfo — or null if it isn't money.
+ *
+ * The inquiry was made by OUR invoice number with the property's own
+ * credentials, so unlike a session id or token off a return URL nothing here
+ * is guest-chosen. The checks are still made: paid (0000 — not pending, not
+ * cancelled, not "no such transaction"), the invoice 2C2P answers about is the
+ * one asked for, and the merchant is this property's. Amount and currency are
+ * checked after this, by finalize's collected-payment assertion.
+ */
+export function paymentFromC2p(c2p: C2pConfig, ref: string, r: C2pInquiry): PaymentInfo | null {
+  if (!c2pPaid(r)) return null;
+  if (r.invoiceNo !== ref) return null;
+  if (r.merchantId && r.merchantId !== c2p.merchantId) return null;
+  return {
+    provider: "2c2p",
+    mode: "payment",
+    accountId: c2p.merchantId,
+    sessionId: ref,
+    transactionId: r.tranRef || r.referenceNo || undefined,
+    amount: r.amount,
+    currency: r.currency,
+    ...(r.accountNo ? { cardLast4: r.accountNo.slice(-4) } : {}),
+  };
+}
+
+/**
+ * A 2C2P charge finalize refused (amount or currency didn't match the
+ * pending). The Stripe/Viva/iyzico twins refund; this gateway has no refund
+ * API wired (2c2p.server.ts), so the money is made VISIBLE instead: the
+ * booking is recorded as failed with the payment attached — it shows in the
+ * admin as "Paid … via 2C2P" with the reason in its error — and the hotel gets
+ * the booking-failed email. The guest is told the payment is held, not
+ * refunded. Best-effort like the other legs: never throws over the bind error.
+ */
+export async function rejectMismatchedC2pPayment(
+  c2p: C2pConfig,
+  payment: PaymentInfo,
+  ref: string,
+  err: SessionBindError,
+): Promise<void> {
+  if (shouldRefundMismatchedSession(err.reason)) {
+    const pending = await getPending(ref);
+    if (pending) {
+      const amount = formatMoney(payment.amount ?? 0, payment.currency || pending.record.currency);
+      const record: BookingRecord = {
+        ...pending.record,
+        status: "failed",
+        inventoryHeld: false,
+        payment,
+        error: `Payment of ${amount} received via 2C2P (merchant ${c2p.merchantId}, invoice ${ref}) did not match the stay (${err.reason}). Nothing was booked — refund it in the 2C2P merchant portal.`,
+      };
+      try {
+        const claim = await claimBooking(pending.pid, record);
+        if (claim.won) await sendBookingFailedEmail(pending.pid, record, pending.origin);
+      } catch (e) {
+        console.error(`[finalize] could not record held 2C2P charge for ${ref}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    console.error(
+      `[finalize] 2C2P charge for ${ref} refused and NOT refunded (no refund API): merchant=${c2p.merchantId} tranRef=${payment.transactionId ?? "?"} amount=${payment.amount} ${payment.currency}`,
+    );
+    await deletePending(ref);
+  }
+  console.error(`[finalize] reject ${ref}: ${err.message}`);
+}
+
+/** Look up the pending booking behind a 2C2P invoice (= our reference), ask
+ *  2C2P whether it was paid, and finalize if so. The server-to-server
+ *  notification's path; the guest's return leg does the same steps inline (see
+ *  routes/property/2c2p.return.tsx). Idempotent, so both firing is safe.
+ *  Returns null when nothing is pending or the payment isn't complete. */
+export async function finalizeFromC2pInvoice(pid: string, ref: string): Promise<BookingRecord | null> {
+  const pending = await getPending(ref);
+  if (!pending || pending.pid !== pid) return null;
+  const c2p = await getC2pConfig(pid);
+  if (!c2p) return null; // disconnected mid-checkout — the operator's problem, don't guess
+  const payment = paymentFromC2p(c2p, ref, await inquireC2pPayment(c2p, ref));
+  if (!payment) return null;
+  let record: BookingRecord;
+  try {
+    record = await finalizeBooking(pending, payment, pending.origin);
+  } catch (e) {
+    if (e instanceof SessionBindError) await rejectMismatchedC2pPayment(c2p, payment, ref, e);
+    throw e;
+  }
+  await deletePending(ref);
+  return record;
+}
+
 /** Look up the pending booking behind a Viva order code, verify the transaction
  *  against Viva's API, and finalize if it's paid. Shared by the return URL and
  *  the webhook — idempotent, so both firing is safe. Returns null when nothing
@@ -257,8 +348,9 @@ export function payloadWithPayment(
   const fmt = (n: number) => formatMoney(n, currency);
   // Append to any note set at prepare time (e.g. the gift-voucher line).
   const lines = typeof base.notes === "string" && base.notes ? [base.notes] : [];
-  const gatewayName = payment?.provider === "viva" ? "Viva" : payment?.provider === "iyzico" ? "iyzico" : "Stripe";
-  if (payment?.provider === "stripe" || payment?.provider === "viva" || payment?.provider === "iyzico") {
+  const GATEWAY_NAMES: Record<string, string> = { stripe: "Stripe", viva: "Viva", iyzico: "iyzico", "2c2p": "2C2P" };
+  const gatewayName = GATEWAY_NAMES[payment?.provider ?? ""] ?? "Stripe";
+  if (payment && payment.provider in GATEWAY_NAMES) {
     if (payment.mode === "payment") {
       lines.push(
         balance > 0
@@ -302,9 +394,16 @@ export function payloadWithPayment(
                 viva_order_code: payment.sessionId,
                 ...(payment.transactionId ? { viva_transaction: payment.transactionId } : {}),
               }
-            : payment
-              ? { provider: payment.provider }
-              : {}),
+            : payment?.provider === "2c2p"
+              ? {
+                  provider: "2c2p",
+                  c2p_merchant: payment.accountId,
+                  c2p_invoice: payment.sessionId,
+                  ...(payment.transactionId ? { c2p_tran_ref: payment.transactionId } : {}),
+                }
+              : payment
+                ? { provider: payment.provider }
+                : {}),
         ...(voucherPaid && booking.voucher
           ? { gift_voucher: { code: booking.voucher.code, amount: voucherPaid } }
           : {}),

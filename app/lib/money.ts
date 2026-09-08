@@ -155,7 +155,7 @@ const norm = (currency: string) => currency.trim().toUpperCase();
 // per-currency default in MONEY_LOCALE, the same formatter formatMoney builds.
 // Charging derives from this so a guest is charged the number they saw.
 const displayDigitsCache = new Map<string, number>();
-function displayFractionDigits(currency: string): number {
+export function displayFractionDigits(currency: string): number {
   const c = norm(currency);
   let digits = displayDigitsCache.get(c);
   if (digits === undefined) {

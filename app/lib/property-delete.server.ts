@@ -11,7 +11,7 @@
 // THEN removes the row. Rooms, texts, images and bookings stay (the same owner
 // can re-add the id and have them back; nobody else can).
 import { revokeAllApiKeys } from "./api-auth.server";
-import { clearSettingsFields, saveIyzicoConfig, saveVivaConfig } from "./overrides.server";
+import { clearSettingsFields, saveC2pConfig, saveIyzicoConfig, saveVivaConfig } from "./overrides.server";
 import { removeProperty } from "./properties.server";
 import { deleteAllWebhooks } from "./webhooks.server";
 
@@ -33,6 +33,7 @@ export async function deletePropertyForGood(id: string): Promise<void> {
   // property the operator believes is gone. That is what happened to iyzico.
   await saveVivaConfig(id, null);
   await saveIyzicoConfig(id, null);
+  await saveC2pConfig(id, null);
   await clearSettingsFields(id, [...CREDENTIAL_FIELDS]);
   await removeProperty(id);
 }

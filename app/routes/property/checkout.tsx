@@ -43,6 +43,7 @@ import { taxConfigFrom } from "~/lib/pricing";
 import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { IYZICO_PLACEHOLDER_IDENTITY, initializeCheckoutForm } from "~/lib/iyzico.server";
+import { createC2pPayment } from "~/lib/2c2p.server";
 import { activeGateway, canSaveCard } from "~/lib/payments.server";
 import { stashPending, stashVivaOrder } from "~/lib/pending-bookings.server";
 import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
@@ -303,9 +304,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       : null,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
-    // Set by the Viva return URL when a charge was refused and refunded; the
-    // only value is a fixed token, never guest text.
-    notice: url.searchParams.get("notice") === "refunded" ? ("refunded" as const) : undefined,
+    // Set by a gateway return URL when a charge was refused: "refunded" (Viva,
+    // iyzico — the money went back) or "held" (2C2P — no refund API, the hotel
+    // refunds by hand). Fixed tokens only, never guest text.
+    notice: (["refunded", "held"] as const).find((n) => n === url.searchParams.get("notice")),
   };
 }
 
@@ -695,6 +697,37 @@ export async function action({ params, request }: Route.ActionArgs) {
       throw redirect(payUrl);
     }
 
+    if (gateway.kind === "2c2p") {
+      // 2C2P's hosted payment page. Both return URLs are given per payment, so
+      // they carry the reference: the guest's return leg and 2C2P's
+      // server-to-server notification each find the pending booking by ?ref=
+      // and re-verify with 2C2P's inquiry API — no order-code mapping.
+      let payUrl: string;
+      try {
+        const init = await createC2pPayment(gateway.c2p, {
+          invoiceNo: reference,
+          description: `${hotelName} - ${roomName} (${dateLabel})`,
+          amount: dueAfterVoucher,
+          currency: stay.currency,
+          frontendReturnUrl: `${url.origin}${base}/2c2p/return?ref=${reference}`,
+          backendReturnUrl: `${url.origin}${base}/2c2p/notify?ref=${reference}`,
+          lang: guestLang,
+          guest: { name: `${g.firstName} ${g.lastName}`.trim(), email: g.email },
+        });
+        payUrl = init.webPaymentUrl;
+      } catch (e) {
+        console.log(
+          `[checkout] 2c2p token failed for pid=${stay.channelId}: ${e instanceof Error ? e.message : e}`,
+        );
+        if (voucherHold) await releaseGiftHold(stay.channelId, voucherHold.code, reference);
+        await releaseCheckoutIntent(stay.channelId, fingerprint);
+        return { paymentError: "failed" as const };
+      }
+      await stashPending(reference, { ...pending, paymentUrl: payUrl });
+      await writeWebCheckoutIdem(stay.channelId, fingerprint, { kind: "payment", reference, url: payUrl });
+      throw redirect(payUrl);
+    }
+
     const account = gateway.account;
     const sessionParams = buildCheckoutSessionParams({
       reference,
@@ -1046,6 +1079,12 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       {notice === "refunded" && (
         <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
           {tr.t("paymentRefundedNotice")}
+        </div>
+      )}
+
+      {notice === "held" && (
+        <div className="mb-6 rounded-card border border-notice-line bg-notice-soft px-4 py-3 text-body text-notice">
+          {tr.t("paymentHeldNotice")}
         </div>
       )}
 

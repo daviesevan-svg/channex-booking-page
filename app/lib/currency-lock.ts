@@ -25,6 +25,7 @@ const LABEL: Record<string, string> = {
   stripe: "Stripe",
   viva: "Viva",
   iyzico: "iyzico",
+  "2c2p": "2C2P",
 };
 
 export function currencyLock(gatewayKind: string | null | undefined): CurrencyLock {

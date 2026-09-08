@@ -520,6 +520,7 @@ const TR: Dict = {
   reviewStarsRequired: "Lütfen bir genel puan seçin.",
   fieldRequired: "Zorunlu",
   paymentRefundedNotice: "Ödemeniz bu konaklamaya uygulanamadı, bu nedenle tamamını iade ettik — hiçbir şey rezerve edilmedi. Lütfen bilgilerinizi kontrol edip tekrar deneyin veya yardıma ihtiyacınız olursa bize ulaşın.",
+  paymentHeldNotice: "Ödemeniz alındı ancak bu konaklamayla eşleştirilemedi; bu nedenle rezervasyon yapılmadı. Otel bilgilendirildi ve tutarı iade edecek — otelden haber almadan lütfen yeniden ödeme yapmayın.",
   paymentStartFailed:
     "Güvenli ödemeyi şu anda başlatamadık. Lütfen birazdan tekrar deneyin — sorun devam ederse bizimle iletişime geçin, rezervasyonunuzu tamamlamanıza yardımcı olalım.",
   paymentNotConfigured:

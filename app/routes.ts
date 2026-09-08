@@ -53,6 +53,10 @@ function guestRoutes(prefix?: string): RouteConfigEntry[] {
     // iyzico posts its callback here; the reference rides in ?ref=, so this
     // needs no static configuration on their side (see the route).
     r("iyzico/return", "routes/property/iyzico.return.tsx", "iyzico-return"),
+    // 2C2P: both URLs are given per payment and carry ?ref=. The guest comes
+    // back on /return; 2C2P's server posts the result to /notify.
+    r("2c2p/return", "routes/property/2c2p.return.tsx", "2c2p-return"),
+    r("2c2p/notify", "routes/property/2c2p.notify.tsx", "2c2p-notify"),
     r("manage", "routes/property/manage.tsx", "manage"),
     // Before manage/:id — same shape, and this one is a fixed word.
     r("manage/verify", "routes/property/manage-verify.tsx", "manage-verify"),
