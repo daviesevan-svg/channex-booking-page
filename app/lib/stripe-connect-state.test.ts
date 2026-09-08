@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  decodeConnectState,
+  encodeConnectState,
   generateConnectNonce,
   matchConnectState,
   parseConnectPending,
+  parseReturnOrigin,
   type StripeConnectPending,
 } from "./stripe-connect-state";
 
@@ -61,5 +64,53 @@ describe("matchConnectState", () => {
     expect(matchConnectState(null, stored.nonce)).toBeNull();
     // One-time: after the caller deletes pending, a replay of the same state fails.
     expect(matchConnectState(null, stored.nonce)).toBeNull();
+  });
+});
+
+describe("partner-host round trip (encode/decode state)", () => {
+  it("a bare nonce is its own state and decodes with no origin", () => {
+    const nonce = generateConnectNonce();
+    expect(encodeConnectState(nonce)).toBe(nonce);
+    expect(decodeConnectState(nonce)).toEqual({ nonce, returnOrigin: null });
+    expect(nonce).not.toContain(".");
+  });
+
+  it("carries a partner admin origin and gives back the bare nonce", () => {
+    const nonce = generateConnectNonce();
+    const state = encodeConnectState(nonce, "https://admin.zimrly.com");
+    expect(state.startsWith(`${nonce}.`)).toBe(true);
+    expect(decodeConnectState(state)).toEqual({ nonce, returnOrigin: "https://admin.zimrly.com" });
+    // The forwarded state must still match the session nonce on the partner host.
+    expect(matchConnectState(pending(VICTIM_UUID, nonce), decodeConnectState(state)!.nonce)).toBe(VICTIM_UUID);
+  });
+
+  it("refuses to encode anything but a bare http(s) origin", () => {
+    const nonce = generateConnectNonce();
+    expect(() => encodeConnectState(nonce, "https://admin.zimrly.com/admin")).toThrow();
+    expect(() => encodeConnectState(nonce, "javascript:alert(1)")).toThrow();
+    expect(() => encodeConnectState(nonce, "https://user:pw@admin.zimrly.com")).toThrow();
+    expect(() => encodeConnectState(nonce, "admin.zimrly.com")).toThrow();
+  });
+
+  it("rejects a tampered or non-origin suffix instead of guessing", () => {
+    const nonce = generateConnectNonce();
+    const b64 = (s: string) => Buffer.from(s).toString("base64url");
+    expect(decodeConnectState(`${nonce}.${b64("https://evil.example/admin/payments/callback")}`)).toBeNull();
+    expect(decodeConnectState(`${nonce}.${b64("https://evil.example/?x=1")}`)).toBeNull();
+    expect(decodeConnectState(`${nonce}.${b64("ftp://evil.example")}`)).toBeNull();
+    expect(decodeConnectState(`${nonce}.${b64("https://a:b@evil.example")}`)).toBeNull();
+    expect(decodeConnectState(`${nonce}.not!base64`)).toBeNull();
+    expect(decodeConnectState(`${nonce}.`)).toBeNull();
+    expect(decodeConnectState(`.${b64("https://evil.example")}`)).toBeNull();
+    expect(decodeConnectState(null)).toBeNull();
+    expect(decodeConnectState("")).toBeNull();
+  });
+
+  it("parseReturnOrigin accepts exactly an origin", () => {
+    expect(parseReturnOrigin("https://admin.zimrly.com")).toBe("https://admin.zimrly.com");
+    expect(parseReturnOrigin("http://localhost:5173")).toBe("http://localhost:5173");
+    expect(parseReturnOrigin("https://admin.zimrly.com/")).toBeNull();
+    expect(parseReturnOrigin("https://admin.zimrly.com:443")).toBeNull();
+    expect(parseReturnOrigin("HTTPS://ADMIN.ZIMRLY.COM")).toBeNull();
   });
 });

@@ -114,6 +114,23 @@ Two consequences worth stating out loud:
 
 ---
 
+### Stripe Connect from a partner admin host (fixed 2026-09-08)
+
+Stripe only redirects a Connect OAuth flow to URIs registered on OUR platform
+account, and a partner's admin domain is never one of them — the first partner
+on their own domain got "Invalid redirect URI" and could not take a live
+payment. The `connect` intent therefore always sends Stripe back to
+`APP_URL/admin/payments/callback` (the registered one) and, off the canonical
+host, carries the admin's origin inside `state`
+(`<nonce>.<base64url(origin)>`, see `stripe-connect-state.ts`). The canonical
+callback forwards Stripe's `code`/`error` plus the bare nonce to that origin's
+callback — but only to a host that serves an admin of ours (own host or a
+registered partner admin host), so it is not an open redirect — and the partner
+host then checks the nonce against its own session exactly as before. The
+callback route sits outside the admin layout so the unauthenticated hop is not
+bounced to login on the canonical host. Nothing to register in Stripe per
+partner.
+
 ## 3. Users, invites, sign-in
 
 - **`canSignIn` becomes host-aware.** On a partner host: superadmins, that

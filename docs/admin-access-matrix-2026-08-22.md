@@ -245,7 +245,7 @@ Gates listed are the **server** checks. “Who” is for a user acting on a prop
 | File | Path | Loader | Action | Who loads | Who mutates |
 |---|---|---|---|---|---|
 | `payments.tsx` | `/admin/payments` | `requireAdmin` + `currentPropertyId` | Same. Intents: `connect`, `disconnect`, `viva-connect`, `viva-disconnect` | Any accessor (area `payments` for teammates) | Same — **no owner gate** |
-| `payments.callback.tsx` | `/admin/payments/callback` | `requireAdmin` + consume nonce + **`canAccess(propertyId)`** + Stripe token exchange | — | Accessor of the stamped property | Writes payment settings |
+| `payments.callback.tsx` | `/admin/payments/callback` | Pre-auth hop first: a `state` carrying a partner admin origin (or one of our own hosts) is forwarded there with Stripe's `code`/`error` and the bare nonce, because Stripe only redirects to the canonical host and the session lives on the partner host (2026-09-08). Then `requireAdmin` + consume nonce + **`canAccess(propertyId)`** + Stripe token exchange. Declared outside the admin layout for the hop. | — | Accessor of the stamped property | Writes payment settings |
 | `general.tsx` | `/admin/general` | `requireAdmin` + `currentPropertyId` | Same: `saveSettings` + `setPropertySlug` (live, currency, slug, …) | Any accessor | Same — **no owner gate** |
 | `property.tsx` | `/admin` | `requireAdmin` + `currentPropertyId` | Same: overrides, images, amenities, `renameProperty` (default lang), **`setPropertyPublic`** | Any accessor | Same — **public is not owner-gated here** |
 | `portal.tsx` | `/admin/portal` | `requireAdmin` + `currentPropertyId` | `savePortalSettings` (cancel, **autoRefund**, modify, copy) | Any accessor | Same — **no owner gate** |

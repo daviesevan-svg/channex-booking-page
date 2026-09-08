@@ -175,6 +175,11 @@ export default [
   route("admin/rooms/:roomId/photo", "routes/admin/room-photo.tsx"),
   route("admin/gallery/photo", "routes/admin/gallery-photo.tsx"),
   route("admin/website/sections/photo", "routes/admin/section-photo.tsx"),
+  // Stripe Connect lands here on the canonical host for EVERY admin, including
+  // one signed in on a partner's admin domain, who has no session on this host.
+  // The route forwards them to their own host's callback before requiring a
+  // session — so it cannot sit under the layout, whose loader requires one.
+  route("admin/payments/callback", "routes/admin/payments.callback.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
@@ -194,7 +199,6 @@ export default [
     route("website-widget", "routes/admin/website-widget.tsx"),
     route("brand-kit", "routes/admin/brand-kit.tsx"),
     route("payments", "routes/admin/payments.tsx"),
-    route("payments/callback", "routes/admin/payments.callback.tsx"),
     route("api-keys", "routes/admin/api-keys.tsx"),
     route("webhooks", "routes/admin/webhooks.tsx"),
     route("portal", "routes/admin/portal.tsx"),
