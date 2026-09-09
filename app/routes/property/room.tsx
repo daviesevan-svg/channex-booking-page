@@ -40,7 +40,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const rawRoom = await getRoom(pid, params.roomId);
   if (!rawRoom) throw new Response("Not Found", { status: 404 });
-  const room = localizeRoom(rawRoom, langFromRequest(request));
+  const room = localizeRoom(rawRoom, langFromRequest(request, settings));
 
   const now = new Date();
   const [calendar, cutoff, rates] = await Promise.all([

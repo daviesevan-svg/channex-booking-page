@@ -10,7 +10,9 @@ import {
   emailDef,
   isDeadlineUnit,
   isFontPairId,
+  isLang,
   isThemeId,
+  langFromRequest,
   normalizeHex,
   pageDef,
   searchDefaults,
@@ -487,6 +489,24 @@ export async function saveBrand(pid: string, form: FormData): Promise<SiteSettin
   return next;
 }
 
+/** The guest default must be one of the languages being saved; anything else
+ *  (a stale option, a hand-edited form) is dropped rather than stored. */
+function cleanDefaultLanguage(v: FormDataEntryValue | null, languages: string[]): string | undefined {
+  const code = String(v ?? "").trim();
+  if (!isLang(code) || code === DEFAULT_LANG) return undefined;
+  return languages.includes(code) ? code : undefined;
+}
+
+/**
+ * The guest language for a request on THIS property — `langFromRequest` with
+ * the property's enabled + default languages. Child loaders run in parallel with
+ * the layout's, so each resolves it for itself; settings come from the
+ * per-request KV cache, so the repeat reads are free.
+ */
+export async function guestLang(request: Request, pid: string): Promise<string> {
+  return langFromRequest(request, await getSettings(pid));
+}
+
 export async function saveSettings(
   pid: string,
   form: FormData,
@@ -502,6 +522,7 @@ export async function saveSettings(
     privacyUrl: safeUrl(form.get("privacyUrl")),
     legalLinks: legalLinksFrom(form),
     languages: form.getAll("languages").map(String),
+    defaultLanguage: cleanDefaultLanguage(form.get("defaultLanguage"), form.getAll("languages").map(String)),
     liveBooking: ownerOnlyValue(existing.liveBooking, form.get("liveBooking") === "on", persistLive),
     singleUnit: form.get("singleUnit") === "on",
     timezone: cleanTimezone(form.get("timezone")),

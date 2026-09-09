@@ -5,7 +5,7 @@ import type { PropertyRef } from "./properties.server";
 import type { CatalogRoom, CatalogRate } from "./catalog.server";
 import type { RoomWithRates, RatePlan } from "./channex/types";
 import type { BookingRecord } from "./bookings.server";
-import type { SiteSettings } from "./content";
+import { guestDefaultLang, type SiteSettings } from "./content";
 import type { Extra } from "./extras";
 import type { PropertyOverrides } from "./overrides.server";
 import { computePricing, type TaxConfig } from "./pricing";
@@ -49,6 +49,7 @@ export function serializePropertyContent(
     checkin_until: settings.checkinUntil ?? null,
     checkout_time: settings.checkoutTime ?? null,
     languages: settings.languages?.length ? settings.languages : ["en"],
+    default_language: guestDefaultLang(settings),
     terms_url: settings.termsUrl ?? null,
     privacy_url: settings.privacyUrl ?? null,
     single_unit: settings.singleUnit === true,

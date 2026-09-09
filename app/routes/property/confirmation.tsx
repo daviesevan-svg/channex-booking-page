@@ -39,7 +39,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // booking couldn't be confirmed (Channex rejected / sold out + auto-refunded).
   const failed = url.searchParams.get("status") === "failed";
   const refunded = url.searchParams.get("refunded") === "1";
-  const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups; links
   // keep params.channelId so the slug stays in the URL.
   const pid = await resolveRequestProperty(params.channelId, request);
@@ -48,6 +47,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // checkout. Entry points that skip ?currency= (the embed widget, go.booking,
   // any shared link) otherwise landed the guest on a GBP-labelled confirmation.
   const settings = await getSettings(pid);
+  const lang = langFromRequest(request, settings);
   const currency = settings.currency || "GBP";
 
   let rooms: { title: string; rate: string; photo?: string }[] = [];

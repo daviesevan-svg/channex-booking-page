@@ -31,7 +31,8 @@ export async function action({ request }: Route.ActionArgs) {
   } catch {
     return apiError(400, "bad_request", "Body must be JSON.");
   }
-  const parsed = validatePropertyPatch(body);
+  const current = await getSettings(auth.pid);
+  const parsed = validatePropertyPatch(body, current);
   if (!parsed.ok) return validationError(parsed.errors);
   const ref = await getProperty(auth.pid);
   if (!ref) return apiError(404, "not_found", "Property not found.");
@@ -40,7 +41,6 @@ export async function action({ request }: Route.ActionArgs) {
   // charged in the GATEWAY's currency, and a property whose currency drifts
   // away from its gateway's charges the guest and then refuses the booking.
   // Checked here rather than in the validator because it needs the gateway.
-  const current = await getSettings(auth.pid);
   const lock = currencyLock((await activeGateway(auth.pid, current))?.kind);
   if (lock.locked && currencyChanged(current.currency, parsed.value.currency)) {
     return validationError({ currency: [currencyLockMessage(lock)] });

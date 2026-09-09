@@ -14,10 +14,10 @@ import { darkAccentTints, darkNeutrals, darkStatus } from "~/lib/theme-neutrals"
 import { parseHex } from "~/lib/color";
 import type { PropertyOutletContext } from "~/lib/booking-context";
 import {
-  DEFAULT_LANG,
   DEFAULT_THEME,
   enabledLanguages,
   fontPair,
+  guestDefaultLang,
   isFontPairId,
   langFromRequest,
   LANG_COOKIE,
@@ -74,8 +74,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Property details and currency come from the admin settings (no live Channex).
   // :channelId may be a slug — resolve it to the real id for data lookups; links
   // keep params.channelId so the slug stays in the URL through the flow.
-  const lang = langFromRequest(request);
-
   // This layout serves BOTH mounts. With a path segment the property comes from
   // it; at the root it comes from the hostname (a hotel's own domain). The
   // hostname is only consulted when there is no segment, so the shared domain
@@ -95,10 +93,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!ref) {
     throw new Response("Property not found", { status: 404 });
   }
-  const [overrides, settings] = await Promise.all([
-    getOverrides(pid, lang),
-    getSettings(pid),
-  ]);
+  // Settings before language: which language this guest gets depends on which
+  // ones the hotel enabled and which it made the default (langFromRequest).
+  const settings = await getSettings(pid);
+  const lang = langFromRequest(request, settings);
+  const overrides = await getOverrides(pid, lang);
   // One read for both bits of website chrome. The "Rooms" nav link only appears
   // when the home page actually has a visible rooms section — a nav link to
   // nothing is worse than no nav link.
@@ -174,6 +173,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     singleUnit: settings.singleUnit ?? false,
     lang,
     languages: enabledLanguages(settings),
+    defaultLang: guestDefaultLang(settings),
+    // For the hreflang alternates below: same origin as the request, so a
+    // hotel's custom domain advertises its own URLs, never the shared one.
+    origin: url.origin,
     websiteRooms: chrome?.hasRoomsSection ?? false,
     // Extra pages the hotel put in the menu, and every extra page's slug — the
     // second is what tells the layout it's ON a website page, so the browsing
@@ -294,28 +297,50 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // page here, just not a hotel's.
   if (loaderData.mode === "passthrough") return <Outlet />;
 
-  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, customCss, themeFont, singleUnit, lang, languages, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, analytics, consent, footerBrand, adminHref } =
+  const { property, currency, hotelName, logoImage, logoHideName, faviconImage, hasVouchers, hasOffers, theme, customColor, customBg, customCss, themeFont, singleUnit, lang, languages, origin, websiteRooms, navPages, pageSlugs, footer, siteStyle: siteStyleId, contact, termsUrl, privacyUrl, legalLinks, analytics, consent, footerBrand, adminHref } =
     loaderData;
   // Resolved once: its token overrides go on the wrapper below, and the same
   // definition is what the provider hands the section renderer.
   const style = siteStyle(siteStyleId ?? undefined);
   const font = fontPair(themeFont);
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { pathname: currentPath } = useLocation();
   const changeLang = (code: string) => {
     // Persist as a cookie so the choice survives navigations that drop ?lang.
-    document.cookie = `${LANG_COOKIE}=${code}; path=/; max-age=${
-      code === DEFAULT_LANG ? 0 : 60 * 60 * 24 * 365
-    }`;
+    // Always written, the default included: with Accept-Language in the chain,
+    // a guest whose browser prefers Dutch and who picks the hotel's German
+    // default would otherwise be handed Dutch again on the next page.
+    document.cookie = `${LANG_COOKIE}=${code}; path=/; max-age=${60 * 60 * 24 * 365}`;
+    // Always in the URL too, for the same reason — root's shouldRevalidate
+    // compares `?lang`, and a switch that leaves it untouched ships no new
+    // dictionary. Only the untouched, never-switched URL stays clean.
     setSearchParams(
       (prev) => {
         const p = new URLSearchParams(prev);
-        if (code === DEFAULT_LANG) p.delete("lang");
-        else p.set("lang", code);
+        p.set("lang", code);
         return p;
       },
       { preventScrollReset: true },
     );
   };
+  // hreflang alternates: one URL per enabled language plus x-default for the
+  // negotiated one. Without these Google indexed the English default only, so a
+  // German hotel's German page never appeared in German search results. React 19
+  // hoists <link> into <head> wherever it is rendered.
+  const alternates =
+    languages.length > 1
+      ? languages.map((code) => {
+          const p = new URLSearchParams(searchParams);
+          p.set("lang", code);
+          return { code, href: `${origin}${currentPath}?${p.toString()}` };
+        })
+      : [];
+  const xDefault = (() => {
+    const p = new URLSearchParams(searchParams);
+    p.delete("lang");
+    const q = p.toString();
+    return `${origin}${currentPath}${q ? `?${q}` : ""}`;
+  })();
   const step = useStep(params.channelId);
   const base = useBase();
   const home = useHome();
@@ -438,6 +463,11 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   }
 
   return (
+    <>
+      {alternates.map((a) => (
+        <link key={a.code} rel="alternate" hrefLang={a.code} href={a.href} />
+      ))}
+      {alternates.length > 0 && <link rel="alternate" hrefLang="x-default" href={xDefault} />}
     <SiteStyleProvider id={siteStyleId ?? undefined}>
     {/* Wraps the whole guest tree — marketing pages, funnel and confirmation
         alike — on the layout mounted at both `/:channelId` and the custom-domain
@@ -666,5 +696,6 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
     </div>
     </TrackingRoot>
     </SiteStyleProvider>
+    </>
   );
 }

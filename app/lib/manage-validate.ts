@@ -369,7 +369,7 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 // ── Property settings (PATCH /v1/manage/property) ───────────────────────────
 
 const PROPERTY_FIELDS = new Set([
-  "currency", "pricing_mode", "languages", "single_unit", "facilities",
+  "currency", "pricing_mode", "languages", "default_language", "single_unit", "facilities",
   "checkin_time", "checkin_until", "checkout_time", "timezone", "booking_cutoff_days", "booking_cutoff_time",
   "address", "portal", "terms_url", "privacy_url", "emails", "website_enabled", "reviews_enabled",
 ]);
@@ -407,7 +407,9 @@ const optCoord = (ctx: Ctx, obj: Record<string, unknown>, field: string, label: 
   return String(n);
 };
 
-export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSettings>> {
+/** `existing` is what is stored now — needed to check `default_language`
+ *  against the enabled languages when the patch does not itself set them. */
+export function validatePropertyPatch(body: unknown, existing: Pick<SiteSettings, "languages"> = {}): Validated<Partial<SiteSettings>> {
   const ctx = new Ctx();
   if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
   rejectUnknown(ctx, body, PROPERTY_FIELDS);
@@ -430,6 +432,20 @@ export function validatePropertyPatch(body: unknown): Validated<Partial<SiteSett
     } else if (!langs.includes(DEFAULT_LANG)) {
       ctx.fail("languages", `Must include the default language ("${DEFAULT_LANG}").`);
     } else out.languages = [...new Set(langs as string[])];
+  }
+  // The guest default: must be enabled — checked against the patch's own
+  // `languages` when it carries one, else against what is stored, so a single
+  // PATCH can switch both and one that only names a default can't name an
+  // unenabled one. null clears it (back to English).
+  const def = body.default_language;
+  if (def !== undefined) {
+    if (def === null) out.defaultLanguage = null as never;
+    else if (typeof def !== "string" || !isLang(def)) ctx.fail("default_language", "Not a supported language code.");
+    else {
+      const enabled = out.languages ?? existing.languages ?? [DEFAULT_LANG];
+      if (def !== DEFAULT_LANG && !enabled.includes(def)) ctx.fail("default_language", "Must be one of the enabled `languages`.");
+      else out.defaultLanguage = def === DEFAULT_LANG ? (null as never) : def;
+    }
   }
   const single = optBool(ctx, body, "single_unit");
   if (single !== undefined) out.singleUnit = single;

@@ -30,7 +30,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const settings = await getSettings(pid);
   if (!settings.websiteEnabled) throw new Response("Not found", { status: 404 });
 
-  const page = await getRenderPage(pid, params.pageSlug, langFromRequest(request));
+  const page = await getRenderPage(pid, params.pageSlug, langFromRequest(request, settings));
   if (!page) throw new Response("Not found", { status: 404 });
 
   // 301: the page has genuinely moved, so let crawlers and browsers cache it.

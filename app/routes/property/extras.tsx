@@ -1,6 +1,5 @@
-import { getPageText } from "~/lib/overrides.server";
+import { getPageText, guestLang } from "~/lib/overrides.server";
 
-import { langFromRequest } from "~/lib/content";
 import { useState } from "react";
 import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 
@@ -64,7 +63,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const state = parseExtrasState(url.searchParams);
-  const text = await getPageText(pid, "extras", langFromRequest(request));
+  const text = await getPageText(pid, "extras", await guestLang(request, pid));
   return {
     // No view event here — extras aren't the product. This step reports the
     // cart only, because the add that got the guest here happened on the room

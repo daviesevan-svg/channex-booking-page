@@ -10,7 +10,6 @@ import type { Route } from "./+types/voucher-book";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { langFromRequest } from "~/lib/content";
 
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { displayStatus, normalizeVoucherCode } from "~/lib/vouchers";
@@ -18,6 +17,7 @@ import { packageCheckinOptions, redeemPackageVoucher } from "~/lib/voucher-redee
 import { getRooms } from "~/lib/catalog.server";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
+import { guestLang } from "~/lib/overrides.server";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
 
@@ -79,7 +79,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     roomId,
     guest,
     origin: new URL(request.url).origin,
-    lang: langFromRequest(request),
+    lang: await guestLang(request, pid),
   });
   if (!result.ok) return { error: result.message };
   if (result.booking.status === "failed") {

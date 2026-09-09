@@ -4,11 +4,11 @@ import { useSearchParams } from "react-router";
 import type { Route } from "./+types/embed.$channelId._index";
 import { CalendarPopover } from "~/components/calendar-popover";
 import { GuestSelector } from "~/components/guest-selector";
-import { DEFAULT_SEARCH, langFromRequest } from "~/lib/content";
+import { DEFAULT_SEARCH } from "~/lib/content";
 import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
 import { readOccupancy, writeOccupancy } from "~/lib/occupancy";
-import { getSearchContent } from "~/lib/overrides.server";
+import { getSearchContent, guestLang } from "~/lib/overrides.server";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useDateRange } from "~/lib/use-date-range";
 
@@ -19,7 +19,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // original segment as `channelId` so the deep-link stays on the slug.
   // Host-disciplined for the same reason as the layout loader above.
   const pid = await resolveRequestProperty(params.channelId, request);
-  const content = await getSearchContent(pid, langFromRequest(request));
+  const content = await getSearchContent(pid, await guestLang(request, pid));
   return { channelId: params.channelId, searchButton: content.searchButton || DEFAULT_SEARCH.searchButton };
 }
 

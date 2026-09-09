@@ -13,7 +13,7 @@ import type { BookingRecord } from "./bookings.server";
 import type { CatalogRate, CatalogRoom } from "./catalog.server";
 import type { Extra } from "./extras";
 import type { Promotion } from "./promotions";
-import type { SiteSettings } from "./content";
+import { guestDefaultLang, type SiteSettings } from "./content";
 import type { PropertyRef } from "./properties.server";
 
 export function serializeManageRoom(r: CatalogRoom) {
@@ -108,6 +108,7 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
     currency: s.currency ?? "GBP",
     pricing_mode: s.pricingMode ?? null,
     languages: s.languages ?? [],
+    default_language: guestDefaultLang(s),
     single_unit: s.singleUnit ?? false,
     facilities: s.facilities ?? [],
     checkin_time: s.checkinTime ?? null,
