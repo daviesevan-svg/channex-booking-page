@@ -24,9 +24,9 @@ import { getRenderPage } from "~/lib/site.server";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const lang = langFromRequest(request);
   const pid = await resolveRequestProperty(params.channelId, request);
   const settings = await getSettings(pid);
+  const lang = langFromRequest(request, settings);
   if (!settings.websiteEnabled) throw new Response("Not found", { status: 404 });
 
   const page = await getRenderPage(pid, params.pageSlug, lang);

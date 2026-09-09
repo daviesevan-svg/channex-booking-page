@@ -33,7 +33,6 @@ import { cx } from "~/lib/site-style";
 import { navCriticalPath, navStage } from "~/lib/nav-tags";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for data lookups.
   //
   // This route is BOTH "/spilmanhotel" and "/". At the root with a hostname that
@@ -59,11 +58,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // fetched as the guest gets there (see calendar-window.ts).
   const now = new Date();
   const today = format(now, "yyyy-MM-dd");
-  const [content, cutoffEarly, settings] = await Promise.all([
-    getSearchContent(pid, lang),
-    getBookingCutoff(pid),
-    getSettings(pid),
-  ]);
+  const [cutoffEarly, settings] = await Promise.all([getBookingCutoff(pid), getSettings(pid)]);
+  const lang = langFromRequest(request, settings);
+  const content = await getSearchContent(pid, lang);
   // Earliest arrival the property currently accepts (lead-time cutoff), so the
   // calendar can grey out dates that are too last-minute to book.
   const earliestCheckin = earliestCheckinDate(cutoffEarly, now);

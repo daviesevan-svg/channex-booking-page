@@ -37,7 +37,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     await requireDatedStay(params.channelId, request);
   const { adults, childrenAge } = occ;
 
-  const lang = langFromRequest(request);
+  const lang = langFromRequest(request, settings);
   const rooms = await getCatalogRooms(
     pid,
     {

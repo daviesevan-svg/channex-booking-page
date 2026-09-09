@@ -10,7 +10,7 @@ import { currentPropertyId, getProperty, isOwnerOrSuper, setPropertySlug } from 
 import { guestHostForProperty } from "~/lib/partners.server";
 import { getConfig } from "~/lib/config.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
-import { DEFAULT_LANG, LANGUAGES } from "~/lib/content";
+import { DEFAULT_LANG, enabledLanguages, guestDefaultLang, LANGUAGES, langLabel } from "~/lib/content";
 import { getRates, pricingModeOf } from "~/lib/catalog.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -393,6 +393,10 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           <p className="mb-3 text-[13px] text-muted">{t("genLanguagesHint")}</p>
           <div className="flex flex-wrap gap-2.5">
             {LANGUAGES.map((l) => {
+              // English is the BASE language — where the copy is written and what
+              // every untranslated field falls back to — so it cannot be switched
+              // off. It is no longer the forced guest default: that is the
+              // select below.
               const isDefault = l.code === DEFAULT_LANG;
               const checked = isDefault || (settings.languages ?? []).includes(l.code);
               return (
@@ -409,10 +413,31 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
                   />
                   <span aria-hidden="true">{l.flag}</span>
                   {l.label}
-                  {isDefault && <span className="text-[11px] text-faint">{t("genDefault")}</span>}
+                  {isDefault && <span className="text-[11px] text-faint">{t("genBaseLanguage")}</span>}
                 </label>
               );
             })}
+          </div>
+          {/* The guest default. Only the enabled languages are offered; the
+              action drops anything else, so an unticked language can't be the
+              default. The list is live: tick Dutch and it appears at once. */}
+          <div className="mt-4 max-w-md">
+            <label className="mb-1 block text-[13px] font-medium" htmlFor="defaultLanguage">
+              {t("genDefaultLanguage")}
+            </label>
+            <select
+              id="defaultLanguage"
+              name="defaultLanguage"
+              defaultValue={guestDefaultLang(settings)}
+              className={FIELD_INPUT}
+            >
+              {enabledLanguages(settings).map((code) => (
+                <option key={code} value={code}>
+                  {langLabel(code)}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[12px] leading-[1.5] text-muted">{t("genDefaultLanguageHint")}</p>
           </div>
         </section>
 

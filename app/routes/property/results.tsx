@@ -50,7 +50,7 @@ import { requireDatedStay } from "~/lib/dated-stay.server";
 export async function loader({ params, request }: Route.LoaderArgs) {
   const { pid, base, url, checkin, checkout, occ, currency, nights, settings } =
     await requireDatedStay(params.channelId, request);
-  const lang = langFromRequest(request);
+  const lang = langFromRequest(request, settings);
 
   // One ARI read for the page: the room list here and every cart occupancy
   // group below price the same stay, so they share this slice.

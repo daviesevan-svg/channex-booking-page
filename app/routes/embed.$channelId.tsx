@@ -15,7 +15,6 @@ import { resolveRequestProperty } from "~/lib/property-scope.server";
 // header/footer/stepper. Deliberately does NOT read ARI: it depends only on the
 // (rarely-changing) theme, so the response is cacheable and cheap per impression.
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const lang = langFromRequest(request);
   // :channelId may be a slug — resolve to the real id for the theme lookup.
   // Host-disciplined like every slug mount (property-scope.server.ts): on our
   // shared domain any property embeds; on a white-label partner's guest host
@@ -23,10 +22,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // widget snippet serves from the property's own brand host, so a foreign
   // tenant's widget must not render under it.
   const pid = await resolveRequestProperty(params.channelId, request);
-  const [overrides, settings] = await Promise.all([
-    getOverrides(pid, lang),
-    getSettings(pid),
-  ]);
+  const settings = await getSettings(pid);
+  const lang = langFromRequest(request, settings);
+  const overrides = await getOverrides(pid, lang);
   return {
     currency: settings.currency || "GBP",
     hotelName: overrides.hotelName || "Your hotel",

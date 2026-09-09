@@ -72,7 +72,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         : null,
     // In the guest's own language, falling back to the hotel's default-language
     // text (and, if they never wrote one, to our built-in string at render).
-    afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request)),
+    afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request, settings)),
   };
 }
 

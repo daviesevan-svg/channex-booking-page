@@ -108,7 +108,8 @@ export const manageSchemas = {
     properties: {
       currency: { type: "string", pattern: "^[A-Z]{3}$" },
       pricing_mode: { type: "string", enum: ["per_room", "per_person"] },
-      languages: { type: "array", items: { type: "string" }, description: "Must include the default language." },
+      languages: { type: "array", items: { type: "string" }, description: "Enabled guest languages. Must include \"en\", the base language the copy is written in." },
+      default_language: { type: "string", nullable: true, description: "The language guests are served when neither ?lang, their cookie nor Accept-Language decides. One of `languages`; null resets to en." },
       single_unit: { type: "boolean" },
       website_enabled: { type: "boolean", description: "Content-safe website-layer toggle." },
       reviews_enabled: { type: "boolean", description: "Guest reviews on/off (default true). Off: no review-request emails, no website Reviews section, guest review links 404. Existing reviews are kept." },

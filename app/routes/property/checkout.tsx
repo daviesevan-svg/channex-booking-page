@@ -153,7 +153,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     await requireDatedStay(params.channelId, request);
   const stay: Stay = { channelId: pid, checkin, checkout, currency, occ };
 
-  const lang = langFromRequest(request);
+  const lang = langFromRequest(request, settings);
   const { rooms, lines } = await resolveStayCart(stay, url);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
@@ -547,7 +547,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     // Written by the consent banner only once the guest allowed advertising,
     // so its mere presence is the permission — nothing to check again here.
     attribution: attributionFromCookies(request.headers.get("Cookie")),
-    lang: langFromRequest(request),
+    lang: langFromRequest(request, settings),
     live,
     account: settings.stripeAccountId ?? "",
     origin: url.origin,

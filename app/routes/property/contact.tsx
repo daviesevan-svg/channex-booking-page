@@ -10,10 +10,9 @@ import { redirect } from "react-router";
 
 import type { Route } from "./+types/contact";
 import { sendContactEmail } from "~/lib/email.server";
-import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { getOverrides, getSettings, guestLang } from "~/lib/overrides.server";
 
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
-import { langFromRequest } from "~/lib/content";
 import { homePath } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 
@@ -52,7 +51,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const [settings, overrides] = await Promise.all([
     getSettings(pid),
-    getOverrides(pid, langFromRequest(request)),
+    guestLang(request, pid).then((lang) => getOverrides(pid, lang)),
   ]);
   const to = settings.hostNotifyEmail || settings.emailReplyTo || overrides.email;
   // No address to send to: say so rather than showing a thank-you for a message

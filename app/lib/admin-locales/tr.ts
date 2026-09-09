@@ -727,9 +727,10 @@ const TR: Record<string, string> = {
   genOwnLinkModeFooter: "Alt bilgi bağlantısı",
   genOwnLinkModeAccept: "Misafir kabul etmeli",
   genLanguages: "Diller",
-  genLanguagesHint:
-    "Misafirlerin geçiş yapabileceği dilleri etkinleştirin. Her birini Sayfalar/Odalar editörlerinde dil seçicisini kullanarak çevirin. İngilizce her zaman kullanılabilir.",
-  genDefault: "varsayılan",
+  genLanguagesHint: "Misafirlerin aralarında geçiş yapabileceği dilleri etkinleştirin. Her birini Sayfalar/Odalar düzenleyicilerinde dil seçiciyle çevirin. İngilizce, metinlerinizin yazıldığı temel dildir; bu nedenle her zaman kullanılabilir.",
+  genBaseLanguage: "temel dil",
+  genDefaultLanguage: "Varsayılan dil",
+  genDefaultLanguageHint: "Tarayıcıları etkin başka bir dili tercih etmiyorsa veya kendileri bir dil seçmemişse misafirler bu dili görür. Google Hotel Center açılış URL\u2019nize ziyaretçi dili yer tutucusunu ekleyin (örneğin lang=(USER-LANGUAGE)); Google ziyaretçileri kendi dillerinde gelir.",
   genPropertyType: "Tesis türü",
   genPropertyTypeHintPrefix: "Daire, stüdyo veya",
   genSingleBookableUnit: "tek bir rezerve edilebilir ünite",

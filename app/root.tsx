@@ -11,6 +11,8 @@ import {
 
 import type { Route } from "./+types/root";
 import { langFromRequest } from "./lib/content";
+import { getSettings } from "./lib/overrides.server";
+import { resolveRequestPropertyOrNull } from "./lib/property-scope.server";
 import { DefaultFontFaces } from "./components/font-faces";
 import { adminLangFromRequest } from "./lib/admin-i18n";
 import { registerAdminDict } from "./lib/admin-dict-registry";
@@ -44,7 +46,7 @@ export function shouldRevalidate({
   return currentUrl.searchParams.get("lang") !== nextUrl.searchParams.get("lang");
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, params }: Route.LoaderArgs) {
   // A white-label partner's hosts (admin door and guest booking domain) carry
   // the partner's favicon on every page. Only looked up off our own hosts, so
   // the shared domain pays nothing; a hotel's custom domain pays two KV reads
@@ -67,7 +69,19 @@ export async function loader({ request }: Route.LoaderArgs) {
     const adminLang = adminLangFromRequest(request);
     return { lang: adminLang, dict: null, adminDict: adminDictFor(adminLang), favicon };
   }
-  const lang = langFromRequest(request);
+  // The guest language depends on the PROPERTY (its enabled languages and its
+  // default), so this loader resolves the property the same way the guest
+  // layout does — segment first, hostname otherwise — and reads its settings
+  // through the per-request KV cache the layout's own read then hits. Any
+  // failure (an unknown slug, a page that belongs to no property) means "no
+  // settings", never an error thrown from root: the layout owns the 404.
+  const settings = await resolveRequestPropertyOrNull(
+    (params as { channelId?: string }).channelId,
+    request,
+  )
+    .then((pid) => (pid ? getSettings(pid) : undefined))
+    .catch(() => undefined);
+  const lang = langFromRequest(request, settings);
   return { lang, dict: guestDictFor(lang), adminDict: null, favicon };
 }
 

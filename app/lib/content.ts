@@ -388,7 +388,13 @@ export interface SiteSettings {
    *  channel connection, so a per-rate mix would advertise a mapping it can't
    *  fulfil. Unset = derived from legacy per-rate flags (see pricingModeOf). */
   pricingMode?: PricingMode;
-  languages?: string[]; // enabled languages (always includes the default)
+  languages?: string[]; // enabled languages (always includes the base language)
+  /** The language guests are served when nothing else decides it — no `?lang`,
+   *  no cookie, and no Accept-Language match among the enabled languages. One
+   *  of the enabled languages; unset = English. Distinct from the BASE language
+   *  (DEFAULT_LANG), which is where a hotel's copy is written and what every
+   *  untranslated field falls back to — that stays English regardless. */
+  defaultLanguage?: string;
   /** When true, checkout pushes real bookings to Channex; when false it simulates.
    *  Unset (never saved) falls back to the ALLOW_LIVE_BOOKING env var. */
   liveBooking?: boolean;
@@ -546,27 +552,78 @@ export const LANGUAGES = [
   { code: "tr", label: "Türkçe", flag: "🇹🇷" },
 ] as const;
 
+/**
+ * The BASE language: where a hotel's copy is written, the admin editor's first
+ * tab, and the per-field fallback for anything untranslated. This is not the
+ * language guests are served by default — that is `settings.defaultLanguage`
+ * (see `guestDefaultLang`), which a hotel picks from its enabled languages.
+ * Until 2026-09-09 the two were the same constant, so a German hotel with
+ * German guests greeted every one of them in English.
+ */
 export const DEFAULT_LANG = "en";
 
 export function isLang(code: string): boolean {
   return LANGUAGES.some((l) => l.code === code);
 }
 
-/** Validate a language code, falling back to the default. */
+/** Validate a language code, falling back to the base language. */
 export function pickLang(code: string): string {
   return isLang(code) ? code : DEFAULT_LANG;
 }
 
 export const LANG_COOKIE = "ibe_lang";
 
-/** Guest language: `?lang` wins, then the sticky `ibe_lang` cookie, then default. */
-export function langFromRequest(request: Request): string {
+/** The guest-facing default: the hotel's choice if it is enabled, else English. */
+export function guestDefaultLang(settings: Pick<SiteSettings, "languages" | "defaultLanguage">): string {
+  const want = settings.defaultLanguage ?? "";
+  return isLang(want) && enabledLanguages(settings).includes(want) ? want : DEFAULT_LANG;
+}
+
+/**
+ * Best match for an Accept-Language header among `candidates` (enabled
+ * languages, in the hotel's order). Honours q-weights; `de-AT` matches `de`.
+ * Undefined when nothing the browser lists is on offer — the caller's default
+ * takes over, never a guess.
+ */
+export function negotiateLang(accept: string | null | undefined, candidates: readonly string[]): string | undefined {
+  if (!accept) return undefined;
+  const ranked = accept
+    .split(",")
+    .map((part, i) => {
+      const [tag, ...params] = part.trim().split(";");
+      const q = params.map((x) => x.trim()).find((x) => x.startsWith("q="));
+      const weight = q ? Number(q.slice(2)) : 1;
+      return { lang: tag.trim().toLowerCase().split("-")[0], weight: Number.isFinite(weight) ? weight : 0, i };
+    })
+    .filter((x) => x.lang && x.lang !== "*" && x.weight > 0)
+    .sort((a, b) => b.weight - a.weight || a.i - b.i);
+  return ranked.find((x) => candidates.includes(x.lang))?.lang;
+}
+
+/**
+ * Guest language: `?lang` wins, then the sticky `ibe_lang` cookie, then the
+ * browser's Accept-Language matched against the hotel's enabled languages, then
+ * the hotel's default language.
+ *
+ * With `settings`, only the hotel's ENABLED languages are honoured — a `?lang=es`
+ * link to a hotel that never enabled Spanish used to serve Spanish UI labels
+ * over English copy. Without settings (a page that belongs to no property)
+ * every supported language is a candidate and the default is English.
+ */
+export function langFromRequest(
+  request: Request,
+  settings?: Pick<SiteSettings, "languages" | "defaultLanguage">,
+): string {
+  const candidates = settings ? enabledLanguages(settings) : LANGUAGES.map((l) => l.code);
+  const ok = (code: string | null | undefined): code is string => !!code && candidates.includes(code);
   const param = new URL(request.url).searchParams.get("lang");
-  if (param && isLang(param)) return param;
+  if (ok(param)) return param;
   const cookie = request.headers.get("Cookie") ?? "";
   const m = cookie.match(/(?:^|;\s*)ibe_lang=([^;]+)/);
-  if (m && isLang(m[1])) return m[1];
-  return DEFAULT_LANG;
+  if (m && ok(m[1])) return m[1];
+  const negotiated = negotiateLang(request.headers.get("Accept-Language"), candidates);
+  if (negotiated) return negotiated;
+  return settings ? guestDefaultLang(settings) : DEFAULT_LANG;
 }
 
 /** Admin language: `?lang` only (independent of the guest cookie). */
@@ -582,10 +639,10 @@ export function langFlag(code: string): string {
   return LANGUAGES.find((l) => l.code === code)?.flag ?? "🌐";
 }
 
-/** Enabled languages from settings — always includes the default, only valid codes. */
-export function enabledLanguages(settings: SiteSettings): string[] {
-  const set = new Set([DEFAULT_LANG, ...(settings.languages ?? []).filter(isLang)]);
-  // preserve LANGUAGES order
+/** Enabled languages from settings — always includes the base language and the
+ *  hotel's default language, only valid codes, in LANGUAGES order. */
+export function enabledLanguages(settings: Pick<SiteSettings, "languages" | "defaultLanguage">): string[] {
+  const set = new Set([DEFAULT_LANG, ...(settings.languages ?? []), settings.defaultLanguage ?? ""].filter(isLang));
   return LANGUAGES.map((l) => l.code).filter((c) => set.has(c));
 }
 
