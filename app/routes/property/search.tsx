@@ -355,7 +355,28 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
       )}
 
       {heroBooking(
-        <>
+        <form
+          method="get"
+          action={`${base}/rooms`}
+          onSubmit={(e) => {
+            // Hydrated: the client-side search (dates check, promo trim, lang).
+            // Before hydration this handler doesn't exist and the browser GETs
+            // the action with the hidden fields below — the server-rendered
+            // stay, which is all the guest could have had at that point.
+            e.preventDefault();
+            searchRooms();
+          }}
+        >
+          {dates.checkinIso && <input type="hidden" name="checkin" value={dates.checkinIso} />}
+          {dates.checkoutIso && <input type="hidden" name="checkout" value={dates.checkoutIso} />}
+          <input type="hidden" name="currency" value={currency} />
+          <input type="hidden" name="adults" value={occupancy.adults} />
+          {occupancy.childrenAge.length > 0 && (
+            <input type="hidden" name="childrenAge" value={occupancy.childrenAge.join(",")} />
+          )}
+          {searchParams.get("lang") && (
+            <input type="hidden" name="lang" value={searchParams.get("lang") ?? ""} />
+          )}
       {/* search card — `#book` is the anchor the room cards jump to */}
       <div className={cx("relative max-w-[920px]", s.headingAlign && "mx-auto")} id="book">
         <div
@@ -398,8 +419,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               skips this stage entirely; the tag is here for the case where the
               point-of-sale URL points at the home page instead. */}
           <button
-            type="button"
-            onClick={searchRooms}
+            type="submit"
             disabled={searching}
             {...navCriticalPath()}
             className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:opacity-70"
@@ -422,17 +442,15 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         </button>
         {showPromo && (
           <input
+            name="promo"
             value={promoCode}
             onChange={(e) => setPromoCode(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") searchRooms();
-            }}
             placeholder={promoPlaceholder}
             className="mt-2 block w-[240px] max-w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
           />
         )}
       </div>
-        </>,
+        </form>,
       )}
     </div>
   );
