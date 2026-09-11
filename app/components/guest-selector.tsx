@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
+import { useDismiss } from "~/lib/use-dismiss";
 
 const MAX_ADULTS = 12;
 const MAX_CHILDREN = 8;
@@ -56,6 +57,11 @@ export function GuestSelector({
   const [open, setOpen] = useState(false);
   const tr = useT();
   const { adults, childrenAge } = value;
+  // The wrapper holds the trigger AND the panel, so a click on the trigger
+  // while open is a plain toggle (not dismiss-then-reopen), and a click
+  // anywhere else — including "Search rooms" — closes without being swallowed.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  useDismiss(wrapperRef, () => setOpen(false));
   const summary =
     tr.p("adult", adults) +
     (childrenAge.length ? `, ${tr.p("child", childrenAge.length)}` : "");
@@ -76,7 +82,7 @@ export function GuestSelector({
   }
 
   return (
-    <div className="relative min-w-[160px] flex-1">
+    <div ref={wrapperRef} className="relative min-w-[160px] flex-1">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -88,7 +94,6 @@ export function GuestSelector({
 
       {open && (
         <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(360px,92vw)] rounded-panel border border-line bg-surface p-5"
             style={{ boxShadow: "var(--shadow-popover)" }}

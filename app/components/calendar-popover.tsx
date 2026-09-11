@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { CalendarLegend, CalendarMonths, CalendarNav } from "~/components/calendar-body";
 import { useT } from "~/lib/i18n";
 import type { DateRangeState } from "~/lib/use-date-range";
+import { useDismiss } from "~/lib/use-dismiss";
 
 export function CalendarPopover({
   state,
@@ -14,6 +15,9 @@ export function CalendarPopover({
   const tr = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [maxH, setMaxH] = useState<number | undefined>(undefined);
+  // Outside click / Escape closes — WITHOUT a backdrop, so the click that
+  // closes the calendar still reaches the "Search rooms" button under it.
+  useDismiss(ref, onClose);
 
   // Render at full size, but cap the popover to the space available below its
   // trigger (it may sit low, e.g. inside a sticky bar the page can't scroll) and
@@ -46,7 +50,6 @@ export function CalendarPopover({
 
   return (
     <>
-      <div className="fixed inset-0 z-30" onClick={onClose} />
       <div
         ref={ref}
         className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-panel border border-line bg-surface p-[22px_22px_18px]"
