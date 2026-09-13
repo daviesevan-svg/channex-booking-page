@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import {
   Link,
   Outlet,
+  redirect,
   useLocation,
   useNavigation,
   useSearchParams,
@@ -41,7 +42,8 @@ import { isSiteStyleId, siteStyle } from "~/lib/site-style";
 import type { ResolvedFooter } from "~/lib/footer";
 import { getProperty } from "~/lib/properties.server";
 import { DEFAULT_BRAND, getPartner } from "~/lib/partners.server";
-import { propertyIdForHost } from "~/lib/domains.server";
+import { liveCustomOrigin, propertyIdForHost } from "~/lib/domains.server";
+import { customDomainRedirect } from "~/lib/domains";
 import { makeTranslator, type Translator } from "~/lib/i18n";
 import { basePath, useBase, useHome } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
@@ -96,6 +98,21 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Settings before language: which language this guest gets depends on which
   // ones the hotel enabled and which it made the default (langFromRequest).
   const settings = await getSettings(pid);
+  // A property with its own live domain is served THERE. Reached by the shared
+  // address — Google's "Official site" link, an old email, the embed widget —
+  // the guest moves to the same page on the hotel's domain, params intact, so
+  // nothing published elsewhere needs changing when a domain goes live. A
+  // custom-domain request has no segment, so this never fires there.
+  // Temporary, not permanent: a hotel that drops its domain later must get the
+  // shared address back without every browser remembering the old answer.
+  if (params.channelId) {
+    const to = customDomainRedirect(
+      request.url,
+      params.channelId,
+      await liveCustomOrigin(pid, settings.websiteDomain),
+    );
+    if (to) throw redirect(to, 302);
+  }
   const lang = langFromRequest(request, settings);
   const overrides = await getOverrides(pid, lang);
   // One read for both bits of website chrome. The "Rooms" nav link only appears

@@ -608,6 +608,15 @@ That second piece is the cost: roughly 40 inline `` `/${params.channelId}/…` `
 links across `app/routes/property/`. Purely mechanical, but wide — worth
 isolating on its own branch.
 
+3. **The shared address redirects once the domain is live.** Google's
+   "Official site" link, confirmation emails and the embed widget all
+   deep-link `book.roompanda.com/<id>/rooms?…`; the guest layout sends those
+   to `<domain>/rooms?…` (302, params intact) when the hostname index says the
+   property serves there — `customDomainRedirect` + `liveCustomOrigin`. The
+   `/go/booking` landing route lands there directly. Nothing published outside
+   has to change when a domain goes live; a `?preview=` request stays put so the
+   admin design preview can still frame it.
+
 *(Rejected: rewriting the URL at the edge. The server would see `/spilman/rooms`
 while the browser has `/rooms`, so client-side navigation would match
 `/:channelId` with `channelId = "rooms"` and render the wrong page.)*

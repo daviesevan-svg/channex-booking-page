@@ -11,7 +11,8 @@ import { addDays, format, parseISO } from "date-fns";
 
 import type { Route } from "./+types/go.booking";
 import { getProperty } from "~/lib/properties.server";
-import { requireCanonicalHost } from "~/lib/domains.server";
+import { getSettings } from "~/lib/overrides.server";
+import { liveCustomOrigin, requireCanonicalHost } from "~/lib/domains.server";
 
 // Channex's Google Hotel ARI landing endpoint — where we forward hotels that
 // aren't ours, unchanged.
@@ -44,7 +45,10 @@ export async function loader({ request }: Route.LoaderArgs) {
         : "";
   const adults = Math.max(1, parseInt(q.get("adults") || "2", 10) || 2);
 
-  const base = `${url.origin}/${channelId}`;
+  // A hotel with its own live domain lands there directly — the guest layout
+  // would redirect the shared address anyway, so this just saves the hop.
+  const own = await liveCustomOrigin(channelId, (await getSettings(channelId)).websiteDomain);
+  const base = own ?? `${url.origin}/${channelId}`;
   // Without usable dates, land on the property home (its date picker) rather
   // than the results page (which would just bounce back for missing dates).
   if (!isDate(checkin) || !isDate(checkout)) {
