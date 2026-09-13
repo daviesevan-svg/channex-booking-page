@@ -20,6 +20,9 @@ const CHANNEX_BOOKING_LINK = "https://app.channex.io/api/v1/meta/googlehotelari/
 
 const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 
+/** Google's stay params, read above and re-expressed in the funnel's names. */
+const CONSUMED = ["channel_id", "checkin_date", "checkout_date", "length", "adults"] as const;
+
 export async function loader({ request }: Route.LoaderArgs) {
   // Our feed, not the hotel's — don't serve it from their domain.
   requireCanonicalHost(request);
@@ -49,11 +52,20 @@ export async function loader({ request }: Route.LoaderArgs) {
   // would redirect the shared address anyway, so this just saves the hop.
   const own = await liveCustomOrigin(channelId, (await getSettings(channelId)).websiteDomain);
   const base = own ?? `${url.origin}/${channelId}`;
+  // Everything Google sent that this route did not consume rides along
+  // untouched — currency, language, promo code, and the ad attribution params
+  // (utm_*, gclid) that make the click measurable. Only the stay fields are
+  // rewritten, into the names the funnel reads; the rest is not ours to drop.
+  const dest = new URLSearchParams(q);
+  for (const consumed of CONSUMED) dest.delete(consumed);
   // Without usable dates, land on the property home (its date picker) rather
   // than the results page (which would just bounce back for missing dates).
   if (!isDate(checkin) || !isDate(checkout)) {
-    return Response.redirect(base, 302);
+    const rest = dest.toString();
+    return Response.redirect(rest ? `${base}?${rest}` : base, 302);
   }
-  const dest = new URLSearchParams({ checkin, checkout, adults: String(adults) });
+  dest.set("checkin", checkin);
+  dest.set("checkout", checkout);
+  dest.set("adults", String(adults));
   return Response.redirect(`${base}/rooms?${dest.toString()}`, 302);
 }
