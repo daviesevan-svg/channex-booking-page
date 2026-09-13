@@ -1230,6 +1230,10 @@ const TR: Record<string, string> = {
   exVatApplies: "KDV uygulanır",
   exVatHint:
     "(oda gibi tesisin KDV oranıyla vergilendirilir — muaf tutmak için işareti kaldırın, ör. transfer)",
+  exMaxQty: "En fazla adet",
+  exMaxQtyHint: "(boş = sınırsız; tam olarak bir kez alınan bir ücret için 1 yazın, ör. seçenekleri zaten 1 veya 2 evcil hayvanı ayıran bir evcil hayvan ücreti)",
+  exQtyOnce: "adet 1’e sabit",
+  exMaxQtyChip: "en fazla {n}",
   exActiveShown: "Etkin (misafirlere gösterilir)",
   exSaveExtra: "Ekstrayı kaydet",
   exAddExtra: "Ekstra ekle",

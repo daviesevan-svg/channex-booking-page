@@ -31,6 +31,7 @@ export function buildExtra(input: ExtraInput, base: Extra): Extra {
     infoTitle: input.infoTitle === undefined ? base.infoTitle : (input.infoTitle ?? undefined),
     scope: input.scope ?? base.scope,
     taxable: input.taxable ?? base.taxable,
+    maxQty: input.maxQty === undefined ? base.maxQty : (input.maxQty ?? undefined),
     excludeRooms: input.excludeRooms ?? base.excludeRooms,
     excludeRates: input.excludeRates ?? base.excludeRates,
     active: input.active ?? base.active,

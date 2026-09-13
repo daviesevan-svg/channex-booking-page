@@ -755,7 +755,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
 
 // ── Extras ───────────────────────────────────────────────────────────────────
 
-const EXTRA_FIELDS = new Set(["name", "description", "image", "unit", "price", "options", "fields", "info_title", "scope", "taxable", "exclude_rooms", "exclude_rates", "active", "position"]);
+const EXTRA_FIELDS = new Set(["name", "description", "image", "unit", "price", "options", "fields", "info_title", "scope", "taxable", "max_qty", "exclude_rooms", "exclude_rates", "active", "position"]);
 const EXTRA_UNITS = new Set(["stay", "night", "person", "person_night", "trip", "item"]);
 
 export interface ExtraInput {
@@ -769,6 +769,8 @@ export interface ExtraInput {
   infoTitle?: string | null;
   scope?: Extra["scope"];
   taxable?: boolean;
+  /** null clears the limit. */
+  maxQty?: number | null;
   excludeRooms?: string[];
   excludeRates?: string[];
   active?: boolean;
@@ -859,6 +861,13 @@ export function validateExtraInput(body: unknown, opts: { create: boolean; roomI
   }
   const taxable = optBool(ctx, body, "taxable");
   if (taxable !== undefined) out.taxable = taxable;
+  const maxQty = body.max_qty;
+  if (maxQty !== undefined) {
+    if (maxQty === null) out.maxQty = null;
+    else if (typeof maxQty !== "number" || !Number.isInteger(maxQty) || maxQty < 1) {
+      ctx.fail("max_qty", "Must be an integer ≥ 1 (1 = charged exactly once, no quantity offered), or null for no limit.");
+    } else out.maxQty = maxQty;
+  }
   const active = optBool(ctx, body, "active");
   if (active !== undefined) out.active = active;
   const position = optInt(ctx, body, "position", 0);

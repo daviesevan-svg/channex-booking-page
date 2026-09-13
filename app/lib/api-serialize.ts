@@ -272,6 +272,8 @@ export function serializeExtra(e: Extra) {
     price: e.price ?? null,
     scope: e.scope ?? "room",
     taxable: e.taxable !== false,
+    // The most a guest may take; 1 = charged exactly once. null = no limit.
+    max_qty: e.maxQty ?? null,
     options: e.options ?? null,
     fields: e.fields ?? null,
   };

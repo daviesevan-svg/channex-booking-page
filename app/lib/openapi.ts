@@ -596,6 +596,7 @@ export const openApiSpec = {
           price: moneyNullable,
           scope: { type: "string", enum: ["room", "booking"] },
           taxable: { type: "boolean" },
+          max_qty: { type: ["integer", "null"], minimum: 1, description: "The most a guest may take; 1 = charged exactly once (no quantity offered). null = no limit. A selection above it is rejected with 422 invalid_extra." },
           options: { type: ["array", "null"] },
           fields: { type: ["array", "null"] },
         },
@@ -609,7 +610,7 @@ export const openApiSpec = {
         properties: {
           extra_id: uuid,
           option_id: { ...uuidNullable, description: "Required when the extra has options (configurable)." },
-          qty: { type: "integer", minimum: 1, maximum: 99, default: 1 },
+          qty: { type: "integer", minimum: 1, maximum: 99, default: 1, description: "Must not exceed the extra's max_qty (see GET /v1/extras)." },
           info: { type: "object", additionalProperties: { type: "string" }, description: "Values for the extra's info fields, keyed by field id. Required fields must be non-empty." },
         },
       },

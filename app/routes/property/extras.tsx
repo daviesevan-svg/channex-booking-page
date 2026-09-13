@@ -14,6 +14,8 @@ import {
   extraEligible,
   fromPrice,
   isConfigurable,
+  maxQtyOf,
+  qtyLocked,
   parseExtrasState,
   resolveExtras,
   scopeOf,
@@ -105,14 +107,17 @@ export function meta({ matches }: Route.MetaArgs) {
 
 // ---- small UI pieces ----
 
-function Stepper({ qty, onDec, onInc }: { qty: number; onDec: () => void; onInc: () => void }) {
+function Stepper({ qty, max, onDec, onInc }: { qty: number; max?: number; onDec: () => void; onInc: () => void }) {
   const btn =
-    "flex h-9 w-9 flex-none items-center justify-center rounded-chip border border-line-alt text-title-sm leading-none text-ink hover:border-accent hover:text-accent";
+    "flex h-9 w-9 flex-none items-center justify-center rounded-chip border border-line-alt text-title-sm leading-none text-ink enabled:hover:border-accent enabled:hover:text-accent disabled:cursor-not-allowed disabled:opacity-30";
+  // At the extra's limit the + is disabled rather than hidden, so the guest
+  // sees there IS a limit instead of a button that does nothing.
+  const atMax = max !== undefined && qty >= max;
   return (
     <div className="flex items-center gap-3">
       <button type="button" aria-label="Decrease" onClick={onDec} className={btn}>−</button>
       <span className="min-w-[20px] text-center text-body-lg font-semibold">{qty}</span>
-      <button type="button" aria-label="Increase" onClick={onInc} className={btn}>+</button>
+      <button type="button" aria-label="Increase" onClick={onInc} disabled={atMax} className={btn}>+</button>
     </div>
   );
 }
@@ -149,7 +154,11 @@ function ExtraSection({
   const setQty = (id: string, qty: number) =>
     setSel((prev) => {
       const next = prev.filter((s) => s.id !== id);
-      if (qty > 0) next.push({ id, qty });
+      // Capped at the extra's limit here too, so a stale URL selection above
+      // it comes down to the cap on the first touch instead of staying there.
+      const extra = extras.find((e) => e.id === id);
+      const capped = extra ? Math.min(qty, maxQtyOf(extra)) : qty;
+      if (capped > 0) next.push({ id, qty: capped });
       return next;
     });
   const removeSel = (id: string) => setSel((prev) => prev.filter((s) => s.id !== id));
@@ -408,7 +417,14 @@ function ExtraCard({
             </button>
           ) : has ? (
             <div className="flex items-center justify-between">
-              <Stepper qty={selection!.qty} onDec={onDec} onInc={onInc} />
+              {/* A once-only extra has no quantity to step: it's in, or it's not. */}
+              {qtyLocked(extra) ? (
+                <button type="button" onClick={onRemove} className="text-caption font-semibold text-danger hover:underline">
+                  {tr.t("removeExtra")}
+                </button>
+              ) : (
+                <Stepper qty={selection!.qty} max={maxQtyOf(extra)} onDec={onDec} onInc={onInc} />
+              )}
               <span className="text-body font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
             </div>
           ) : (
@@ -450,7 +466,9 @@ function ConfigureModal({
   const s = useSlots();
   const configurable = isConfigurable(extra);
   const [optionId, setOptionId] = useState<string | undefined>(current?.optionId);
-  const [qty, setQty] = useState(current?.qty ?? 1);
+  // A selection carried in the URL may exceed the limit; it opens clamped.
+  const limit = maxQtyOf(extra);
+  const [qty, setQty] = useState(Math.min(current?.qty ?? 1, limit));
   const [info, setInfo] = useState<Record<string, string>>(current?.info ?? {});
 
   const draft: ExtraSelection = { id: extra.id, optionId, qty, info };
@@ -516,10 +534,18 @@ function ConfigureModal({
             </div>
           )}
 
-          {(optionOk || !configurable) && (
+          {/* No quantity row at all for a once-only extra (limit 1): the options
+              ARE the quantity ("1 pet" / "2 pets"), and a stepper beside them
+              let a guest multiply the fee by accident. */}
+          {(optionOk || !configurable) && limit > 1 && (
             <div className="mb-5 flex items-center justify-between">
               <span className="text-body font-semibold text-secondary">{tr.t("quantity")}</span>
-              <Stepper qty={qty} onDec={() => setQty((q) => Math.max(1, q - 1))} onInc={() => setQty((q) => q + 1)} />
+              <Stepper
+                qty={qty}
+                max={limit}
+                onDec={() => setQty((q) => Math.max(1, q - 1))}
+                onInc={() => setQty((q) => Math.min(limit, q + 1))}
+              />
             </div>
           )}
 

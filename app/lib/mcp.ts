@@ -567,6 +567,7 @@ const extraBodyProps = {
   info_title: { type: ["string", "null"] },
   scope: { type: "string", enum: ["room", "booking"], description: "room = chosen per room; booking = once for the whole stay." },
   taxable: { type: "boolean", description: "Default true — VAT applies like the room." },
+  max_qty: { type: ["integer", "null"], minimum: 1, description: "The most a guest may take. 1 = charged exactly once and no quantity control is shown — use it when the options already encode the count (\"1 pet\" / \"2 pets\"), so a guest can't multiply the fee. null = no limit (e.g. propane tanks sold per tank)." },
   exclude_rooms: { type: "array", items: { type: "string" } },
   exclude_rates: { type: "array", items: { type: "string" } },
   active: { type: "boolean" },

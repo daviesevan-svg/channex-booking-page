@@ -325,6 +325,7 @@ export const manageSchemas = {
       info_title: nullableStr,
       scope: { type: "string", enum: ["room", "booking"] },
       taxable: { type: "boolean" },
+      max_qty: { type: ["integer", "null"], minimum: 1, description: "The most a guest may take. 1 = charged exactly once — the guest page shows no quantity control (use it when the options already encode the count, e.g. \"1 pet\" / \"2 pets\"). null = no limit." },
       exclude_rooms: { type: "array", items: { type: "string" } },
       exclude_rates: { type: "array", items: { type: "string" } },
       active: { type: "boolean" },

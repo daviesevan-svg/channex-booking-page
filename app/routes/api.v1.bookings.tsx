@@ -13,6 +13,7 @@ import { cartCoverage, withinAvailability, serializeCart, type CartLine, type Re
 import {
   extraEligible,
   isConfigurable,
+  maxQtyOf,
   resolveAllExtras,
   scopeOf,
   type Extra,
@@ -100,7 +101,7 @@ const Body = z.object({
  *  checkout silently drops invalid selections (the guest sees the re-priced
  *  cart); an API client gets no such feedback, so a bad selection must be a
  *  hard 422 — otherwise "breakfast" silently vanishes from a paid booking. */
-function extraSelectionError(
+export function extraSelectionError(
   catalog: Extra[],
   sel: z.infer<typeof ExtraSel>,
   ctx: { scope: "room" | "booking"; roomId?: string; rateId?: string },
@@ -121,6 +122,14 @@ function extraSelectionError(
   }
   for (const f of extra.fields ?? []) {
     if (f.required && !sel.info?.[f.id]?.trim()) return `"${extra.name}" requires info field "${f.id}" (${f.label})`;
+  }
+  // The web checkout clamps an over-limit quantity; an API client would never
+  // learn why it was charged less than it sent, so it's a hard 422 here.
+  const limit = maxQtyOf(extra);
+  if ((sel.qty ?? 1) > limit) {
+    return limit === 1
+      ? `"${extra.name}" is charged exactly once — qty must be 1 (its options already set the amount)`
+      : `"${extra.name}" allows at most ${limit} — qty ${sel.qty} requested`;
   }
   return null;
 }
