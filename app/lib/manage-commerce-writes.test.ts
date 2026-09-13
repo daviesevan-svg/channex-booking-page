@@ -73,6 +73,46 @@ describe("extras writes", () => {
     expect(((await gone.json()) as { deleted: boolean }).deleted).toBe(true);
     expect(store.has("extras_seeded:p1")).toBe(false); // still never demo-seeded
   });
+
+  it("stores, clears and validates a per-extra quantity limit (max_qty)", async () => {
+    const ak = await akPromise;
+    const extras = await import("../routes/api.v1.manage.extras");
+    const extra = await import("../routes/api.v1.manage.extras.$id");
+
+    const created = (await extras.action({
+      request: jsonReq("/v1/manage/extras", ak, "POST", {
+        name: "Pet fee",
+        unit: "night",
+        scope: "booking",
+        max_qty: 1,
+        options: [{ name: "1 pet", price: 35 }, { name: "2 pets", price: 70 }],
+      }),
+    } as never)) as Response;
+    expect(created.status).toBe(201);
+    const { data: x } = (await created.json()) as { data: { id: string; max_qty: number | null } };
+    expect(x.max_qty).toBe(1);
+
+    const bad = (await extra.action({
+      request: jsonReq(`/v1/manage/extras/${x.id}`, ak, "PATCH", { max_qty: 0 }),
+      params: { id: x.id },
+    } as never)) as Response;
+    expect(bad.status).toBe(422);
+    const fractional = (await extra.action({
+      request: jsonReq(`/v1/manage/extras/${x.id}`, ak, "PATCH", { max_qty: 1.5 }),
+      params: { id: x.id },
+    } as never)) as Response;
+    expect(fractional.status).toBe(422);
+
+    const cleared = (await extra.action({
+      request: jsonReq(`/v1/manage/extras/${x.id}`, ak, "PATCH", { max_qty: null }),
+      params: { id: x.id },
+    } as never)) as Response;
+    expect(((await cleared.json()) as { data: { max_qty: number | null } }).data.max_qty).toBeNull();
+
+    const listed = (await extras.loader({ request: jsonReq("/v1/manage/extras", ak, "GET") } as never)) as Response;
+    const { data } = (await listed.json()) as { data: { id: string; max_qty: number | null }[] };
+    expect(data.find((e) => e.id === x.id)?.max_qty).toBeNull();
+  });
 });
 
 describe("promotion writes", () => {

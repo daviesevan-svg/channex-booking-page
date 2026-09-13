@@ -67,6 +67,7 @@ export function serializeManageExtra(e: Extra) {
     info_title: e.infoTitle ?? null,
     scope: e.scope ?? "room",
     taxable: e.taxable !== false,
+    max_qty: e.maxQty ?? null,
     exclude_rooms: e.excludeRooms ?? [],
     exclude_rates: e.excludeRates ?? [],
     active: e.active,

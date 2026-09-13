@@ -8,7 +8,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings } from "~/lib/overrides.server";
 import { formatMoney } from "~/lib/money";
-import { UNITS, UNIT_LABEL, isConfigurable, parseExtraUnit, scopeOf, type Extra, type ExtraField, type ExtraOption, type ExtraScope, type ExtraUnit } from "~/lib/extras";
+import { UNITS, UNIT_LABEL, isConfigurable, parseExtraUnit, qtyLocked, scopeOf, type Extra, type ExtraField, type ExtraOption, type ExtraScope, type ExtraUnit } from "~/lib/extras";
 import { deleteExtra, ensureExampleExtras, getExtras, saveExtra, toggleExtra } from "~/lib/extras.server";
 import { queueImageCleanup } from "~/lib/image-gc.server";
 import { resolveImageField, uploadExtraImage } from "~/lib/images.server";
@@ -111,15 +111,21 @@ export async function action({ request }: Route.ActionArgs) {
   const optionsText = String(form.get("options") ?? "");
   const fieldsText = String(form.get("fields") ?? "");
   const infoTitle = String(form.get("infoTitle") ?? "").trim() || undefined;
+  // Blank = no limit. "1" = charged exactly once (no quantity control shown).
+  const maxQtyRaw = String(form.get("maxQty") ?? "").trim();
+  const maxQty = maxQtyRaw ? Number(maxQtyRaw) : undefined;
   const active = form.get("active") != null;
   const taxable = form.get("taxable") != null;
   const scope: ExtraScope = form.get("scope") === "booking" ? "booking" : "room";
   // Exclusions only apply to room-scoped extras.
   const excludeRooms = scope === "room" ? form.getAll("excludeRooms").map(String).filter(Boolean) : [];
   const excludeRates = scope === "room" ? form.getAll("excludeRates").map(String).filter(Boolean) : [];
-  const values = { id, name, desc: desc ?? "", unit, price: priceRaw, options: optionsText, fields: fieldsText, infoTitle: infoTitle ?? "" };
+  const values = { id, name, desc: desc ?? "", unit, price: priceRaw, options: optionsText, fields: fieldsText, infoTitle: infoTitle ?? "", maxQty: maxQtyRaw };
 
   if (!name) return { error: "Enter a name for the extra.", values };
+  if (maxQty !== undefined && (!Number.isInteger(maxQty) || maxQty < 1)) {
+    return { error: "Maximum quantity must be a whole number of 1 or more, or blank for no limit.", values };
+  }
 
   const usedOpt = new Set<string>();
   const options = optionsText
@@ -162,6 +168,7 @@ export async function action({ request }: Route.ActionArgs) {
     options: configurable ? options : undefined,
     fields: fields.length ? fields : undefined,
     infoTitle: fields.length ? infoTitle : undefined,
+    maxQty,
     scope,
     excludeRooms: excludeRooms.length ? excludeRooms : undefined,
     excludeRates: excludeRates.length ? excludeRates : undefined,
@@ -325,6 +332,19 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
         </label>
 
         <label className="block text-[13px] font-semibold text-secondary">
+          {t("exMaxQty")} <span className="font-normal text-faint">{t("exMaxQtyHint")}</span>
+          <input
+            name="maxQty"
+            type="number"
+            min={1}
+            step={1}
+            defaultValue={cur("maxQty", editing?.maxQty ? String(editing.maxQty) : "")}
+            placeholder="—"
+            className={FIELD_INPUT}
+          />
+        </label>
+
+        <label className="block text-[13px] font-semibold text-secondary">
           {t("exOptions")} <span className="font-normal text-faint">{t("exOptionsSubtitle")}</span>
           <textarea
             name="options"
@@ -480,6 +500,11 @@ export default function AdminExtras({ loaderData, actionData }: Route.ComponentP
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exPerBooking")}</span>
                   ) : (e.excludeRooms?.length || e.excludeRates?.length) ? (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exLimitedRoomsRates")}</span>
+                  ) : null}
+                  {qtyLocked(e) ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exQtyOnce")}</span>
+                  ) : e.maxQty ? (
+                    <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exMaxQtyChip", { n: e.maxQty })}</span>
                   ) : null}
                   {e.taxable === false ? (
                     <span className="rounded-full bg-chip px-2 py-0.5 text-[11px] font-semibold text-muted">{t("exVatExempt")}</span>

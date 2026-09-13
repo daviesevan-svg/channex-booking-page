@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseExtraUnit, resolveExtras, UNIT_LABEL, UNITS, unitMultiplier, type Extra } from "./extras";
+import { clampQty, maxQtyOf, parseExtraUnit, qtyLocked, resolveExtras, UNIT_LABEL, UNITS, unitMultiplier, type Extra } from "./extras";
 
 describe("per-item extras", () => {
   it("is a unit the admin menu, the API and the label all know", () => {
@@ -31,5 +31,47 @@ describe("per-item extras", () => {
     expect(parseExtraUnit("night")).toBe("night");
     expect(parseExtraUnit("Comes with a regulator")).toBeUndefined();
     expect(parseExtraUnit(null)).toBeUndefined();
+  });
+});
+
+describe("per-extra quantity limit (maxQty)", () => {
+  // Camptel's Pet Fee: options already say "1 pet" / "2 pets" — the quantity
+  // must be exactly 1, whatever the URL or an API body claims.
+  const petFee = {
+    id: "pet",
+    name: "Pet fee",
+    unit: "night",
+    maxQty: 1,
+    scope: "booking",
+    active: true,
+    options: [
+      { id: "one", name: "1 pet", price: 35 },
+      { id: "two", name: "2 pets", price: 70 },
+    ],
+  } as unknown as Extra;
+  const tank = { id: "tank", name: "Propane tank", unit: "item", price: 35, scope: "booking", active: true } as unknown as Extra;
+  const towels = { id: "towels", name: "Beach towels", unit: "stay", price: 5, maxQty: 4, active: true } as unknown as Extra;
+
+  it("charges a locked extra exactly once even when the selection says qty 5", () => {
+    const [line] = resolveExtras([petFee], [{ id: "pet", optionId: "two", qty: 5 }], 3, 2);
+    expect(line).toMatchObject({ optionId: "two", qty: 1, amount: 210 }); // 70 × 3 nights × 1
+  });
+
+  it("caps a bounded extra at its limit and leaves an unlimited one alone", () => {
+    const [capped] = resolveExtras([towels], [{ id: "towels", qty: 9 }], 1, 2);
+    expect(capped).toMatchObject({ qty: 4, amount: 20 });
+    const [free] = resolveExtras([tank], [{ id: "tank", qty: 9 }], 1, 2);
+    expect(free).toMatchObject({ qty: 9, amount: 315 }); // tanks are sold per tank
+  });
+
+  it("treats absent, zero and garbage limits as no limit", () => {
+    expect(maxQtyOf({})).toBe(Infinity);
+    expect(maxQtyOf({ maxQty: 0 })).toBe(Infinity);
+    expect(maxQtyOf({ maxQty: Number.NaN })).toBe(Infinity);
+    expect(maxQtyOf({ maxQty: 2.9 })).toBe(2);
+    expect(qtyLocked({ maxQty: 1 })).toBe(true);
+    expect(qtyLocked({ maxQty: 2 })).toBe(false);
+    expect(clampQty({ maxQty: 1 }, "7")).toBe(1);
+    expect(clampQty({}, -3)).toBe(1);
   });
 });

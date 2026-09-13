@@ -82,6 +82,12 @@ export interface Extra {
    *  mode as the room). Default-on: only an explicit `false` is exempt — see
    *  isExtraTaxable(). */
   taxable?: boolean;
+  /** The most a guest may take of this extra. `1` means it is charged
+   *  exactly once and the quantity control is not shown at all — a pet fee
+   *  whose options already say "1 pet" / "2 pets" must not ALSO multiply by a
+   *  quantity (a guest did, and overpaid). Undefined = no limit. Enforced in
+   *  resolveExtras(), so a crafted URL or API payload can't exceed it either. */
+  maxQty?: number;
   /** Room type ids this extra is NOT offered for (room-scoped only). */
   excludeRooms?: string[];
   /** Rate plan ids this extra is NOT offered for (room-scoped only). */
@@ -119,6 +125,24 @@ export const UNIT_LABEL: Record<ExtraUnit, string> = {
   trip: "per trip",
   item: "each",
 };
+
+/** The most a guest may take of an extra; Infinity when unlimited. */
+export function maxQtyOf(e: Pick<Extra, "maxQty">): number {
+  const n = e.maxQty;
+  return typeof n === "number" && Number.isFinite(n) && n >= 1 ? Math.floor(n) : Infinity;
+}
+
+/** Whether the extra is charged exactly once (no quantity control). */
+export function qtyLocked(e: Pick<Extra, "maxQty">): boolean {
+  return maxQtyOf(e) === 1;
+}
+
+/** A requested quantity made valid for an extra: a whole number, at least 1,
+ *  at most the extra's limit. The single place quantity is trusted. */
+export function clampQty(e: Pick<Extra, "maxQty">, qty: unknown): number {
+  const n = Math.max(1, Math.round(Number(qty) || 1));
+  return Math.min(n, maxQtyOf(e));
+}
 
 export function isConfigurable(e: Extra): boolean {
   return Array.isArray(e.options) && e.options.length > 0;
@@ -262,7 +286,8 @@ export function resolveExtras(
   for (const sel of selections) {
     const extra = byId.get(sel.id);
     if (!extra) continue;
-    const qty = Math.max(1, Math.round(sel.qty || 1));
+    // Clamped to the extra's limit, never trusted from the URL or an API body.
+    const qty = clampQty(extra, sel.qty);
     const infoLine = infoLineFor(extra, sel.info);
     if (isConfigurable(extra)) {
       const opt = extra.options!.find((o) => o.id === sel.optionId);
