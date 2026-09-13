@@ -56,6 +56,28 @@ export async function propertyIdForHost(hostname: string): Promise<string | null
 }
 
 /**
+ * The origin the property is LIVE on under its own domain, or null.
+ *
+ * Reads the hostname index rather than trusting `settings.websiteDomain`: a
+ * stored domain proves only that someone typed it. The index key is written
+ * once Cloudflare confirms the hostname is active and owned (see
+ * custom-hostnames.server.ts), so redirecting on its word cannot send a guest to
+ * a domain that is still dark, or to one another property holds. Always https —
+ * custom hostnames only ever serve over Cloudflare's certificate.
+ *
+ * One KV read, and only for properties with a domain set, so the shared domain
+ * pays nothing for everyone else.
+ */
+export async function liveCustomOrigin(
+  pid: string,
+  websiteDomain: string | undefined,
+): Promise<string | null> {
+  const host = normalizeDomain(websiteDomain ?? "");
+  if (!host) return null;
+  return (await propertyIdForHost(host)) === pid ? `https://${host}` : null;
+}
+
+/**
  * True when `host` is an address of ours rather than a hotel's own domain.
  *
  * Covers the app's own hostname, the CNAME target hotels point at (claiming the

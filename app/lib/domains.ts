@@ -4,6 +4,9 @@
 // typed, tell them the record to create, and can check what DNS actually says.
 // Provisioning the hostname on the Cloudflare side is a separate step.
 
+import { isPathSegment } from "./base";
+import { stripInternalParams } from "./internal-params";
+
 /** Strip anything a hotel is likely to paste around a hostname: a scheme, a
  *  path, a port, a trailing dot, stray whitespace, uppercase. */
 export function normalizeDomain(input: string): string {
@@ -62,4 +65,42 @@ export type DnsVerdict =
  *  dot optional. */
 export function sameHost(a: string, b: string): boolean {
   return normalizeDomain(a) === normalizeDomain(b) && normalizeDomain(a) !== "";
+}
+
+/**
+ * Where a shared-domain guest URL belongs once the property has its own live
+ * domain: the same page on that domain, query string intact — or null when the
+ * request should stay where it is.
+ *
+ *   book.roompanda.com/cadc7be3-…/rooms?checkin=…  →  book.camptelpoconos.com/rooms?checkin=…
+ *
+ * Google's "Official site" link, confirmation emails and the embed widget all
+ * deep-link the shared address, and a hotel with its own domain wants every
+ * one of them to land there without anything being republished. Only the first
+ * path segment moves — on the hotel's domain the property IS the hostname — and
+ * every param survives, because check-in, occupancy, currency and the ad
+ * attribution params are the click. React Router's `_routes` is the exception:
+ * it belongs to `.data` requests only (see internal-params.ts).
+ *
+ * Stays put for the admin design preview (`?preview=`): that iframe lives on the
+ * back-office host, which a hotel's own domain does not allow to frame it.
+ *
+ * `origin` is the live custom origin, already proven to serve `channelId`'s
+ * property — the caller decides that (domains.server.ts); this only moves URLs.
+ */
+export function customDomainRedirect(
+  requestUrl: string | URL,
+  channelId: string | undefined,
+  origin: string | null | undefined,
+): string | null {
+  if (!origin || !isPathSegment(channelId)) return null;
+  const url = new URL(requestUrl);
+  if (url.searchParams.has("preview")) return null;
+  const [, first, ...rest] = url.pathname.split("/");
+  if (decodeURIComponent(first ?? "") !== channelId) return null;
+  const to = new URL(origin);
+  if (to.origin === url.origin) return null;
+  to.pathname = `/${rest.join("/")}`;
+  to.search = stripInternalParams(url.searchParams).toString();
+  return to.toString();
 }
