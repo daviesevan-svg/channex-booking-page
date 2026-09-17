@@ -16,8 +16,8 @@ const date = { start: "2026-10-01", end: "2026-10-01" };
 const payload: AriPayload = {
   rates: [{ ...date, roomId: "open", rateId: "rate", currency: "GBP", amounts: [{ guests: 1, net: 100, gross: 100 }] }],
   avail: [
-    { ...date, roomId: "closed", rateId: "rate", stopSell: true, cta: false, ctd: false, minStay: 1 },
-    { ...date, roomId: "open", rateId: "rate", stopSell: false, cta: false, ctd: false, minStay: 1 },
+    { ...date, roomId: "closed", rateId: "rate", stopSell: true, cta: false, ctd: false, minStay: 1, maxStay: 0 },
+    { ...date, roomId: "open", rateId: "rate", stopSell: false, cta: false, ctd: false, minStay: 1, maxStay: 0 },
   ],
   inventory: [{ ...date, roomId: "closed", count: 0 }, { ...date, roomId: "open", count: 5 }],
 };

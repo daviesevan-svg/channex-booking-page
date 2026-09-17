@@ -151,6 +151,10 @@ export function useDateRange({
     () => closedDates?.minStayArrival ?? {},
     [closedDates],
   );
+  const maxStayMap = useMemo(
+    () => closedDates?.maxStayArrival ?? {},
+    [closedDates],
+  );
   const ctaSet = useMemo(() => new Set(closedDates?.closedToArrival ?? []), [closedDates]);
   const ctdSet = useMemo(() => new Set(closedDates?.closedToDeparture ?? []), [closedDates]);
 
@@ -158,6 +162,9 @@ export function useDateRange({
   // the longer one wins — an offer needing 3 nights can't be satisfied by the
   // hotel's 2-night minimum, and vice versa.
   const minStayFor = (d: Date) => Math.max(minStayMap[iso(d)] ?? 1, minNightsFloor ?? 1);
+  // Longest stay allowed from this arrival; 0 = no cap. Keyed by arrival date
+  // like the minimum, and enforced the same way on the check-out side.
+  const maxStayFor = (d: Date) => maxStayMap[iso(d)] ?? 0;
   const isSold = (d: Date) => soldSet.has(iso(d));
   // Is this date's availability loaded? A date past the loaded window is
   // unknown, NOT open — the picker infers "for sale" from absence, so treating
@@ -208,9 +215,12 @@ export function useDateRange({
     if (isSold(date) || ctaSet.has(iso(date))) return false;
     if (afterLastArrival(date) || wrongArrivalDay(date)) return false;
     const need = minStayFor(date);
+    const cap = maxStayFor(date);
     let nights = 0;
     while (!isSold(addDays(date, nights))) {
       nights++;
+      // Past the cap no check-out can be valid, so the arrival is a dead end.
+      if (cap > 0 && nights > cap) return false;
       const out = addDays(date, nights);
       // The walk has left the loaded window, so whether a check-out exists here
       // is unanswerable. Refuse rather than assume: the date opens up on its own
@@ -233,7 +243,10 @@ export function useDateRange({
     if (!checkin || checkout || !isBefore(checkin, date)) return false;
     if (!isKnown(date)) return false;
     if (ctdSet.has(iso(date)) || afterLastDeparture(date) || wrongDepartureDay(date)) return false;
-    if (differenceInCalendarDays(date, checkin) < minStayFor(checkin)) return false;
+    const nights = differenceInCalendarDays(date, checkin);
+    if (nights < minStayFor(checkin)) return false;
+    const cap = maxStayFor(checkin);
+    if (cap > 0 && nights > cap) return false;
     for (let d = checkin; isBefore(d, date); d = addDays(d, 1)) if (isSold(d)) return false;
     return true;
   };
@@ -254,12 +267,18 @@ export function useDateRange({
         return;
       }
       const minS = minStayFor(date);
+      const maxS = maxStayFor(date);
       setCheckin(date);
       setCheckout(null);
+      // One sentence: the minimum is the one a guest most often trips over, so
+      // it wins when both apply; the cap still gets explained on the check-out
+      // click that exceeds it.
       setHelper(
         minS > 1
           ? tr.t("helperMinStayArrival", { n: minS, date: fmt(date, "EEE d MMM") })
-          : "",
+          : maxS > 0
+            ? tr.t("helperMaxStayArrival", { n: maxS, date: fmt(date, "EEE d MMM") })
+            : "",
       );
       return;
     }
@@ -276,6 +295,13 @@ export function useDateRange({
     if (nights < minS) {
       setHelper(
         tr.t("helperMinStayCheckout", { n: minS, date: fmt(addDays(checkin, minS), "EEE d MMM") }),
+      );
+      return;
+    }
+    const maxS = maxStayFor(checkin);
+    if (maxS > 0 && nights > maxS) {
+      setHelper(
+        tr.t("helperMaxStayCheckout", { n: maxS, date: fmt(addDays(checkin, maxS), "EEE d MMM") }),
       );
       return;
     }
@@ -389,6 +415,7 @@ export function useDateRange({
     monthOffset,
     soldSet,
     minStayMap,
+    maxStayMap,
     ctaSet,
     ctdSet,
     minCheckin,

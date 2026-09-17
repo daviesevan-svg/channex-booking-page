@@ -563,6 +563,8 @@ const NL: Dict = {
   metaDescOffer: "{offer} bij {hotel} — wat de aanbieding inhoudt, wanneer die geldt, en de actuele beschikbaarheid.",
   helperMaxArrival: "Deze data staan aankomst alleen toe tot {date}.",
   helperMaxDeparture: "Deze data staan vertrek alleen toe tot {date}.",
+  helperMaxStayArrival: "Maximaal verblijf van {n} nachten voor aankomst op {date}.",
+  helperMaxStayCheckout: "Maximaal verblijf van {n} nachten — kies een vertrek op {date} of eerder.",
 
   // ---- transactional emails (booking details block + review request) ----
   paid: "Betaald",

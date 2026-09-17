@@ -210,8 +210,8 @@ export function serializeAvailabilityRoom(r: RoomWithRates, ctx?: StayContext) {
 
 /** Rooms and rates that exist but weren't offered, and why. Without this a caller
  *  can only see that something is absent — the same silent-vanish problem the
- *  date picker had. `min_stay` carries the nights needed so a caller can propose
- *  a stay that would actually work. */
+ *  date picker had. `min_stay` / `max_stay` carry the nights needed / allowed so
+ *  a caller can propose a stay that would actually work. */
 export function serializeGateReason(g: GateReason) {
   return {
     room_id: g.roomId,
@@ -220,6 +220,7 @@ export function serializeGateReason(g: GateReason) {
     rate_title: g.rateTitle ?? null,
     reason: g.reason,
     min_nights: g.minNights ?? null,
+    max_nights: g.maxNights ?? null,
     message:
       g.reason === "sold_out"
         ? "No availability for these dates."
@@ -227,9 +228,11 @@ export function serializeGateReason(g: GateReason) {
           ? "Closed for sale on one or more of these nights."
           : g.reason === "min_stay"
             ? `Needs a minimum stay of ${g.minNights ?? "more"} nights.`
-            : g.reason === "closed_to_arrival"
-              ? "Arrivals are not accepted on the check-in date."
-              : "Departures are not accepted on the check-out date.",
+            : g.reason === "max_stay"
+              ? `Stays from this check-in date are limited to ${g.maxNights ?? "fewer"} nights.`
+              : g.reason === "closed_to_arrival"
+                ? "Arrivals are not accepted on the check-in date."
+                : "Departures are not accepted on the check-out date.",
   };
 }
 

@@ -152,6 +152,7 @@ export async function action({ request }: Route.ActionArgs) {
     const avail = num("avail");
     const price = num("price");
     const minStay = num("minStay");
+    const maxStay = num("maxStay");
     const stopSell = tri("stopSell");
     const cta = tri("cta");
     const ctd = tri("ctd");
@@ -160,6 +161,7 @@ export async function action({ request }: Route.ActionArgs) {
       avail === undefined &&
       !(price !== undefined && price > 0) &&
       minStay === undefined &&
+      maxStay === undefined &&
       stopSell === undefined &&
       cta === undefined &&
       ctd === undefined
@@ -175,6 +177,7 @@ export async function action({ request }: Route.ActionArgs) {
       avail: avail !== undefined ? Math.max(0, Math.round(avail)) : undefined,
       price: price !== undefined && price > 0 ? Math.round(price * 100) / 100 : undefined,
       minStay: minStay !== undefined ? Math.max(0, Math.round(minStay)) : undefined,
+      maxStay: maxStay !== undefined ? Math.max(0, Math.round(maxStay)) : undefined,
       stopSell,
       cta,
       ctd,
@@ -245,6 +248,7 @@ export async function action({ request }: Route.ActionArgs) {
           date,
           stopSell: form.get(`s:${suffix}`) != null,
           minStay: Math.max(0, Math.round(Number(form.get(`m:${suffix}`)) || 0)),
+          maxStay: Math.max(0, Math.round(Number(form.get(`x:${suffix}`)) || 0)),
           cta: form.get(`ca:${suffix}`) != null,
           ctd: form.get(`cd:${suffix}`) != null,
         });
@@ -263,6 +267,10 @@ export function meta({ matches }: Route.MetaArgs) {
 
 const cellInput =
   "w-full rounded-[6px] border border-line-alt bg-surface px-1.5 py-1 text-center text-[13px] text-ink outline-none focus:border-accent";
+
+/** The two nights boxes under a price cell: min stay, then max stay (blank = none). */
+const stayInput =
+  "w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent";
 
 const bulkField = "rounded-[8px] border border-line-alt bg-surface px-2.5 py-1.5 text-[13px] text-ink outline-none focus:border-accent";
 const bulkLabel = "mb-1 block text-[11px] font-semibold uppercase tracking-wider text-faint";
@@ -505,6 +513,10 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                 <input type="number" name="minStay" min={0} placeholder={t("invLeaveBlank")} className={`${bulkField} w-full`} />
               </label>
               <label className="block">
+                <span className={bulkLabel}>{t("invMaxStay")}</span>
+                <input type="number" name="maxStay" min={0} placeholder={t("invLeaveBlank")} className={`${bulkField} w-full`} />
+              </label>
+              <label className="block">
                 <span className={bulkLabel}>{t("invClosedStopSell")}</span>
                 <select name="stopSell" defaultValue="" className={`${bulkField} w-full cursor-pointer`}>
                   <option value="">{t("invLeaveUnchanged")}</option>
@@ -590,7 +602,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         </div>
 
         {/* One disabled fieldset makes every cell in the grid read-only —
-            availability, prices, min stay and the three toggles — and keeps
+            availability, prices, min/max stay and the three toggles — and keeps
             them out of the submission, so a future cell is covered without
             remembering to gate it. The paging and filter controls sit above,
             outside it, and stay usable. */}
@@ -709,7 +721,16 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
                                       defaultValue={restr?.minStay || ""}
                                       title={t("invMinimumStay")}
                                       placeholder="0"
-                                      className="w-8 rounded-[6px] border border-line-alt bg-surface px-1 py-0.5 text-center text-[11px] outline-none focus:border-accent"
+                                      className={stayInput}
+                                    />
+                                    <input
+                                      name={`x:${suffix}`}
+                                      type="number"
+                                      min={0}
+                                      defaultValue={restr?.maxStay || ""}
+                                      title={t("invMaximumStay")}
+                                      placeholder="∞"
+                                      className={stayInput}
                                     />
                                     <Toggle name={`s:${suffix}`} label="✕" title={t("invClosedStopSell")} checked={restr?.stopSell} danger />
                                     <Toggle name={`ca:${suffix}`} label="A" title={t("invClosedToArrival")} checked={restr?.cta} />

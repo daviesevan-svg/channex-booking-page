@@ -58,7 +58,7 @@ describe("incremental Google ARI payloads", () => {
     const payload = await collectAri("hotel", { from: "2026-10-01", to: "2026-10-03" }, {
       availability: [], products: [{ roomId: "room", rateId: "remote", dates: ["2026-09-30", "2026-10-01", "2027-01-01"] }],
     });
-    expect(payload.avail).toEqual([{ roomId: "room", rateId: "local", start: "2026-10-01", end: "2026-10-01", stopSell: true, cta: false, ctd: false, minStay: 1 }]);
+    expect(payload.avail).toEqual([{ roomId: "room", rateId: "local", start: "2026-10-01", end: "2026-10-01", stopSell: true, cta: false, ctd: false, minStay: 1, maxStay: 0 }]);
     expect(payload.rates).toHaveLength(1);
   });
 

@@ -227,7 +227,7 @@ export const openApiSpec = {
         ],
         responses: {
           "200": {
-            description: "Closed / closed-to-arrival / closed-to-departure / min-stay by date",
+            description: "Closed / closed-to-arrival / closed-to-departure / min-stay / max-stay by date",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Calendar" } } },
           },
           "400": { $ref: "#/components/responses/Error" },
@@ -541,6 +541,7 @@ export const openApiSpec = {
           closed_to_departure: { type: "array", items: date },
           min_stay_arrival: { type: "object", additionalProperties: { type: "integer", minimum: 1 }, description: "Minimum nights keyed by arrival date." },
           min_stay_through: { type: "object", additionalProperties: { type: "integer", minimum: 1 } },
+          max_stay_arrival: { type: "object", additionalProperties: { type: "integer", minimum: 1 }, description: "Maximum nights keyed by arrival date. A date with no entry has no cap." },
         },
       },
       Room: {

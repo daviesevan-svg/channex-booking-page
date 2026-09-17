@@ -172,10 +172,11 @@ export async function collectAri(pid: string, window: AriWindow, scope?: Invento
           cta: c?.cta ?? false,
           ctd: c?.ctd ?? false,
           minStay: Math.max(1, c?.minStay || 1),
+          maxStay: Math.max(0, c?.maxStay || 0),
         };
       };
       const sameCell = (a: ReturnType<typeof cellAt>, b: ReturnType<typeof cellAt>) =>
-        a.stopSell === b.stopSell && a.cta === b.cta && a.ctd === b.ctd && a.minStay === b.minStay;
+        a.stopSell === b.stopSell && a.cta === b.cta && a.ctd === b.ctd && a.minStay === b.minStay && a.maxStay === b.maxStay;
       for (const run of groupRuns(productDates, cellAt, sameCell)) {
         avail.push({ roomId: room.id, rateId: rate.id, start: run.start, end: run.end, ...run.value });
       }

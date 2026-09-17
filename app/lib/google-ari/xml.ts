@@ -184,11 +184,14 @@ export interface AvailEntry {
   ctd: boolean;
   /** Min length of stay (nights); 1 = no minimum. */
   minStay: number;
+  /** Max length of stay (nights); 0 = no maximum. */
+  maxStay: number;
 }
 
 /** OTA_HotelAvailNotifRQ — availability + restrictions. We send authoritative
- *  open/close for Master (stop-sell), Arrival (CTA), Departure (CTD) and a
- *  SetMinLOS length-of-stay, so lifting a restriction is pushed too. */
+ *  open/close for Master (stop-sell), Arrival (CTA), Departure (CTD) and
+ *  SetMinLOS/SetMaxLOS lengths-of-stay, so lifting a restriction is pushed too
+ *  (Google reads SetMaxLOS Time="0" as "no maximum"). */
 export function buildAvailXml(env: AriEnvelope, entries: AvailEntry[]): string {
   const msg = (roomId: string, rateId: string, start: string, end: string, inner: string) =>
     `    <AvailStatusMessage>\n` +
@@ -201,7 +204,10 @@ export function buildAvailXml(env: AriEnvelope, entries: AvailEntry[]): string {
       const arrival = `      <RestrictionStatus Status="${e.cta ? "Close" : "Open"}" Restriction="Arrival"/>\n`;
       const departure = `      <RestrictionStatus Status="${e.ctd ? "Close" : "Open"}" Restriction="Departure"/>\n`;
       const los =
-        `      <LengthsOfStay><LengthOfStay Time="${Math.max(1, e.minStay)}" MinMaxMessageType="SetMinLOS"/></LengthsOfStay>\n`;
+        `      <LengthsOfStay>` +
+        `<LengthOfStay Time="${Math.max(1, e.minStay)}" MinMaxMessageType="SetMinLOS"/>` +
+        `<LengthOfStay Time="${Math.max(0, e.maxStay)}" MinMaxMessageType="SetMaxLOS"/>` +
+        `</LengthsOfStay>\n`;
       return (
         msg(e.roomId, e.rateId, e.start, e.end, master) +
         msg(e.roomId, e.rateId, e.start, e.end, arrival) +

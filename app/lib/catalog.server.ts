@@ -293,15 +293,16 @@ export async function getCatalogMapping(pid: string): Promise<MappingRoomType[]>
 }
 
 /** Why a room or rate was withheld for a stay. Emitted only when a caller asks
- *  for it (see `getCatalogRooms` opts.reasons). `min_stay` carries the nights
- *  required so a caller can suggest a stay that would work. */
+ *  for it (see `getCatalogRooms` opts.reasons). `min_stay` / `max_stay` carry
+ *  the nights required / allowed so a caller can suggest a stay that would work. */
 export interface GateReason {
   roomId: string;
   roomTitle: string;
   rateId?: string;
   rateTitle?: string;
-  reason: "sold_out" | "stop_sell" | "min_stay" | "closed_to_arrival" | "closed_to_departure";
+  reason: "sold_out" | "stop_sell" | "min_stay" | "max_stay" | "closed_to_arrival" | "closed_to_departure";
   minNights?: number;
+  maxNights?: number;
 }
 
 // ---- shared stay inventory ----
@@ -440,6 +441,14 @@ export async function getCatalogRooms(
                 const minStay = (checkinDate && inv.restrictions[k(checkinDate)]?.minStay) || 1;
                 if (nights < minStay) {
                   note({ ...where, reason: "min_stay", minNights: minStay });
+                  return null;
+                }
+                // Max stay is keyed by the ARRIVAL date, like min stay: the
+                // restriction on the night you check in caps how long you may
+                // stay from there. 0 (the column default) = no cap.
+                const maxStay = (checkinDate && inv.restrictions[k(checkinDate)]?.maxStay) || 0;
+                if (maxStay > 0 && nights > maxStay) {
+                  note({ ...where, reason: "max_stay", maxNights: maxStay });
                   return null;
                 }
                 if (checkinDate && inv.restrictions[k(checkinDate)]?.cta) {
@@ -636,7 +645,9 @@ export async function resolveCartByOccupancy(
  *  shape the date picker consumes. A date is closed when no room is bookable
  *  (availability 0, or every active rate stop-sold); closedToArrival/Departure
  *  when every otherwise-bookable rate is closed to arrival/departure that day;
- *  minStayArrival is the smallest min-stay among the bookable rates. Dates with
+ *  minStayArrival is the smallest min-stay among the bookable rates, and
+ *  maxStayArrival the largest max-stay — present only when EVERY bookable rate
+ *  is capped, since one uncapped rate means the date has no ceiling. Dates with
  *  no inventory row are closed (not bookable, same as the booking flow). */
 export async function getCalendarAvailability(
   pid: string,
@@ -668,11 +679,14 @@ export async function getCalendarAvailability(
   const closedToArrival: string[] = [];
   const closedToDeparture: string[] = [];
   const minStayArrival: Record<string, number> = {};
+  const maxStayArrival: Record<string, number> = {};
   const end = parseISO(to);
   for (let d = parseISO(from); d <= end; d = addDays(d, 1)) {
     const date = format(d, "yyyy-MM-dd");
     let bookable = false;
     let minStay = Infinity;
+    let maxStay = 0;
+    let uncapped = false;
     let arrivalOpen = false;
     let departureOpen = false;
     for (const room of rooms) {
@@ -693,6 +707,8 @@ export async function getCalendarAvailability(
         if ((inv.prices[`${room.id}|${rid}|${date}`] ?? rt.prices[room.id]) <= 0) continue;
         bookable = true;
         minStay = Math.min(minStay, r?.minStay || 1);
+        if (r?.maxStay) maxStay = Math.max(maxStay, r.maxStay);
+        else uncapped = true;
         if (!r?.cta) arrivalOpen = true;
         if (!r?.ctd) departureOpen = true;
       }
@@ -702,9 +718,10 @@ export async function getCalendarAvailability(
       continue;
     }
     if (Number.isFinite(minStay) && minStay > 1) minStayArrival[date] = minStay;
+    if (!uncapped && maxStay > 0) maxStayArrival[date] = maxStay;
     if (!arrivalOpen) closedToArrival.push(date);
     if (!departureOpen) closedToDeparture.push(date);
   }
 
-  return { closed, closedToArrival, closedToDeparture, minStayArrival, minStayThrough: {} };
+  return { closed, closedToArrival, closedToDeparture, minStayArrival, minStayThrough: {}, maxStayArrival };
 }

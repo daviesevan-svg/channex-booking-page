@@ -100,6 +100,7 @@ type RestrRow = {
   min_stay_arrival: number;
   closed_to_arrival: number;
   closed_to_departure: number;
+  max_stay: number;
 };
 
 /** Shared body of the two readers above. Every part's three table reads go in a
@@ -120,7 +121,7 @@ async function readParts(hotelCode: string, parts: QueryPart[]): Promise<Invento
   const columns = {
     availability: "room_type_id, date, avail",
     rate: "room_type_id, rate_plan_id, date, occupancy, price_minor, fraction_size",
-    restriction: "room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure",
+    restriction: "room_type_id, rate_plan_id, date, stop_sell, min_stay_arrival, closed_to_arrival, closed_to_departure, max_stay",
   };
   const stmts = parts.map((p) => D.prepare(
     `SELECT ${columns[p.table]} FROM ${p.table} WHERE hotel_code=? AND ${p.where}`,
@@ -175,6 +176,7 @@ async function readParts(hotelCode: string, parts: QueryPart[]): Promise<Invento
       minStay: r.min_stay_arrival || 0,
       cta: Boolean(r.closed_to_arrival),
       ctd: Boolean(r.closed_to_departure),
+      maxStay: r.max_stay || 0,
     };
   return data;
 }

@@ -9,6 +9,7 @@ const closed = (partial: Partial<ClosedDates>): ClosedDates => ({
   closedToDeparture: [],
   minStayArrival: {},
   minStayThrough: {},
+  maxStayArrival: {},
   ...partial,
 });
 
@@ -52,6 +53,19 @@ describe("firstAvailableStay", () => {
     });
     expect(firstAvailableStay(cd, "2026-09-01")).toEqual({
       checkin: "2026-09-03",
+      checkout: "2026-09-04",
+    });
+  });
+
+  it("skips an arrival whose max-stay leaves no valid check-out", () => {
+    // Sep 1 allows at most 2 nights, but both Sep 2 and Sep 3 are closed to
+    // departure — no stay from Sep 1 can end legally, so it is a dead end.
+    const cd = closed({
+      maxStayArrival: { "2026-09-01": 2 },
+      closedToDeparture: ["2026-09-02", "2026-09-03"],
+    });
+    expect(firstAvailableStay(cd, "2026-09-01")).toEqual({
+      checkin: "2026-09-02",
       checkout: "2026-09-04",
     });
   });
