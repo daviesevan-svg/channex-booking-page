@@ -288,7 +288,7 @@ export const MANAGE_TOOLS: McpTool[] = [
   {
     name: "get_ari",
     description:
-      "READ-ONLY availability/rates/restrictions grid as the booking engine sells it, per date (max 400 days per call): rooms available, nightly prices (major units — zero-decimal currencies come back whole), per-occupancy prices, min-stay and closure flags. Use it to reconcile against another system's inventory. ARI cannot be changed here — updates flow from the property's channel manager; if asked to change availability or prices, say so.",
+      "READ-ONLY availability/rates/restrictions grid as the booking engine sells it, per date (max 400 days per call): rooms available, nightly prices (major units — zero-decimal currencies come back whole), per-occupancy prices, min-stay, max-stay and closure flags. Use it to reconcile against another system's inventory. ARI cannot be changed here — updates flow from the property's channel manager; if asked to change availability or prices, say so.",
     inputSchema: {
       type: "object",
       properties: {

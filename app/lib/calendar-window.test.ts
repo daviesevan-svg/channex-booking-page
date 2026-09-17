@@ -23,6 +23,7 @@ const closed = (partial: Partial<ClosedDates> = {}): ClosedDates => ({
   closedToDeparture: [],
   minStayArrival: {},
   minStayThrough: {},
+  maxStayArrival: {},
   ...partial,
 });
 

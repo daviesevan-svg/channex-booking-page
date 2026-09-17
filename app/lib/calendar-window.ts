@@ -76,5 +76,6 @@ export function mergeClosedDates(a: ClosedDates, b: ClosedDates): ClosedDates {
     closedToDeparture: [...a.closedToDeparture, ...b.closedToDeparture],
     minStayArrival: { ...a.minStayArrival, ...b.minStayArrival },
     minStayThrough: { ...a.minStayThrough, ...b.minStayThrough },
+    maxStayArrival: { ...a.maxStayArrival, ...b.maxStayArrival },
   };
 }

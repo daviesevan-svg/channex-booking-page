@@ -335,6 +335,7 @@ export async function blockOnGoogle(pid: string): Promise<AriPushResult[]> {
       cta: false,
       ctd: false,
       minStay: 1,
+      maxStay: 0,
     }));
   });
   const inv: InvEntry[] = rooms.map((room) => ({ roomId: room.id, start: from, end: to, count: 0 }));

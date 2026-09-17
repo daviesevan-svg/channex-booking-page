@@ -551,6 +551,8 @@ const EL: Dict = {
   metaDescOffer: "{offer} στο {hotel} — τι περιλαμβάνει η προσφορά, πότε ισχύει και η τρέχουσα διαθεσιμότητα.",
   helperMaxArrival: "Αυτές οι ημερομηνίες επιτρέπουν άφιξη μόνο έως {date}.",
   helperMaxDeparture: "Αυτές οι ημερομηνίες επιτρέπουν αναχώρηση μόνο έως {date}.",
+  helperMaxStayArrival: "Μέγιστη διαμονή {n} διανυκτερεύσεων για αφίξεις στις {date}.",
+  helperMaxStayCheckout: "Μέγιστη διαμονή {n} διανυκτερεύσεων — επιλέξτε αναχώρηση έως τις {date}.",
 
   // ---- transactional emails (booking details block + review request) ----
   paid: "Πληρώθηκε",

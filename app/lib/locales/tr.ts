@@ -589,6 +589,8 @@ const TR: Dict = {
     "{hotel} tesisinde {offer} — kampanyanın kapsamı, geçerlilik tarihleri ve canlı müsaitlik.",
   helperMaxArrival: "Bu tarihlerde yalnızca {date} tarihine kadar giriş yapılabilir.",
   helperMaxDeparture: "Bu tarihlerde yalnızca {date} tarihine kadar çıkış yapılabilir.",
+  helperMaxStayArrival: "{date} tarihli girişler için azami {n} gece konaklama.",
+  helperMaxStayCheckout: "Azami {n} gece konaklama — lütfen {date} tarihinde veya öncesinde bir çıkış seçin.",
 
   // ---- transactional emails (booking details block + review request) ----
   paid: "Ödendi",

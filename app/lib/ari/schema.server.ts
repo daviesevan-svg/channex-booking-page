@@ -106,6 +106,8 @@ export interface RestrictionCell {
   cta: boolean;
   /** closed to departure — can't end a stay on this date */
   ctd: boolean;
+  /** longest stay (nights) allowed for an arrival on this date; 0 = no cap */
+  maxStay: number;
 }
 
 export interface InventoryData {

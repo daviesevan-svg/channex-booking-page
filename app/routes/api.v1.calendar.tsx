@@ -3,7 +3,8 @@ import { authenticateApiKey, apiError } from "~/lib/api-auth.server";
 import { getCalendarAvailability } from "~/lib/catalog.server";
 
 // GET /v1/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD — per-date availability for a
-// date-picker (closed / closed-to-arrival / closed-to-departure / min-stay).
+// date-picker (closed / closed-to-arrival / closed-to-departure / min-stay /
+// max-stay).
 export async function loader({ request }: Route.LoaderArgs) {
   const auth = await authenticateApiKey(request);
   if (auth instanceof Response) return auth;
@@ -30,5 +31,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     closed_to_departure: c.closedToDeparture,
     min_stay_arrival: c.minStayArrival,
     min_stay_through: c.minStayThrough,
+    max_stay_arrival: c.maxStayArrival,
   });
 }

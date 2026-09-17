@@ -25,6 +25,7 @@ const empty = (): ClosedDates => ({
   closedToDeparture: [],
   minStayArrival: {},
   minStayThrough: {},
+  maxStayArrival: {},
 });
 
 const withClosed = (...dates: string[]): ClosedDates => ({ ...empty(), closed: dates });

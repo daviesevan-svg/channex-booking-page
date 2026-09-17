@@ -51,6 +51,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       ...cell(key),
       stop_sell: r.stopSell,
       min_stay: r.minStay,
+      max_stay: r.maxStay,
       closed_to_arrival: r.cta ?? false,
       closed_to_departure: r.ctd ?? false,
     }))

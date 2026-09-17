@@ -16,6 +16,8 @@ export interface ClosedDates {
   closedToDeparture: string[];
   minStayArrival: Record<string, number>;
   minStayThrough: Record<string, number>;
+  /** longest stay (nights) for an arrival on that date; absent = no cap */
+  maxStayArrival: Record<string, number>;
 }
 
 export interface Occupancy {

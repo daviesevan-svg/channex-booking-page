@@ -563,6 +563,8 @@ const DE: Dict = {
   metaDescOffer: "{offer} im {hotel} — was das Angebot umfasst, für welche Termine es gilt, und die aktuelle Verfügbarkeit.",
   helperMaxArrival: "Für diese Termine ist eine Anreise nur bis {date} möglich.",
   helperMaxDeparture: "Für diese Termine ist eine Abreise nur bis {date} möglich.",
+  helperMaxStayArrival: "Höchstaufenthalt von {n} Nächten für Anreisen am {date}.",
+  helperMaxStayCheckout: "Höchstaufenthalt von {n} Nächten — bitte eine Abreise am {date} oder früher wählen.",
 
   // ---- transactional emails (booking details block + review request) ----
   paid: "Bezahlt",

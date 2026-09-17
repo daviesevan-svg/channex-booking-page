@@ -217,8 +217,10 @@ export function firstAvailableStay(
     if (!known(arrival)) return null; // past the loaded data — nothing to say
     if (sold.has(arrival) || cta.has(arrival)) continue;
     const need = Math.max(closedDates.minStayArrival[arrival] ?? 1, 1);
+    const cap = closedDates.maxStayArrival?.[arrival] ?? 0; // 0 = no cap
     // Walk the open run from this arrival looking for the first valid check-out.
     for (let nights = 1; nights <= MAX_STAY_NIGHTS; nights++) {
+      if (cap > 0 && nights > cap) break; // nothing longer is allowed from here
       if (sold.has(addDaysISO(arrival, nights - 1))) break; // run ended before a stay fit
       const out = addDaysISO(arrival, nights);
       if (!known(out)) break; // can't confirm a check-out we have no data for

@@ -66,6 +66,8 @@ export interface InventoryEdits {
     minStay: number;
     cta: boolean;
     ctd: boolean;
+    /** 0 = no maximum */
+    maxStay: number;
   }[];
 }
 
@@ -93,10 +95,10 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
     `DELETE FROM rate WHERE hotel_code=? AND room_type_id=? AND rate_plan_id=? AND date=? AND occupancy=?`,
   );
   const restrStmt = D.prepare(
-    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival,closed_to_arrival,closed_to_departure)
-     VALUES (?,?,?,?,?,?,?,?)
+    `INSERT INTO restriction (hotel_code,room_type_id,rate_plan_id,date,stop_sell,min_stay_arrival,closed_to_arrival,closed_to_departure,max_stay)
+     VALUES (?,?,?,?,?,?,?,?,?)
      ON CONFLICT(hotel_code,room_type_id,rate_plan_id,date)
-     DO UPDATE SET stop_sell=excluded.stop_sell,min_stay_arrival=excluded.min_stay_arrival,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure`,
+     DO UPDATE SET stop_sell=excluded.stop_sell,min_stay_arrival=excluded.min_stay_arrival,closed_to_arrival=excluded.closed_to_arrival,closed_to_departure=excluded.closed_to_departure,max_stay=excluded.max_stay`,
   );
 
   const stmts: D1PreparedStatement[] = [];
@@ -109,7 +111,7 @@ export async function saveInventory(hotelCode: string, edits: InventoryEdits, ac
     stmts.push(rateDelStmt.bind(hotelCode, p.roomId, p.rateId, p.date, p.occupancy));
   for (const r of edits.restrictions)
     stmts.push(
-      restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay, r.cta ? 1 : 0, r.ctd ? 1 : 0),
+      restrStmt.bind(hotelCode, r.roomId, r.rateId, r.date, r.stopSell ? 1 : 0, r.minStay, r.cta ? 1 : 0, r.ctd ? 1 : 0, r.maxStay),
     );
 
   const write = async () => {
@@ -141,6 +143,8 @@ export interface BulkScope {
   avail?: number;
   price?: number;
   minStay?: number;
+  /** 0 clears the maximum */
+  maxStay?: number;
   stopSell?: boolean;
   cta?: boolean;
   ctd?: boolean;
@@ -148,7 +152,7 @@ export interface BulkScope {
 
 /** Apply one set of values across a range of cells. Restriction fields that
  *  aren't being changed are read back and preserved, so e.g. a bulk stop-sell
- *  doesn't clear existing min-stay/CTA/CTD on the same cells. */
+ *  doesn't clear existing min-stay/max-stay/CTA/CTD on the same cells. */
 export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: AriActor): Promise<{ cells: number }> {
   if (!s.dates.length) return { cells: 0 };
   // Bulk sets the occupancy-less price only: the panel has one price box, and in
@@ -160,7 +164,8 @@ export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: A
     for (const room of s.rooms) for (const date of s.dates) edits.availability.push({ roomId: room.id, date, avail });
   }
 
-  const touchRestr = s.minStay !== undefined || s.stopSell !== undefined || s.cta !== undefined || s.ctd !== undefined;
+  const touchRestr =
+    s.minStay !== undefined || s.maxStay !== undefined || s.stopSell !== undefined || s.cta !== undefined || s.ctd !== undefined;
   const touchPrice = s.price !== undefined && s.price > 0;
   if (touchPrice || touchRestr) {
     // Read the current values once so we can preserve restriction fields the
@@ -190,6 +195,7 @@ export async function applyBulkUpdate(hotelCode: string, s: BulkScope, actor?: A
               minStay: s.minStay ?? cur?.minStay ?? 0,
               cta: s.cta ?? cur?.cta ?? false,
               ctd: s.ctd ?? cur?.ctd ?? false,
+              maxStay: s.maxStay ?? cur?.maxStay ?? 0,
             });
           }
         }
