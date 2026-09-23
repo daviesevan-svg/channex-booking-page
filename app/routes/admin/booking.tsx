@@ -18,7 +18,8 @@ import { incrementAvailability } from "~/lib/ari/admin.server";
 import { sendCancellationEmails, sendGuestBookingEmail } from "~/lib/email.server";
 import { dispatchWebhook } from "~/lib/webhooks.server";
 import { serializeBooking } from "~/lib/api-serialize";
-import { refundBookingCharge } from "~/lib/refunds.server";
+import { recordManualRefund, refundBookingCharge } from "~/lib/refunds.server";
+import { isManualRefundGateway, manualRefundGatewayName } from "~/lib/manual-refunds";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { formatMoney } from "~/lib/money";
 
@@ -166,8 +167,31 @@ export async function action({ params, request }: Route.ActionArgs) {
             : r.reason === "invalid_amount"
               ? "Enter an amount above 0 and no more than what was charged."
               : r.reason === "unsupported"
-                ? "Refunds for 2C2P bookings are issued in the 2C2P merchant portal, not from here."
+                ? "Refunds for this gateway are made in its merchant panel, not from here. Refund it there, then mark it refunded."
                 : "The refund couldn't be processed — check your payment provider and try again.",
+    };
+  }
+
+  if (intent === "markRefunded") {
+    // The hotel refunded in the gateway's own panel (iyzico, 2C2P) and is
+    // saying so. No money moves; same owner/manager gate as a real refund.
+    if (!(await canManageProperty(request, propertyId))) {
+      return { error: "Only an owner or manager can record refunds." };
+    }
+    const by = (await getAdminEmail(request)) ?? undefined;
+    const amount = Number(String(form.get("amount") ?? "").trim());
+    const reference = String(form.get("reference") ?? "");
+    const r = await recordManualRefund(propertyId, booking, { amount, reference, by });
+    if (r.ok) return { markedRefunded: true as const };
+    return {
+      error:
+        r.reason === "already_refunded"
+          ? "This booking has already been refunded."
+          : r.reason === "no_charge"
+            ? "There's no charge on this booking to refund."
+            : r.reason === "invalid_amount"
+              ? "Enter an amount above 0 and no more than what was charged."
+              : "Refunds for this gateway are issued from here — use the Refund button.",
     };
   }
   return { error: "Unknown action." };
@@ -186,6 +210,25 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// "Paid {amount} via …", per gateway. Stripe is the default: it was the only
+// gateway when the booking record was designed.
+function paidViaKey(provider: string): string {
+  return provider === "viva"
+    ? "bkdPaidViaViva"
+    : provider === "2c2p"
+      ? "bkdPaidVia2c2p"
+      : provider === "iyzico"
+        ? "bkdPaidViaIyzico"
+        : "bkdPaidViaStripe";
+}
+
+// Labels for payment.accountId / payment.sessionId, per gateway (Stripe = default).
+const GATEWAY_FIELD_KEYS: Record<string, { merchant: string; session: string }> = {
+  viva: { merchant: "bkdVivaMerchant", session: "bkdVivaOrder" },
+  "2c2p": { merchant: "bkd2c2pMerchant", session: "bkd2c2pInvoice" },
+  iyzico: { merchant: "bkdIyzicoMerchant", session: "bkdIyzicoBasket" },
+};
+
 // Maps audit-trail field names to dictionary keys (display only).
 const FIELD_LABEL_KEYS: Record<string, string> = {
   firstName: "bkdFirstName",
@@ -202,6 +245,8 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const nav = useNavigation();
   const intent = nav.formData?.get("intent");
   const refunding = nav.state !== "idle" && intent === "refund";
+  const markingRefunded = nav.state !== "idle" && intent === "markRefunded";
+  const manualGateway = isManualRefundGateway(b.payment?.provider) ? manualRefundGatewayName(b.payment.provider) : null;
   const retrying = nav.state !== "idle" && intent === "retry";
   const resending = nav.state !== "idle" && intent === "resendEmail";
   const cancelling = nav.state !== "idle" && intent === "cancel";
@@ -330,11 +375,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               value={t(
                 b.payment.provider === "voucher"
                   ? "bkdPaidWithVoucher"
-                  : b.payment.provider === "viva"
-                    ? "bkdPaidViaViva"
-                    : b.payment.provider === "2c2p"
-                      ? "bkdPaidVia2c2p"
-                      : "bkdPaidViaStripe",
+                  : paidViaKey(b.payment.provider),
                 { amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency) },
               )}
             />
@@ -554,7 +595,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
               <>
                 <dt className="text-muted">{t("bkdStatus")}</dt>
                 <dd className={b.payment.refund ? "font-semibold text-ink" : "font-semibold text-[#3f7a52]"}>
-                  {t(b.payment.provider === "viva" ? "bkdPaidViaViva" : b.payment.provider === "2c2p" ? "bkdPaidVia2c2p" : "bkdPaidViaStripe", {
+                  {t(paidViaKey(b.payment.provider), {
                     amount: formatMoney(b.payment.amount ?? 0, b.payment.currency || b.currency),
                   })}
                 </dd>
@@ -567,7 +608,16 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                         date: fmtDate(b.payment.refund.at, "d MMM yyyy", dl),
                       })}
                       {b.payment.refund.by && <span className="font-normal text-muted"> {t("bkdRefundBy", { by: b.payment.refund.by })}</span>}
+                      {b.payment.refund.manual && manualGateway && (
+                        <span className="font-normal text-muted"> {t("bkdRefundRecordedManually", { gateway: manualGateway })}</span>
+                      )}
                     </dd>
+                    {b.payment.refund.manual && b.payment.refund.id !== "manual" && (
+                      <>
+                        <dt className="text-muted">{t("bkdRefundReference")}</dt>
+                        <dd className="font-mono text-[12px] text-ink">{b.payment.refund.id}</dd>
+                      </>
+                    )}
                   </>
                 )}
                 {b.payment.paymentIntentId && (
@@ -578,7 +628,9 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 )}
                 {b.payment.transactionId && (
                   <>
-                    <dt className="text-muted">{t(b.payment.provider === "2c2p" ? "bkd2c2pTranRef" : "bkdVivaTransaction")}</dt>
+                    <dt className="text-muted">
+                      {t(b.payment.provider === "2c2p" ? "bkd2c2pTranRef" : b.payment.provider === "iyzico" ? "bkdIyzicoPaymentId" : "bkdVivaTransaction")}
+                    </dt>
                     <dd className="font-mono text-[12px] text-ink">{b.payment.transactionId}</dd>
                   </>
                 )}
@@ -601,22 +653,76 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
                 <dd className="text-secondary">{t("bkdPayAtHotel")}</dd>
               </>
             )}
-            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaMerchant" : b.payment.provider === "2c2p" ? "bkd2c2pMerchant" : "bkdStripeAccount")}</dt>
+            <dt className="text-muted">{t(GATEWAY_FIELD_KEYS[b.payment.provider]?.merchant ?? "bkdStripeAccount")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.accountId}</dd>
-            <dt className="text-muted">{t(b.payment.provider === "viva" ? "bkdVivaOrder" : b.payment.provider === "2c2p" ? "bkd2c2pInvoice" : "bkdCheckoutSession")}</dt>
+            <dt className="text-muted">{t(GATEWAY_FIELD_KEYS[b.payment.provider]?.session ?? "bkdCheckoutSession")}</dt>
             <dd className="font-mono text-[12px] text-ink">{b.payment.sessionId}</dd>
           </dl>
         ) : (
           <p className="text-[14px] text-muted-2">{t("bkdNoPaymentInfo")}</p>
         )}
 
-        {/* 2C2P has no refund API wired (refunds.server.ts): say where the
-            refund happens instead of offering a button that would refuse. */}
-        {b.payment?.mode === "payment" && b.payment.provider === "2c2p" && !b.payment.refund && (
-          <p className="mt-4 border-t border-divider pt-4 text-[13px] leading-[1.6] text-secondary">{t("bkd2c2pRefundManual")}</p>
+        {/* iyzico and 2C2P are never refunded from here (manual-refunds.ts):
+            say where the refund happens, and let an owner/manager record it
+            once it's done so the booking stops showing it as owed. */}
+        {b.payment?.mode === "payment" && manualGateway && !b.payment.refund && (
+          <div className="mt-4 border-t border-divider pt-4">
+            <p className="text-[13px] leading-[1.6] text-secondary">{t("bkdRefundManualGateway", { gateway: manualGateway })}</p>
+            {canRefund && (
+              <Form
+                method="post"
+                className="mt-3"
+                onSubmit={(e) => {
+                  const cur = b.payment!.currency || b.currency;
+                  const question = t("bkdMarkRefundedConfirm", { amount: formatMoney(Number(refundAmount) || 0, cur), gateway: manualGateway });
+                  if (!confirm(question)) e.preventDefault();
+                }}
+              >
+                <input type="hidden" name="intent" value="markRefunded" />
+                <div className="flex flex-wrap gap-4">
+                  <label className="block text-[13px] font-semibold text-secondary">
+                    {t("bkdMarkRefundedAmount")}
+                    <input
+                      name="amount"
+                      type="number"
+                      step="0.01"
+                      min={0.01}
+                      max={b.payment.amount ?? undefined}
+                      required
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      className={`${FIELD_INPUT} max-w-[200px]`}
+                    />
+                  </label>
+                  <label className="block text-[13px] font-semibold text-secondary">
+                    {t("bkdMarkRefundedReference", { gateway: manualGateway })}
+                    <input name="reference" type="text" maxLength={120} autoComplete="off" className={`${FIELD_INPUT} max-w-[260px]`} />
+                  </label>
+                </div>
+                {policyRefund && policyRefund.refund < policyRefund.charged && (
+                  <p className="mt-1.5 text-[12px] text-secondary">
+                    {t("bkdRefundPolicyHint", {
+                      amount: formatMoney(policyRefund.refund, b.payment.currency || b.currency),
+                      charged: formatMoney(policyRefund.charged, b.payment.currency || b.currency),
+                    })}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={markingRefunded}
+                  className="mt-3 rounded-[10px] border border-line-alt bg-surface px-4 py-2.5 text-[14px] font-semibold text-secondary hover:border-accent hover:text-accent disabled:opacity-60"
+                >
+                  {markingRefunded
+                    ? t("bkdMarkingRefunded")
+                    : t("bkdMarkRefundedButton", { amount: formatMoney(Number(refundAmount) || 0, b.payment.currency || b.currency) })}
+                </button>
+                <p className="mt-2 text-[12px] text-muted">{t("bkdMarkRefundedHint", { gateway: manualGateway })}</p>
+              </Form>
+            )}
+          </div>
         )}
 
-        {b.payment?.mode === "payment" && b.payment.provider !== "2c2p" && !b.payment.refund && canRefund && (
+        {b.payment?.mode === "payment" && !manualGateway && !b.payment.refund && canRefund && (
           <Form
             method="post"
             className="mt-4 border-t border-divider pt-4"
@@ -664,6 +770,11 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
         {actionData?.error && (
           <p className="mt-3 rounded-[10px] border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-700">
             {actionData.error}
+          </p>
+        )}
+        {actionData?.markedRefunded && (
+          <p className="mt-3 rounded-[10px] border border-[#cfe3d0] bg-[#eef5ec] px-3.5 py-2.5 text-[13px] text-[#3f7a52]">
+            {t("bkdMarkRefundedDone")}
           </p>
         )}
         {actionData?.refunded && (

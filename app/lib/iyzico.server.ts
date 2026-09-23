@@ -329,30 +329,10 @@ export function iyzicoPaid(r: IyzicoPaymentResult): boolean {
   return r.paymentStatus.toUpperCase() === "SUCCESS" && r.fraudStatus !== -1 && r.fraudStatus !== 0;
 }
 
-export interface IyzicoRefundResult {
-  refunded: boolean;
-  message?: string;
-}
-
-export async function iyzicoRefund(
-  c: IyzicoConfig,
-  paymentId: string,
-  amount: number,
-  currency: string,
-  ip?: string,
-): Promise<IyzicoRefundResult> {
-  const res = await call(c, "/payment/refund", {
-    locale: "en",
-    conversationId: paymentId,
-    paymentTransactionId: paymentId,
-    price: toIyzicoAmount(amount),
-    currency: currency.toUpperCase(),
-    ip: ip || undefined,
-  });
-  return res.status === "success"
-    ? { refunded: true }
-    : { refunded: false, message: res.errorMessage || "iyzico refused the refund" };
-}
+// No refund call: iyzico refunds are made by the hotel in the iyzico merchant
+// panel and confirmed on the booking page (manual-refunds.ts). The removed
+// helper also sent our stored paymentId where iyzico's v1 /payment/refund
+// expects a per-item paymentTransactionId.
 
 /**
  * Are these credentials usable? Called when a hotel saves them.

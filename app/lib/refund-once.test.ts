@@ -64,21 +64,8 @@ vi.mock("./viva.server", async (importOriginal) => {
   };
 });
 
-const iyzicoCalls: unknown[][] = [];
-vi.mock("./iyzico.server", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("./iyzico.server")>();
-  return {
-    ...mod,
-    iyzicoRefund: vi.fn(async (...args: unknown[]) => {
-      iyzicoCalls.push(args);
-      return { refunded: true };
-    }),
-  };
-});
-
 const PID = "p1";
 store.set(`viva_config:${PID}`, JSON.stringify({ merchantId: "m", apiKey: "k", clientId: "c", clientSecret: "s", sourceCode: "1", demo: true }));
-store.set(`iyzico_config:${PID}`, JSON.stringify({ apiKey: "k", secretKey: "s", merchantId: "m" }));
 
 describe("claimRefund", () => {
   it("lets exactly one caller through, and a released claim can be won again", async () => {
@@ -159,69 +146,79 @@ describe("refundBookingCharge (Viva)", () => {
   });
 });
 
-describe("refundBookingCharge (iyzico)", () => {
-  it("calls iyzicoRefund exactly once and records payment.refund on success", async () => {
+// iyzico and 2C2P are refunded by the hotel in the gateway's own panel. We
+// never call out; the hotel confirms, and recordManualRefund writes it down.
+const manualDraft = (id: string, provider: "iyzico" | "2c2p" | "viva") =>
+  ({
+    id,
+    reference: id.toUpperCase(),
+    status: "confirmed",
+    createdAt: "2026-09-02T00:00:00Z",
+    checkin: "2026-10-01",
+    checkout: "2026-10-03",
+    nights: 2,
+    rooms: [],
+    total: 120,
+    currency: "TRY",
+    guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
+    payment: { provider, mode: "payment", accountId: "m", sessionId: "o", transactionId: `tx_${id}`, amount: 120, currency: "TRY" },
+  }) as never;
+
+describe("manual-refund gateways", () => {
+  it("refundBookingCharge never refunds an iyzico or 2C2P charge", async () => {
     const { claimBooking, getBooking } = await import("./bookings.server");
     const { refundBookingCharge } = await import("./refunds.server");
-    const draft = {
-      id: "b-iyzico",
-      reference: "IYZICO01",
-      status: "confirmed",
-      createdAt: "2026-09-02T00:00:00Z",
-      checkin: "2026-10-01",
-      checkout: "2026-10-03",
-      nights: 2,
-      rooms: [],
-      total: 120,
-      currency: "EUR",
-      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
-      payment: { provider: "iyzico", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_iyz_1", amount: 120, currency: "EUR" },
-    } as never;
-    expect((await claimBooking(PID, draft)).won).toBe(true);
-    const booking = (await getBooking(PID, "b-iyzico"))!;
-
-    iyzicoCalls.length = 0;
-    const outcomes = await Promise.all([
-      refundBookingCharge(PID, booking, { by: "guest" }),
-      refundBookingCharge(PID, booking, { by: "guest-dup" }),
-      refundBookingCharge(PID, booking, { by: "admin" }),
-    ]);
-    expect(iyzicoCalls).toHaveLength(1);
-    expect(iyzicoCalls[0][1]).toBe("tx_iyz_1");
-    expect(outcomes.filter((o) => o.ok)).toHaveLength(1);
-    expect(outcomes.filter((o) => !o.ok && o.reason === "already_refunded")).toHaveLength(2);
-    const after = (await getBooking(PID, "b-iyzico"))!;
-    expect(after.payment?.refund?.id).toBe("tx_iyz_1");
-    expect(after.payment?.refund?.amount).toBe(120);
+    for (const provider of ["iyzico", "2c2p"] as const) {
+      const id = `b-${provider}-auto`;
+      expect((await claimBooking(PID, manualDraft(id, provider))).won).toBe(true);
+      const booking = (await getBooking(PID, id))!;
+      expect(await refundBookingCharge(PID, booking, { by: "auto (guest cancellation)" })).toEqual({ ok: false, reason: "unsupported" });
+      expect((await getBooking(PID, id))!.payment?.refund).toBeUndefined();
+    }
   });
 
-  it("reports a gateway refusal as an error and leaves the claim for a retry", async () => {
+  it("recordManualRefund records the hotel's refund once, however many times it is confirmed", async () => {
     const { claimBooking, getBooking } = await import("./bookings.server");
-    const { refundBookingCharge } = await import("./refunds.server");
-    const draft = {
-      id: "b-iyzico-refuse",
-      reference: "IYZICO02",
-      status: "confirmed",
-      createdAt: "2026-09-02T00:00:00Z",
-      checkin: "2026-10-01",
-      checkout: "2026-10-03",
-      nights: 2,
-      rooms: [],
-      total: 120,
-      currency: "EUR",
-      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
-      payment: { provider: "iyzico", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_iyz_2", amount: 120, currency: "EUR" },
-    } as never;
-    expect((await claimBooking(PID, draft)).won).toBe(true);
-    const booking = (await getBooking(PID, "b-iyzico-refuse"))!;
+    const { recordManualRefund, refundBookingCharge } = await import("./refunds.server");
+    expect((await claimBooking(PID, manualDraft("b-iyz-manual", "iyzico"))).won).toBe(true);
+    const booking = (await getBooking(PID, "b-iyz-manual"))!;
 
-    const { iyzicoRefund } = await import("./iyzico.server");
-    vi.mocked(iyzicoRefund).mockResolvedValueOnce({ refunded: false, message: "insufficient funds" });
-    expect(await refundBookingCharge(PID, booking)).toEqual({ ok: false, reason: "error" });
-    const after = (await getBooking(PID, "b-iyzico-refuse"))!;
-    expect(after.payment?.refund).toBeUndefined();
-    // Claim was released: a retry can win it and reach the gateway again.
-    expect(await refundBookingCharge(PID, after)).toMatchObject({ ok: true });
+    const outcomes = await Promise.all([
+      recordManualRefund(PID, booking, { amount: 80, reference: "  RF-778  ", by: "owner@example.com" }),
+      recordManualRefund(PID, booking, { amount: 80, by: "owner@example.com" }),
+    ]);
+    expect(outcomes.filter((o) => o.ok)).toHaveLength(1);
+    expect(outcomes.filter((o) => !o.ok && o.reason === "already_refunded")).toHaveLength(1);
+
+    const after = (await getBooking(PID, "b-iyz-manual"))!;
+    expect(after.payment?.refund).toMatchObject({ amount: 80, currency: "TRY", by: "owner@example.com", manual: true });
+    expect(["RF-778", "manual"]).toContain(after.payment?.refund?.id);
+    // Recorded = done: a later confirm or refund attempt is refused.
+    expect(await recordManualRefund(PID, after, { amount: 40 })).toEqual({ ok: false, reason: "already_refunded" });
+    expect(await refundBookingCharge(PID, after)).toEqual({ ok: false, reason: "already_refunded" });
+  });
+
+  it("recordManualRefund refuses an amount outside (0, charged] without taking the claim", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { recordManualRefund } = await import("./refunds.server");
+    expect((await claimBooking(PID, manualDraft("b-c2p-manual", "2c2p"))).won).toBe(true);
+    const booking = (await getBooking(PID, "b-c2p-manual"))!;
+    for (const amount of [0, -5, 120.5, Number.NaN]) {
+      expect(await recordManualRefund(PID, booking, { amount })).toEqual({ ok: false, reason: "invalid_amount" });
+    }
+    const ok = await recordManualRefund(PID, booking, { amount: 120 });
+    expect(ok).toMatchObject({ ok: true, amount: 120 });
+    const after = (await getBooking(PID, "b-c2p-manual"))!;
+    expect(after.payment?.refund).toMatchObject({ id: "manual", amount: 120, manual: true });
+  });
+
+  it("recordManualRefund won't mark a Stripe or Viva charge refunded by hand", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { recordManualRefund } = await import("./refunds.server");
+    expect((await claimBooking(PID, manualDraft("b-viva-manual", "viva"))).won).toBe(true);
+    const booking = (await getBooking(PID, "b-viva-manual"))!;
+    expect(await recordManualRefund(PID, booking, { amount: 120 })).toEqual({ ok: false, reason: "not_manual" });
+    expect((await getBooking(PID, "b-viva-manual"))!.payment?.refund).toBeUndefined();
   });
 });
 

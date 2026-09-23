@@ -2292,6 +2292,7 @@ const TR: Record<string, string> = {
   payIyzicoEnvSandbox: "Sandbox",
   payIyzicoCurrency: "iyzico, bu tesisin para birimi olan {currency} birimini kabul etmiyor. TRY, USD, EUR, GBP, NOK ve CHF kabul ediliyor.",
   payIyzicoNoGuarantee: "iyzico ödeme tahsil eder, kartı teminat olarak saklayamaz. Kart isteyip tahsilat yapmayan fiyatlar, hiçbir ödeme altyapısı bağlı değilmiş gibi kartsız rezerve edilir.",
+  payIyzicoNoRefunds: "İadeler buradan yapılmaz: iyzico rezervasyonunu burada her zamanki gibi iptal edin, iyzico üye iş yeri panelinden iade edin, ardından rezervasyon sayfasında iade edildi olarak işaretleyin. Misafir iptalinde otomatik iade bu altyapı için geçerli değildir.",
 
   // -- payments: 2C2P --
   pay2c2pDesc: "Güneydoğu Asya'da kartlar, cüzdanlar ve yerel ödeme yöntemleri, 2C2P'nin ödeme sayfasında.",
@@ -2303,12 +2304,25 @@ const TR: Record<string, string> = {
   pay2c2pSandboxToggle: "Bunlar sandbox bilgileridir",
   pay2c2pConnectedSandbox: "Bağlandı (sandbox)",
   pay2c2pNoGuarantee: "2C2P ödeme tahsil eder, kartı teminat olarak saklayamaz. Kart isteyip tahsilat yapmayan fiyatlar, hiçbir ödeme altyapısı bağlı değilmiş gibi kartsız rezerve edilir.",
-  pay2c2pNoRefunds: "İadeler henüz buradan yapılmıyor: 2C2P rezervasyonunu burada her zamanki gibi iptal edin, sonra 2C2P üye iş yeri portalından iade edin. Misafir iptalinde otomatik iade bu altyapı için geçerli değildir.",
+  pay2c2pNoRefunds: "İadeler buradan yapılmaz: 2C2P rezervasyonunu burada her zamanki gibi iptal edin, 2C2P üye iş yeri portalından iade edin, ardından rezervasyon sayfasında iade edildi olarak işaretleyin. Misafir iptalinde otomatik iade bu altyapı için geçerli değildir.",
   bkdPaidVia2c2p: "2C2P ile {amount} ödendi",
   bkd2c2pTranRef: "2C2P işlem referansı",
   bkd2c2pMerchant: "2C2P üye iş yeri",
   bkd2c2pInvoice: "2C2P fatura numarası",
-  bkd2c2pRefundManual: "Bu ödeme 2C2P üzerinden tahsil edildi. İadeyi 2C2P üye iş yeri portalından yapın — bu altyapı için buradan iade yapılamaz.",
+  bkdPaidViaIyzico: "iyzico ile {amount} ödendi",
+  bkdIyzicoPaymentId: "iyzico ödeme kimliği",
+  bkdIyzicoMerchant: "iyzico üye iş yeri",
+  bkdIyzicoBasket: "iyzico sepet kimliği",
+  bkdRefundManualGateway: "Bu ödeme {gateway} üzerinden tahsil edildi. İadeler buradan yapılmaz: iadeyi {gateway} üye iş yeri panelinden yapın, ardından aşağıda iade edildi olarak işaretleyin.",
+  bkdMarkRefundedAmount: "İade ettiğiniz tutar",
+  bkdMarkRefundedReference: "{gateway} iade referansı (isteğe bağlı)",
+  bkdMarkRefundedButton: "{amount} iade edildi olarak işaretle",
+  bkdMarkRefundedConfirm: "{amount} tutarını {gateway} üye iş yeri panelinden zaten iade ettiğinizi onaylıyor musunuz? Bu yalnızca rezervasyona kaydedilir — buradan para gönderilmez.",
+  bkdMarkRefundedHint: "Yalnızca iade {gateway} tarafında tamamlandıktan sonra. Rezervasyon başına bir iade.",
+  bkdMarkingRefunded: "Kaydediliyor…",
+  bkdMarkRefundedDone: "✓ İade edildi olarak işaretlendi.",
+  bkdRefundRecordedManually: "· {gateway} üzerinden iade edildi",
+  bkdRefundReference: "İade referansı",
 
 };
 

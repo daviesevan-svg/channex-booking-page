@@ -2231,6 +2231,7 @@ const EN: Record<string, string> = {
   payIyzicoEnvSandbox: "Sandbox",
   payIyzicoCurrency: "iyzico doesn't accept {currency}, which is this property's currency. It takes TRY, USD, EUR, GBP, NOK and CHF.",
   payIyzicoNoGuarantee: "iyzico takes payment; it can't hold a card as a guarantee. Rates that ask for a card without charging it will book without one, as they do with no gateway connected.",
+  payIyzicoNoRefunds: "Refunds aren't issued from here: cancel an iyzico booking here as usual, refund it in the iyzico merchant panel, then mark it refunded on the booking page. Automatic refunds on guest cancellation don't apply to this gateway.",
 
   // -- payments: 2C2P --
   pay2c2pDesc: "Cards, wallets and local payment methods across South-East Asia, on 2C2P's hosted page.",
@@ -2242,12 +2243,25 @@ const EN: Record<string, string> = {
   pay2c2pSandboxToggle: "These are sandbox credentials",
   pay2c2pConnectedSandbox: "Connected (sandbox)",
   pay2c2pNoGuarantee: "2C2P takes payment; it can't hold a card as a guarantee. Rates that ask for a card without charging it will book without one, as they do with no gateway connected.",
-  pay2c2pNoRefunds: "Refunds aren't issued from here yet: cancel a 2C2P booking here as usual, then refund it in the 2C2P merchant portal. Automatic refunds on guest cancellation don't apply to this gateway.",
+  pay2c2pNoRefunds: "Refunds aren't issued from here: cancel a 2C2P booking here as usual, refund it in the 2C2P merchant portal, then mark it refunded on the booking page. Automatic refunds on guest cancellation don't apply to this gateway.",
   bkdPaidVia2c2p: "Paid {amount} via 2C2P",
   bkd2c2pTranRef: "2C2P transaction ref",
   bkd2c2pMerchant: "2C2P merchant",
   bkd2c2pInvoice: "2C2P invoice number",
-  bkd2c2pRefundManual: "This payment was taken by 2C2P. Refund it in the 2C2P merchant portal — refunds can't be issued from here for this gateway.",
+  bkdPaidViaIyzico: "Paid {amount} via iyzico",
+  bkdIyzicoPaymentId: "iyzico payment ID",
+  bkdIyzicoMerchant: "iyzico merchant",
+  bkdIyzicoBasket: "iyzico basket ID",
+  bkdRefundManualGateway: "This payment was taken by {gateway}. Refunds aren't issued from here: refund it in the {gateway} merchant panel, then mark it refunded below.",
+  bkdMarkRefundedAmount: "Amount you refunded",
+  bkdMarkRefundedReference: "Refund reference from {gateway} (optional)",
+  bkdMarkRefundedButton: "Mark {amount} as refunded",
+  bkdMarkRefundedConfirm: "Confirm you've already refunded {amount} in the {gateway} merchant panel? This only records it on the booking — no money is sent from here.",
+  bkdMarkRefundedHint: "Only once the refund has gone through in {gateway}. One refund per booking.",
+  bkdMarkingRefunded: "Saving…",
+  bkdMarkRefundedDone: "✓ Marked as refunded.",
+  bkdRefundRecordedManually: "· refunded in {gateway}",
+  bkdRefundReference: "Refund reference",
 
 };
 

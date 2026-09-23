@@ -450,7 +450,7 @@ const FR: Dict = {
   cancelConfirmPartial: "Vous avez payé {paid}. En annulant maintenant, {refund} vous seront remboursés. Annuler cette réservation ? Cette action est irréversible.",
   refundedLabel: "Remboursé",
   refundOwedLabel: "Remboursement dû au client",
-  refundOwedManual2c2p: "Effectuez ce remboursement depuis le portail marchand 2C2P — les remboursements automatiques ne sont pas possibles avec cette passerelle.",
+  refundOwedManualGateway: "Effectuez ce remboursement depuis le portail marchand {gateway}, puis marquez-le comme remboursé sur la page de la réservation dans votre admin — les remboursements automatiques ne sont pas possibles avec cette passerelle.",
   refundOwedManual: "Pas encore remboursé — effectuez ce remboursement depuis la page de la réservation dans votre admin.",
   cancelBandUntil: "Jusqu’au {date}, nous facturons {penalty} en cas d’annulation.",
   ackPartial: "Je comprends qu’une annulation à partir de maintenant entraîne la facturation de {penalty}.",

@@ -2212,6 +2212,7 @@ const TH: Record<string, string> = {
   payIyzicoEnvSandbox: "Sandbox",
   payIyzicoCurrency: "iyzico ไม่รองรับ {currency} ซึ่งเป็นสกุลเงินของที่พักนี้ โดยรองรับ TRY, USD, EUR, GBP, NOK และ CHF",
   payIyzicoNoGuarantee: "iyzico เรียกเก็บเงินได้ แต่ไม่สามารถเก็บบัตรไว้เป็นหลักประกัน ราคาที่ขอบัตรโดยไม่เรียกเก็บเงินจะจองได้โดยไม่ต้องใช้บัตร เช่นเดียวกับกรณีที่ไม่ได้เชื่อมต่อช่องทางชำระเงินใด ๆ",
+  payIyzicoNoRefunds: "ไม่สามารถคืนเงินจากที่นี่: ยกเลิกการจอง iyzico ที่นี่ตามปกติ คืนเงินใน merchant panel ของ iyzico แล้วทำเครื่องหมายว่าคืนเงินแล้วในหน้าการจอง การคืนเงินอัตโนมัติเมื่อผู้เข้าพักยกเลิกไม่มีผลกับช่องทางนี้",
 
   // -- payments: 2C2P --
   pay2c2pDesc: "บัตร กระเป๋าเงินดิจิทัล และช่องทางชำระเงินท้องถิ่นทั่วเอเชียตะวันออกเฉียงใต้ บนหน้าชำระเงินของ 2C2P",
@@ -2223,12 +2224,25 @@ const TH: Record<string, string> = {
   pay2c2pSandboxToggle: "ข้อมูลนี้เป็นข้อมูลรับรองแบบ sandbox",
   pay2c2pConnectedSandbox: "เชื่อมต่อแล้ว (sandbox)",
   pay2c2pNoGuarantee: "2C2P เรียกเก็บเงินได้ แต่ไม่สามารถเก็บบัตรไว้เป็นหลักประกัน ราคาที่ขอบัตรโดยไม่เรียกเก็บเงินจะจองได้โดยไม่ต้องใช้บัตร เช่นเดียวกับกรณีที่ไม่ได้เชื่อมต่อช่องทางชำระเงินใด ๆ",
-  pay2c2pNoRefunds: "ยังไม่สามารถคืนเงินจากที่นี่: ยกเลิกการจอง 2C2P ที่นี่ตามปกติ แล้วคืนเงินใน merchant portal ของ 2C2P การคืนเงินอัตโนมัติเมื่อผู้เข้าพักยกเลิกไม่มีผลกับช่องทางนี้",
+  pay2c2pNoRefunds: "ไม่สามารถคืนเงินจากที่นี่: ยกเลิกการจอง 2C2P ที่นี่ตามปกติ คืนเงินใน merchant portal ของ 2C2P แล้วทำเครื่องหมายว่าคืนเงินแล้วในหน้าการจอง การคืนเงินอัตโนมัติเมื่อผู้เข้าพักยกเลิกไม่มีผลกับช่องทางนี้",
   bkdPaidVia2c2p: "ชำระ {amount} ผ่าน 2C2P",
   bkd2c2pTranRef: "หมายเลขอ้างอิงธุรกรรม 2C2P",
   bkd2c2pMerchant: "ร้านค้า 2C2P",
   bkd2c2pInvoice: "หมายเลขใบแจ้งหนี้ 2C2P",
-  bkd2c2pRefundManual: "การชำระเงินนี้เรียกเก็บผ่าน 2C2P โปรดคืนเงินใน merchant portal ของ 2C2P — ช่องทางนี้ไม่สามารถคืนเงินจากที่นี่ได้",
+  bkdPaidViaIyzico: "ชำระ {amount} ผ่าน iyzico",
+  bkdIyzicoPaymentId: "รหัสการชำระเงิน iyzico",
+  bkdIyzicoMerchant: "ร้านค้า iyzico",
+  bkdIyzicoBasket: "รหัสตะกร้า iyzico",
+  bkdRefundManualGateway: "การชำระเงินนี้เรียกเก็บผ่าน {gateway} ไม่สามารถคืนเงินจากที่นี่ได้: โปรดคืนเงินใน merchant panel ของ {gateway} แล้วทำเครื่องหมายว่าคืนเงินแล้วด้านล่าง",
+  bkdMarkRefundedAmount: "จำนวนเงินที่คุณคืน",
+  bkdMarkRefundedReference: "หมายเลขอ้างอิงการคืนเงินจาก {gateway} (ไม่บังคับ)",
+  bkdMarkRefundedButton: "ทำเครื่องหมายว่าคืน {amount} แล้ว",
+  bkdMarkRefundedConfirm: "ยืนยันว่าคุณคืนเงิน {amount} ใน merchant panel ของ {gateway} แล้วใช่ไหม? การดำเนินการนี้เป็นเพียงการบันทึกในการจอง — ไม่มีการส่งเงินจากที่นี่",
+  bkdMarkRefundedHint: "ทำหลังจากการคืนเงินใน {gateway} เสร็จสมบูรณ์แล้วเท่านั้น คืนเงินได้หนึ่งครั้งต่อการจอง",
+  bkdMarkingRefunded: "กำลังบันทึก…",
+  bkdMarkRefundedDone: "✓ ทำเครื่องหมายว่าคืนเงินแล้ว",
+  bkdRefundRecordedManually: "· คืนเงินผ่าน {gateway}",
+  bkdRefundReference: "หมายเลขอ้างอิงการคืนเงิน",
 
 };
 
