@@ -192,9 +192,9 @@ export async function rejectMismatchedC2pPayment(
  * 2C2P). The Stripe/Viva twins refund; here the money is made VISIBLE instead:
  * the booking is recorded as failed with the payment attached — it shows in the
  * admin as paid with the reason in its error, where the hotel refunds it in the
- * gateway's panel and marks it refunded — and the hotel gets the
- * booking-failed email. Best-effort like the other legs: never throws over the
- * bind error.
+ * gateway's panel and marks it refunded — and sendBookingFailedEmail tells the
+ * guest a refund is to follow and the hotel that it owes one. Best-effort like
+ * the other legs: never throws over the bind error.
  */
 async function holdMismatchedPayment(
   gateway: string,
@@ -638,7 +638,8 @@ export async function finalizeBooking(
       const r = await refundBookingCharge(pid, record, { by: "auto (unavailable at booking)" });
       if (r.ok) record = r.booking;
     });
-    // Tell the guest we couldn't confirm and have refunded them.
+    // Tell the guest we couldn't confirm — refunded, or (no refund recorded:
+    // iyzico/2C2P, or the refund failed) refund to follow, with the hotel told.
     await afterCommit(draft.reference, "booking-failed email", () => sendBookingFailedEmail(pid, record, origin));
   }
   return record;

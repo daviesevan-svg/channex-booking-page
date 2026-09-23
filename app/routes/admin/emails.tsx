@@ -50,6 +50,8 @@ const TEMPLATE_NAME_KEYS: Record<string, string> = {
   booking_cancellation: "navEmailBookingCancellation",
   cancellation_notification: "navEmailCancellationNotification",
   booking_failed: "navEmailBookingFailed",
+  booking_failed_refund_pending: "navEmailBookingFailedPending",
+  booking_failed_notification: "navEmailBookingFailedNotification",
   review_request: "navEmailReviewRequest",
 };
 

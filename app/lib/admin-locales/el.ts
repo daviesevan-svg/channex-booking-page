@@ -85,6 +85,8 @@ const EL: Record<string, string> = {
   navEmailBookingCancellation: "Ακύρωση (επισκέπτης)",
   navEmailCancellationNotification: "Ακύρωση (σε εσάς)",
   navEmailBookingFailed: "Αδυναμία επιβεβαίωσης (επισκέπτης)",
+  navEmailBookingFailedPending: "Αδυναμία επιβεβαίωσης, επιστροφή σε εκκρεμότητα (επισκέπτης)",
+  navEmailBookingFailedNotification: "Αδυναμία επιβεβαίωσης, οφειλόμενη επιστροφή (σε εσάς)",
   navEmailReviewRequest: "Αίτημα κριτικής",
   loginCheckEmail: "Ελέγξτε το email σας",
   loginLinkSent: "Σας στείλαμε με email έναν σύνδεσμο σύνδεσης. Λήγει σε 15 λεπτά. Αν είναι η πρώτη σας φορά, ο σύνδεσμος δημιουργεί τον λογαριασμό σας.",

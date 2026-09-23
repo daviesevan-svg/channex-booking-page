@@ -91,6 +91,8 @@ const TR: Record<string, string> = {
   navEmailBookingCancellation: "İptal (misafire)",
   navEmailCancellationNotification: "İptal (size)",
   navEmailBookingFailed: "Onaylanamadı (misafire)",
+  navEmailBookingFailedPending: "Onaylanamadı, iade yapılacak (misafire)",
+  navEmailBookingFailedNotification: "Onaylanamadı, iade bekliyor (size)",
   navEmailReviewRequest: "Değerlendirme daveti",
   loginCheckEmail: "E-postanızı kontrol edin",
   loginLinkSent:

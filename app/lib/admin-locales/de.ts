@@ -96,6 +96,8 @@ const DE: Record<string, string> = {
   navEmailBookingCancellation: "Stornierung (Gast)",
   navEmailCancellationNotification: "Stornierung (an Sie)",
   navEmailBookingFailed: "Nicht bestätigt (Gast)",
+  navEmailBookingFailedPending: "Nicht bestätigt, Erstattung folgt (Gast)",
+  navEmailBookingFailedNotification: "Nicht bestätigt, Erstattung offen (an Sie)",
   navEmailReviewRequest: "Bewertungsanfrage",
 
   // -- login --

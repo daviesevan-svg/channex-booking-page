@@ -209,6 +209,72 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
       outro: "Yaşattığımız hayal kırıklığı için üzgünüz. Farklı tarihler deneyin; yardımcı olabileceksek bize yazın.",
     },
   },
+  // Same subject and heading as booking_failed; only the refund sentence differs.
+  booking_failed_refund_pending: {
+    fr: {
+      subject: "Nous n'avons pas pu confirmer votre réservation à {hotel_name} ({reference})",
+      heading: "Désolé, {guest_first_name} — nous n'avons pas pu confirmer votre réservation",
+      intro:
+        "Malheureusement, la chambre s'est vendue avant la fin de votre paiement et nous n'avons pas pu confirmer votre séjour à {hotel_name}. Vous avez droit au remboursement intégral de {refund_amount} : l'hôtel le reversera sur votre carte, et il peut ensuite falloir quelques jours pour qu'il apparaisse.",
+      outro: "Nous sommes désolés de cette déception. Si le remboursement ne vous est pas parvenu d'ici une semaine, répondez simplement à cet e-mail.",
+    },
+    de: {
+      subject: "Wir konnten Ihre Buchung bei {hotel_name} nicht bestätigen ({reference})",
+      heading: "Es tut uns leid, {guest_first_name} — wir konnten Ihre Buchung nicht bestätigen",
+      intro:
+        "Leider war das Zimmer ausverkauft, bevor Ihre Zahlung abgeschlossen war, sodass wir Ihren Aufenthalt bei {hotel_name} nicht bestätigen konnten. Ihnen steht eine vollständige Erstattung von {refund_amount} zu: Das Hotel erstattet den Betrag auf Ihre Karte, danach kann es einige Tage dauern, bis er erscheint.",
+      outro: "Die Enttäuschung tut uns leid. Falls die Erstattung nicht innerhalb einer Woche bei Ihnen eingeht, antworten Sie einfach auf diese E-Mail.",
+    },
+    es: {
+      subject: "No hemos podido confirmar tu reserva en {hotel_name} ({reference})",
+      heading: "Lo sentimos, {guest_first_name}: no hemos podido confirmar tu reserva",
+      intro:
+        "Lamentablemente, la habitación se agotó antes de completarse tu pago, así que no hemos podido confirmar tu estancia en {hotel_name}. Tienes derecho al reembolso íntegro de {refund_amount}: el hotel te lo devolverá en tu tarjeta y, después, puede tardar unos días en aparecer.",
+      outro: "Sentimos la decepción. Si el reembolso no te ha llegado en una semana, responde a este correo.",
+    },
+    it: {
+      subject: "Non siamo riusciti a confermare la tua prenotazione presso {hotel_name} ({reference})",
+      heading: "Ci dispiace, {guest_first_name} — non siamo riusciti a confermare la tua prenotazione",
+      intro:
+        "Purtroppo la camera è andata esaurita prima che il pagamento fosse completato, quindi non abbiamo potuto confermare il tuo soggiorno presso {hotel_name}. Ti spetta il rimborso integrale di {refund_amount}: l'hotel lo riaccrediterà sulla tua carta, e poi potrebbero volerci alcuni giorni perché compaia.",
+      outro: "Ci dispiace per la delusione. Se il rimborso non ti è arrivato entro una settimana, rispondi pure a questa email.",
+    },
+    pt: {
+      subject: "Não conseguimos confirmar a sua reserva em {hotel_name} ({reference})",
+      heading: "Lamentamos, {guest_first_name} — não conseguimos confirmar a sua reserva",
+      intro:
+        "Infelizmente, o quarto esgotou antes de o seu pagamento ficar concluído, pelo que não conseguimos confirmar a sua estadia em {hotel_name}. Tem direito ao reembolso total de {refund_amount}: o hotel vai devolvê-lo para o seu cartão e, depois disso, pode demorar alguns dias a aparecer.",
+      outro: "Lamentamos a desilusão. Se o reembolso não lhe chegar no prazo de uma semana, basta responder a este e-mail.",
+    },
+    nl: {
+      subject: "We konden je boeking bij {hotel_name} niet bevestigen ({reference})",
+      heading: "Sorry, {guest_first_name} — we konden je boeking niet bevestigen",
+      intro:
+        "Helaas was de kamer uitverkocht voordat je betaling was afgerond, dus we konden je verblijf bij {hotel_name} niet bevestigen. Je krijgt {refund_amount} volledig terug: het hotel stort het bedrag terug op je kaart, en daarna kan het een paar dagen duren voordat je het ziet.",
+      outro: "Sorry voor de teleurstelling. Heb je de terugbetaling binnen een week nog niet ontvangen? Beantwoord dan gewoon deze e-mail.",
+    },
+    el: {
+      subject: "Δεν μπορέσαμε να επιβεβαιώσουμε την κράτησή σας στο {hotel_name} ({reference})",
+      heading: "Λυπούμαστε, {guest_first_name} — δεν μπορέσαμε να επιβεβαιώσουμε την κράτησή σας",
+      intro:
+        "Δυστυχώς το δωμάτιο εξαντλήθηκε πριν ολοκληρωθεί η πληρωμή σας, οπότε δεν μπορέσαμε να επιβεβαιώσουμε τη διαμονή σας στο {hotel_name}. Δικαιούστε πλήρη επιστροφή {refund_amount}: το ξενοδοχείο θα την κάνει στην κάρτα σας και έπειτα ίσως χρειαστούν λίγες ημέρες για να εμφανιστεί.",
+      outro: "Λυπούμαστε για την απογοήτευση. Αν η επιστροφή δεν έχει φτάσει μέσα σε μία εβδομάδα, απλώς απαντήστε σε αυτό το email.",
+    },
+    th: {
+      subject: "เราไม่สามารถยืนยันการจองของคุณที่ {hotel_name} ({reference})",
+      heading: "ขออภัย คุณ{guest_first_name} — เราไม่สามารถยืนยันการจองของคุณได้",
+      intro:
+        "น่าเสียดายที่ห้องพักถูกจองเต็มก่อนการชำระเงินของคุณจะเสร็จสมบูรณ์ เราจึงไม่สามารถยืนยันการเข้าพักของคุณที่ {hotel_name} ได้ คุณจะได้รับเงินคืนเต็มจำนวน {refund_amount} โดยโรงแรมจะคืนเงินไปยังบัตรของคุณ และหลังจากนั้นอาจใช้เวลาสองสามวันจึงจะปรากฏ",
+      outro: "ขออภัยที่ทำให้ผิดหวัง หากยังไม่ได้รับเงินคืนภายในหนึ่งสัปดาห์ เพียงตอบกลับอีเมลนี้",
+    },
+    tr: {
+      subject: "{hotel_name} rezervasyonunuzu onaylayamadık ({reference})",
+      heading: "Üzgünüz {guest_first_name} — rezervasyonunuzu onaylayamadık",
+      intro:
+        "Ne yazık ki ödemeniz tamamlanmadan oda tükendi ve {hotel_name} konaklamanızı onaylayamadık. {refund_amount} tutarının tamamı size iade edilecek: iadeyi otel kartınıza yapacak, ardından görünmesi birkaç gün sürebilir.",
+      outro: "Yaşattığımız hayal kırıklığı için üzgünüz. İade bir hafta içinde size ulaşmazsa bu e-postayı yanıtlamanız yeterli.",
+    },
+  },
   review_request: {
     fr: {
       subject: "Comment s'est passé votre séjour à {hotel_name} ?",

@@ -96,6 +96,8 @@ const EN: Record<string, string> = {
   navEmailBookingCancellation: "Cancellation (guest)",
   navEmailCancellationNotification: "Cancellation (to you)",
   navEmailBookingFailed: "Couldn't confirm (guest)",
+  navEmailBookingFailedPending: "Couldn't confirm, refund to follow (guest)",
+  navEmailBookingFailedNotification: "Couldn't confirm, refund owed (to you)",
   navEmailReviewRequest: "Review request",
 
   // -- login --

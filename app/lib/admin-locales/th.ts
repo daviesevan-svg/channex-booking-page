@@ -96,6 +96,8 @@ const TH: Record<string, string> = {
   navEmailBookingCancellation: "การยกเลิก (ผู้เข้าพัก)",
   navEmailCancellationNotification: "การยกเลิก (ถึงคุณ)",
   navEmailBookingFailed: "ยืนยันไม่สำเร็จ (ผู้เข้าพัก)",
+  navEmailBookingFailedPending: "ยืนยันไม่สำเร็จ รอคืนเงิน (ผู้เข้าพัก)",
+  navEmailBookingFailedNotification: "ยืนยันไม่สำเร็จ ต้องคืนเงิน (ถึงคุณ)",
   navEmailReviewRequest: "คำขอรีวิว",
 
   // -- login --

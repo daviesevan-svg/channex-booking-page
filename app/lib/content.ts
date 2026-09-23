@@ -849,6 +849,16 @@ const FAILED_TOKENS: TokenDef[] = [
   ...GUEST_TOKENS.filter((t) => t.token !== "{manage_url}"),
   { token: "{refund_amount}", desc: "Amount refunded to the guest, with currency" },
 ];
+// The same email when the money has NOT gone back yet (iyzico/2C2P, or an
+// automatic refund that failed): {refund_amount} is what the guest is owed.
+const FAILED_PENDING_TOKENS: TokenDef[] = [
+  ...GUEST_TOKENS.filter((t) => t.token !== "{manage_url}"),
+  { token: "{refund_amount}", desc: "Amount the guest paid and is owed back, with currency" },
+];
+const FAILED_HOST_TOKENS: TokenDef[] = [
+  ...HOST_TOKENS.filter((t) => t.token !== "{manage_url}"),
+  { token: "{refund_amount}", desc: "Amount the guest paid and is owed back, with currency" },
+];
 // The review request has no money/manage link — just stay context. The star
 // rating buttons and the review link are rendered by the system, not typed.
 const REVIEW_TOKENS: TokenDef[] = [
@@ -930,6 +940,38 @@ export const EMAIL_TEMPLATES: EmailDef[] = [
       intro:
         "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. We've refunded {refund_amount} in full to your card — it can take a few days to appear.",
       outro: "We're sorry for the disappointment. Please try different dates, and do reach out if we can help.",
+    }),
+  },
+  {
+    // Sent instead of booking_failed when the charge is still with the hotel:
+    // a gateway we never refund through (manual-refunds.ts) or a failed
+    // automatic refund. Says the refund is coming, never that it has been made.
+    id: "booking_failed_refund_pending",
+    label: "Couldn't confirm, refund to follow (to guest)",
+    recipient: "guest",
+    tokens: FAILED_PENDING_TOKENS,
+    fields: emailFields({
+      subject: "We couldn't confirm your booking at {hotel_name} ({reference})",
+      heading: "Sorry, {guest_first_name} — we couldn't confirm your booking",
+      intro:
+        "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. You're owed a full refund of {refund_amount}: the hotel will send it back to your card, and it can take a few days to appear after that.",
+      outro: "We're sorry for the disappointment. If the refund hasn't reached you within a week, just reply to this email.",
+    }),
+  },
+  {
+    // The hotel's half of booking_failed_refund_pending: money came in, nothing
+    // was booked, and nobody has sent it back. Always sent when there is a host
+    // address — it is money owed, not a notification the hotel opts into.
+    id: "booking_failed_notification",
+    label: "Couldn't confirm, refund owed (to you)",
+    recipient: "host",
+    tokens: FAILED_HOST_TOKENS,
+    fields: emailFields({
+      subject: "Refund needed: {guest_first_name} {guest_last_name} paid {refund_amount} — {reference}",
+      heading: "A guest paid, but the booking couldn't be confirmed",
+      intro:
+        "{guest_first_name} {guest_last_name} paid {refund_amount}, but the stay couldn't be confirmed, so nothing was booked. The payment has NOT been refunded. Refund it in your payment provider's merchant panel, then open the booking in your admin and mark it refunded.",
+      outro: "",
     }),
   },
   {

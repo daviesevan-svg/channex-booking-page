@@ -503,6 +503,18 @@ export function composeReviewEmail(args: {
  *  in the database — see routes/property/review.tsx. */
 export const SAMPLE_BOOKING_ID = "sample";
 
+/** The sample booking as a given template would really see it. The
+ *  refund-still-owed templates are only sent when no refund was recorded, so
+ *  their preview must not show a "Refunded" row under "has NOT been refunded". */
+export function sampleBookingFor(templateId: string, currency = "GBP"): BookingRecord {
+  const b = sampleBooking(currency);
+  if ((templateId === "booking_failed_refund_pending" || templateId === "booking_failed_notification") && b.payment) {
+    const { refund: _refund, ...payment } = b.payment;
+    return { ...b, status: "failed", payment };
+  }
+  return b;
+}
+
 /** A representative booking for editor previews + test sends. */
 export function sampleBooking(currency = "GBP"): BookingRecord {
   return {
