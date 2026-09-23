@@ -11,8 +11,9 @@
 import { updateBooking, type BookingRecord } from "./bookings.server";
 import { createRefund } from "./stripe.server";
 import { fromStripeMinor, toStripeMinor } from "./money";
-import { getVivaConfig } from "./overrides.server";
+import { getIyzicoConfig, getVivaConfig } from "./overrides.server";
 import { fromVivaMinor, toVivaMinor, vivaRefund } from "./viva.server";
+import { iyzicoRefund } from "./iyzico.server";
 import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 
 export type RefundOutcome =
@@ -38,7 +39,8 @@ export async function refundBookingCharge(
   // admin button) already treats a not-ok outcome as "the hotel handles it".
   if (p.provider === "2c2p") return { ok: false, reason: "unsupported" };
   if (p.provider === "viva" && !p.transactionId) return { ok: false, reason: "no_charge" };
-  if (p.provider !== "viva" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
+  if (p.provider === "iyzico" && !p.transactionId) return { ok: false, reason: "no_charge" };
+  if (p.provider !== "viva" && p.provider !== "iyzico" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
 
   const charged = p.amount ?? 0;
   const currency = p.currency || booking.currency;
@@ -77,6 +79,24 @@ export async function refundBookingCharge(
       };
     } catch (e) {
       console.log(`[refund] failed for booking=${booking.reference} viva tx=${p.transactionId}: ${e instanceof Error ? e.message : e}`);
+      // Nothing left the account: hand the claim back so a retry can try again.
+      await releaseRefundClaim(claimKey);
+      return { ok: false, reason: "error" };
+    }
+  } else if (p.provider === "iyzico") {
+    const iyzico = await getIyzicoConfig(pid);
+    if (!iyzico) {
+      console.log(`[refund] iyzico credentials missing for pid=${pid} booking=${booking.reference}`);
+      await releaseRefundClaim(claimKey);
+      return { ok: false, reason: "error" };
+    }
+    try {
+      const amount = partial ?? charged;
+      const r = await iyzicoRefund(iyzico, p.transactionId!, amount, currency);
+      if (!r.refunded) throw new Error(r.message ?? "iyzico refused the refund");
+      refund = { id: p.transactionId!, amount, currency: p.currency };
+    } catch (e) {
+      console.log(`[refund] failed for booking=${booking.reference} iyzico tx=${p.transactionId}: ${e instanceof Error ? e.message : e}`);
       // Nothing left the account: hand the claim back so a retry can try again.
       await releaseRefundClaim(claimKey);
       return { ok: false, reason: "error" };
