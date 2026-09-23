@@ -64,8 +64,21 @@ vi.mock("./viva.server", async (importOriginal) => {
   };
 });
 
+const iyzicoCalls: unknown[][] = [];
+vi.mock("./iyzico.server", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("./iyzico.server")>();
+  return {
+    ...mod,
+    iyzicoRefund: vi.fn(async (...args: unknown[]) => {
+      iyzicoCalls.push(args);
+      return { refunded: true };
+    }),
+  };
+});
+
 const PID = "p1";
 store.set(`viva_config:${PID}`, JSON.stringify({ merchantId: "m", apiKey: "k", clientId: "c", clientSecret: "s", sourceCode: "1", demo: true }));
+store.set(`iyzico_config:${PID}`, JSON.stringify({ apiKey: "k", secretKey: "s", merchantId: "m" }));
 
 describe("claimRefund", () => {
   it("lets exactly one caller through, and a released claim can be won again", async () => {
@@ -143,6 +156,72 @@ describe("refundBookingCharge (Viva)", () => {
     expect(after.payment?.refund?.id).toBe("rf_1");
     expect(await refundBookingCharge(PID, after)).toMatchObject({ ok: false, reason: "already_refunded" });
     expect(vivaCalls).toHaveLength(1);
+  });
+});
+
+describe("refundBookingCharge (iyzico)", () => {
+  it("calls iyzicoRefund exactly once and records payment.refund on success", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { refundBookingCharge } = await import("./refunds.server");
+    const draft = {
+      id: "b-iyzico",
+      reference: "IYZICO01",
+      status: "confirmed",
+      createdAt: "2026-09-02T00:00:00Z",
+      checkin: "2026-10-01",
+      checkout: "2026-10-03",
+      nights: 2,
+      rooms: [],
+      total: 120,
+      currency: "EUR",
+      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
+      payment: { provider: "iyzico", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_iyz_1", amount: 120, currency: "EUR" },
+    } as never;
+    expect((await claimBooking(PID, draft)).won).toBe(true);
+    const booking = (await getBooking(PID, "b-iyzico"))!;
+
+    iyzicoCalls.length = 0;
+    const outcomes = await Promise.all([
+      refundBookingCharge(PID, booking, { by: "guest" }),
+      refundBookingCharge(PID, booking, { by: "guest-dup" }),
+      refundBookingCharge(PID, booking, { by: "admin" }),
+    ]);
+    expect(iyzicoCalls).toHaveLength(1);
+    expect(iyzicoCalls[0][1]).toBe("tx_iyz_1");
+    expect(outcomes.filter((o) => o.ok)).toHaveLength(1);
+    expect(outcomes.filter((o) => !o.ok && o.reason === "already_refunded")).toHaveLength(2);
+    const after = (await getBooking(PID, "b-iyzico"))!;
+    expect(after.payment?.refund?.id).toBe("tx_iyz_1");
+    expect(after.payment?.refund?.amount).toBe(120);
+  });
+
+  it("reports a gateway refusal as an error and leaves the claim for a retry", async () => {
+    const { claimBooking, getBooking } = await import("./bookings.server");
+    const { refundBookingCharge } = await import("./refunds.server");
+    const draft = {
+      id: "b-iyzico-refuse",
+      reference: "IYZICO02",
+      status: "confirmed",
+      createdAt: "2026-09-02T00:00:00Z",
+      checkin: "2026-10-01",
+      checkout: "2026-10-03",
+      nights: 2,
+      rooms: [],
+      total: 120,
+      currency: "EUR",
+      guest: { firstName: "A", lastName: "B", email: "a@example.com", phone: "" },
+      payment: { provider: "iyzico", mode: "payment", accountId: "m", sessionId: "o", transactionId: "tx_iyz_2", amount: 120, currency: "EUR" },
+    } as never;
+    expect((await claimBooking(PID, draft)).won).toBe(true);
+    const booking = (await getBooking(PID, "b-iyzico-refuse"))!;
+
+    const { iyzicoRefund } = await import("./iyzico.server");
+    vi.mocked(iyzicoRefund).mockResolvedValueOnce({ refunded: false, message: "insufficient funds" });
+    expect(await refundBookingCharge(PID, booking)).toEqual({ ok: false, reason: "error" });
+    const after = (await getBooking(PID, "b-iyzico-refuse"))!;
+    expect(after.payment?.refund).toBeUndefined();
+    // Claim was released: a retry can win it and reach the gateway again.
+    expect(await refundBookingCharge(PID, after)).toMatchObject({ ok: true });
   });
 });
 
