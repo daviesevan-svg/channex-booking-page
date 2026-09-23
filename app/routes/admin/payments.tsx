@@ -575,6 +575,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
               </DetailRow>
             </dl>
             <p className="mt-3 text-[12px] leading-[1.5] text-muted-2">{t("payIyzicoNoGuarantee")}</p>
+            <Note>{t("payIyzicoNoRefunds")}</Note>
             <div className="mt-5">{disconnect("iyzico-disconnect")}</div>
           </Panel>
         )}
@@ -679,6 +680,7 @@ export default function AdminPayments({ loaderData, actionData }: Route.Componen
                       <input type="checkbox" name="sandbox" className="h-4 w-4 rounded border-line-alt text-accent focus:ring-accent" />
                       {t("payIyzicoSandboxToggle")}
                     </label>
+                    <p className="text-[12px] leading-[1.5] text-muted">{t("payIyzicoNoRefunds")}</p>
                     <div className="mt-1">
                       <button type="submit" disabled={busy || !iyzicoCurrencyOk} className={PRIMARY_BUTTON}>
                         {busy ? t("payIyzicoVerifying") : t("payIyzicoConnect")}

@@ -5,6 +5,7 @@ import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
 import { policyRefundNow } from "./cancel-gate";
+import { isManualRefundGateway, manualRefundGatewayName } from "./manual-refunds";
 import { cancellationBandMessages, formatCancelDeadline, penaltyText } from "./cancellation";
 import type { EmailDef, LegalLink, SiteSettings } from "./content";
 import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
@@ -228,10 +229,11 @@ function detailsHtml(
   // Cancelled, charged, and nothing sent back yet: tell the HOTEL what the
   // policy owes the guest and where to issue it. An automatic refund records
   // payment.refund before this email is composed, so this row only appears when
-  // the refund still has to be made by hand — always for 2C2P, which has no
-  // refund API wired, and for any gateway when automatic refunds are off or
-  // failed. Measured at the moment of cancellation, not at send time, so a
-  // delayed email can't slide the booking into a later, stricter band.
+  // the refund still has to be made by hand — always for iyzico and 2C2P,
+  // which we never refund through (manual-refunds.ts), and for any gateway
+  // when automatic refunds are off or failed. Measured at the moment of
+  // cancellation, not at send time, so a delayed email can't slide the booking
+  // into a later, stricter band.
   const owed =
     opts.recipient === "host" && booking.lifecycle === "cancelled" && !booking.payment?.refund
       ? policyRefundNow(booking, booking.cancelledAt ? Date.parse(booking.cancelledAt) : Date.now())
@@ -239,7 +241,11 @@ function detailsHtml(
   const owedBlock =
     owed && owed.refund > 0
       ? `<table role="presentation" width="100%" style="margin-top:6px;">${ROW(tr.t("refundOwedLabel"), money(owed.refund), true)}</table>
-         <p style="margin:4px 0 0;color:#9a6a1e;font-size:12px;">${esc(tr.t(booking.payment?.provider === "2c2p" ? "refundOwedManual2c2p" : "refundOwedManual"))}</p>`
+         <p style="margin:4px 0 0;color:#9a6a1e;font-size:12px;">${esc(
+           isManualRefundGateway(booking.payment?.provider)
+             ? tr.t("refundOwedManualGateway", { gateway: manualRefundGatewayName(booking.payment.provider) })
+             : tr.t("refundOwedManual"),
+         )}</p>`
       : "";
 
   const manageBtn =

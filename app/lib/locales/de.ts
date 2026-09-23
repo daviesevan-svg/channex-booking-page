@@ -450,7 +450,7 @@ const DE: Dict = {
   cancelConfirmPartial: "Sie haben {paid} gezahlt. Bei einer Stornierung jetzt werden {refund} erstattet. Buchung stornieren? Dies kann nicht rückgängig gemacht werden.",
   refundedLabel: "Erstattet",
   refundOwedLabel: "Dem Gast geschuldete Erstattung",
-  refundOwedManual2c2p: "Veranlassen Sie diese Erstattung im 2C2P-Händlerportal – für dieses Gateway sind automatische Erstattungen nicht möglich.",
+  refundOwedManualGateway: "Veranlassen Sie diese Erstattung im {gateway}-Händlerportal und markieren Sie sie dann auf der Buchungsseite in Ihrem Admin als erstattet – für dieses Gateway erfolgen keine automatischen Erstattungen.",
   refundOwedManual: "Noch nicht erstattet – veranlassen Sie diese Erstattung über die Buchungsseite in Ihrem Admin.",
   cancelBandUntil: "Bis {date} berechnen wir bei Stornierung {penalty}.",
   ackPartial: "Ich verstehe, dass bei einer Stornierung ab jetzt {penalty} berechnet wird.",

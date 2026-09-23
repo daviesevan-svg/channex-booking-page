@@ -51,12 +51,20 @@ const render = (booking: BookingRecord, recipient: "host" | "guest" = "host") =>
   }).html;
 
 describe("host cancellation email: refund owed", () => {
-  it("names the amount and points a 2C2P hotel at the merchant portal", () => {
+  it("names the amount and points a 2C2P hotel at the merchant panel", () => {
     const html = render(cancelled({}));
     expect(html).toContain("Refund owed to guest");
     expect(html).toContain("180.00");
-    expect(html).toContain("2C2P merchant portal");
+    expect(html).toContain("2C2P merchant panel");
     expect(html).not.toContain("Refunded");
+  });
+
+  it("points an iyzico hotel at the iyzico panel, then back to mark it refunded", () => {
+    const html = render(cancelled({ provider: "iyzico" }));
+    expect(html).toContain("Refund owed to guest");
+    expect(html).toContain("iyzico merchant panel");
+    expect(html).toContain("mark it refunded");
+    expect(html).not.toContain("2C2P");
   });
 
   it("tells other gateways to refund from the booking page", () => {

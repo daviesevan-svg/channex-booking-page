@@ -450,7 +450,7 @@ const NL: Dict = {
   cancelConfirmPartial: "Je hebt {paid} betaald. Bij annulering nu wordt {refund} terugbetaald. Deze boeking annuleren? Dit kan niet ongedaan worden gemaakt.",
   refundedLabel: "Terugbetaald",
   refundOwedLabel: "Aan de gast verschuldigde terugbetaling",
-  refundOwedManual2c2p: "Voer deze terugbetaling uit in het 2C2P-merchantportaal — automatische terugbetalingen zijn met deze gateway niet mogelijk.",
+  refundOwedManualGateway: "Voer deze terugbetaling uit in het {gateway}-merchantportaal en markeer ze daarna als terugbetaald op de boekingspagina in uw beheer — automatische terugbetalingen zijn met deze gateway niet mogelijk.",
   refundOwedManual: "Nog niet terugbetaald — voer deze terugbetaling uit via de boekingspagina in uw beheer.",
   cancelBandUntil: "Tot {date} brengen wij bij annulering {penalty} in rekening.",
   ackPartial: "Ik begrijp dat bij annulering vanaf nu {penalty} in rekening wordt gebracht.",

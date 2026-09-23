@@ -50,8 +50,10 @@ export interface PaymentInfo {
   cardLast4?: string;
   cardBrand?: string;
   /** Set once the charge has been refunded (full or partial). `by` is the admin
-   *  who issued it, or an "auto …" marker for automatic refunds. */
-  refund?: { id: string; amount: number; currency?: string; at: string; by?: string };
+   *  who issued it, or an "auto …" marker for automatic refunds. `manual`: the
+   *  hotel refunded it in the gateway's own panel and confirmed it here (iyzico,
+   *  2C2P); `id` is then the reference they gave, or "manual". */
+  refund?: { id: string; amount: number; currency?: string; at: string; by?: string; manual?: boolean };
 }
 
 export interface BookingRoom {

@@ -2214,6 +2214,7 @@ const PT: Record<string, string> = {
   payIyzicoEnvSandbox: "Sandbox",
   payIyzicoCurrency: "A iyzico não aceita {currency}, que é a moeda desta propriedade. Aceita TRY, USD, EUR, GBP, NOK e CHF.",
   payIyzicoNoGuarantee: "A iyzico cobra pagamentos, mas não guarda um cartão como garantia. As tarifas que pedem cartão sem cobrar ficam reservadas sem cartão, como acontece sem nenhum gateway ligado.",
+  payIyzicoNoRefunds: "Os reembolsos não são feitos a partir daqui: cancele a reserva iyzico aqui como habitualmente, reembolse-a no painel de comerciante da iyzico e depois marque-a como reembolsada na página da reserva. Os reembolsos automáticos em cancelamentos de hóspedes não se aplicam a este gateway.",
 
   // -- payments: 2C2P --
   pay2c2pDesc: "Cartões, carteiras digitais e métodos de pagamento locais no Sudeste Asiático, na página alojada da 2C2P.",
@@ -2225,12 +2226,25 @@ const PT: Record<string, string> = {
   pay2c2pSandboxToggle: "Estas são credenciais de sandbox",
   pay2c2pConnectedSandbox: "Ligado (sandbox)",
   pay2c2pNoGuarantee: "A 2C2P cobra pagamentos, mas não guarda um cartão como garantia. As tarifas que pedem cartão sem cobrar ficam reservadas sem cartão, como acontece sem nenhum gateway ligado.",
-  pay2c2pNoRefunds: "Os reembolsos ainda não são feitos a partir daqui: cancele a reserva 2C2P aqui como habitualmente e reembolse-a depois no portal de comerciante da 2C2P. Os reembolsos automáticos em cancelamentos de hóspedes não se aplicam a este gateway.",
+  pay2c2pNoRefunds: "Os reembolsos não são feitos a partir daqui: cancele a reserva 2C2P aqui como habitualmente, reembolse-a no portal de comerciante da 2C2P e depois marque-a como reembolsada na página da reserva. Os reembolsos automáticos em cancelamentos de hóspedes não se aplicam a este gateway.",
   bkdPaidVia2c2p: "Pago {amount} via 2C2P",
   bkd2c2pTranRef: "Referência de transação 2C2P",
   bkd2c2pMerchant: "Comerciante 2C2P",
   bkd2c2pInvoice: "Número de fatura 2C2P",
-  bkd2c2pRefundManual: "Este pagamento foi cobrado pela 2C2P. Reembolse-o no portal de comerciante da 2C2P — para este gateway não é possível reembolsar a partir daqui.",
+  bkdPaidViaIyzico: "Pago {amount} via iyzico",
+  bkdIyzicoPaymentId: "ID de pagamento iyzico",
+  bkdIyzicoMerchant: "Comerciante iyzico",
+  bkdIyzicoBasket: "ID do cesto iyzico",
+  bkdRefundManualGateway: "Este pagamento foi cobrado pela {gateway}. Os reembolsos não são feitos a partir daqui: reembolse-o no painel de comerciante da {gateway} e depois marque-o como reembolsado abaixo.",
+  bkdMarkRefundedAmount: "Valor que reembolsou",
+  bkdMarkRefundedReference: "Referência do reembolso na {gateway} (opcional)",
+  bkdMarkRefundedButton: "Marcar {amount} como reembolsado",
+  bkdMarkRefundedConfirm: "Confirma que já reembolsou {amount} no painel de comerciante da {gateway}? Isto apenas fica registado na reserva — não é enviado dinheiro a partir daqui.",
+  bkdMarkRefundedHint: "Só depois de o reembolso estar concluído na {gateway}. Um reembolso por reserva.",
+  bkdMarkingRefunded: "A guardar…",
+  bkdMarkRefundedDone: "✓ Marcado como reembolsado.",
+  bkdRefundRecordedManually: "· reembolsado na {gateway}",
+  bkdRefundReference: "Referência do reembolso",
 
 };
 

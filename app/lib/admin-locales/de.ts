@@ -2220,6 +2220,7 @@ const DE: Record<string, string> = {
   payIyzicoEnvSandbox: "Sandbox",
   payIyzicoCurrency: "iyzico akzeptiert {currency} nicht – die Währung dieser Unterkunft. Möglich sind TRY, USD, EUR, GBP, NOK und CHF.",
   payIyzicoNoGuarantee: "iyzico zieht Zahlungen ein, kann aber keine Karte als Garantie hinterlegen. Tarife, die eine Karte ohne Belastung verlangen, werden ohne Karte gebucht – wie ohne verbundenes Zahlungssystem.",
+  payIyzicoNoRefunds: "Erstattungen erfolgen nicht von hier aus: Stornieren Sie eine iyzico-Buchung hier wie gewohnt, erstatten Sie sie im iyzico-Händlerportal und markieren Sie sie dann auf der Buchungsseite als erstattet. Automatische Erstattungen bei Gaststornierung gelten nicht für dieses Gateway.",
 
   // -- payments: 2C2P --
   pay2c2pDesc: "Karten, Wallets und lokale Zahlungsmethoden in Südostasien, auf der Zahlungsseite von 2C2P.",
@@ -2231,12 +2232,25 @@ const DE: Record<string, string> = {
   pay2c2pSandboxToggle: "Dies sind Sandbox-Zugangsdaten",
   pay2c2pConnectedSandbox: "Verbunden (Sandbox)",
   pay2c2pNoGuarantee: "2C2P zieht Zahlungen ein, kann aber keine Karte als Garantie hinterlegen. Raten, die eine Karte ohne Belastung verlangen, werden ohne Karte gebucht – wie ohne verbundenes Gateway.",
-  pay2c2pNoRefunds: "Erstattungen erfolgen noch nicht von hier aus: Stornieren Sie eine 2C2P-Buchung hier wie gewohnt und erstatten Sie sie dann im 2C2P-Händlerportal. Automatische Erstattungen bei Gaststornierung gelten nicht für dieses Gateway.",
+  pay2c2pNoRefunds: "Erstattungen erfolgen nicht von hier aus: Stornieren Sie eine 2C2P-Buchung hier wie gewohnt, erstatten Sie sie im 2C2P-Händlerportal und markieren Sie sie dann auf der Buchungsseite als erstattet. Automatische Erstattungen bei Gaststornierung gelten nicht für dieses Gateway.",
   bkdPaidVia2c2p: "{amount} über 2C2P bezahlt",
   bkd2c2pTranRef: "2C2P-Transaktionsreferenz",
   bkd2c2pMerchant: "2C2P-Händler",
   bkd2c2pInvoice: "2C2P-Rechnungsnummer",
-  bkd2c2pRefundManual: "Diese Zahlung wurde über 2C2P eingezogen. Erstatten Sie sie im 2C2P-Händlerportal – für dieses Gateway sind Erstattungen von hier aus nicht möglich.",
+  bkdPaidViaIyzico: "{amount} über iyzico bezahlt",
+  bkdIyzicoPaymentId: "iyzico-Zahlungs-ID",
+  bkdIyzicoMerchant: "iyzico-Händler",
+  bkdIyzicoBasket: "iyzico-Warenkorb-ID",
+  bkdRefundManualGateway: "Diese Zahlung wurde über {gateway} eingezogen. Erstattungen erfolgen nicht von hier aus: Erstatten Sie sie im {gateway}-Händlerportal und markieren Sie sie dann unten als erstattet.",
+  bkdMarkRefundedAmount: "Erstatteter Betrag",
+  bkdMarkRefundedReference: "Erstattungsreferenz von {gateway} (optional)",
+  bkdMarkRefundedButton: "{amount} als erstattet markieren",
+  bkdMarkRefundedConfirm: "Bestätigen Sie, dass Sie {amount} bereits im {gateway}-Händlerportal erstattet haben? Das wird nur an der Buchung vermerkt – von hier aus wird kein Geld gesendet.",
+  bkdMarkRefundedHint: "Erst, wenn die Erstattung bei {gateway} durchgeführt ist. Eine Erstattung pro Buchung.",
+  bkdMarkingRefunded: "Wird gespeichert…",
+  bkdMarkRefundedDone: "✓ Als erstattet markiert.",
+  bkdRefundRecordedManually: "· erstattet über {gateway}",
+  bkdRefundReference: "Erstattungsreferenz",
 
 };
 

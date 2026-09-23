@@ -158,7 +158,7 @@ const PT: Dict = {
   cancelConfirmPartial: "Pagou {paid}. Ao cancelar agora são reembolsados {refund}. Cancelar esta reserva? Esta ação não pode ser anulada.",
   refundedLabel: "Reembolsado",
   refundOwedLabel: "Reembolso devido ao hóspede",
-  refundOwedManual2c2p: "Faça este reembolso no portal de comerciante da 2C2P — com este gateway não é possível reembolsar automaticamente.",
+  refundOwedManualGateway: "Faça este reembolso no painel de comerciante da {gateway} e marque-o como reembolsado na página da reserva na sua administração — com este gateway não é possível reembolsar automaticamente.",
   refundOwedManual: "Ainda não reembolsado — faça este reembolso a partir da página da reserva na sua administração.",
   cancelBandUntil: "Até {date}, em caso de cancelamento é cobrada {penalty}.",
   ackPartial: "Compreendo que, ao cancelar a partir de agora, é cobrada {penalty}.",

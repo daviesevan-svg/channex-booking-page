@@ -90,7 +90,7 @@ const TR: Dict = {
   cancelConfirmPartial: "{paid} ödediniz. Şimdi iptal ederseniz {refund} iade edilir. Bu rezervasyon iptal edilsin mi? Bu işlem geri alınamaz.",
   refundedLabel: "İade edildi",
   refundOwedLabel: "Misafire ödenecek iade",
-  refundOwedManual2c2p: "Bu iadeyi 2C2P üye iş yeri portalından yapın — bu altyapıda otomatik iade yapılamaz.",
+  refundOwedManualGateway: "Bu iadeyi {gateway} üye iş yeri panelinden yapın, ardından yönetim panelindeki rezervasyon sayfasında iade edildi olarak işaretleyin — bu altyapıda otomatik iade yapılmaz.",
   refundOwedManual: "Henüz iade edilmedi — bu iadeyi yönetim panelindeki rezervasyon sayfasından yapın.",
   cancelBandUntil: "{date} tarihine kadar iptal ederseniz {penalty} tahsil edilir.",
   ackPartial: "Bundan sonra iptal edersem {penalty} tahsil edileceğini anlıyorum.",

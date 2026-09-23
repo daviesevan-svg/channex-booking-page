@@ -81,7 +81,7 @@ const EN: Dict = {
   cancelConfirmPartial: "You paid {paid}. Cancelling now refunds {refund}. Cancel this booking? This can't be undone.",
   refundedLabel: "Refunded",
   refundOwedLabel: "Refund owed to guest",
-  refundOwedManual2c2p: "Issue this refund in the 2C2P merchant portal — refunds can't be issued automatically for this gateway.",
+  refundOwedManualGateway: "Issue this refund in the {gateway} merchant panel, then mark it refunded on the booking page in your admin — refunds aren't issued automatically for this gateway.",
   refundOwedManual: "Not yet refunded — issue this refund from the booking page in your admin.",
   cancelBandUntil: "Until {date}, {penalty} is charged if you cancel.",
   ackPartial: "I understand that cancelling from now on means {penalty} is charged.",

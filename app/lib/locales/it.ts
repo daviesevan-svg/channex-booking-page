@@ -450,7 +450,7 @@ const IT: Dict = {
   cancelConfirmPartial: "Hai pagato {paid}. Cancellando ora verranno rimborsati {refund}. Cancellare questa prenotazione? L’operazione non può essere annullata.",
   refundedLabel: "Rimborsato",
   refundOwedLabel: "Rimborso dovuto all'ospite",
-  refundOwedManual2c2p: "Effettui questo rimborso dal portale merchant 2C2P: con questo gateway i rimborsi automatici non sono possibili.",
+  refundOwedManualGateway: "Effettui questo rimborso dal pannello merchant {gateway}, poi lo segni come rimborsato nella pagina della prenotazione del suo pannello: con questo gateway i rimborsi automatici non sono possibili.",
   refundOwedManual: "Non ancora rimborsato: effettui questo rimborso dalla pagina della prenotazione nel suo pannello.",
   cancelBandUntil: "Fino al {date}, in caso di cancellazione addebitiamo {penalty}.",
   ackPartial: "Capisco che cancellando da ora in avanti verrà addebitato {penalty}.",

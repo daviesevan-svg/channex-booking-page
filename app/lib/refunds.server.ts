@@ -1,6 +1,7 @@
-// Issue a refund for a booking's charge and record it on the booking — Stripe,
-// Viva or iyzico, depending on which gateway took the payment (2C2P: refused,
-// see below). Guarded so it only ever
+// Issue a refund for a booking's charge and record it on the booking — Stripe
+// or Viva, depending on which gateway took the payment. iyzico and 2C2P are
+// refunded by the hotel in the gateway's own panel (manual-refunds.ts); the
+// hotel then confirms it with recordManualRefund. Guarded so it only ever
 // refunds a real charge once; guarantee-card (setup) bookings have no charge to
 // refund.
 //
@@ -11,10 +12,10 @@
 import { updateBooking, type BookingRecord } from "./bookings.server";
 import { createRefund } from "./stripe.server";
 import { fromStripeMinor, toStripeMinor } from "./money";
-import { getIyzicoConfig, getVivaConfig } from "./overrides.server";
+import { getVivaConfig } from "./overrides.server";
 import { fromVivaMinor, toVivaMinor, vivaRefund } from "./viva.server";
-import { iyzicoRefund } from "./iyzico.server";
 import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
+import { isManualRefundGateway } from "./manual-refunds";
 
 export type RefundOutcome =
   | { ok: true; booking: BookingRecord; amount: number }
@@ -33,14 +34,13 @@ export async function refundBookingCharge(
   const p = booking.payment;
   if (!p || p.mode !== "payment") return { ok: false, reason: "no_charge" };
   if (p.refund) return { ok: false, reason: "already_refunded" };
-  // 2C2P refunds live behind a separate API with its own RSA key exchange
-  // (see 2c2p.server.ts). Until that is wired, the hotel refunds in the 2C2P
-  // merchant portal — and every caller (guest self-cancel with autoRefund, the
-  // admin button) already treats a not-ok outcome as "the hotel handles it".
-  if (p.provider === "2c2p") return { ok: false, reason: "unsupported" };
+  // iyzico and 2C2P: we never call the gateway. The hotel refunds in its
+  // merchant panel and confirms it here (recordManualRefund). Every caller
+  // (guest self-cancel with autoRefund, the sold-out auto-refund, the admin
+  // button) already treats a not-ok outcome as "the hotel handles it".
+  if (isManualRefundGateway(p.provider)) return { ok: false, reason: "unsupported" };
   if (p.provider === "viva" && !p.transactionId) return { ok: false, reason: "no_charge" };
-  if (p.provider === "iyzico" && !p.transactionId) return { ok: false, reason: "no_charge" };
-  if (p.provider !== "viva" && p.provider !== "iyzico" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
+  if (p.provider !== "viva" && (!p.paymentIntentId || !p.accountId)) return { ok: false, reason: "no_charge" };
 
   const charged = p.amount ?? 0;
   const currency = p.currency || booking.currency;
@@ -83,24 +83,6 @@ export async function refundBookingCharge(
       await releaseRefundClaim(claimKey);
       return { ok: false, reason: "error" };
     }
-  } else if (p.provider === "iyzico") {
-    const iyzico = await getIyzicoConfig(pid);
-    if (!iyzico) {
-      console.log(`[refund] iyzico credentials missing for pid=${pid} booking=${booking.reference}`);
-      await releaseRefundClaim(claimKey);
-      return { ok: false, reason: "error" };
-    }
-    try {
-      const amount = partial ?? charged;
-      const r = await iyzicoRefund(iyzico, p.transactionId!, amount, currency);
-      if (!r.refunded) throw new Error(r.message ?? "iyzico refused the refund");
-      refund = { id: p.transactionId!, amount, currency: p.currency };
-    } catch (e) {
-      console.log(`[refund] failed for booking=${booking.reference} iyzico tx=${p.transactionId}: ${e instanceof Error ? e.message : e}`);
-      // Nothing left the account: hand the claim back so a retry can try again.
-      await releaseRefundClaim(claimKey);
-      return { ok: false, reason: "error" };
-    }
   } else {
     try {
       // Stripe's smallest unit is per currency and NOT the display decimals —
@@ -132,4 +114,49 @@ export async function refundBookingCharge(
     },
   });
   return { ok: true, booking: updated ?? booking, amount: refund.amount };
+}
+
+export type ManualRefundOutcome =
+  | { ok: true; booking: BookingRecord; amount: number }
+  | { ok: false; reason: "no_charge" | "already_refunded" | "invalid_amount" | "not_manual" };
+
+/** Record a refund the hotel has already made in the gateway's own panel
+ *  (iyzico, 2C2P). No money moves here — this is the hotel saying "done", so
+ *  the booking, the admin list and the API stop showing the refund as owed.
+ *  `amount` is in MAJOR units, within (0, charged]. `reference` is the
+ *  gateway's refund id if the hotel has one. Same one-refund-per-booking claim
+ *  as refundBookingCharge, so a double-click records it once. */
+export async function recordManualRefund(
+  pid: string,
+  booking: BookingRecord,
+  opts: { amount: number; reference?: string; by?: string },
+): Promise<ManualRefundOutcome> {
+  const p = booking.payment;
+  if (!p || p.mode !== "payment") return { ok: false, reason: "no_charge" };
+  // Stripe and Viva refunds are issued from the booking page, which records
+  // what the gateway actually returned. Marking one "refunded" by hand would
+  // hide a charge that was never sent back.
+  if (!isManualRefundGateway(p.provider)) return { ok: false, reason: "not_manual" };
+  if (p.refund) return { ok: false, reason: "already_refunded" };
+  const charged = p.amount ?? 0;
+  if (!(Number.isFinite(opts.amount) && opts.amount > 0 && opts.amount <= charged + 1e-9)) {
+    return { ok: false, reason: "invalid_amount" };
+  }
+  const claimKey = `booking:${pid}:${booking.id}`;
+  if (!(await claimRefund(claimKey))) return { ok: false, reason: "already_refunded" };
+  const reference = opts.reference?.trim().slice(0, 120) || undefined;
+  const updated = await updateBooking(pid, booking.id, {
+    payment: {
+      ...p,
+      refund: {
+        id: reference ?? "manual",
+        amount: opts.amount,
+        currency: p.currency,
+        at: new Date().toISOString(),
+        by: opts.by,
+        manual: true,
+      },
+    },
+  });
+  return { ok: true, booking: updated ?? booking, amount: opts.amount };
 }

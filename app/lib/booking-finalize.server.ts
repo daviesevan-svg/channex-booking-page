@@ -35,7 +35,7 @@ import {
   type VivaConfig,
   type VivaTransaction,
 } from "./viva.server";
-import { iyzicoPaid, iyzicoRefund, type IyzicoConfig, type IyzicoPaymentResult } from "./iyzico.server";
+import { iyzicoPaid, type IyzicoConfig, type IyzicoPaymentResult } from "./iyzico.server";
 import { c2pPaid, inquireC2pPayment, type C2pConfig, type C2pInquiry } from "./2c2p.server";
 import { claimRefund, releaseRefundClaim } from "./refund-claim.server";
 import { getC2pConfig, getVivaConfig } from "./overrides.server";
@@ -132,9 +132,10 @@ export function paymentFromIyzico(
 }
 
 /**
- * An iyzico charge finalize refused — the twin of the Viva and Stripe legs.
- * Refunded rather than kept, behind a once-only claim so a retry can't refund
- * twice.
+ * An iyzico charge finalize refused (amount or currency didn't match the
+ * pending). iyzico refunds are the hotel's to make (manual-refunds.ts), so the
+ * charge is held and made visible exactly as a 2C2P one is — see
+ * holdMismatchedPayment.
  */
 export async function rejectMismatchedIyzicoPayment(
   iyzico: IyzicoConfig,
@@ -142,23 +143,8 @@ export async function rejectMismatchedIyzicoPayment(
   ref: string,
   err: SessionBindError,
 ): Promise<void> {
-  if (shouldRefundMismatchedSession(err.reason) && payment.transactionId) {
-    const claimKey = `iyzico_mismatch:${ref}`;
-    if (await claimRefund(claimKey)) {
-      try {
-        const res = await iyzicoRefund(iyzico, payment.transactionId, payment.amount ?? 0, payment.currency ?? "TRY");
-        if (!res.refunded) throw new Error(res.message ?? "refused");
-        console.error(`[finalize] refunded mismatched iyzico charge for ${ref} payment=${payment.transactionId}`);
-      } catch (e) {
-        await releaseRefundClaim(claimKey);
-        console.error(
-          `[finalize] mismatch refund failed for ${ref} iyzico payment=${payment.transactionId}: ${e instanceof Error ? e.message : e}`,
-        );
-      }
-    }
-    await deletePending(ref);
-  }
-  console.error(`[finalize] reject ${ref}: ${err.message}`);
+  const merchant = iyzico.merchantId ? `merchant ${iyzico.merchantId}, ` : "";
+  await holdMismatchedPayment("iyzico", `${merchant}payment ${payment.transactionId ?? "?"}`, payment, ref, err);
 }
 
 /**
@@ -189,15 +175,30 @@ export function paymentFromC2p(c2p: C2pConfig, ref: string, r: C2pInquiry): Paym
 
 /**
  * A 2C2P charge finalize refused (amount or currency didn't match the
- * pending). The Stripe/Viva/iyzico twins refund; this gateway has no refund
- * API wired (2c2p.server.ts), so the money is made VISIBLE instead: the
- * booking is recorded as failed with the payment attached — it shows in the
- * admin as "Paid … via 2C2P" with the reason in its error — and the hotel gets
- * the booking-failed email. The guest is told the payment is held, not
- * refunded. Best-effort like the other legs: never throws over the bind error.
+ * pending). 2C2P refunds are the hotel's to make (manual-refunds.ts) — see
+ * holdMismatchedPayment.
  */
 export async function rejectMismatchedC2pPayment(
   c2p: C2pConfig,
+  payment: PaymentInfo,
+  ref: string,
+  err: SessionBindError,
+): Promise<void> {
+  await holdMismatchedPayment("2C2P", `merchant ${c2p.merchantId}, invoice ${ref}`, payment, ref, err);
+}
+
+/**
+ * A charge finalize refused on a gateway we never refund through (iyzico,
+ * 2C2P). The Stripe/Viva twins refund; here the money is made VISIBLE instead:
+ * the booking is recorded as failed with the payment attached — it shows in the
+ * admin as paid with the reason in its error, where the hotel refunds it in the
+ * gateway's panel and marks it refunded — and the hotel gets the
+ * booking-failed email. Best-effort like the other legs: never throws over the
+ * bind error.
+ */
+async function holdMismatchedPayment(
+  gateway: string,
+  where: string,
   payment: PaymentInfo,
   ref: string,
   err: SessionBindError,
@@ -211,17 +212,17 @@ export async function rejectMismatchedC2pPayment(
         status: "failed",
         inventoryHeld: false,
         payment,
-        error: `Payment of ${amount} received via 2C2P (merchant ${c2p.merchantId}, invoice ${ref}) did not match the stay (${err.reason}). Nothing was booked — refund it in the 2C2P merchant portal.`,
+        error: `Payment of ${amount} received via ${gateway} (${where}) did not match the stay (${err.reason}). Nothing was booked — refund it in the ${gateway} merchant panel, then mark it refunded here.`,
       };
       try {
         const claim = await claimBooking(pending.pid, record);
         if (claim.won) await sendBookingFailedEmail(pending.pid, record, pending.origin);
       } catch (e) {
-        console.error(`[finalize] could not record held 2C2P charge for ${ref}: ${e instanceof Error ? e.message : e}`);
+        console.error(`[finalize] could not record held ${gateway} charge for ${ref}: ${e instanceof Error ? e.message : e}`);
       }
     }
     console.error(
-      `[finalize] 2C2P charge for ${ref} refused and NOT refunded (no refund API): merchant=${c2p.merchantId} tranRef=${payment.transactionId ?? "?"} amount=${payment.amount} ${payment.currency}`,
+      `[finalize] ${gateway} charge for ${ref} refused and NOT refunded (hotel refunds manually): ${where} amount=${payment.amount} ${payment.currency}`,
     );
     await deletePending(ref);
   }
