@@ -150,17 +150,35 @@ export async function sendBookingEmails(pid: string, booking: BookingRecord, ori
   }
 }
 
-/** Guest "couldn't confirm — you've been refunded" email, sent when a paid
- *  booking can't be fulfilled (room sold out before payment completed). No manage
- *  link (there's no booking to manage). Never throws. */
+/** "Couldn't confirm" emails, sent when a paid booking can't be fulfilled
+ *  (room sold out before payment completed, or a charge that didn't match the
+ *  stay). No manage link — there's no booking to manage. Never throws.
+ *
+ *  Which guest email depends on whether the money actually went back:
+ *  `payment.refund` is only set after a gateway refund succeeded. Without it
+ *  (iyzico/2C2P, which we never refund through, or an automatic refund that
+ *  failed) the guest is told a refund is coming — never that it was made — and
+ *  the hotel is told it owes one, whatever its notification toggles say. */
 export async function sendBookingFailedEmail(pid: string, booking: BookingRecord, _origin: string): Promise<void> {
   try {
     const [settings, ov] = await Promise.all([getSettings(pid), getOverrides(pid, booking.lang)]);
     const hotelName = ov.hotelName || "Your hotel";
     const from = await senderFor(pid, settings);
-    const text = await getEmailTemplate(pid, "booking_failed", booking.lang);
-    const g = composeEmail({ def: emailDef("booking_failed")!, text, booking, hotelName, brand: await emailBrand(pid, accentHex(settings)), manageUrl: "", legal: legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG) });
+    const brand = await emailBrand(pid, accentHex(settings));
+    const refundPending = booking.payment?.mode === "payment" && !booking.payment.refund;
+    const guestId = refundPending ? "booking_failed_refund_pending" : "booking_failed";
+    const text = await getEmailTemplate(pid, guestId, booking.lang);
+    const g = composeEmail({ def: emailDef(guestId)!, text, booking, hotelName, brand, manageUrl: "", legal: legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG) });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
+
+    const hostTo = settings.hostNotifyEmail || ov.email;
+    if (refundPending && hostTo) {
+      const htext = await getEmailTemplate(pid, "booking_failed_notification");
+      const h = composeEmail({ def: emailDef("booking_failed_notification")!, text: htext, booking, hotelName, brand, manageUrl: "", lang: DEFAULT_LANG });
+      await sendEmail({ to: hostTo, subject: h.subject, html: h.html, from, replyTo: booking.guest.email });
+    } else if (refundPending) {
+      console.log(`[email] refund owed on ${booking.reference} but pid=${pid} has no host address to tell`);
+    }
   } catch (e) {
     console.log(`[email] sendBookingFailedEmail failed: ${e instanceof Error ? e.message : e}`);
   }

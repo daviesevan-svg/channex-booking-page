@@ -7,7 +7,7 @@ import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { DEFAULT_LANG, emailDef, langParam, pickLang } from "~/lib/content";
 import { getEmailOverridesRaw, getEmailTemplate, getOverrides, getSettings, saveEmailContent } from "~/lib/overrides.server";
-import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, legalLinksForEmail, sampleBooking } from "~/lib/email-render.server";
+import { accentHex, bookingVars, composeEmail, composeReviewEmail, emailBrand, legalLinksForEmail, sampleBookingFor } from "~/lib/email-render.server";
 import { sendEmail, senderFor } from "~/lib/email.server";
 import { FIELD_INPUT, TranslationNote } from "~/components/admin-form";
 import { AdminPageHeader } from "~/components/admin-page-header";
@@ -30,7 +30,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getEmailTemplate(pid, params.template, lang),
   ]);
   const hotelName = ov.hotelName || "Your hotel";
-  const sample = { ...sampleBooking(settings.currency || "GBP"), lang };
+  const sample = { ...sampleBookingFor(params.template, settings.currency || "GBP"), lang };
   const origin = new URL(request.url).origin;
   const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
   const { subject, html } =
@@ -75,7 +75,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       getOverrides(pid, lang),
       getEmailTemplate(pid, params.template, lang),
     ]);
-    const sample = { ...sampleBooking(settings.currency || "GBP"), lang };
+    const sample = { ...sampleBookingFor(params.template, settings.currency || "GBP"), lang };
     const origin = new URL(request.url).origin;
     const manageUrl = `${origin}/${pid}/manage/${sample.id}`;
     const hotelName = ov.hotelName || "Your hotel";
@@ -101,6 +101,8 @@ const EMAIL_NAV_KEY: Record<string, string> = {
   booking_cancellation: "navEmailBookingCancellation",
   cancellation_notification: "navEmailCancellationNotification",
   booking_failed: "navEmailBookingFailed",
+  booking_failed_refund_pending: "navEmailBookingFailedPending",
+  booking_failed_notification: "navEmailBookingFailedNotification",
   review_request: "navEmailReviewRequest",
 };
 

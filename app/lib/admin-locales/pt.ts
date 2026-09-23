@@ -95,6 +95,8 @@ const PT: Record<string, string> = {
   navEmailBookingCancellation: "Cancelamento (hóspede)",
   navEmailCancellationNotification: "Cancelamento (para si)",
   navEmailBookingFailed: "Não foi possível confirmar (hóspede)",
+  navEmailBookingFailedPending: "Não foi possível confirmar, reembolso a seguir (hóspede)",
+  navEmailBookingFailedNotification: "Não foi possível confirmar, reembolso em dívida (para si)",
   navEmailReviewRequest: "Pedido de avaliação",
 
   // -- login --

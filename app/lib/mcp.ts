@@ -911,7 +911,7 @@ export const MANAGE_EMAIL_TOOLS: McpTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "review_request"] },
+        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "booking_failed_refund_pending", "booking_failed_notification", "review_request"] },
         ...langArg,
       },
       required: ["id"],
@@ -929,7 +929,7 @@ export const MANAGE_EMAIL_TOOLS: McpTool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "review_request"] },
+        id: { type: "string", enum: ["booking_confirmation", "host_notification", "booking_cancellation", "cancellation_notification", "booking_failed", "booking_failed_refund_pending", "booking_failed_notification", "review_request"] },
         ...langArg,
         subject: { type: ["string", "null"] },
         subject2: { type: ["string", "null"], description: "review_request only — 1st reminder's subject." },

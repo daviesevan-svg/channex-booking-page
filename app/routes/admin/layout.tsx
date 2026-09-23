@@ -329,6 +329,8 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
         { to: "/admin/emails/booking_cancellation", label: t("navEmailBookingCancellation"), area: "emails" },
         { to: "/admin/emails/cancellation_notification", label: t("navEmailCancellationNotification"), area: "emails" },
         { to: "/admin/emails/booking_failed", label: t("navEmailBookingFailed"), area: "emails" },
+        { to: "/admin/emails/booking_failed_refund_pending", label: t("navEmailBookingFailedPending"), area: "emails" },
+        { to: "/admin/emails/booking_failed_notification", label: t("navEmailBookingFailedNotification"), area: "emails" },
         { to: "/admin/emails/review_request", label: t("navEmailReviewRequest"), area: "emails" },
       ],
     },
