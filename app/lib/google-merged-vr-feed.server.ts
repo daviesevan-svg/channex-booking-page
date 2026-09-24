@@ -4,6 +4,7 @@
 // merged hotels feed — see google-merged-feed.server.ts.
 import {
   getSavedFeed,
+  getSavedFeedStream,
   refreshFeedSnapshot,
   saveFeedSnapshot,
   spliceListingsFeed,
@@ -22,6 +23,7 @@ export async function buildMergedVrFeed(): Promise<string> {
 }
 
 export const getSavedMergedVrFeed = () => getSavedFeed(VR_FEED_KEY);
+export const getSavedMergedVrFeedStream = () => getSavedFeedStream(VR_FEED_KEY);
 export const saveMergedVrFeed = (xml: string) => saveFeedSnapshot(VR_FEED_KEY, xml);
 export const refreshMergedVrFeed = (force = false) =>
   refreshFeedSnapshot(VR_FEED_KEY, buildMergedVrFeed, force);

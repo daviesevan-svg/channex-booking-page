@@ -10,8 +10,9 @@
 import { getConfig } from "./config.server";
 import { getRooms } from "./catalog.server";
 import { VR_AMENITY_ENUMS, VR_AMENITY_KEYS, type SiteSettings } from "./content";
-import { checkGoogleReadiness } from "./google-readiness.server";
-import { GOOGLE_HOTEL_BRAND } from "./hotel-list-feed.server";
+import { canTakeBookings, requiredMissing } from "./google-readiness.server";
+import { FEED_CONCURRENCY, GOOGLE_HOTEL_BRAND } from "./hotel-list-feed.server";
+import { mapLimit } from "./map-limit";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 
@@ -107,25 +108,27 @@ function imageElements(sources: (string | undefined)[], title: string): string {
  *  (no `<listings>` wrapper) — reused both by our own VR feed and by the merged
  *  Channex+us VR feed. Empty string when there's nothing to advertise. */
 export async function vrListingElements(): Promise<string> {
-  const properties = await getProperties();
-  const listings: string[] = [];
-
-  for (const p of properties) {
-    if (!p.public) continue;
+  const properties = (await getProperties()).filter((p) => p.public);
+  // Concurrent, like the Hotel List Feed (FEED_CONCURRENCY): one property at a
+  // time spent the request waiting on storage round trips.
+  const listings = await mapLimit(properties, FEED_CONCURRENCY, async (p) => {
     const settings = await getSettings(p.id);
     // Only vacation-rental properties belong in this feed.
-    if (settings.googleProgram !== "vacation_rentals") continue;
+    if (settings.googleProgram !== "vacation_rentals") return null;
+    const [overrides, rooms, canBook] = await Promise.all([
+      getOverrides(p.id),
+      getRooms(p.id),
+      canTakeBookings(p.id, settings),
+    ]);
     // Skip properties missing data Google requires — an incomplete listing can
     // get the whole feed rejected. Same required set as the Hotel List Feed
     // (name/address/country/geo/bookable); VR adds capacity + website below,
     // both of which we always have (capacity from the unit, website derived).
-    const readiness = await checkGoogleReadiness(p.id);
-    if (!readiness.ready) continue;
-
-    const [overrides, rooms] = await Promise.all([getOverrides(p.id), getRooms(p.id)]);
+    // The rule checkGoogleReadiness applies, on the records already read here.
+    if (requiredMissing(settings, overrides, canBook, Boolean(p.public)).length > 0) return null;
     // A VR listing is a single unit — take the first room for its capacity.
     const unit = rooms[0];
-    if (!unit) continue;
+    if (!unit) return null;
 
     const name = overrides.hotelName || p.name;
     const address =
@@ -150,7 +153,7 @@ export async function vrListingElements(): Promise<string> {
       clientAttr("description", overrides.description || unit.description) +
       amenityAttrs(settings, unit.amenities ?? []);
 
-    listings.push(
+    return (
       `  <listing>\n` +
         tag("id", p.id) +
         tag("name", name) +
@@ -162,11 +165,11 @@ export async function vrListingElements(): Promise<string> {
         // Free-text per Google ("use whatever property type categories you wish").
         tag("category", overrides.propertyType || "vacation_rental") +
         `    <content>\n${images}      <attributes>\n${attrs}      </attributes>\n    </content>\n` +
-        `  </listing>`,
+        `  </listing>`
     );
-  }
+  });
 
-  return listings.join("\n");
+  return listings.filter((l): l is string => l !== null).join("\n");
 }
 
 /** Build the standalone VR list feed XML (our properties only). Empty

@@ -251,13 +251,13 @@ export async function applyChanges(body: unknown, options?: { repairRevision: st
 export async function hasReceivedAri(hotelCode: string): Promise<boolean> {
   if (!hotelCode) return false;
   await ensureSchema();
-  const D = db();
-  const avail = await D.prepare(`SELECT 1 AS x FROM availability WHERE hotel_code=? LIMIT 1`)
+  // One round trip, not two: the Google feeds ask this of every property.
+  const row = await db()
+    .prepare(
+      `SELECT EXISTS(SELECT 1 FROM availability WHERE hotel_code=?1)
+           OR EXISTS(SELECT 1 FROM rate WHERE hotel_code=?1) AS x`,
+    )
     .bind(hotelCode)
     .first<{ x: number }>();
-  if (avail) return true;
-  const rate = await D.prepare(`SELECT 1 AS x FROM rate WHERE hotel_code=? LIMIT 1`)
-    .bind(hotelCode)
-    .first<{ x: number }>();
-  return Boolean(rate);
+  return Boolean(row?.x);
 }
