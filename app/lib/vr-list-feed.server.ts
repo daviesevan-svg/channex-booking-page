@@ -148,7 +148,7 @@ export async function vrListingElements(): Promise<string> {
       // our own booking pages (same mechanism as the Hotel List Feed), so a
       // merged feed sends ours to us and Channex's rest to Channex.
       clientAttr("hotel_brand", GOOGLE_HOTEL_BRAND) +
-      // We confirm bookings instantly (Stripe or a live Channex connection).
+      // We confirm bookings instantly (a payment gateway or a live Channex connection).
       clientAttr("instant_bookable", "Yes") +
       clientAttr("description", overrides.description || unit.description) +
       amenityAttrs(settings, unit.amenities ?? []);
