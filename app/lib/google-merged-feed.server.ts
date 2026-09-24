@@ -91,6 +91,20 @@ export async function getSavedFeed(feedKey: string): Promise<SavedFeed | null> {
   return { xml: await obj.text(), builtAt: Number(obj.customMetadata?.builtAt) || 0 };
 }
 
+/** The stored snapshot as a stream, for serving it as-is. The feeds are ~15 MB:
+ *  reading one into a string first (getSavedFeed) holds it in memory twice
+ *  over — as UTF-16, then re-encoded for the response — before the first byte
+ *  leaves. Null if none saved / no R2 configured. */
+export async function getSavedFeedStream(
+  feedKey: string,
+): Promise<{ body: ReadableStream; size: number; builtAt: number } | null> {
+  const bucket = getImagesBucket();
+  if (!bucket) return null;
+  const obj = await bucket.get(feedKey);
+  if (!obj) return null;
+  return { body: obj.body, size: obj.size, builtAt: Number(obj.customMetadata?.builtAt) || 0 };
+}
+
 async function save(feedKey: string, xml: string, at: number): Promise<void> {
   const bucket = getImagesBucket();
   if (!bucket) return;
@@ -134,6 +148,7 @@ export async function refreshFeedSnapshot(
 
 // ── Hotels wrappers (bound to the hotels feed key) ───────────────────────────
 export const getSavedMergedGoogleFeed = () => getSavedFeed(HOTELS_FEED_KEY);
+export const getSavedMergedGoogleFeedStream = () => getSavedFeedStream(HOTELS_FEED_KEY);
 export const saveMergedGoogleFeed = (xml: string) => saveFeedSnapshot(HOTELS_FEED_KEY, xml);
 export const refreshMergedGoogleFeed = (force = false) =>
   refreshFeedSnapshot(HOTELS_FEED_KEY, buildMergedGoogleFeed, force);

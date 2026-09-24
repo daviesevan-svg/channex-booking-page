@@ -7,15 +7,16 @@
 // returns 502 so Google keeps its last successful pull.
 import {
   buildMergedGoogleFeed,
-  getSavedMergedGoogleFeed,
+  getSavedMergedGoogleFeedStream,
   saveMergedGoogleFeed,
 } from "~/lib/google-merged-feed.server";
 import { requireCanonicalHost } from "~/lib/domains.server";
 
-function xml(body: string, builtAt?: number): Response {
+function xml(body: string | ReadableStream, builtAt?: number, size?: number): Response {
   return new Response(body, {
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
+      ...(size ? { "Content-Length": String(size) } : {}),
       "Cache-Control": "public, max-age=3600",
       ...(builtAt ? { "Last-Modified": new Date(builtAt).toUTCString() } : {}),
     },
@@ -25,9 +26,9 @@ function xml(body: string, builtAt?: number): Response {
 export async function loader({ request }: { request: Request }) {
   // Our feed, not the hotel's — don't serve it from their domain.
   requireCanonicalHost(request);
-  // Fast path: serve the stored snapshot.
-  const saved = await getSavedMergedGoogleFeed();
-  if (saved) return xml(saved.xml, saved.builtAt);
+  // Fast path: stream the stored snapshot straight from R2.
+  const saved = await getSavedMergedGoogleFeedStream();
+  if (saved) return xml(saved.body, saved.builtAt, saved.size);
 
   // No snapshot yet — build once, store for next time, serve.
   try {

@@ -3,16 +3,20 @@
 // returning a Response, no component.
 import { buildHotelListFeed } from "~/lib/hotel-list-feed.server";
 import { requireCanonicalHost } from "~/lib/domains.server";
+import { cachedFeed, FEED_CACHE_SECONDS } from "~/lib/feed-cache.server";
 
 export async function loader({ request }: { request: Request }) {
   // Our feed, not the hotel's — don't serve it from their domain.
   requireCanonicalHost(request);
-  const xml = await buildHotelListFeed();
-  return new Response(xml, {
-    headers: {
-      "Content-Type": "application/xml; charset=utf-8",
-      // Google pulls on a schedule; a short cache is plenty and keeps it fresh.
-      "Cache-Control": "public, max-age=3600",
-    },
+  // Built from every property's records, so served from the edge cache for an
+  // hour rather than rebuilt on each pull (feed-cache.server.ts).
+  return cachedFeed(request, async () => {
+    const xml = await buildHotelListFeed();
+    return new Response(xml, {
+      headers: {
+        "Content-Type": "application/xml; charset=utf-8",
+        "Cache-Control": `public, max-age=${FEED_CACHE_SECONDS}`,
+      },
+    });
   });
 }

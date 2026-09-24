@@ -30,6 +30,7 @@ import { addProperty } from "./properties.server";
 import { getUser } from "./users.server";
 import { DEFAULT_LANG, type DeadlineUnit } from "./content";
 import { scrapeUrl } from "./scrapfly.server";
+import { mapLimit } from "./map-limit";
 
 // ---- payload types (also what the wizard round-trips through the form) ----
 
@@ -581,21 +582,6 @@ async function importPhoto(prefix: string, url: string): Promise<string | null> 
   }
 }
 
-/** Small concurrency cap: ~80 image fetches in flight at once would trip
- *  subrequest and memory limits; 6 at a time keeps the import a few seconds. */
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
-
 /** Create the local property from a reviewed payload. Returns the new pid. */
 export async function importBookingListing(
   owner: string,
@@ -627,6 +613,8 @@ export async function importBookingListing(
   }
 
   if (sel.importPhotos && payload.photos.length) {
+    // ~80 image fetches in flight at once would trip subrequest and memory
+    // limits; 6 at a time keeps the import a few seconds.
     const urls = (await mapLimit(payload.photos, 6, (u) => importPhoto(`home/${pid}`, u))).filter(
       (u): u is string => Boolean(u),
     );

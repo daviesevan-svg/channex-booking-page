@@ -9,6 +9,7 @@
 import { getOverrides, getSettings } from "./overrides.server";
 import { getProperties } from "./properties.server";
 import { canTakeBookings, requiredMissing } from "./google-readiness.server";
+import { mapLimit } from "./map-limit";
 
 // Brand id stamped on our listings (Google local feed `hotel_brand` client attr).
 // A Google POS `<Match brand="…">` on this value routes our hotels to our own
@@ -16,6 +17,11 @@ import { canTakeBookings, requiredMissing } from "./google-readiness.server";
 // POS — so a single merged feed can send our hotels direct to us and the rest
 // direct to Channex, with no redirect hop.
 export const GOOGLE_HOTEL_BRAND = "roompanda";
+
+// Properties built at once by the feed builders. Each one is a handful of
+// KV/D1 reads, so 16 in flight stays far below the Worker's subrequest and
+// connection limits.
+export const FEED_CONCURRENCY = 16;
 
 function esc(s: string): string {
   return s
@@ -40,17 +46,15 @@ function tag(name: string, value?: string): string {
  *  (no `<listings>` wrapper) — reused both by our own feed and by the merged
  *  Channex+us feed. Empty string when we have nothing to advertise. */
 export async function googleListingElements(): Promise<string> {
-  const properties = await getProperties();
-  const listings: string[] = [];
-
-  for (const p of properties) {
-    // Only properties opted into the public listing are advertised to Google.
-    if (!p.public) continue;
+  const properties = (await getProperties()).filter((p) => p.public);
+  // Several storage round trips per property; one property at a time made
+  // the feed take 4 s warm and ~40 s cold at ~100 properties.
+  const listings = await mapLimit(properties, FEED_CONCURRENCY, async (p) => {
     const [settings, overrides] = await Promise.all([getSettings(p.id), getOverrides(p.id)]);
     // Skip properties missing data Google requires — an incomplete listing can
     // get the whole feed rejected. The admin readiness panel flags these.
     const canBook = await canTakeBookings(p.id, settings);
-    if (requiredMissing(settings, overrides, canBook, p.public).length > 0) continue;
+    if (requiredMissing(settings, overrides, canBook, Boolean(p.public)).length > 0) return null;
 
     const id = p.id;
     const name = overrides.hotelName || p.name;
@@ -61,22 +65,22 @@ export async function googleListingElements(): Promise<string> {
       component("postal_code", settings.addressPostalCode);
 
     const hasGeo = settings.latitude && settings.longitude;
-    listings.push(
+    return (
       `  <listing>\n` +
-        tag("id", id) +
-        tag("name", name) +
-        (address ? `    <address format="simple">\n${address}    </address>\n` : "") +
-        tag("country", settings.addressCountry) +
-        (hasGeo ? tag("latitude", settings.latitude) + tag("longitude", settings.longitude) : "") +
-        (overrides.phone ? `    <phone type="main">${esc(overrides.phone)}</phone>\n` : "") +
-        `    <category>hotel</category>\n` +
-        // hotel_brand → lets a Google POS route our hotels to our own landing.
-        `    <content>\n      <attributes>\n        <client_attr name="hotel_brand">${GOOGLE_HOTEL_BRAND}</client_attr>\n      </attributes>\n    </content>\n` +
-        `  </listing>`,
+      tag("id", id) +
+      tag("name", name) +
+      (address ? `    <address format="simple">\n${address}    </address>\n` : "") +
+      tag("country", settings.addressCountry) +
+      (hasGeo ? tag("latitude", settings.latitude) + tag("longitude", settings.longitude) : "") +
+      (overrides.phone ? `    <phone type="main">${esc(overrides.phone)}</phone>\n` : "") +
+      `    <category>hotel</category>\n` +
+      // hotel_brand → lets a Google POS route our hotels to our own landing.
+      `    <content>\n      <attributes>\n        <client_attr name="hotel_brand">${GOOGLE_HOTEL_BRAND}</client_attr>\n      </attributes>\n    </content>\n` +
+      `  </listing>`
     );
-  }
+  });
 
-  return listings.join("\n");
+  return listings.filter((l): l is string => l !== null).join("\n");
 }
 
 /** Build the HLF XML for all public, structured-data-enabled properties. */
