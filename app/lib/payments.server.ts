@@ -1,7 +1,7 @@
 // Which payment gateway a property charges through. One property uses ONE
 // gateway: Stripe (Connect Standard, platform-level secret + per-property
-// account id in settings) or Viva (per-property credentials in their own KV
-// key). Everything that used to test `settings.stripeAccountId &&
+// account id in settings), or Viva, iyzico or 2C2P (per-property credentials
+// in their own KV keys). Everything that used to test `settings.stripeAccountId &&
 // config.stripeSecretKey` resolves through here instead, so Viva properties
 // pass the same gates.
 import { getConfig } from "./config.server";
@@ -26,11 +26,10 @@ export async function activeGateway(pid: string, settings?: SiteSettings): Promi
   if (s.stripeAccountId && getConfig().stripeSecretKey) {
     return { kind: "stripe", account: s.stripeAccountId };
   }
-  const viva = await getVivaConfig(pid);
+  // One round trip for the three credential keys, precedence unchanged.
+  const [viva, iyzico, c2p] = await Promise.all([getVivaConfig(pid), getIyzicoConfig(pid), getC2pConfig(pid)]);
   if (viva) return { kind: "viva", viva };
-  const iyzico = await getIyzicoConfig(pid);
   if (iyzico) return { kind: "iyzico", iyzico };
-  const c2p = await getC2pConfig(pid);
   return c2p ? { kind: "2c2p", c2p } : null;
 }
 

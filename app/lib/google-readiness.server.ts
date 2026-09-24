@@ -3,20 +3,25 @@
 // listings (or rejects the whole feed) when required fields are missing, so we
 // gate the feed on `requiredMissing` and surface the gaps in the admin.
 import type { SiteSettings } from "./content";
-import { getOverrides, getSettings, getVivaConfig, type PropertyOverrides } from "./overrides.server";
+import { getOverrides, getSettings, type PropertyOverrides } from "./overrides.server";
+import { activeGateway } from "./payments.server";
 import { getProperty } from "./properties.server";
 import { hasReceivedAri } from "./ari/ingest.server";
 
 /** Whether the property can actually take a booking — required before Google
- *  advertises it. Either an active payment gateway (Stripe with charges
- *  enabled, or Viva credentials — we charge the guest directly), OR a live
- *  Channex connection where bookings push to Channex for payment/reservation.
+ *  advertises it. Either a payment gateway we charge the guest through
+ *  (Stripe with charges enabled, Viva, iyzico or 2C2P — whichever
+ *  activeGateway resolves, the same lookup checkout uses), OR a live Channex
+ *  connection where bookings push to Channex for payment/reservation.
  *  "Live" means Channex has actually sent an ARI push (not just that the
  *  connection was toggled on), so we never advertise a Channex property that
  *  isn't really trading. */
 export async function canTakeBookings(pid: string, settings: SiteSettings): Promise<boolean> {
   if (settings.stripeAccountId && settings.stripeChargesEnabled) return true;
-  if (await getVivaConfig(pid)) return true;
+  // A Stripe account that can't charge yet still wins activeGateway, so
+  // checkout would send the guest to it: that is not a way to book.
+  const gateway = await activeGateway(pid, settings);
+  if (gateway && gateway.kind !== "stripe") return true;
   if (settings.connectedSystem === "channex" && (await hasReceivedAri(pid))) return true;
   return false;
 }
@@ -55,9 +60,9 @@ export function requiredMissing(
   need(settings.addressCity, "addressCity", "City (Location)");
   need(settings.addressCountry, "addressCountry", "Country (Location)");
   need(settings.latitude && settings.longitude, "geo", "Map coordinates — latitude & longitude (Location)");
-  // Google must not advertise a property that can't take a booking: an active
-  // Stripe connection, or a live channel manager connection receiving rates.
-  need(canBook, "payment", "A way to take bookings — connect Stripe (Payments), or a live channel manager connection receiving rates (Connectivity)");
+  // Google must not advertise a property that can't take a booking: a payment
+  // gateway, or a live channel manager connection receiving rates.
+  need(canBook, "payment", "A way to take bookings — connect a payment gateway: Stripe, Viva, iyzico or 2C2P (Payments), or a live channel manager connection receiving rates (Connectivity)");
   return out;
 }
 

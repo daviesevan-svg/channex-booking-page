@@ -17,6 +17,7 @@ type Fixture = {
   overrides: Record<string, string>;
   ari?: boolean;
   rooms?: unknown[];
+  iyzico?: object;
 };
 let fixtures: Fixture[] = [];
 let inFlight = 0;
@@ -38,6 +39,8 @@ vi.mock("./overrides.server", () => ({
   getSettings: async (pid: string) => read(byId(pid).settings),
   getOverrides: async (pid: string) => read(byId(pid).overrides),
   getVivaConfig: async () => read(null),
+  getIyzicoConfig: async (pid: string) => read(byId(pid).iyzico ?? null),
+  getC2pConfig: async () => read(null),
 }));
 vi.mock("./ari/ingest.server", () => ({ hasReceivedAri: async (pid: string) => read(Boolean(byId(pid).ari)) }));
 vi.mock("./catalog.server", () => ({ getRooms: async (pid: string) => read(byId(pid).rooms ?? []) }));
@@ -77,11 +80,13 @@ describe("googleListingElements", () => {
       { ...ready(5), ari: false },
       { ...ready(6), settings: { ...ready(6).settings, stripeAccountId: "acct_1", stripeChargesEnabled: true, connectedSystem: undefined } },
       ready(7),
+      // Paid through iyzico, no Channex connection: bookable, so listed.
+      { ...ready(8), ari: false, settings: { ...ready(8).settings, connectedSystem: undefined }, iyzico: { apiKey: "k" } },
     ];
     const xml = await googleListingElements();
-    expect(ids(xml)).toEqual(["p001", "p003", "p006", "p007"]);
+    expect(ids(xml)).toEqual(["p001", "p003", "p006", "p007", "p008"]);
     expect(xml).toContain("<name>Hotel 3</name>");
-    expect(xml.split("<listing>")).toHaveLength(5);
+    expect(xml.split("<listing>")).toHaveLength(6);
   });
 
   it("takes about (properties / concurrency) round trips, not one per property", async () => {
@@ -94,7 +99,8 @@ describe("googleListingElements", () => {
     expect(ids(xml)[99]).toBe("p100");
     // 100 properties × 2 sequential reads × 20 ms was ~4 s one at a time.
     expect(ms).toBeLessThan(1500);
-    expect(maxInFlight).toBeLessThanOrEqual(FEED_CONCURRENCY * 2);
+    // At most three reads at once per property (the gateway credential keys).
+    expect(maxInFlight).toBeLessThanOrEqual(FEED_CONCURRENCY * 3);
   });
 });
 
