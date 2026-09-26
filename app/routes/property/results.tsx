@@ -517,16 +517,13 @@ function CartPanel({
       )}
 
       <div
-        className="mb-4 flex items-center gap-2 rounded-control px-3.5 py-2.5 text-caption font-semibold"
-        style={{
-          background: covered ? "#e8f0e6" : "#f5efe5",
-          color: covered ? "#3f7a52" : "var(--color-muted)",
-        }}
+        className={cx(
+          "mb-4 flex items-center gap-2 rounded-control px-3.5 py-2.5 text-caption font-semibold",
+          covered ? "bg-success-soft text-success" : "bg-chip text-muted",
+        )}
       >
         {covered ? (
-          <span className="flex-none text-body leading-none" style={{ color: "#3f7a52" }}>
-            ✓
-          </span>
+          <span className="flex-none text-body leading-none">✓</span>
         ) : (
           <span
             className="h-[7px] w-[7px] flex-none rounded-mark bg-accent"
