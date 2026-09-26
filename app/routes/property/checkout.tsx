@@ -1097,7 +1097,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       )}
 
       <Form method="post" className="flex flex-wrap items-start gap-9">
-        <div className="flex min-w-[340px] flex-[1.5] flex-col gap-7">
+        <div className="flex min-w-[min(340px,100%)] flex-[1.5] flex-col gap-7">
           <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

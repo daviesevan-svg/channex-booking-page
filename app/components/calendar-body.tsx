@@ -22,14 +22,14 @@ export function cellStyle(cell: DayCell): CSSProperties {
     return { background: "var(--accent-soft)", color: "var(--color-ink)", fontWeight: 600 };
   }
   if (cell.past) {
-    return { color: "#c9bdac", cursor: "default", fontWeight: 400 };
+    return { color: "var(--color-disabled-day)", cursor: "default", fontWeight: 400 };
   }
   if (cell.disabled) {
     // The first sold night after an available run reads as readable black with a
     // strike-through (you can still check out on it). Deeper sold/closed nights
     // use the plain greyed-out unavailable style.
     return {
-      color: cell.checkoutBoundary ? "var(--color-ink)" : "#c9bdac",
+      color: cell.checkoutBoundary ? "var(--color-ink)" : "var(--color-disabled-day)",
       cursor: "default",
       fontWeight: 400,
       textDecoration: cell.sold ? "line-through" : "none",

@@ -31,6 +31,7 @@ import { viewItemListEvent } from "~/lib/tracking";
 import { isTagged } from "~/lib/tracking-settings";
 import { TrackCart, TrackFunnel } from "~/components/tracking-events";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { stayTotals } from "~/lib/checkout-totals";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { formatMoney } from "~/lib/money";
@@ -190,6 +191,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     party,
   );
   const extrasSum = extrasTotal(extraLines);
+  // The cart's Total is the same all-in figure checkout charges — the room cards
+  // and the rate picker already show tax-inclusive prices, so a room-only total
+  // here read as the price dropping between steps (€705 → €620 → €705).
+  const grandTotal = stayTotals(cartLines, extraLines, { nights, checkin }, taxConfig).grandTotal;
 
   // Google Hotel price structured data — every bookable room + its rates, at the
   // all-in price (so Google shows the same total the guest pays at checkout).
@@ -232,6 +237,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     coverage,
     covered,
     extrasSum,
+    grandTotal,
     text,
     jsonLd,
     singleUnit: settings.singleUnit ?? false,
@@ -369,7 +375,7 @@ function RoomCard({
           ))}
         </div>
       </div>
-      <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
+      <div className="flex w-full flex-none flex-col items-stretch justify-center gap-2.5 border-t border-divider p-5 text-right sm:ml-auto sm:w-[250px] sm:border-l sm:border-t-0">
         {cheapest?.offer && (
           <div className="self-end rounded-full bg-info-soft px-2.5 py-0.5 text-micro font-semibold text-info">
             {cheapest.offer.name} · −{cheapest.offer.percent}%
@@ -442,6 +448,7 @@ function CartPanel({
   qs,
   extrasCounts,
   extrasSum,
+  grandTotal,
 }: {
   lines: ResolvedLine[];
   coverage: { capacity: number; total: number };
@@ -458,11 +465,16 @@ function CartPanel({
   qs: string;
   extrasCounts: number[];
   extrasSum: number;
+  /** All-in: rooms + extras + taxes & fees, exactly what checkout charges. */
+  grandTotal: number;
 }) {
   const base = useBase();
   const s = useSlots();
   const home = useHome();
   const tr = useT();
+  // Whatever the all-in total adds over rooms + extras (VAT, city tax, fees).
+  // Zero for a tax-inclusive property with no on-top charges, so no row.
+  const taxesSum = Math.round((grandTotal - coverage.total - extrasSum) * 100) / 100;
   return (
     <aside
       className={cx("sticky top-24 w-full min-w-[280px] flex-1 self-start", s.strip, "p-6")}
@@ -543,10 +555,16 @@ function CartPanel({
           <span className="font-semibold">{formatMoney(extrasSum, currency)}</span>
         </div>
       )}
+      {taxesSum > 0 && (
+        <div className="mb-2 flex items-baseline justify-between text-caption">
+          <span className="text-secondary">{tr.t("taxesFees")}</span>
+          <span className="font-semibold">{formatMoney(taxesSum, currency)}</span>
+        </div>
+      )}
       <div className="mb-4 flex items-baseline justify-between">
         <span className="text-body-lg font-semibold">{tr.t("total")}</span>
         <span className="font-serif text-display-sm font-semibold">
-          {formatMoney(coverage.total + extrasSum, currency)}
+          {formatMoney(grandTotal, currency)}
         </span>
       </div>
 
@@ -632,7 +650,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
   const s = useSlots();
   const home = useHome();
-  const { tracking, rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, text, jsonLd, singleUnit, query } = loaderData;
+  const { tracking, rooms, nights, bestMatchId, party, fitsParty, maxCapacity, cartLines, coverage, covered, extrasSum, grandTotal, text, jsonLd, singleUnit, query } = loaderData;
   const { currency } = useProperty();
   const tr = useT();
   const [searchParams] = useSearchParams();
@@ -777,6 +795,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
             qs={qs}
             extrasCounts={extrasCounts}
             extrasSum={extrasSum}
+            grandTotal={grandTotal}
           />
         </div>
       ) : (
@@ -814,6 +833,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
               qs={qs}
               extrasCounts={extrasCounts}
               extrasSum={extrasSum}
+              grandTotal={grandTotal}
             />
           </div>
         </div>
@@ -822,7 +842,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
       {showCartBar && (
         <MobileCartBar
           count={cartLines.length}
-          total={coverage.total + extrasSum}
+          total={grandTotal}
           currency={currency}
           covered={covered}
           continuePending={continuePending}
