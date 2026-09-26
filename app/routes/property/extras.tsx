@@ -254,7 +254,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
       </Link>
 
       <div className="flex flex-wrap items-start gap-9">
-        <div className="min-w-[340px] flex-[1.6]">
+        <div className="min-w-[min(340px,100%)] flex-[1.6]">
           <ExtraSection
             title={text.heading.replaceAll("{room}", roomTitle)}
             subtitle={text.intro}

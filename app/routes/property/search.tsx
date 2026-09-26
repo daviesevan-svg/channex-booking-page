@@ -396,7 +396,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               {dates.checkinLabel}
             </div>
           </button>
-          <div className="my-2 w-px bg-line" />
+          <div className="my-2 hidden w-px bg-line md:block" />
           <button
             type="button"
             onClick={() => setShowCal(true)}
@@ -410,7 +410,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
               {dates.checkoutLabel}
             </div>
           </button>
-          <div className="my-2 w-px bg-line" />
+          <div className="my-2 hidden w-px bg-line md:block" />
           <GuestSelector value={occupancy} onChange={setOccupancy} />
           {/* The critical path off the landing page — but only usable when the
               URL already carried dates, since this button searches whatever the
@@ -422,7 +422,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
             type="submit"
             disabled={searching}
             {...navCriticalPath()}
-            className="min-h-16 flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:opacity-70"
+            className="min-h-16 w-full flex-none cursor-pointer rounded-card bg-accent px-[34px] text-lead font-semibold text-on-accent transition-colors hover:bg-accent-deep disabled:opacity-70 lg:w-auto"
           >
             {searching ? tr.t("searching") : searchButton}
           </button>

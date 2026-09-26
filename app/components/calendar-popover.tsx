@@ -15,6 +15,7 @@ export function CalendarPopover({
   const tr = useT();
   const ref = useRef<HTMLDivElement>(null);
   const [maxH, setMaxH] = useState<number | undefined>(undefined);
+  const [maxW, setMaxW] = useState<number | undefined>(undefined);
   // Outside click / Escape closes — WITHOUT a backdrop, so the click that
   // closes the calendar still reaches the "Search rooms" button under it.
   useDismiss(ref, onClose);
@@ -31,6 +32,14 @@ export function CalendarPopover({
       if (!el) return;
       const top = el.getBoundingClientRect().top;
       setMaxH(Math.max(320, Math.round(window.innerHeight - top - 16)));
+      // The popover hangs off its trigger's LEFT edge at 94vw, so on a phone,
+      // where the trigger sits inside the page gutter, it ran past the right
+      // edge. Mirror the left gutter on the right (at least 12px). Layout
+      // offsets, not getBoundingClientRect: a template's entrance animation
+      // can still be sliding the search card in when this first runs.
+      let left = 0;
+      for (let n: HTMLElement | null = el; n; n = n.offsetParent as HTMLElement | null) left += n.offsetLeft;
+      setMaxW(Math.max(280, Math.round(window.innerWidth - left - Math.max(left, 12))));
     };
     let inner = 0;
     // Scroll into view (instant, so layout settles this frame), then measure the
@@ -53,7 +62,11 @@ export function CalendarPopover({
       <div
         ref={ref}
         className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(700px,94vw)] overflow-y-auto rounded-panel border border-line bg-surface p-[22px_22px_18px]"
-        style={{ boxShadow: "var(--shadow-popover)", maxHeight: maxH ? `${maxH}px` : undefined }}
+        style={{
+          boxShadow: "var(--shadow-popover)",
+          maxHeight: maxH ? `${maxH}px` : undefined,
+          maxWidth: maxW ? `${maxW}px` : undefined,
+        }}
       >
         <CalendarNav state={state} />
         <CalendarMonths state={state} />

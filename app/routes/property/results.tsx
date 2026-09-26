@@ -369,7 +369,7 @@ function RoomCard({
           ))}
         </div>
       </div>
-      <div className="flex w-[250px] flex-none flex-col items-stretch justify-center gap-2.5 border-l border-divider p-5 text-right">
+      <div className="flex w-full flex-none flex-col items-stretch justify-center gap-2.5 border-t border-divider p-5 text-right sm:ml-auto sm:w-[250px] sm:border-l sm:border-t-0">
         {cheapest?.offer && (
           <div className="self-end rounded-full bg-info-soft px-2.5 py-0.5 text-micro font-semibold text-info">
             {cheapest.offer.name} · −{cheapest.offer.percent}%
