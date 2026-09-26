@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useT } from "~/lib/i18n";
 import type { Occupancy } from "~/lib/occupancy";
 import { useDismiss } from "~/lib/use-dismiss";
+import { useViewportClamp } from "~/lib/use-viewport-clamp";
 
 const MAX_ADULTS = 12;
 const MAX_CHILDREN = 8;
@@ -62,6 +63,8 @@ export function GuestSelector({
   // anywhere else — including "Search rooms" — closes without being swallowed.
   const wrapperRef = useRef<HTMLDivElement>(null);
   useDismiss(wrapperRef, () => setOpen(false));
+  const popRef = useRef<HTMLDivElement>(null);
+  useViewportClamp(popRef, open);
   const summary =
     tr.p("adult", adults) +
     (childrenAge.length ? `, ${tr.p("child", childrenAge.length)}` : "");
@@ -95,6 +98,7 @@ export function GuestSelector({
       {open && (
         <>
           <div
+            ref={popRef}
             className="absolute left-0 top-[calc(100%+12px)] z-40 w-[min(360px,92vw)] rounded-panel border border-line bg-surface p-5"
             style={{ boxShadow: "var(--shadow-popover)" }}
           >
