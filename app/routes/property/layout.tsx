@@ -464,6 +464,10 @@ export default function PropertyLayout({ loaderData, params }: Route.ComponentPr
   // (theme-neutrals.ts). After the style vars, because a style can move the page.
   if (dark) {
     Object.assign(themeStyle, dark, darkStatus(resolvedPage, dark["--color-ink"], dark["--color-surface"]) ?? {});
+    // Native controls draw from color-scheme, not our tokens: without this a
+    // <select>'s open list paints white under the theme's white text, and
+    // checkboxes and scrollbars stay light-mode on the dark page.
+    themeStyle.colorScheme = "dark";
     const accent = String(themeStyle["--accent" as keyof React.CSSProperties] ?? "");
     const tints = isCustom
       ? darkAccentTints(resolvedPage, accent, [
