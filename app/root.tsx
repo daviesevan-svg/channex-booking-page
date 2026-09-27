@@ -143,12 +143,19 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     stack = error.stack;
   }
 
+  // Only reached outside a hotel's pages now — an unknown property address, the
+  // back office — since guest pages have their own boundary inside the hotel's
+  // layout (routes/property/guest-boundary.tsx). No property here, so no theme
+  // and no language: plain English on the default palette, with a way out.
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
+    <main className="mx-auto max-w-[640px] px-7 pb-[72px] pt-16">
+      <h1 className="mb-3 font-serif text-display-sm font-semibold">{message}</h1>
+      <p className="mb-8 text-body-lg text-secondary">{details}</p>
+      <a href="/" className="text-body font-semibold text-accent hover:underline">
+        Go to the home page
+      </a>
       {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
+        <pre className="mt-8 w-full overflow-x-auto p-4">
           <code>{stack}</code>
         </pre>
       )}
