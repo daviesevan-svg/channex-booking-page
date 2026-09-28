@@ -38,3 +38,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const { search } = new URL(request.url);
   throw redirect(`${basePath(params.channelId)}/p/${params.pageSlug}${search}`, 301);
 }
+
+// A component makes this a UI route, so the 404s above reach the branded
+// boundary (guest-boundary.tsx). As a loader-only resource route, its thrown
+// Response went back raw — a plain-text "Not found" for every mistyped URL.
+// Never rendered: the loader always throws.
+export default function PageLegacy() {
+  return null;
+}

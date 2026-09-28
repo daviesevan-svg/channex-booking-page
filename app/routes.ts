@@ -249,15 +249,23 @@ export default [
   //
   // The shared-domain mount keeps file-derived route ids, so nothing that
   // referenced them by name changes.
+  //
+  // Both mounts put the pages under guest-boundary.tsx, a pathless route whose
+  // ErrorBoundary renders inside the layout, so a 404 keeps the hotel's header,
+  // theme and language; and both end in a splat so an unmatched path reaches it.
   route(":channelId", "routes/property/layout.tsx", [
-    index("routes/property/search.tsx"),
-    ...guestRoutes(),
-    // Website pages at their OLD address. MUST stay last: it matches any single
-    // segment, and only React Router's static-beats-dynamic ranking keeps the
-    // funnel routes above from being read as page slugs. Redirects real pages,
-    // 404s anything else. Only on this mount — a custom domain never had the old
-    // shape, so there is nothing to redirect there.
-    route(":pageSlug", "routes/property/page-legacy.tsx"),
+    layout("routes/property/guest-boundary.tsx", [
+      index("routes/property/search.tsx"),
+      ...guestRoutes(),
+      // Website pages at their OLD address. MUST stay last of the named routes:
+      // it matches any single segment, and only React Router's
+      // static-beats-dynamic ranking keeps the funnel routes above from being
+      // read as page slugs. Redirects real pages, 404s anything else. Only on
+      // this mount — a custom domain never had the old shape, so there is
+      // nothing to redirect there.
+      route(":pageSlug", "routes/property/page-legacy.tsx"),
+      route("*", "routes/property/not-found.tsx"),
+    ]),
   ]),
 
   // The same tree at the root, for a hotel's own domain. Pathless: it contributes
@@ -265,11 +273,14 @@ export default [
   // explicit id because the modules are already used by the mount above.
   //
   layout("routes/property/layout.tsx", { id: "host" }, [
-    // "/" — a hotel's home page on their own domain, the property picker on ours.
-    // One route, because one URL: search.tsx branches on whether the hostname
-    // resolved to a property. There is no way to express that in the route table,
-    // since matching happens before anything can look at the host.
-    index("routes/property/search.tsx", { id: "host-index" }),
-    ...guestRoutes("host"),
+    layout("routes/property/guest-boundary.tsx", { id: "host-boundary" }, [
+      // "/" — a hotel's home page on their own domain, the property picker on
+      // ours. One route, because one URL: search.tsx branches on whether the
+      // hostname resolved to a property. There is no way to express that in the
+      // route table, since matching happens before anything can look at the host.
+      index("routes/property/search.tsx", { id: "host-index" }),
+      ...guestRoutes("host"),
+      route("*", "routes/property/not-found.tsx", { id: "host-not-found" }),
+    ]),
   ]),
 ] satisfies RouteConfig;
