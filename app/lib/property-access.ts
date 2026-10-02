@@ -11,6 +11,8 @@ export type AccessActor = {
 export type AccessProperty = {
   owner?: string;
   partnerId?: string;
+  /** Teammates the owner gave "full access" on the Team page — manager level. */
+  fullAccess?: string[];
 };
 
 /** Hotel owner or platform superadmin. Teammates and partner_admins who do not
@@ -21,13 +23,23 @@ export function canOwnProperty(actor: AccessActor, property: AccessProperty | un
   return Boolean(property && property.owner === actor.email);
 }
 
-/** Owner, partner_admin of that hotel's partner, or superadmin. Teammates fail.
- *  Does not consult member-area hide or partner hiddenPages — those overlays
- *  never apply to partner_admin. */
-export function canManageProperty(actor: AccessActor, property: AccessProperty | undefined): boolean {
+/** Who may hand out (or take back) full access: the owner, the hotel's partner
+ *  admin, or a superadmin. A teammate who was GIVEN full access cannot pass it
+ *  on — otherwise one grant would fan out past the owner's say-so. */
+export function canGrantFullAccess(actor: AccessActor, property: AccessProperty | undefined): boolean {
   if (canOwnProperty(actor, property)) return true;
   if (!property?.partnerId) return false;
   return actor.role === "partner_admin" && actor.partnerId === property.partnerId;
+}
+
+/** Owner, partner_admin of that hotel's partner, superadmin, or a teammate the
+ *  owner gave full access. Ordinary teammates fail. Does not consult
+ *  member-area hide or partner hiddenPages — those overlays never apply to
+ *  partner_admin. Full access stops short of ownership: money, slug, live
+ *  booking and deleting the hotel stay with canOwnProperty. */
+export function canManageProperty(actor: AccessActor, property: AccessProperty | undefined): boolean {
+  if (canGrantFullAccess(actor, property)) return true;
+  return Boolean(actor.email && property?.fullAccess?.includes(actor.email));
 }
 
 /** Keep the stored value unless the actor may persist an owner-only field

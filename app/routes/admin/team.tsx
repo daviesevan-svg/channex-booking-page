@@ -10,10 +10,12 @@ import {
   accessActor,
   actorCanManageProperty,
   addPropertyMember,
+  canGrantFullAccess,
   currentPropertyId,
   getProperties,
   getProperty,
   removePropertyMember,
+  setMemberFullAccess,
   setMemberHiddenAreas,
 } from "~/lib/properties.server";
 import { isMemberArea, MEMBER_AREAS, type MemberArea } from "~/lib/member-areas";
@@ -43,6 +45,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Invites requested through the management API, waiting for approval here.
     pending: await listPendingInvites(propertyId),
     memberHiddenAreas: property?.memberHiddenAreas ?? {},
+    fullAccess: property?.fullAccess ?? [],
+    // Only the owner / partner admin hands out full access — a teammate who
+    // was given it can manage the team but not pass it on.
+    canGrantFullAccess: canGrantFullAccess(actor, property),
     invitableProperties: manageable.map((p) => ({ id: p.id, name: p.name })),
     // The OTHER manageable properties each teammate is also on — display only,
     // so cross-property access is visible from any one Team page.
@@ -87,6 +93,10 @@ export async function action({ request }: Route.ActionArgs) {
     await removePendingInvite(propertyId, email);
   } else if (intent === "remove" && email) {
     await removePropertyMember(propertyId, email);
+  } else if (intent === "full-access" && email) {
+    if (canGrantFullAccess(actor, await getProperty(propertyId))) {
+      await setMemberFullAccess(propertyId, email, form.get("on") === "1");
+    }
   } else if (intent === "access" && email) {
     // Checkboxes carry what the member CAN see; we store the complement so
     // absent-entry = full access stays the default for existing teams.
@@ -122,7 +132,8 @@ export function meta({ matches }: Route.MetaArgs) {
 }
 
 export default function AdminTeam({ loaderData }: Route.ComponentProps) {
-  const { propertyId, name, owner, members, pending, memberHiddenAreas, invitableProperties, alsoOn } = loaderData;
+  const { propertyId, name, owner, members, pending, memberHiddenAreas, fullAccess, canGrantFullAccess: canGrant, invitableProperties, alsoOn } =
+    loaderData;
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const t = useAdminT();
@@ -156,6 +167,7 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
         {/* teammates */}
         {members.map((m) => {
           const hidden = memberHiddenAreas[m] ?? [];
+          const isFull = fullAccess.includes(m);
           return (
             <div key={m} className="border-t border-divider px-5 py-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -178,30 +190,49 @@ export default function AdminTeam({ loaderData }: Route.ComponentProps) {
                   {t("tmAlsoOn")} {alsoOn[m].join(", ")}
                 </p>
               )}
-              {/* Per-member page access: ticked = can see that area. */}
-              <Form method="post" className="mt-3">
-                <input type="hidden" name="intent" value="access" />
-                <input type="hidden" name="email" value={m} />
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">
-                    {t("tmAccessTitle")}
-                  </span>
-                  {MEMBER_AREAS.map((a) => (
-                    <label key={a} className="flex items-center gap-1.5 text-[13px] text-secondary">
-                      <input type="checkbox" name="areas" value={a} defaultChecked={!hidden.includes(a)} />
-                      {areaLabel[a]}
-                    </label>
-                  ))}
+              {isFull ? (
+                <p className="mt-2 text-[12px] text-faint">{t("tmFullAccessActive")}</p>
+              ) : (
+                /* Per-member page access: ticked = can see that area. */
+                <Form method="post" className="mt-3">
+                  <input type="hidden" name="intent" value="access" />
+                  <input type="hidden" name="email" value={m} />
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-faint">
+                      {t("tmAccessTitle")}
+                    </span>
+                    {MEMBER_AREAS.map((a) => (
+                      <label key={a} className="flex items-center gap-1.5 text-[13px] text-secondary">
+                        <input type="checkbox" name="areas" value={a} defaultChecked={!hidden.includes(a)} />
+                        {areaLabel[a]}
+                      </label>
+                    ))}
+                    <button
+                      type="submit"
+                      disabled={busy}
+                      className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold hover:border-accent hover:text-accent disabled:opacity-60"
+                    >
+                      {t("tmAccessSave")}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[12px] text-faint">{t("tmAccessHint")}</p>
+                </Form>
+              )}
+              {canGrant && (
+                <Form method="post" className="mt-2">
+                  <input type="hidden" name="intent" value="full-access" />
+                  <input type="hidden" name="email" value={m} />
+                  <input type="hidden" name="on" value={isFull ? "0" : "1"} />
                   <button
                     type="submit"
                     disabled={busy}
-                    className="rounded-[8px] border border-line-alt px-2.5 py-1 text-[12px] font-semibold hover:border-accent hover:text-accent disabled:opacity-60"
+                    className="text-[12px] font-semibold text-accent hover:underline disabled:opacity-60"
                   >
-                    {t("tmAccessSave")}
+                    {isFull ? t("tmFullAccessRevoke") : t("tmFullAccessGrant")}
                   </button>
-                </div>
-                <p className="mt-1 text-[12px] text-faint">{t("tmAccessHint")}</p>
-              </Form>
+                  {!isFull && <span className="ml-2 text-[12px] text-faint">{t("tmFullAccessHint")}</span>}
+                </Form>
+              )}
             </div>
           );
         })}

@@ -18,7 +18,7 @@ import {
   type AccessActor,
 } from "./property-access";
 
-export { canOwnProperty, canManageProperty as actorCanManageProperty } from "./property-access";
+export { canOwnProperty, canGrantFullAccess, canManageProperty as actorCanManageProperty } from "./property-access";
 export type { AccessActor, AccessProperty } from "./property-access";
 
 export interface PropertyRef {
@@ -42,6 +42,11 @@ export interface PropertyRef {
    *  absent/empty = full access, mirroring the partner hiddenPages semantics.
    *  Set from the Team page; enforced by assertMemberAreaAllowed below. */
   memberHiddenAreas?: Record<string, MemberArea[]>;
+  /** Teammates (subset of `members`) the owner gave FULL ACCESS on the Team
+   *  page: manager level — widget, API keys, webhooks, team, connectivity,
+   *  Google, refunds — and never bound by memberHiddenAreas. Still not the
+   *  owner: money, slug, live booking and deleting the hotel stay owner-only. */
+  fullAccess?: string[];
   /** Discoverable in the directory collection operators browse. Opt-OUT — unset
    *  means listed. Only content already public on the property's own booking
    *  page is exposed there, and never a contact address, so the directory can't
@@ -644,6 +649,10 @@ export async function removePropertyMember(id: string, email: string): Promise<v
     delete p.memberHiddenAreas[e];
     if (!Object.keys(p.memberHiddenAreas).length) delete p.memberHiddenAreas;
   }
+  if (p.fullAccess?.includes(e)) {
+    p.fullAccess = p.fullAccess.filter((m) => m !== e);
+    if (!p.fullAccess.length) delete p.fullAccess;
+  }
   await writeOne(list, id);
 }
 
@@ -709,6 +718,7 @@ export async function currentPropertyId(request: Request): Promise<string | unde
  *  lock an owner out), superadmins, or the property's own partner admins. */
 async function memberRestrictionApplies(p: PropertyRef, email: string): Promise<boolean> {
   if (p.owner === email) return false;
+  if (p.fullAccess?.includes(email)) return false;
   if (await isSuperadmin(email)) return false;
   const user = await getUser(email);
   if (user?.role === "partner_admin" && user.partnerId && user.partnerId === p.partnerId) return false;
@@ -745,6 +755,31 @@ export async function hiddenMemberAreasFor(request: Request, propertyId: string 
   return (await memberRestrictionApplies(p, email)) ? hidden : [];
 }
 
+/** Gives a teammate full access (manager level) or takes it back. Granting also
+ *  clears any hidden areas — full access means all of it, and a stale hide list
+ *  would silently come back the day access is taken away. Owner-or-manager
+ *  gating happens at the route; non-members are ignored so this can't be used
+ *  to add someone to the team. */
+export async function setMemberFullAccess(id: string, email: string, on: boolean): Promise<void> {
+  const e = email.trim().toLowerCase();
+  const list = await read();
+  const p = list.find((x) => x.id === id);
+  if (!p || !p.members?.includes(e)) return;
+  const set = new Set(p.fullAccess ?? []);
+  if (on) {
+    set.add(e);
+    if (p.memberHiddenAreas && e in p.memberHiddenAreas) {
+      delete p.memberHiddenAreas[e];
+      if (!Object.keys(p.memberHiddenAreas).length) delete p.memberHiddenAreas;
+    }
+  } else {
+    set.delete(e);
+  }
+  if (set.size) p.fullAccess = [...set];
+  else delete p.fullAccess;
+  await writeOne(list, id);
+}
+
 /** Replaces a teammate's hidden-area list (empty = full access, entry removed).
  *  Owner-or-superadmin gating happens at the route; unknown emails are ignored
  *  so a removed member can't be re-added through this side door. */
@@ -753,6 +788,9 @@ export async function setMemberHiddenAreas(id: string, email: string, hidden: Me
   const list = await read();
   const p = list.find((x) => x.id === id);
   if (!p || !p.members?.includes(e)) return;
+  // Full access is never narrowed by a hide list (memberRestrictionApplies
+  // ignores it anyway); storing one would only resurface when access is revoked.
+  if (p.fullAccess?.includes(e)) return;
   const map = { ...(p.memberHiddenAreas ?? {}) };
   if (hidden.length) map[e] = hidden;
   else delete map[e];
