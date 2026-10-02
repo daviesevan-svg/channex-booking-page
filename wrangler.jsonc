@@ -94,7 +94,7 @@
 	// Separate bounded recovery/cleanup ticks from the existing six-hour jobs.
 	// Most minute ticks only check for failed Google queue admissions in D1.
 	"triggers": {
-		"crons": ["* * * * *", "*/15 * * * *", "0 */6 * * *"]
+		"crons": ["* * * * *", "*/15 * * * *", "10 * * * *", "0 */6 * * *"]
 	},
 	"observability": {
 		"enabled": true

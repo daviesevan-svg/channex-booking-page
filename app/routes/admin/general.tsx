@@ -12,6 +12,8 @@ import { getConfig } from "~/lib/config.server";
 import { SUPPORTED_CURRENCIES } from "~/lib/currencies";
 import { DEFAULT_LANG, enabledLanguages, guestDefaultLang, LANGUAGES, langLabel } from "~/lib/content";
 import { getRates, pricingModeOf } from "~/lib/catalog.server";
+import { hasAdvanceWindow } from "~/lib/advance-window";
+import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { getSettings, saveSettings } from "~/lib/overrides.server";
 import { AdminPageHeader } from "~/components/admin-page-header";
 import { FIELD_INPUT } from "~/components/admin-form";
@@ -94,6 +96,11 @@ export async function action({ request }: Route.ActionArgs) {
     return { error: currencyLockMessage(lock) };
   }
   await saveSettings(propertyId, form, { persistLive: canOwn });
+  // An advance-purchase window counts days from the hotel's midnight, so a new
+  // timezone moves which dates Google should show as open.
+  if ((String(form.get("timezone") ?? "") || "UTC") !== (current.timezone || "UTC") && hasAdvanceWindow(await getRates(propertyId))) {
+    await queueGoogleAriPush(propertyId, ["ari"]);
+  }
   // The shortcode lives on the property registry (globally unique), not the
   // per-property settings blob — save it separately and surface any clash.
   // Slug is the same owner-only identity gate as live.

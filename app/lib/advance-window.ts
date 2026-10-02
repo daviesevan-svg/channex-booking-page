@@ -36,3 +36,10 @@ export function parseAdvanceDays(raw: unknown): number | undefined {
 export function validateAdvanceWindow(w: AdvanceWindow): "min_gt_max" | null {
   return w.minAdvanceDays != null && w.maxAdvanceDays != null && w.minAdvanceDays > w.maxAdvanceDays ? "min_gt_max" : null;
 }
+
+/** Whether any of these rates sells inside an advance window. Such a rate's
+ *  open/closed state changes with the calendar, not just with edits, so the
+ *  Google feed has to be refreshed when the hotel's date rolls over. */
+export function hasAdvanceWindow(rates: (AdvanceWindow & { active?: boolean })[]): boolean {
+  return rates.some((r) => r.active !== false && (r.minAdvanceDays != null || r.maxAdvanceDays != null));
+}

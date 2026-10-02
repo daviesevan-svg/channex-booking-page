@@ -29,7 +29,7 @@ export function isStayBookable(checkin: string, checkout: string): boolean {
 }
 
 /** Current calendar date (YYYY-MM-DD) and minutes-since-midnight in a timezone. */
-function localNowParts(tz: string, now: Date): { date: string; minutes: number } {
+export function localNowParts(tz: string, now: Date): { date: string; minutes: number } {
   try {
     const parts = Object.fromEntries(
       new Intl.DateTimeFormat("en-CA", {

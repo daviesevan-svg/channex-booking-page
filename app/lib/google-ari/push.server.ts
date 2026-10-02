@@ -7,6 +7,8 @@
 // outcome is recorded on the property so the admin can show it.
 import { getConfig } from "../config.server";
 import type { InventoryScope } from "../ari/read.server";
+import { hasAdvanceWindow } from "../advance-window";
+import { localNowParts } from "../dates";
 import { submitGoogleAriWork } from "./queue-client.server";
 import { getRooms, getRates, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
@@ -366,6 +368,31 @@ export async function scheduledGoogleAriSync(): Promise<void> {
       await submitGoogleAriWork({ pid: p.id, kinds: ALL_SYNC_KINDS });
     } catch (e) {
       console.log(`[google-ari] scheduled sync failed for ${p.id}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+}
+
+/** Hourly cron: refresh the Google feed at each hotel's midnight when it sells
+ *  Early Bird / Last Minute rates.
+ *
+ *  An advance-purchase window slides with the date — a Last Minute rate opens
+ *  for a new arrival date, and an Early Bird one closes for another, at the
+ *  stroke of the hotel's local midnight, with no edit to trigger a push. The
+ *  6-hourly full sync would catch it eventually; this makes it land within the
+ *  hour. Stateless: every property sees exactly one tick per day during its
+ *  local hour 0 (offsets of 30/45 minutes included), so there is nothing to
+ *  store and a missed tick falls back to the 6-hourly sweep. */
+export async function scheduledGoogleAriWindowSync(now: Date = new Date()): Promise<void> {
+  const properties = await getProperties();
+  for (const p of properties) {
+    try {
+      const settings = await getSettings(p.id);
+      if (!settings.googleAriPush) continue;
+      if (Math.floor(localNowParts(settings.timezone || "UTC", now).minutes / 60) !== 0) continue;
+      if (!hasAdvanceWindow(await getRates(p.id))) continue;
+      await submitGoogleAriWork({ pid: p.id, kinds: ["ari"] });
+    } catch (e) {
+      console.log(`[google-ari] window sync failed for ${p.id}: ${e instanceof Error ? e.message : e}`);
     }
   }
 }
