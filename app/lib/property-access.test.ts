@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canManageProperty, canOwnProperty, ownerOnlyValue } from "./property-access";
+import { canGrantFullAccess, canManageProperty, canOwnProperty, ownerOnlyValue } from "./property-access";
 
 const property = { owner: "owner@hotel.com", partnerId: "pms-a" };
 const otherPartnerHotel = { owner: "owner@hotel.com", partnerId: "pms-b" };
@@ -88,5 +88,33 @@ describe("partner_admin ops (team / keys / refunds / widget)", () => {
   it("lets a partner_admin of that partner through canManageProperty", () => {
     expect(canManageProperty(partnerAdmin, property)).toBe(true);
     expect(canManageProperty(teammate, property)).toBe(false);
+  });
+});
+
+describe("full access teammates", () => {
+  const withFull = { ...property, fullAccess: [teammate.email] };
+
+  it("can manage the hotel they were given full access on", () => {
+    expect(canManageProperty(teammate, withFull)).toBe(true);
+  });
+
+  it("still cannot own it — money, slug, live booking, delete stay with the owner", () => {
+    expect(canOwnProperty(teammate, withFull)).toBe(false);
+  });
+
+  it("only that teammate: another teammate on the same hotel stays ordinary", () => {
+    expect(canManageProperty({ email: "other@hotel.com", role: "member" }, withFull)).toBe(false);
+  });
+
+  it("does not carry over to a different hotel", () => {
+    expect(canManageProperty(teammate, property)).toBe(false);
+  });
+
+  it("cannot pass full access on, but the owner and partner admin can grant it", () => {
+    expect(canGrantFullAccess(teammate, withFull)).toBe(false);
+    expect(canGrantFullAccess(owner, withFull)).toBe(true);
+    expect(canGrantFullAccess(partnerAdmin, withFull)).toBe(true);
+    expect(canGrantFullAccess(otherPartnerAdmin, withFull)).toBe(false);
+    expect(canGrantFullAccess(superadmin, withFull)).toBe(true);
   });
 });
