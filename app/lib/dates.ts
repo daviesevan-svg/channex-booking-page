@@ -57,6 +57,12 @@ function localNowParts(tz: string, now: Date): { date: string; minutes: number }
   }
 }
 
+/** Today's calendar date (YYYY-MM-DD) in `tz` — the hotel's today, which differs
+ *  from the server's (UTC) around midnight. */
+export function todayInTimezone(tz: string | undefined, now: Date = new Date()): string {
+  return localNowParts(tz || "UTC", now).date;
+}
+
 export function addDaysISO(dateISO: string, n: number): string {
   return new Date(Date.parse(`${dateISO}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 }

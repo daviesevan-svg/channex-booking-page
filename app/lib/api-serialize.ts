@@ -221,6 +221,8 @@ export function serializeGateReason(g: GateReason) {
     reason: g.reason,
     min_nights: g.minNights ?? null,
     max_nights: g.maxNights ?? null,
+    advance_days: g.advanceDays ?? null,
+    days_ahead: g.daysAhead ?? null,
     message:
       g.reason === "sold_out"
         ? "No availability for these dates."
@@ -230,9 +232,13 @@ export function serializeGateReason(g: GateReason) {
             ? `Needs a minimum stay of ${g.minNights ?? "more"} nights.`
             : g.reason === "max_stay"
               ? `Stays from this check-in date are limited to ${g.maxNights ?? "fewer"} nights.`
-              : g.reason === "closed_to_arrival"
-                ? "Arrivals are not accepted on the check-in date."
-                : "Departures are not accepted on the check-out date.",
+              : g.reason === "min_advance"
+                ? `Only sold for arrivals at least ${g.advanceDays ?? "more"} days away (this one is ${g.daysAhead ?? "fewer"}).`
+                : g.reason === "max_advance"
+                  ? `Only sold for arrivals within ${g.advanceDays ?? "fewer"} days (this one is ${g.daysAhead ?? "more"} days away).`
+                  : g.reason === "closed_to_arrival"
+                    ? "Arrivals are not accepted on the check-in date."
+                    : "Departures are not accepted on the check-out date.",
   };
 }
 

@@ -14,6 +14,8 @@ import { getPromotions } from "./promotions.server";
 import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, pricedOccupancy, type OccupancyPricing } from "./rate-pricing";
 import { ratePolicyOf, type RatePolicy } from "./rate-policy";
 import { policyToCancellation } from "./policy-copy";
+import { advanceMiss, type AdvanceWindow } from "./advance-window";
+import { todayInTimezone } from "./dates";
 import { lineOccupancy, type CartLine, type ResolvedLine } from "./cart";
 import { roomCapacity } from "./occupancy";
 
@@ -80,7 +82,7 @@ export interface RateTranslation {
   cancellationNote?: string;
 }
 
-export interface CatalogRate {
+export interface CatalogRate extends AdvanceWindow {
   id: string;
   title: string;
   mealPlan?: string;
@@ -300,9 +302,13 @@ export interface GateReason {
   roomTitle: string;
   rateId?: string;
   rateTitle?: string;
-  reason: "sold_out" | "stop_sell" | "min_stay" | "max_stay" | "closed_to_arrival" | "closed_to_departure";
+  reason: "sold_out" | "stop_sell" | "min_stay" | "max_stay" | "closed_to_arrival" | "closed_to_departure" | "min_advance" | "max_advance";
   minNights?: number;
   maxNights?: number;
+  /** `min_advance` / `max_advance`: the rate's advance-purchase bound, in days
+   *  before arrival, and how far off this arrival is. */
+  advanceDays?: number;
+  daysAhead?: number;
 }
 
 // ---- shared stay inventory ----
@@ -381,8 +387,11 @@ export async function getCatalogRooms(
   // Best automatic offer for this stay (early bird / last-minute / length-of-stay),
   // baked into each rate price below so the sale shows consistently on results,
   // detail, cart, checkout and confirmation (all of which call this function).
+  // "Today" is the hotel's today, not the server's: a Worker runs in UTC, so
+  // around midnight the two disagree by a day and a rate with a 0-day maximum
+  // would be on sale for tomorrow's arrivals.
   const daysAhead = checkinDate
-    ? differenceInCalendarDays(parseISO(checkinDate), parseISO(format(new Date(), "yyyy-MM-dd")))
+    ? differenceInCalendarDays(parseISO(checkinDate), parseISO(todayInTimezone(settings.timezone)))
     : 0;
   // One context, two independent questions: which discount is best, and what's
   // included. `bestAutoOffer` returns null when a matching value-add is
@@ -437,6 +446,16 @@ export async function getCatalogRooms(
                 if (nightDates.some((d) => inv.restrictions[k(d)]?.stopSell)) {
                   note({ ...where, reason: "stop_sell" });
                   return null;
+                }
+                // Advance-purchase window (Early Bird / Last Minute rates): a
+                // property of the rate, not of a date, so it is checked against
+                // how far off the arrival is.
+                if (checkinDate) {
+                  const miss = advanceMiss(r, daysAhead);
+                  if (miss) {
+                    note({ ...where, reason: miss, advanceDays: miss === "min_advance" ? r.minAdvanceDays : r.maxAdvanceDays, daysAhead });
+                    return null;
+                  }
                 }
                 const minStay = (checkinDate && inv.restrictions[k(checkinDate)]?.minStay) || 1;
                 if (nights < minStay) {
@@ -658,13 +677,15 @@ export async function getCalendarAvailability(
    *  anything free?". Same gate either way, so the two can't disagree. */
   opts: { roomId?: string } = {},
 ): Promise<ClosedDates> {
-  const [allRooms, rates, inv] = await Promise.all([
+  const [allRooms, rates, inv, settings] = await Promise.all([
     getRooms(pid),
     getRates(pid),
     // Narrowed in SQL, not after the fact: a one-room calendar has no use for
     // the other nineteen rooms' rows.
     getInventory(pid, from, to, opts.roomId),
+    getSettings(pid),
   ]);
+  const today = parseISO(todayInTimezone(settings.timezone));
   const rooms = opts.roomId ? allRooms.filter((r) => r.id === opts.roomId) : allRooms;
   const ratesByRoom = new Map<string, CatalogRate[]>();
   for (const r of rates) {
@@ -683,6 +704,7 @@ export async function getCalendarAvailability(
   const end = parseISO(to);
   for (let d = parseISO(from); d <= end; d = addDays(d, 1)) {
     const date = format(d, "yyyy-MM-dd");
+    const daysAhead = differenceInCalendarDays(d, today);
     let bookable = false;
     let minStay = Infinity;
     let maxStay = 0;
@@ -702,6 +724,9 @@ export async function getCalendarAvailability(
         const rid = rateChannexId(rt, room.id);
         const r = inv.restrictions[`${room.id}|${rid}|${date}`];
         if (r?.stopSell) continue; // rate not bookable this day
+        // Outside the rate's advance-purchase window: not for sale for an
+        // arrival on this date. A date is open only if SOME rate is in window.
+        if (advanceMiss(rt, daysAhead)) continue;
         // A night with no price (or 0) isn't for sale — mirror getCatalogRooms
         // so the calendar doesn't offer a date the results page will reject.
         if ((inv.prices[`${room.id}|${rid}|${date}`] ?? rt.prices[room.id]) <= 0) continue;

@@ -24,6 +24,7 @@ import { AdminPageHeader } from "~/components/admin-page-header";
 import { activeGateway } from "~/lib/payments.server";
 import { MAX_CANCEL_TIERS, validateTiers } from "~/lib/cancel-bands";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
+import { parseAdvanceDays, validateAdvanceWindow } from "~/lib/advance-window";
 import { getSettings } from "~/lib/overrides.server";
 
 /** Build the structured policy from form field getters — shared by the save
@@ -246,6 +247,17 @@ export async function action({ params, request }: Route.ActionArgs) {
     if (Object.keys(map).length > 0) occupancyPricingByRoom = map;
   }
 
+  // Booking window. Blank = no limit; 0 is a real maximum (same-day arrivals
+  // only), so this can't share the `> 0` parsers above.
+  const minAdvanceDays = parseAdvanceDays(form.get("minAdvanceDays"));
+  const maxAdvanceDays = parseAdvanceDays(form.get("maxAdvanceDays"));
+  if (Number.isNaN(minAdvanceDays) || Number.isNaN(maxAdvanceDays)) {
+    return { error: "Booking window: enter a whole number of days, or leave the box blank." };
+  }
+  if (validateAdvanceWindow({ minAdvanceDays, maxAdvanceDays })) {
+    return { error: "Booking window: the minimum days before arrival can't be more than the maximum." };
+  }
+
   const mealPlan = String(form.get("mealPlan") ?? "").trim();
   const inclusions = String(form.get("inclusions") ?? "")
     .split("\n")
@@ -292,6 +304,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     cancelDeadlineUnit: tier0?.deadlineUnit,
     cancellationNote: policy.overrideNote,
     inclusions: onDefault ? inclusions : (existing?.inclusions ?? []),
+    minAdvanceDays,
+    maxAdvanceDays,
     active: form.get("active") != null,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     translations,
@@ -787,6 +801,23 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
             <label className="block text-[13px] font-semibold text-secondary">
               {t("rtChargeValue")} <span className="font-normal text-faint">{t("rtChargeValueHint")}</span>
               <input name="noShowPenaltyValue" type="number" min={0} step="0.01" defaultValue={pol.noShow.penaltyValue ?? ""} placeholder={t("rtEg", { v: 100 })} disabled={!needsValue(noShowPenalty)} className={disabledInput} />
+            </label>
+          </div>
+        </div>
+
+        <div className="border-t border-divider pt-5">
+          <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtAdvanceTitle")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("rtAdvanceIntro")}</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block text-[13px] font-semibold text-secondary">
+              {t("rtMinAdvance")}
+              <input name="minAdvanceDays" type="number" min={0} step={1} defaultValue={rate?.minAdvanceDays ?? ""} placeholder={t("rtEg", { v: 30 })} className={FIELD_INPUT} />
+              <span className="mt-1 block text-[12px] font-normal text-faint">{t("rtMinAdvanceHint")}</span>
+            </label>
+            <label className="block text-[13px] font-semibold text-secondary">
+              {t("rtMaxAdvance")}
+              <input name="maxAdvanceDays" type="number" min={0} step={1} defaultValue={rate?.maxAdvanceDays ?? ""} placeholder={t("rtEg", { v: 3 })} className={FIELD_INPUT} />
+              <span className="mt-1 block text-[12px] font-normal text-faint">{t("rtMaxAdvanceHint")}</span>
             </label>
           </div>
         </div>

@@ -1570,6 +1570,12 @@ const TR: Record<string, string> = {
   rtNoShowIntro: "Misafir hiç gelmez ve iptal etmezse ne tahsil edileceği.",
   rtNoShowCharge: "Gelmeme ücreti",
   rtActive: "Etkin (misafirler rezerve edebilir)",
+  rtAdvanceTitle: "Rezervasyon aralığı",
+  rtAdvanceIntro: "Bu fiyatı yalnızca giriş tarihi belirli bir gün sayısı uzaktaysa satın: Erken Rezervasyon fiyatı için en az, Son Dakika fiyatı için en fazla. Her giriş tarihinde satmak için ikisini de boş bırakın.",
+  rtMinAdvance: "Girişten en az kaç gün önce",
+  rtMinAdvanceHint: "Erken Rezervasyon: 30 = yalnızca en az 30 gün sonraki girişler için.",
+  rtMaxAdvance: "Girişten en fazla kaç gün önce",
+  rtMaxAdvanceHint: "Son Dakika: 3 = yalnızca önümüzdeki 3 gün içindeki girişler için (0 = yalnızca aynı gün giriş).",
   rtPreviewTitle: "Misafirlerin göreceği",
   rtPreviewIntro:
     "Rezervasyon sayfasında gösterilen koşul metninin canlı önizlemesi (misafir bunu kendi dilinde ve gerçek tutarlarla görür).",
