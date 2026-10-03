@@ -47,6 +47,9 @@ export function serializeManageRate(r: CatalogRate) {
     occupancy_pricing_by_room: r.occupancyPricingByRoom ?? {},
     policy: r.policy ?? null,
     inclusions: r.inclusions,
+    /** Advance-purchase window, in days before arrival. null = no limit. */
+    min_advance_days: r.minAdvanceDays ?? null,
+    max_advance_days: r.maxAdvanceDays ?? null,
     /** Read-only: the per-room Channex rate_plan_ids ARI and bookings key by.
      *  Absent (empty) for native rates. Never writable through this API. */
     channex_rate_ids: r.channexRateIds ?? {},

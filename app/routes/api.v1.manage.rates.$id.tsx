@@ -1,3 +1,4 @@
+import { validateAdvanceWindow } from "~/lib/advance-window";
 import type { Route } from "./+types/api.v1.manage.rates.$id";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
 import { deleteRate, getRates, getRooms, saveRate } from "~/lib/catalog.server";
@@ -39,6 +40,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const parsed = validateRateInput(body, { create: false, roomIds });
     if (!parsed.ok) return validationError(parsed.errors);
     const next = buildRate(parsed.value, rate);
+    // Checked on the MERGED rate: a PATCH of one bound can contradict the other.
+    if (validateAdvanceWindow(next)) return validationError({ min_advance_days: ["Can't be more than max_advance_days."] });
     await saveRate(auth.pid, next);
     await queueGoogleAriPush(auth.pid, ["property_data", "ari"]);
     return Response.json({ data: serializeManageRate(next) });

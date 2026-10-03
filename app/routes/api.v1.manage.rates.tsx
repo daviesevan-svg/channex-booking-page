@@ -2,6 +2,7 @@ import type { Route } from "./+types/api.v1.manage.rates";
 import { apiError, authenticateApiKey } from "~/lib/api-auth.server";
 import { getRates, getRooms, pricingModeOf, replaceRates, saveRate, type CatalogRate } from "~/lib/catalog.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
+import { validateAdvanceWindow } from "~/lib/advance-window";
 import { serializeManageRate } from "~/lib/manage-serialize";
 import { applyPolicyMirrors, validateRateInput, validationError, type RateInput } from "~/lib/manage-validate";
 import { getSettings } from "~/lib/overrides.server";
@@ -37,6 +38,8 @@ export function buildRate(input: RateInput, base: CatalogRate): CatalogRate {
           ? input.occupancyPricingByRoom
           : undefined,
     inclusions: input.inclusions ?? base.inclusions,
+    minAdvanceDays: input.minAdvanceDays === undefined ? base.minAdvanceDays : (input.minAdvanceDays ?? undefined),
+    maxAdvanceDays: input.maxAdvanceDays === undefined ? base.maxAdvanceDays : (input.maxAdvanceDays ?? undefined),
   };
   if (input.policy) next = applyPolicyMirrors(next, input.policy);
   return next;
@@ -65,6 +68,7 @@ export async function action({ request }: Route.ActionArgs) {
       active: parsed.value.active ?? true,
       createdAt: new Date().toISOString(),
     });
+    if (validateAdvanceWindow(rate)) return validationError({ min_advance_days: ["Can't be more than max_advance_days."] });
     await saveRate(auth.pid, rate);
     await queueGoogleAriPush(auth.pid, ["property_data", "ari"]);
     return Response.json({ data: serializeManageRate(rate) }, { status: 201 });
@@ -82,8 +86,7 @@ export async function action({ request }: Route.ActionArgs) {
       const parsed = validateRateInput(rest, { create: true, roomIds });
       if (!parsed.ok) return validationError(Object.fromEntries(Object.entries(parsed.errors).map(([k, v]) => [`[${i}].${k}`, v])));
       const base = byId.get(id);
-      next.push(
-        buildRate(parsed.value, {
+      const built = buildRate(parsed.value, {
           id,
           title: "",
           prices: {},
@@ -94,8 +97,11 @@ export async function action({ request }: Route.ActionArgs) {
           // Server-owned fields survive a full replace for retained ids.
           channexRateIds: base?.channexRateIds,
           perPerson: base?.perPerson,
-        }),
-      );
+        });
+      if (validateAdvanceWindow(built)) {
+        return validationError({ [`[${i}].min_advance_days`]: ["Can't be more than max_advance_days."] });
+      }
+      next.push(built);
     }
     await replaceRates(auth.pid, next);
     await queueGoogleAriPush(auth.pid, ["property_data", "ari"]);

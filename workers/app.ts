@@ -1,6 +1,6 @@
 import { createRequestHandler } from "react-router";
 
-import { scheduledGoogleAriSync } from "../app/lib/google-ari/push.server";
+import { scheduledGoogleAriSync, scheduledGoogleAriWindowSync } from "../app/lib/google-ari/push.server";
 import { retryGoogleAriRepairs } from "../app/lib/google-ari/repair.server";
 import { processImageCleanup } from "../app/lib/image-gc.server";
 import { refreshMergedGoogleFeed } from "../app/lib/google-merged-feed.server";
@@ -111,6 +111,11 @@ export default {
   async scheduled(controller, _env, ctx) {
     if (controller.cron === "* * * * *") {
       ctx.waitUntil(retryGoogleAriRepairs().catch((e) => console.error("[cron] Google ARI repair failed", e)));
+      return;
+    }
+    // Hotel-midnight refresh of Google for Early Bird / Last Minute rates.
+    if (controller.cron === "10 * * * *") {
+      ctx.waitUntil(scheduledGoogleAriWindowSync().catch((e) => console.error("[cron] Google ARI window sync failed", e)));
       return;
     }
     if (controller.cron === "*/15 * * * *") {

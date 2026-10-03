@@ -200,7 +200,7 @@ export function validateRoomInput(body: unknown, opts: { create: boolean; defaul
 
 // ── Rates ────────────────────────────────────────────────────────────────────
 
-const RATE_FIELDS = new Set(["title", "meal_plan", "active", "prices", "occupancy_pricing", "occupancy_pricing_by_room", "policy", "inclusions"]);
+const RATE_FIELDS = new Set(["title", "meal_plan", "active", "prices", "occupancy_pricing", "occupancy_pricing_by_room", "policy", "inclusions", "min_advance_days", "max_advance_days"]);
 const TIMINGS = new Set(["pay_at_hotel", "deposit", "full_prepay"]);
 const CARDS = new Set(["guarantee", "charge_at_booking"]);
 const DEPOSITS = new Set(["percent", "fixed", "first_night", "first_n_nights"]);
@@ -216,6 +216,9 @@ export interface RateInput {
   occupancyPricingByRoom?: Record<string, OccupancyPricing> | null;
   policy?: RatePolicy;
   inclusions?: string[];
+  /** Advance-purchase window; null clears a bound, absent leaves it alone. */
+  minAdvanceDays?: number | null;
+  maxAdvanceDays?: number | null;
 }
 
 function validateOccupancy(ctx: Ctx, v: unknown, field: string): OccupancyPricing | undefined {
@@ -315,6 +318,14 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
 
   const active = optBool(ctx, body, "active");
   if (active !== undefined) out.active = active;
+
+  for (const [field, key] of [["min_advance_days", "minAdvanceDays"], ["max_advance_days", "maxAdvanceDays"]] as const) {
+    const v = body[field];
+    if (v === undefined) continue;
+    if (v === null) out[key] = null;
+    else if (typeof v === "number" && Number.isInteger(v) && v >= 0) out[key] = v;
+    else ctx.fail(field, "Must be a whole number of days ≥ 0, or null for no limit.");
+  }
 
   const prices = body.prices;
   if (prices !== undefined) {

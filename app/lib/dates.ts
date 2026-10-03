@@ -29,7 +29,7 @@ export function isStayBookable(checkin: string, checkout: string): boolean {
 }
 
 /** Current calendar date (YYYY-MM-DD) and minutes-since-midnight in a timezone. */
-function localNowParts(tz: string, now: Date): { date: string; minutes: number } {
+export function localNowParts(tz: string, now: Date): { date: string; minutes: number } {
   try {
     const parts = Object.fromEntries(
       new Intl.DateTimeFormat("en-CA", {
@@ -55,6 +55,12 @@ function localNowParts(tz: string, now: Date): { date: string; minutes: number }
     const isoStr = now.toISOString();
     return { date: isoStr.slice(0, 10), minutes: now.getUTCHours() * 60 + now.getUTCMinutes() };
   }
+}
+
+/** Today's calendar date (YYYY-MM-DD) in `tz` — the hotel's today, which differs
+ *  from the server's (UTC) around midnight. */
+export function todayInTimezone(tz: string | undefined, now: Date = new Date()): string {
+  return localNowParts(tz || "UTC", now).date;
 }
 
 export function addDaysISO(dateISO: string, n: number): string {

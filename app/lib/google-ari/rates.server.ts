@@ -6,9 +6,11 @@
 // promotions.server.ts), so Google applies them on top without double-counting.
 // Per-occupancy amounts come from our own occupancy pricing so Google's price
 // matches the site's for the same party.
-import { addDays, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, format, parseISO } from "date-fns";
 
 import { getInventory, getInventoryForScope, type InventoryScope } from "../ari/read.server";
+import { advanceMiss } from "../advance-window";
+import { todayInTimezone } from "../dates";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "../catalog.server";
 import type { SiteSettings } from "../content";
 import { getSettings } from "../overrides.server";
@@ -91,6 +93,9 @@ export async function collectAri(pid: string, window: AriWindow, scope?: Invento
   const vat = vatRate(settings);
   const inclusive = settings.taxesInclusive === true;
   const dates = eachDate(window.from, window.to);
+  // The hotel's today, so an Early Bird / Last Minute window opens and closes at
+  // the hotel's midnight — the same day the booking page counts from.
+  const hotelToday = parseISO(todayInTimezone(settings.timezone));
   const activeRates = allRates.filter((r) => r.active);
   // Property-wide pricing mode — every rate prices per room or per person.
   const perPersonMode = pricingModeOf(settings, allRates) === "per_person";
@@ -168,7 +173,12 @@ export async function collectAri(pid: string, window: AriWindow, scope?: Invento
           // An unpriced date (see amountsAt) is unbookable on the site, so it
           // must read closed on Google too — otherwise the date shows open
           // with whatever stale price Google last accepted.
-          stopSell: (c?.stopSell ?? false) || amountsAt(date).length === 0,
+          // A date outside the rate's advance-purchase window is stop-sold: the
+          // booking page won't sell it, so Google must not show it as open.
+          stopSell:
+            (c?.stopSell ?? false) ||
+            amountsAt(date).length === 0 ||
+            advanceMiss(rate, differenceInCalendarDays(parseISO(date), hotelToday)) !== null,
           cta: c?.cta ?? false,
           ctd: c?.ctd ?? false,
           minStay: Math.max(1, c?.minStay || 1),
