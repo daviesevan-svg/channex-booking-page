@@ -3,6 +3,7 @@
 // decided at finalize). Used by BOTH the web checkout action and POST /v1/bookings
 // so the two paths build identical bookings. The caller does validation,
 // pricing, policy and consent; this only assembles the result.
+import { channexCharges } from "./channex-charges";
 import { addDays, format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
@@ -59,11 +60,12 @@ export interface PreparePendingInput {
   offer?: AppliedPromo;
   /** Value-added offers this stay qualified for, as the guest was shown them. */
   valueAdds?: { name: string; inclusions: string[] }[];
-  /** Taxes & fees breakdown from computePricing — pushed to Channex as services
-   *  (the day prices carry only the room amounts) and snapshotted on the record
-   *  for display. taxLines = on-top VAT; taxIncluded = VAT inside gross prices. */
+  /** Taxes & fees breakdown from computePricing — pushed to Channex (the day
+   *  prices carry only the room amounts) and snapshotted on the record for
+   *  display. Fees ride as services; VAT and city tax as room taxes. taxLines =
+   *  on-top VAT; taxIncluded = VAT inside gross prices. */
   pricing: {
-    charges: { label: string; amount: number }[];
+    charges: { label: string; amount: number; kind?: "fee" | "tax" }[];
     taxLines: { label: string; amount: number }[];
     taxIncluded: number;
   };
@@ -108,29 +110,12 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
   const stayDates = Array.from({ length: nights }, (_, i) => format(addDays(parseISO(checkin), i), "yyyy-MM-dd"));
   const ratio = input.baseTotal > 0 ? input.discountedTotal / input.baseTotal : 1;
 
-  // Everything charged on top of the room day-prices rides as Channex services
-  // (excluded: true = not part of the day prices, so Channex adds them to the
-  // booking total): fees + city tax + cleaning, on-top VAT, and extras. Then
-  // sum(days) + sum(services) equals exactly what the guest paid. Inclusive-mode
-  // VAT is already inside the day prices, so it sends no service line.
-  const partySize = lines.reduce((s, l) => s + l.occupancy.adults + l.occupancy.children, 0);
-  const service = (type: "Fee" | "Extra", name: string, amount: number) => ({
-    type,
-    name,
-    price_mode: "Per stay",
-    price_per_unit: amount.toFixed(2),
-    total_price: amount.toFixed(2),
-    persons: partySize,
+  const { services, roomTaxes } = channexCharges({
+    pricing: input.pricing,
+    extraLines: input.extraLines,
+    lines,
     nights,
-    excluded: true,
   });
-  const services = [
-    ...input.pricing.charges.map((c) => service("Fee", c.label, c.amount)),
-    ...input.pricing.taxLines.map((t) => service("Fee", t.label, t.amount)),
-    ...input.extraLines.map((x) =>
-      service("Extra", x.optionName ? `${x.name} — ${x.optionName}` : x.name, x.amount),
-    ),
-  ].filter((s) => Number(s.total_price) > 0);
 
   // Notes reach the hotel's PMS. System lines come first so guest text (whose
   // newlines guestNoteLine collapses) can never pose as one of them.
@@ -180,6 +165,7 @@ export async function preparePendingBooking(input: PreparePendingInput): Promise
           price: (i === nights - 1 ? Math.round((lineTotal - per * (nights - 1)) * 100) / 100 : per).toFixed(2),
           rate_plan_code: pushRateId(l.roomId, l.rateId),
         })),
+        ...(roomTaxes(index).length ? { taxes: roomTaxes(index) } : {}),
       };
     }),
     ...(services.length ? { services } : {}),

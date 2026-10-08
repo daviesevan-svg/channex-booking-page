@@ -104,7 +104,7 @@ export interface BookingRecord {
    *  top of the room prices (fees, city tax, cleaning, on-top VAT) plus the VAT
    *  share already inside inclusive prices. Absent on legacy bookings. */
   pricing?: {
-    charges: { label: string; amount: number }[];
+    charges: { label: string; amount: number; kind?: "fee" | "tax" }[];
     taxLines: { label: string; amount: number }[];
     taxIncluded: number;
   };

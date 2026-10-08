@@ -15,6 +15,7 @@ import { pushOpenChannelBooking, pushOpenChannelRevision } from "./open-channel.
 import { getConfig } from "./config.server";
 import { formatMoney, fromStripeMinor, toStripeMinor } from "./money";
 import { refundBookingCharge } from "./refunds.server";
+import { channexCharges } from "./channex-charges";
 import { sendBookingEmails, sendBookingFailedEmail } from "./email.server";
 import { deletePending, getPending, type PendingBooking } from "./pending-bookings.server";
 import { bookingSideEffects } from "./booking-side-effects";
@@ -728,6 +729,35 @@ export function payloadWithGuest(payload: unknown, guest: BookingRecord["guest"]
   };
 }
 
+/** Re-derive the charges on top of the room prices (services + per-room taxes)
+ *  from the booking's saved pricing. Bookings created before taxes had their own
+ *  field carry VAT/city tax as `services`; a revision built from the stored
+ *  payload would repeat that, so a modify rebuilds them. Legacy bookings with no
+ *  pricing snapshot keep their payload as stored. */
+export function payloadWithCharges(
+  payload: Record<string, unknown> | null,
+  booking: BookingRecord,
+): Record<string, unknown> | null {
+  if (!payload || !booking.pricing || !Array.isArray(payload.rooms)) return payload;
+  const { services, roomTaxes } = channexCharges({
+    pricing: booking.pricing,
+    extraLines: booking.extras ?? [],
+    lines: booking.rooms.map((r) => ({ total: r.total, occupancy: { adults: r.adults, children: r.children } })),
+    nights: booking.nights,
+  });
+  if (payload.rooms.length !== booking.rooms.length) return payload;
+  const { services: _legacy, ...rest } = payload;
+  return {
+    ...rest,
+    ...(services.length ? { services } : {}),
+    rooms: payload.rooms.map((r, i) => {
+      const { taxes: _old, ...room } = (r ?? {}) as Record<string, unknown>;
+      const taxes = roomTaxes(i);
+      return taxes.length ? { ...room, taxes } : room;
+    }),
+  };
+}
+
 /** Push a "modified" revision to Channex after an admin edits guest details, so
  *  the hotel's PMS copy carries the corrected name/email/phone. Same payload as
  *  the original push (keyed by reservation_id), status "modified". Best-effort:
@@ -739,7 +769,7 @@ export async function pushGuestModification(
   if (!booking.channexId) return { pushed: false }; // never pushed live — nothing upstream to update
   const cfg = getConfig();
   const base =
-    payloadWithGuest(booking.channexPayload, booking.guest) ?? {
+    payloadWithCharges(payloadWithGuest(booking.channexPayload, booking.guest), booking) ?? {
       provider_code: cfg.providerCode,
       hotel_code: pid,
       ota_name: cfg.providerCode || "Direct",
