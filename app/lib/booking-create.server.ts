@@ -62,7 +62,7 @@ export interface PreparePendingInput {
   valueAdds?: { name: string; inclusions: string[] }[];
   /** Taxes & fees breakdown from computePricing — pushed to Channex (the day
    *  prices carry only the room amounts) and snapshotted on the record for
-   *  display. Fees ride as services; VAT and city tax as room taxes. taxLines =
+   *  display. Extras ride as services; fees, VAT and city tax as room taxes. taxLines =
    *  on-top VAT; taxIncluded = VAT inside gross prices. */
   pricing: {
     charges: { label: string; amount: number; kind?: "fee" | "tax" }[];
