@@ -13,13 +13,14 @@ export function channexCharges(input: {
   const { lines, nights } = input;
   // Everything charged on top of the room day-prices is sent so that
   // sum(days) + sum(excluded services) + sum(exclusive taxes) equals exactly what
-  // the guest paid. Fees (cleaning, operator fees) and extras are Channex
-  // services (excluded: true = not part of the day prices). Taxes — on-top VAT
-  // and city tax — are room-level `taxes`, so the PMS books them as taxes rather
-  // than as services. Inclusive-mode VAT is already inside the day prices, so it
+  // the guest paid. Extras are Channex services (excluded: true = not part of
+  // the day prices). Everything the stay is taxed or charged — on-top VAT, city
+  // tax and the property's fees (cleaning, environmental, ...) — is a room-level
+  // `taxes` entry (vat / city_tax / fee), so the PMS books it as a tax rather
+  // than as a service. Inclusive-mode VAT is already inside the day prices, so it
   // is sent as an inclusive tax (informational, adds nothing to the total).
   const partySize = lines.reduce((s, l) => s + l.occupancy.adults + l.occupancy.children, 0);
-  const service = (type: "Fee" | "Extra", name: string, amount: number) => ({
+  const service = (type: "Extra", name: string, amount: number) => ({
     type,
     name,
     price_mode: "Per stay",
@@ -29,17 +30,17 @@ export function channexCharges(input: {
     nights,
     excluded: true,
   });
-  const services = [
-    ...input.pricing.charges.filter((c) => c.kind !== "tax").map((c) => service("Fee", c.label, c.amount)),
-    ...input.extraLines.map((x) =>
-      service("Extra", x.optionName ? `${x.name} — ${x.optionName}` : x.name, x.amount),
-    ),
-  ].filter((s) => Number(s.total_price) > 0);
+  const services = input.extraLines
+    .map((x) => service("Extra", x.optionName ? `${x.name} — ${x.optionName}` : x.name, x.amount))
+    .filter((s) => Number(s.total_price) > 0);
 
-  const taxes: { name: string; type: "vat" | "city_tax"; is_inclusive: boolean; amount: number }[] = [
-    ...input.pricing.charges
-      .filter((c) => c.kind === "tax")
-      .map((c) => ({ name: c.label, type: "city_tax" as const, is_inclusive: false, amount: c.amount })),
+  const taxes: { name: string; type: "vat" | "city_tax" | "fee"; is_inclusive: boolean; amount: number }[] = [
+    ...input.pricing.charges.map((c) => ({
+      name: c.label,
+      type: c.kind === "tax" ? ("city_tax" as const) : ("fee" as const),
+      is_inclusive: false,
+      amount: c.amount,
+    })),
     ...input.pricing.taxLines.map((t) => ({ name: t.label, type: "vat" as const, is_inclusive: false, amount: t.amount })),
     ...(input.pricing.taxIncluded > 0
       ? [{ name: "VAT", type: "vat" as const, is_inclusive: true, amount: input.pricing.taxIncluded }]

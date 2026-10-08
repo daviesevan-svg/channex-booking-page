@@ -5,7 +5,7 @@ const line = (total: number) => ({ total, occupancy: { adults: 2, children: 0 } 
 const sum = (xs: { total_price: string }[]) => xs.reduce((n, x) => n + Number(x.total_price), 0);
 
 describe("channexCharges", () => {
-  it("sends on-top VAT as a room tax and the fee as a service", () => {
+  it("sends on-top VAT and the fee both as room taxes", () => {
     const { services, roomTaxes } = channexCharges({
       pricing: {
         charges: [{ label: "Environmental Fee", amount: 14, kind: "fee" }],
@@ -16,10 +16,22 @@ describe("channexCharges", () => {
       lines: [line(2190.35)],
       nights: 7,
     });
-    expect(services.map((s) => s.name)).toEqual(["Environmental Fee"]);
+    expect(services).toEqual([]);
     expect(roomTaxes(0)).toEqual([
+      { name: "Environmental Fee", type: "fee", is_inclusive: false, total_price: "14.00" },
       { name: "VAT (13%)", type: "vat", is_inclusive: false, total_price: "284.75" },
     ]);
+  });
+
+  it("keeps extras as services", () => {
+    const { services, roomTaxes } = channexCharges({
+      pricing: { charges: [], taxLines: [], taxIncluded: 0 },
+      extraLines: [{ name: "Airport transfer", optionName: "Return", amount: 60 }],
+      lines: [line(100)],
+      nights: 1,
+    });
+    expect(services).toMatchObject([{ type: "Extra", name: "Airport transfer — Return", total_price: "60.00" }]);
+    expect(roomTaxes(0)).toEqual([]);
   });
 
   it("sends city tax as a city_tax room tax, not a service", () => {
