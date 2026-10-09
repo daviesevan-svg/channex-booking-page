@@ -238,6 +238,32 @@ export function getConfigKV(): KVNamespace {
   });
 }
 
+/** KV's bulk get takes at most 100 keys and counts as ONE operation. */
+const KV_BULK_MAX = 100;
+
+/** Read many KV keys at once: ceil(n/100) round trips instead of n gets.
+ *
+ *  Why it exists: Workers allow ~6 simultaneous subrequests, so a page that
+ *  fired one get per property (the collection pages: 144 properties × 2-3 keys)
+ *  queued them up and took ~2 s. Missing keys come back null.
+ *
+ *  Read-only and uncached: it skips getConfigKV's per-request cache, so use it
+ *  for listing pages, never for a read that must see this request's own write. */
+export async function getConfigKVMany(keys: string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  const kv = (env as unknown as { CONFIG_KV: KVNamespace }).CONFIG_KV;
+  if (!kv || keys.length === 0) return out;
+  const chunks: string[][] = [];
+  for (let i = 0; i < keys.length; i += KV_BULK_MAX) chunks.push(keys.slice(i, i + KV_BULK_MAX));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      const got = await kv.get(chunk);
+      for (const k of chunk) out.set(k, got.get(k) ?? null);
+    }),
+  );
+  return out;
+}
+
 /** The R2 bucket holding uploaded images (undefined if not bound). */
 export function getImagesBucket(): R2Bucket | undefined {
   return (env as unknown as { IMAGES?: R2Bucket }).IMAGES;

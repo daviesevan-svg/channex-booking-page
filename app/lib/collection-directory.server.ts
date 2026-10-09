@@ -14,7 +14,7 @@
 //   Never  — contact details. The operator presses Invite and the platform
 //            carries it. Handing over email addresses would turn the directory
 //            into a lead list and properties would opt out en masse.
-import { getHeroImage, getOverrides, getSettings } from "./overrides.server";
+import { getDirectoryFields } from "./overrides.server";
 import { getProperties, type PropertyRef } from "./properties.server";
 import { propertyActivity } from "./property-activity.server";
 import type { PropertyActivity } from "./property-activity";
@@ -67,23 +67,20 @@ export async function browseDirectory(query: DirectoryQuery = {}): Promise<Direc
 
   // Resolve display fields first, then filter — city/region live in settings, so
   // a location search can't be done against the registry alone.
-  const resolved = await Promise.all(
-    candidates.map(async (p) => {
-      const [ov, settings, photo] = await Promise.all([
-        getOverrides(p.id),
-        getSettings(p.id),
-        getHeroImage(p.id).catch(() => undefined),
-      ]);
-      return {
-        id: p.id,
-        name: ov.hotelName || p.name,
-        location: locationOf(settings),
-        propertyType: ov.propertyType?.trim() || undefined,
-        country: settings.addressCountry?.trim().toUpperCase() || undefined,
-        photo: photo || undefined,
-      };
-    }),
-  );
+  // Bulk-read the three keys per candidate (a get each was ~430 reads for 144
+  // properties, queued behind the ~6-subrequest limit).
+  const fields = await getDirectoryFields(candidates.map((p) => p.id));
+  const resolved = candidates.map((p) => {
+    const { overrides: ov, settings, heroImage } = fields.get(p.id)!;
+    return {
+      id: p.id,
+      name: ov.hotelName || p.name,
+      location: locationOf(settings),
+      propertyType: ov.propertyType?.trim() || undefined,
+      country: settings.addressCountry?.trim().toUpperCase() || undefined,
+      photo: heroImage || undefined,
+    };
+  });
 
   const matched = resolved
     .filter((e) => (country ? e.country === country : true))

@@ -4,7 +4,7 @@
 // Batched deliberately: the directory renders a page of properties at a time,
 // and doing this per row would be one query per property. One grouped query
 // covers the whole page.
-import { getLastAriReceivedAt } from "./ari/ingest.server";
+import { getLastAriReceivedAtMany } from "./ari/ingest.server";
 import { ensureSchema } from "./ari/schema.server";
 import { getDB } from "./config.server";
 import { chunkForBinds, placeholders } from "./d1-limits";
@@ -30,18 +30,22 @@ async function openDaysFor(ids: string[], from: string, to: string): Promise<Map
 
   // `reserved: 2` for the two date bounds — a flat chunk of 100 ids plus those
   // would be 102 parameters, two over what D1 accepts.
-  for (const batch of chunkForBinds(ids, 2)) {
-    const rows = await d
-      .prepare(
-        `SELECT hotel_code, COUNT(DISTINCT date) AS open_days
-           FROM availability
-          WHERE hotel_code IN (${placeholders(batch.length)}) AND date >= ? AND date <= ? AND avail > 0
-          GROUP BY hotel_code`,
-      )
-      .bind(...batch, from, to)
-      .all<{ hotel_code: string; open_days: number }>();
-    for (const r of rows.results ?? []) out.set(r.hotel_code, Number(r.open_days) || 0);
-  }
+  // The chunks are independent, so they run together rather than one after the
+  // other (144 properties is two chunks; a partner's few hundred is several).
+  await Promise.all(
+    chunkForBinds(ids, 2).map(async (batch) => {
+      const rows = await d
+        .prepare(
+          `SELECT hotel_code, COUNT(DISTINCT date) AS open_days
+             FROM availability
+            WHERE hotel_code IN (${placeholders(batch.length)}) AND date >= ? AND date <= ? AND avail > 0
+            GROUP BY hotel_code`,
+        )
+        .bind(...batch, from, to)
+        .all<{ hotel_code: string; open_days: number }>();
+      for (const r of rows.results ?? []) out.set(r.hotel_code, Number(r.open_days) || 0);
+    }),
+  );
   return out;
 }
 
@@ -53,15 +57,17 @@ async function seenIds(ids: string[]): Promise<Set<string>> {
   if (!d || ids.length === 0) return seen;
 
   // Nothing else is bound here, so the ids get the whole budget.
-  for (const batch of chunkForBinds(ids)) {
-    for (const table of ["availability", "rate"] as const) {
-      const rows = await d
-        .prepare(`SELECT DISTINCT hotel_code FROM ${table} WHERE hotel_code IN (${placeholders(batch.length)})`)
-        .bind(...batch)
-        .all<{ hotel_code: string }>();
-      for (const r of rows.results ?? []) seen.add(r.hotel_code);
-    }
-  }
+  await Promise.all(
+    chunkForBinds(ids).flatMap((batch) =>
+      (["availability", "rate"] as const).map(async (table) => {
+        const rows = await d
+          .prepare(`SELECT DISTINCT hotel_code FROM ${table} WHERE hotel_code IN (${placeholders(batch.length)})`)
+          .bind(...batch)
+          .all<{ hotel_code: string }>();
+        for (const r of rows.results ?? []) seen.add(r.hotel_code);
+      }),
+    ),
+  );
   return seen;
 }
 
@@ -88,11 +94,11 @@ export async function propertyActivity(
     const from = iso(nowMs);
     const to = iso(nowMs + (windowDays - 1) * 86_400_000);
     const [days, seen] = await Promise.all([openDaysFor(propertyIds, from, to), seenIds(propertyIds)]);
-    // Last-received lives in KV, one key per property — cheap, but do them
-    // together rather than serially down the page.
-    const lastSeen = await Promise.all(propertyIds.map((id) => getLastAriReceivedAt(id).catch(() => null)));
+    // Last-received lives in KV, one key per property — one bulk read, not a
+    // get each (see getConfigKVMany for why that mattered).
+    const lastSeen = await getLastAriReceivedAtMany(propertyIds);
 
-    propertyIds.forEach((id, i) => {
+    propertyIds.forEach((id) => {
       const openDays = days.get(id) ?? 0;
       out.set(id, {
         propertyId: id,
@@ -100,7 +106,7 @@ export async function propertyActivity(
         windowDays,
         openPct: openPercent(openDays, windowDays),
         hasAri: seen.has(id),
-        lastAriAt: lastSeen[i],
+        lastAriAt: lastSeen.get(id) ?? null,
       });
     });
   } catch (err) {
