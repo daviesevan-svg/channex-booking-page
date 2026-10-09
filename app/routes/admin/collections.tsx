@@ -19,7 +19,7 @@ import {
   resolveMembership,
 } from "~/lib/collections.server";
 import { getConfig } from "~/lib/config.server";
-import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { getHotelNames, getOverrides, getSettings } from "~/lib/overrides.server";
 import { sendCollectionRequestEmail } from "~/lib/email.server";
 import { getVisibleProperties } from "~/lib/properties.server";
 import { useAdminT } from "~/lib/admin-i18n";
@@ -36,9 +36,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const mine = await getVisibleProperties(request);
   const myIds = new Set(mine.map((p) => p.id));
   const operated = new Set(collections.map((c) => c.slug));
-  const names = new Map(
-    await Promise.all(mine.map(async (p) => [p.id, (await getOverrides(p.id)).hotelName || p.name] as const)),
-  );
+  // One bulk KV read for every name, not a get per property.
+  const hotelNames = await getHotelNames(mine.map((p) => p.id));
+  const names = new Map(mine.map((p) => [p.id, hotelNames.get(p.id) || p.name] as const));
   const listings = (await membershipsForProperties([...myIds]))
     // Your own collections are managed above; don't show them twice.
     .filter((m) => !operated.has(m.collection.slug))

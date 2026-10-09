@@ -368,6 +368,58 @@ export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
 
+// KV's bulk get takes at most 100 keys and counts as ONE operation. Listing pages
+// that read a key per property (collections, 144 properties on the superadmin
+// account) used to fire one get each: Workers allow ~6 simultaneous subrequests,
+// so 288 gets queued up and the page took ~2 s. A bulk read is 3 round trips.
+const KV_BULK_MAX = 100;
+
+async function readJsonMany<T>(keys: string[]): Promise<Map<string, T | null>> {
+  const out = new Map<string, T | null>();
+  const kv = getConfigKV();
+  if (!kv || keys.length === 0) return out;
+  const parse = (raw: string | null): T | null => {
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return null;
+    }
+  };
+  const chunks: string[][] = [];
+  for (let i = 0; i < keys.length; i += KV_BULK_MAX) chunks.push(keys.slice(i, i + KV_BULK_MAX));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      const got = await kv.get(chunk);
+      for (const k of chunk) out.set(k, parse(got.get(k) ?? null));
+    }),
+  );
+  return out;
+}
+
+/** Display names for many properties at once — the same value `getOverrides`
+ *  gives for `hotelName`, read in bulk. Absent = no override set. */
+export async function getHotelNames(pids: string[]): Promise<Map<string, string | undefined>> {
+  const maps = await readJsonMany<LangMap<PropertyOverrides>>(pids.map(overridesKey));
+  return new Map(
+    pids.map((pid) => {
+      const m = maps.get(overridesKey(pid));
+      return [pid, m?.[DEFAULT_LANG]?.hotelName || undefined] as const;
+    }),
+  );
+}
+
+/** Whether each property has map coordinates, read in bulk. */
+export async function getHasGeo(pids: string[]): Promise<Map<string, boolean>> {
+  const maps = await readJsonMany<SiteSettings>(pids.map(settingsKey));
+  return new Map(
+    pids.map((pid) => {
+      const s = maps.get(settingsKey(pid));
+      return [pid, Boolean(s?.latitude && s?.longitude)] as const;
+    }),
+  );
+}
+
 /** Removes the named fields from a property's settings, leaving the rest. */
 export async function clearSettingsFields(pid: string, keys: (keyof SiteSettings)[]): Promise<void> {
   const existing = await getSettings(pid);

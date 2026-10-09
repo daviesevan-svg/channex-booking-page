@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/properties";
@@ -102,6 +103,38 @@ export async function action({ request }: Route.ActionArgs) {
   return redirect("/admin/properties");
 }
 
+/**
+ * The superadmin's owner picker. Every row used to render an <option> for EVERY
+ * user, so the page grew as properties × users — 144 properties × 92 users was
+ * 13,214 options and 940 kB of the 1.3 MB document. Until the picker is touched
+ * it holds only the current owner (all a closed select displays); the full list
+ * is filled in on focus, before the dropdown opens.
+ */
+function OwnerSelect({ owner, userEmails }: { owner?: string; userEmails: string[] }) {
+  const t = useAdminT();
+  const [full, setFull] = useState(false);
+  const emails = full ? [...new Set([...userEmails, ...(owner ? [owner] : [])])] : owner ? [owner] : [];
+  return (
+    <select
+      name="owner"
+      defaultValue={owner ?? ""}
+      onFocus={() => setFull(true)}
+      onPointerDown={() => setFull(true)}
+      onChange={(e) => e.currentTarget.form?.requestSubmit()}
+      aria-label={t("prsOwner")}
+      title={t("prsReassignOwner")}
+      className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[12px] font-semibold text-ink outline-none focus:border-accent"
+    >
+      <option value="">{t("prsUnassignedOption")}</option>
+      {emails.map((em) => (
+        <option key={em} value={em}>
+          {em}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function meta({ matches }: Route.MetaArgs) {
   return adminMeta(matches, { key: "navProperties" });
 }
@@ -169,21 +202,7 @@ export default function AdminProperties({ loaderData, actionData }: Route.Compon
                   <Form method="post" className="flex items-center">
                     <input type="hidden" name="intent" value="reassign" />
                     <input type="hidden" name="id" value={p.id} />
-                    <select
-                      name="owner"
-                      defaultValue={p.owner ?? ""}
-                      onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                      aria-label={t("prsOwner")}
-                      title={t("prsReassignOwner")}
-                      className="cursor-pointer rounded-[8px] border border-line-alt bg-surface px-2 py-1 text-[12px] font-semibold text-ink outline-none focus:border-accent"
-                    >
-                      <option value="">{t("prsUnassignedOption")}</option>
-                      {[...new Set([...userEmails, ...(p.owner ? [p.owner] : [])])].map((em) => (
-                        <option key={em} value={em}>
-                          {em}
-                        </option>
-                      ))}
-                    </select>
+                    <OwnerSelect owner={p.owner} userEmails={userEmails} />
                   </Form>
                 )}
                 {p.canManage ? (
