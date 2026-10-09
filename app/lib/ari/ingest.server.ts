@@ -3,7 +3,7 @@
 // receive ARI" reads that describe ingest state.
 import { googleAriRepairStatements } from "../google-ari/repair.server";
 import { boundAriScope } from "../google-ari/scope";
-import { getConfig, getConfigKV } from "../config.server";
+import { getConfig, getConfigKV, getConfigKVMany } from "../config.server";
 import { d1Retry, db } from "../d1.server";
 import { timingSafeEqual } from "../hmac.server";
 import { toMinor } from "./fraction";
@@ -64,6 +64,22 @@ export async function getLastAriReceivedAt(hotelCode: string): Promise<number | 
   } catch {
     return null;
   }
+}
+
+/** `getLastAriReceivedAt` for many hotels in bulk (see getConfigKVMany). */
+export async function getLastAriReceivedAtMany(hotelCodes: string[]): Promise<Map<string, number | null>> {
+  const out = new Map<string, number | null>();
+  try {
+    const got = await getConfigKVMany(hotelCodes.filter(Boolean).map(lastAriKey));
+    for (const code of hotelCodes) {
+      const v = got.get(lastAriKey(code));
+      const n = v ? Number(v) : NaN;
+      out.set(code, Number.isFinite(n) ? n : null);
+    }
+  } catch {
+    for (const code of hotelCodes) out.set(code, null);
+  }
+  return out;
 }
 
 /** Apply one or more changes_notification messages. Returns counts by type. */

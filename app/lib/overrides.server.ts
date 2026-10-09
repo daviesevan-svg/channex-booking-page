@@ -1,4 +1,4 @@
-import { getConfigKV } from "./config.server";
+import { getConfigKV, getConfigKVMany } from "./config.server";
 import { isSupportedCurrency } from "./currencies";
 import { checkCustomCss } from "./custom-css";
 import { parseHHMM } from "./dates";
@@ -368,32 +368,22 @@ export async function getSettings(pid: string): Promise<SiteSettings> {
   return (await readJson<SiteSettings>(settingsKey(pid))) ?? {};
 }
 
-// KV's bulk get takes at most 100 keys and counts as ONE operation. Listing pages
-// that read a key per property (collections, 144 properties on the superadmin
-// account) used to fire one get each: Workers allow ~6 simultaneous subrequests,
-// so 288 gets queued up and the page took ~2 s. A bulk read is 3 round trips.
-const KV_BULK_MAX = 100;
-
+// Listing pages that read a key per property (collections: 144 properties on the
+// superadmin account) must use the bulk reader — see getConfigKVMany.
 async function readJsonMany<T>(keys: string[]): Promise<Map<string, T | null>> {
+  const raw = await getConfigKVMany(keys);
   const out = new Map<string, T | null>();
-  const kv = getConfigKV();
-  if (!kv || keys.length === 0) return out;
-  const parse = (raw: string | null): T | null => {
-    if (!raw) return null;
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return null;
+  for (const [k, v] of raw) {
+    let parsed: T | null = null;
+    if (v) {
+      try {
+        parsed = JSON.parse(v) as T;
+      } catch {
+        parsed = null;
+      }
     }
-  };
-  const chunks: string[][] = [];
-  for (let i = 0; i < keys.length; i += KV_BULK_MAX) chunks.push(keys.slice(i, i + KV_BULK_MAX));
-  await Promise.all(
-    chunks.map(async (chunk) => {
-      const got = await kv.get(chunk);
-      for (const k of chunk) out.set(k, parse(got.get(k) ?? null));
-    }),
-  );
+    out.set(k, parsed);
+  }
   return out;
 }
 
@@ -417,6 +407,28 @@ export async function getHasGeo(pids: string[]): Promise<Map<string, boolean>> {
       const s = maps.get(settingsKey(pid));
       return [pid, Boolean(s?.latitude && s?.longitude)] as const;
     }),
+  );
+}
+
+/** What the collection directory shows for each property — overrides, settings
+ *  and hero image — in three bulk reads instead of three gets per property. */
+export async function getDirectoryFields(
+  pids: string[],
+): Promise<Map<string, { overrides: PropertyOverrides; settings: SiteSettings; heroImage?: string }>> {
+  const [ovs, sets, contents] = await Promise.all([
+    readJsonMany<LangMap<PropertyOverrides>>(pids.map(overridesKey)),
+    readJsonMany<SiteSettings>(pids.map(settingsKey)),
+    readJsonMany<LangMap<SiteContent>>(pids.map(contentKey)),
+  ]);
+  return new Map(
+    pids.map((pid) => [
+      pid,
+      {
+        overrides: ovs.get(overridesKey(pid))?.[DEFAULT_LANG] ?? {},
+        settings: sets.get(settingsKey(pid)) ?? {},
+        heroImage: contents.get(contentKey(pid))?.[DEFAULT_LANG]?.search?.heroImage,
+      },
+    ]),
   );
 }
 

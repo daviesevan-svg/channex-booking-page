@@ -54,6 +54,38 @@ describe("bulk property readers", () => {
     expect(geo.get("p2")).toBe(false); // no settings at all
   });
 
+  it("directory fields match the per-property readers", async () => {
+    const { getDirectoryFields, getHeroImage, getOverrides, getSettings } = await import("./overrides.server");
+    store.set("overrides:d1", JSON.stringify({ en: { hotelName: "Dee", propertyType: "Boutique hotel" } }));
+    store.set("settings:d1", JSON.stringify({ addressCity: "Carmarthen", addressCountry: "gb" }));
+    store.set("content:d1", JSON.stringify({ en: { search: { heroImage: "/images/x.jpg" } } }));
+    const ids = ["d1", "d-missing"];
+    singleCalls = bulkCalls = 0;
+    const got = await getDirectoryFields(ids);
+    expect(singleCalls).toBe(0);
+    expect(bulkCalls).toBe(3); // overrides, settings, content — one each
+    for (const id of ids) {
+      const f = got.get(id)!;
+      expect(f.overrides).toEqual(await getOverrides(id));
+      expect(f.settings).toEqual(await getSettings(id));
+      expect(f.heroImage).toBe(await getHeroImage(id));
+    }
+    expect(got.get("d1")!.heroImage).toBe("/images/x.jpg");
+    expect(got.get("d-missing")).toEqual({ overrides: {}, settings: {}, heroImage: undefined });
+  });
+
+  it("last-received times match the single reader, bad values become null", async () => {
+    const { getLastAriReceivedAt, getLastAriReceivedAtMany } = await import("./ari/ingest.server");
+    store.set("ari:last-received:h1", "1700000000000");
+    store.set("ari:last-received:h2", "garbage");
+    const ids = ["h1", "h2", "h3"];
+    const many = await getLastAriReceivedAtMany(ids);
+    for (const id of ids) expect(many.get(id)).toBe(await getLastAriReceivedAt(id));
+    expect(many.get("h1")).toBe(1700000000000);
+    expect(many.get("h2")).toBeNull();
+    expect(many.get("h3")).toBeNull();
+  });
+
   it("does nothing for an empty list", async () => {
     const { getHasGeo, getHotelNames } = await import("./overrides.server");
     bulkCalls = 0;
