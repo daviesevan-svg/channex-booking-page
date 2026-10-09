@@ -24,7 +24,7 @@ import {
   type MembershipMode,
 } from "~/lib/collections.server";
 import { activityLevel, type PropertyActivity } from "~/lib/property-activity";
-import { getOverrides, getSettings } from "~/lib/overrides.server";
+import { getHasGeo, getHotelNames, getOverrides } from "~/lib/overrides.server";
 import { useAdminT } from "~/lib/admin-i18n";
 
 export async function loader({ params, request }: Route.LoaderArgs) {
@@ -36,21 +36,23 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // The properties this user can add to the collection, with the name + whether
   // each has map coordinates (needed for the map pins on the public page).
   const props = await getVisibleProperties(request);
-  // Whether each property is actually trading, so a dormant one doesn't get
-  // added and then show "no availability" to every guest who clicks it.
-  // Batched: one grouped query for the whole list, not one per row.
-  const activity = await propertyActivity(props.map((p) => p.id));
-  const properties = await Promise.all(
-    props.map(async (p) => {
-      const [ov, settings] = await Promise.all([getOverrides(p.id), getSettings(p.id)]);
-      return {
-        id: p.id,
-        name: ov.hotelName || p.name,
-        hasGeo: Boolean(settings.latitude && settings.longitude),
-        activity: activity.get(p.id) ?? null,
-      };
-    }),
-  );
+  // Activity = whether each property is actually trading, so a dormant one
+  // doesn't get added and then show "no availability" to every guest who clicks
+  // it. All three are batched (one grouped query, two bulk KV reads) rather than
+  // per row: a get per property was 2 reads each and, past a handful of
+  // properties, the page's entire load time.
+  const propIds = props.map((p) => p.id);
+  const [activity, hotelNames, geo] = await Promise.all([
+    propertyActivity(propIds),
+    getHotelNames(propIds),
+    getHasGeo(propIds),
+  ]);
+  const properties = props.map((p) => ({
+    id: p.id,
+    name: hotelNames.get(p.id) || p.name,
+    hasGeo: geo.get(p.id) ?? false,
+    activity: activity.get(p.id) ?? null,
+  }));
 
   // Members the operator does NOT own. They can't appear as checkboxes above
   // (that list is scoped to the operator's own properties), so they get their
@@ -59,17 +61,20 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const externalIds = collection.members
     .filter((m) => m.status !== "left" && m.status !== "declined" && !ownIds.has(m.propertyId))
     .map((m) => m.propertyId);
-  const externalActivity = await propertyActivity(externalIds);
+  const [externalActivity, externalNames] = await Promise.all([
+    propertyActivity(externalIds),
+    getHotelNames(externalIds),
+  ]);
   const external = await Promise.all(
     externalIds.map(async (id) => {
       // The display name can live in either place: an override if the owner has
       // set one, otherwise the registry. Falling back to the id alone showed a
       // raw UUID for any property without an override.
-      const [ov, ref] = await Promise.all([getOverrides(id), getProperty(id)]);
+      const ref = await getProperty(id);
       const member = collection.members.find((m) => m.propertyId === id)!;
       return {
         id,
-        name: ov.hotelName || ref?.name || id,
+        name: externalNames.get(id) || ref?.name || id,
         status: member.status,
         initiatedBy: member.initiatedBy,
         activity: externalActivity.get(id) ?? null,
