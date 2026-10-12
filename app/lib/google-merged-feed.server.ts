@@ -3,8 +3,8 @@
 // Used for both Hotels (this file's wrappers) and Vacation Rentals
 // (google-merged-vr-feed.server.ts) — the splice + snapshot logic is generic.
 //
-// Contract: we pass Channex's feed through untouched — EXCEPT one mechanical
-// schema repair (normalizeRelations below) — and splice our <listing> blocks in
+// Contract: we pass Channex's feed through untouched — EXCEPT two mechanical
+// schema repairs (normalizeRelations, normalizeImageTypes below) — and splice our <listing> blocks in
 // immediately before the closing </listings> tag, so nothing of theirs is
 // reparsed. Our listings come from the same generators as our own feeds, so
 // they conform to the Google local_feed.xsd (incomplete properties are already
@@ -32,6 +32,15 @@ export function normalizeRelations(xml: string): string {
   );
 }
 
+/** Repair Channex's <image type> values: the schema's enumeration is
+ *  {ad, coupon, menu, photo}, but Channex's generator passes its own image
+ *  category through (`room`, `exterior`), and Google rejects the file listing
+ *  every one. Mapping them to `photo` (what they are) is a mechanical attribute
+ *  rewrite; valid types don't match and pass through unchanged. */
+export function normalizeImageTypes(xml: string): string {
+  return xml.replace(/(<image\s+type=")(?!(?:ad|coupon|menu|photo)")[^"]*(")/g, "$1photo$2");
+}
+
 /** Fetch a Channex list feed and return it with our listings appended. Throws if
  *  the Channex feed can't be fetched or doesn't look like the expected document
  *  — the caller should then serve an error, NOT a partial feed, so Google keeps
@@ -47,7 +56,7 @@ export async function spliceListingsFeed(
     throw new Error("Could not reach the partner feed.");
   }
   if (!res.ok) throw new Error(`Partner feed returned ${res.status}.`);
-  const channex = normalizeRelations(await res.text());
+  const channex = normalizeImageTypes(normalizeRelations(await res.text()));
 
   // Guard: only splice into a document that really is the listings feed.
   const close = channex.lastIndexOf(CLOSE_TAG);
