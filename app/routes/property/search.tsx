@@ -435,6 +435,7 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         <button
           type="button"
           onClick={() => setShowPromo((v) => !v)}
+          aria-expanded={showPromo}
           className="flex cursor-pointer items-center gap-1.5 text-sm text-muted hover:text-accent"
         >
           <span className="text-title-sm leading-none text-accent">{showPromo ? "\u2212" : "+"}</span>
@@ -442,10 +443,12 @@ export default function Search({ loaderData, params }: Route.ComponentProps) {
         </button>
         {showPromo && (
           <input
+            id="promo-code"
             name="promo"
             value={promoCode}
             onChange={(e) => setPromoCode(e.target.value)}
             placeholder={promoPlaceholder}
+            aria-label={promoText}
             className="mt-2 block w-[240px] max-w-full rounded-control border border-line bg-surface px-3.5 py-2.5 text-body uppercase text-ink outline-none focus:border-accent"
           />
         )}

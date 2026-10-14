@@ -73,6 +73,11 @@ export const IMAGE_SIZES = {
   /** Room cards: 1-up, 2-up ≥640, 3-up ≥1024. gap-6 = 24px. */
   roomCard:
     "(min-width: 1160px) 352px, (min-width: 1024px) calc((100vw - 104px) / 3), (min-width: 640px) calc((100vw - 80px) / 2), calc(100vw - 56px)",
+  /** Directory cards on the shared-domain front door. Same 1/2/3-up rhythm as
+   *  the room cards, but the shell padding is clamp(16px, 4vw, 32px), so it
+   *  caps at 32px from 800px up. Measured against property-picker.tsx. */
+  pickerCard:
+    "(min-width: 1160px) 350px, (min-width: 1024px) calc((100vw - 112px) / 3), (min-width: 800px) calc((100vw - 88px) / 2), (min-width: 640px) calc((92vw - 24px) / 2), calc(100vw - 32px)",
   /** Hero photo beside the copy: the 1fr of `1.1fr 1fr`, gap-10 = 40px. */
   heroSplit:
     "(min-width: 1160px) 507px, (min-width: 1024px) calc((100vw - 96px) / 2.1), calc(100vw - 56px)",
