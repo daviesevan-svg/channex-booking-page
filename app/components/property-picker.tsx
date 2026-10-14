@@ -7,6 +7,7 @@
 
 import { Link } from "react-router";
 
+import { imageProps, IMAGE_SIZES } from "~/lib/image-srcset";
 import type { PickerCard } from "~/lib/picker.server";
 
 const HATCH =
@@ -67,7 +68,7 @@ export function PropertyPicker({ items, subtitle, brandName, brandLogo }: { item
 
         {/* grid of cards */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((c) => (
+          {items.map((c, i) => (
             <Link
               key={c.href}
               to={c.href}
@@ -79,8 +80,14 @@ export function PropertyPicker({ items, subtitle, brandName, brandLogo }: { item
               >
                 {c.photo && (
                   <img
-                    src={c.photo}
+                    {...imageProps(c.photo, IMAGE_SIZES.pickerCard)}
                     alt={c.name}
+                    // The first card is the LCP candidate on a phone; the first
+                    // row (three cards) is on screen at desktop. Everything
+                    // after that is below the fold on both, so it must not be
+                    // preloaded at full size ahead of the hero card.
+                    {...(i === 0 ? { fetchPriority: "high" as const } : {})}
+                    {...(i >= 3 ? { loading: "lazy" as const } : {})}
                     className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
                 )}
@@ -97,9 +104,9 @@ export function PropertyPicker({ items, subtitle, brandName, brandLogo }: { item
                     {c.meta}
                   </div>
                 )}
-                <h3 className="font-serif text-title-md font-semibold tracking-[-0.01em] group-hover:text-accent">
+                <h2 className="font-serif text-title-md font-semibold tracking-[-0.01em] group-hover:text-accent">
                   {c.name}
-                </h3>
+                </h2>
                 {c.blurb && (
                   <p className="mt-2 line-clamp-2 text-body leading-[1.55] text-secondary">
                     {c.blurb}

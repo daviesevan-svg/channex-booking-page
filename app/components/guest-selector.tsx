@@ -14,11 +14,15 @@ function Stepper({
   value,
   min,
   max,
+  label,
   onChange,
 }: {
   value: number;
   min: number;
   max: number;
+  /** What the stepper changes ("adults", "children"), so the two controls
+   *  aren't both just "Decrease". */
+  label: string;
   onChange: (v: number) => void;
 }) {
   const btn =
@@ -30,7 +34,7 @@ function Stepper({
         className={btn}
         disabled={value <= min}
         onClick={() => onChange(value - 1)}
-        aria-label="Decrease"
+        aria-label={`Decrease ${label}`}
       >
         −
       </button>
@@ -40,7 +44,7 @@ function Stepper({
         className={btn}
         disabled={value >= max}
         onClick={() => onChange(value + 1)}
-        aria-label="Increase"
+        aria-label={`Increase ${label}`}
       >
         +
       </button>
@@ -89,6 +93,7 @@ export function GuestSelector({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
         className="w-full cursor-pointer rounded-card px-[18px] py-3.5 text-left transition-colors hover:bg-field-hover"
       >
         <div className="field-label mb-1.5">{tr.t("guests")}</div>
@@ -107,7 +112,7 @@ export function GuestSelector({
                 <div className="text-body-lg font-semibold">{tr.t("adults")}</div>
                 <div className="text-caption text-muted-2">{tr.t("adultsSub")}</div>
               </div>
-              <Stepper value={adults} min={1} max={MAX_ADULTS} onChange={setAdults} />
+              <Stepper value={adults} min={1} max={MAX_ADULTS} label={tr.t("adults")} onChange={setAdults} />
             </div>
 
             <div className="flex items-center justify-between border-t border-divider py-2 pt-3">
@@ -119,6 +124,7 @@ export function GuestSelector({
                 value={childrenAge.length}
                 min={0}
                 max={MAX_CHILDREN}
+                label={tr.t("children")}
                 onChange={setChildrenCount}
               />
             </div>
