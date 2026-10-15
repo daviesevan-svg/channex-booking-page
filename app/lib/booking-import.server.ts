@@ -232,6 +232,7 @@ const CURRENCY_BY_COUNTRY: Record<string, string> = {
   si: "EUR", hr: "EUR", cy: "EUR", mt: "EUR", lu: "EUR", bg: "EUR",
   us: "USD", ca: "CAD", au: "AUD", nz: "NZD", ch: "CHF", jp: "JPY", th: "THB", tr: "TRY",
   se: "SEK", no: "NOK", dk: "DKK", pl: "PLN", cz: "CZK", hu: "HUF", ro: "RON", is: "ISK",
+  mk: "MKD",
   mx: "MXN", br: "BRL", za: "ZAR", ae: "AED", sg: "SGD", hk: "HKD", in: "INR", id: "IDR",
   my: "MYR", ph: "PHP", vn: "VND", kr: "KRW", cn: "CNY", eg: "EGP", ma: "MAD", ke: "KES",
 };
