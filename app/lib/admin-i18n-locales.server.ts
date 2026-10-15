@@ -1,7 +1,7 @@
 // Every admin language, on the server only.
 //
 // The `.server` suffix is doing real work here: this module statically imports
-// all five non-English dictionaries, and if the browser bundle could reach it
+// all six non-English dictionaries, and if the browser bundle could reach it
 // we would be straight back to a 755 kB chunk of languages the signed-in admin
 // cannot read, loaded by every admin page. Nothing outside a loader may import
 // this. Same contract as i18n-locales.server.ts on the guest side.
@@ -13,11 +13,12 @@
 import { registerAdminDict } from "./admin-dict-registry";
 import de from "./admin-locales/de";
 import el from "./admin-locales/el";
+import mk from "./admin-locales/mk";
 import pt from "./admin-locales/pt";
 import th from "./admin-locales/th";
 import tr from "./admin-locales/tr";
 
-const ALL: Record<string, Record<string, string>> = { de, pt, el, th, tr };
+const ALL: Record<string, Record<string, string>> = { de, pt, el, th, tr, mk };
 
 for (const [lang, dict] of Object.entries(ALL)) registerAdminDict(lang, dict);
 

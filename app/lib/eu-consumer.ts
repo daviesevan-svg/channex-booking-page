@@ -49,6 +49,7 @@ const PAY_BUTTON: Record<string, string> = {
   el: "Κράτηση με υποχρέωση πληρωμής",
   th: "จองโดยมีภาระผูกพันในการชำระเงิน",
   tr: "Ödeme yükümlülüğüyle rezervasyon yap",
+  mk: "Резервирај со обврска за плаќање",
 };
 
 export function payButtonLabel(lang: string): string {

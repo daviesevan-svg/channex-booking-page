@@ -6,7 +6,7 @@
 // gracefully rather than breaking.
 //
 // Only ENGLISH is bundled for the browser — it is the default and the per-key
-// fallback. The other five dictionaries live in ./admin-locales/*, are imported
+// fallback. The other six dictionaries live in ./admin-locales/*, are imported
 // on the server only (admin-i18n-locales.server.ts), and the active one reaches
 // the browser as root loader data, registered by root's Layout before anything
 // renders. Same shape as the guest split in i18n.ts, for the same reason: they
@@ -14,6 +14,7 @@
 import {
   de as deDateLocale,
   el as elDateLocale,
+  mk as mkDateLocale,
   pt as ptDateLocale,
   th as thDateLocale,
   tr as trDateLocale,
@@ -25,7 +26,7 @@ import EN from "./admin-locales/en";
 import { registeredAdminDict } from "./admin-dict-registry";
 export { registerAdminDict } from "./admin-dict-registry";
 
-export type AdminLang = "en" | "de" | "pt" | "el" | "th" | "tr";
+export type AdminLang = "en" | "de" | "pt" | "el" | "th" | "tr" | "mk";
 /** Flags are spelled out here rather than read from `LANGUAGES` in content.ts:
  *  the admin's languages are deliberately independent of the guest ones (a
  *  guest language can be dropped without touching the admin panel), and the
@@ -37,6 +38,7 @@ export const ADMIN_LANGS: { id: AdminLang; label: string; flag: string }[] = [
   { id: "el", label: "Ελληνικά", flag: "🇬🇷" },
   { id: "th", label: "ไทย", flag: "🇹🇭" },
   { id: "tr", label: "Türkçe", flag: "🇹🇷" },
+  { id: "mk", label: "Македонски", flag: "🇲🇰" },
 ];
 export const ADMIN_LANG_COOKIE = "admin_lang";
 export const DEFAULT_ADMIN_LANG: AdminLang = "en";
@@ -57,6 +59,7 @@ export function adminLangFromRequest(request: Request): AdminLang {
   if (accept.startsWith("el")) return "el";
   if (accept.startsWith("th")) return "th";
   if (accept.startsWith("tr")) return "tr";
+  if (accept.startsWith("mk")) return "mk";
   return DEFAULT_ADMIN_LANG;
 }
 
@@ -91,6 +94,7 @@ const DATE_LOCALES: Record<Exclude<AdminLang, "en">, Locale> = {
   el: elDateLocale,
   th: thDateLocale,
   tr: trDateLocale,
+  mk: mkDateLocale,
 };
 
 export function adminDateLocale(lang: AdminLang): Locale | undefined {

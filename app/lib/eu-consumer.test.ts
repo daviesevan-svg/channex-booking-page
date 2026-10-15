@@ -62,7 +62,7 @@ describe("the order button", () => {
 
 describe("the withdrawal notice", () => {
   it("is translated, not left to the English fallback, in every shipped language", async () => {
-    for (const lang of ["de", "fr", "es", "it", "pt", "nl", "el", "th", "tr"]) {
+    for (const lang of ["de", "fr", "es", "it", "pt", "nl", "el", "th", "tr", "mk"]) {
       const dict = (await import(`./locales/${lang}.ts`)).default as Record<string, string>;
       expect(dict.noWithdrawalRight, lang).toBeTruthy();
       expect(dict.noWithdrawalRight, lang).not.toBe(EN.noWithdrawalRight);

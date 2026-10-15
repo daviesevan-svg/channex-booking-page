@@ -550,6 +550,7 @@ export const LANGUAGES = [
   { code: "el", label: "Ελληνικά", flag: "🇬🇷" },
   { code: "th", label: "ไทย", flag: "🇹🇭" },
   { code: "tr", label: "Türkçe", flag: "🇹🇷" },
+  { code: "mk", label: "Македонски", flag: "🇲🇰" },
 ] as const;
 
 /**
@@ -734,6 +735,13 @@ const SEARCH_TRANSLATIONS: Record<string, SearchDefaults> = {
     searchButton: "Oda ara",
     highlights: [],
   },
+  mk: {
+    heading: "Резервирајте го Вашиот престој",
+    intro: "Погледнете ја достапноста во реално време и резервирајте го Вашиот престој директно кај нас.",
+    promoText: "Додајте промо или корпоративен код",
+    searchButton: "Пребарај соби",
+    highlights: [],
+  },
 };
 
 export function searchDefaults(lang: string): SearchDefaults {
@@ -751,6 +759,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     el: { heading: "Επιλέξτε τα δωμάτιά σας", editSearch: "Αλλαγή αναζήτησης", cartTitle: "Η διαμονή σας", continueButton: "Συνέχεια στα στοιχεία" },
     th: { heading: "เลือกห้องพักของคุณ", editSearch: "แก้ไขการค้นหา", cartTitle: "การเข้าพักของคุณ", continueButton: "ไปกรอกข้อมูล" },
     tr: { heading: "Odalarınızı seçin", editSearch: "Aramayı düzenle", cartTitle: "Konaklamanız", continueButton: "Bilgilere devam et" },
+    mk: { heading: "Изберете ги Вашите соби", editSearch: "Уреди го пребарувањето", cartTitle: "Вашиот престој", continueButton: "Продолжи кон податоците" },
   },
   detail: {
     fr: { backLink: "Toutes les chambres", amenitiesTitle: "Dans cette chambre", rateTitle: "Choisissez votre tarif", addButton: "Ajouter à votre séjour" },
@@ -762,6 +771,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     el: { backLink: "Όλα τα δωμάτια", amenitiesTitle: "Σε αυτό το δωμάτιο", rateTitle: "Επιλέξτε τιμή", addButton: "Προσθήκη στη διαμονή" },
     th: { backLink: "ห้องพักทั้งหมด", amenitiesTitle: "ในห้องนี้", rateTitle: "เลือกแพ็กเกจราคาของคุณ", addButton: "เพิ่มในการเข้าพักของคุณ" },
     tr: { backLink: "Tüm odalar", amenitiesTitle: "Bu odada", rateTitle: "Fiyat planınızı seçin", addButton: "Konaklamanıza ekle" },
+    mk: { backLink: "Сите соби", amenitiesTitle: "Во оваа соба", rateTitle: "Изберете тарифа", addButton: "Додај во Вашиот престој" },
   },
   checkout: {
     fr: { heading: "Vos coordonnées", guestSection: "Informations du client", arrivalSection: "Arrivée et demandes", requestsPlaceholder: "Chambre calme, arrivée tôt, tout ce que nous devrions savoir…", paymentSection: "Paiement", paymentNote: "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.", completeButton: "Finaliser la réservation" },
@@ -773,6 +783,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     el: { heading: "Τα στοιχεία σας", guestSection: "Στοιχεία επισκέπτη", arrivalSection: "Άφιξη & αιτήματα", requestsPlaceholder: "Ήσυχο δωμάτιο, πρόωρη άφιξη, ό,τι πρέπει να γνωρίζουμε…", paymentSection: "Πληρωμή", paymentNote: "Η ευέλικτη τιμή σας πληρώνεται στο ξενοδοχείο. Χρειαζόμαστε μόνο μια κάρτα για την εξασφάλιση της κράτησης — δεν θα χρεωθείτε σήμερα.", completeButton: "Ολοκλήρωση κράτησης" },
     th: { heading: "ข้อมูลของคุณ", guestSection: "ข้อมูลผู้เข้าพัก", arrivalSection: "การเดินทางถึงและคำขอเพิ่มเติม", requestsPlaceholder: "ห้องเงียบ เช็คอินก่อนเวลา หรือสิ่งอื่นที่เราควรทราบ…", paymentSection: "การชำระเงิน", paymentNote: "ราคาแบบยืดหยุ่นของคุณชำระที่โรงแรม เราขอเพียงบัตรเพื่อรับประกันการจอง — วันนี้ยังไม่มีการเรียกเก็บเงิน", completeButton: "ยืนยันการจอง" },
     tr: { heading: "Bilgileriniz", guestSection: "Misafir bilgileri", arrivalSection: "Varış ve istekler", requestsPlaceholder: "Sessiz oda, erken giriş, bilmemiz gereken her şey…", paymentSection: "Ödeme", paymentNote: "Esnek fiyat planınız otelde ödenir. Rezervasyonu garanti altına almak için yalnızca bir karta ihtiyacımız var — bugün tahsilat yapılmayacak.", completeButton: "Rezervasyonu tamamla" },
+    mk: { heading: "Вашите податоци", guestSection: "Податоци за гостинот", arrivalSection: "Пристигнување и барања", requestsPlaceholder: "Тивка соба, рано пристигнување, сè што треба да знаеме…", paymentSection: "Плаќање", paymentNote: "Вашата флексибилна тарифа се плаќа во објектот. Ни треба само картичка за да ја гарантираме резервацијата — денес нема да се наплати ништо.", completeButton: "Заврши ја резервацијата" },
   },
   extras: {
     fr: { heading: "Améliorez votre {room}", intro: "Des extras facultatifs pour rendre votre séjour spécial.", stayTitle: "Pour tout votre séjour", summaryLabel: "Extras", continueButton: "Continuer", skipButton: "Passer pour l’instant" },
@@ -784,6 +795,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     el: { heading: "Αναβαθμίστε το {room}", intro: "Προαιρετικά έξτρα για να κάνετε τη διαμονή σας ξεχωριστή.", stayTitle: "Για όλη τη διαμονή σας", summaryLabel: "Έξτρα", continueButton: "Συνέχεια", skipButton: "Παράλειψη για τώρα" },
     th: { heading: "เพิ่มความพิเศษให้ {room}", intro: "บริการเสริมที่เลือกได้ เพื่อให้การเข้าพักของคุณพิเศษยิ่งขึ้น", stayTitle: "สำหรับการเข้าพักทั้งหมด", summaryLabel: "บริการเสริม", continueButton: "ดำเนินการต่อ", skipButton: "ข้ามไปก่อน" },
     tr: { heading: "{room} odanızı zenginleştirin", intro: "Konaklamanızı özel kılacak isteğe bağlı ek hizmetler.", stayTitle: "Tüm konaklamanız için", summaryLabel: "Ekstralar", continueButton: "Devam et", skipButton: "Şimdilik geç" },
+    mk: { heading: "Збогатете ја Вашата {room}", intro: "Изборни додатоци за Вашиот престој да биде посебен.", stayTitle: "За целиот Ваш престој", summaryLabel: "Додатоци", continueButton: "Продолжи", skipButton: "Прескокни за сега" },
   },
   confirmation: {
     fr: { heading: "Tout est confirmé", subtitle: "Votre séjour à {hotel} est confirmé. Un e-mail de confirmation est en route.", newBooking: "Faire une autre réservation" },
@@ -795,6 +807,7 @@ const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> 
     el: { heading: "Είστε έτοιμοι", subtitle: "Η διαμονή σας στο {hotel} επιβεβαιώθηκε. Ένα email επιβεβαίωσης βρίσκεται καθ’ οδόν.", newBooking: "Κάντε νέα κράτηση" },
     th: { heading: "เรียบร้อยแล้ว", subtitle: "การเข้าพักของคุณที่ {hotel} ได้รับการยืนยันแล้ว อีเมลยืนยันกำลังส่งถึงคุณ", newBooking: "จองอีกครั้ง" },
     tr: { heading: "Her şey hazır", subtitle: "{hotel} tesisindeki konaklamanız onaylandı. Onay e-postanız yolda.", newBooking: "Yeni bir rezervasyon yap" },
+    mk: { heading: "Сè е готово", subtitle: "Вашиот престој во {hotel} е потврден. Потврдата е на пат по е-пошта.", newBooking: "Направи нова резервација" },
   },
 };
 

@@ -80,6 +80,13 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
         "{hotel_name} ile doğrudan rezervasyon yaptığınız için teşekkürler. Konaklamanızın ayrıntıları aşağıda — sizi ağırlamak için sabırsızlanıyoruz.",
       outro: "Bir değişiklik mi gerekiyor? Yukarıdaki “Rezervasyonu yönet” düğmesini istediğiniz zaman kullanabilirsiniz. Görüşmek üzere!",
     },
+    mk: {
+      subject: "Вашата резервација во {hotel_name} е потврдена ({reference})",
+      heading: "Резервацијата е готова, {guest_first_name}!",
+      intro:
+        "Ви благодариме што резервиравте директно во {hotel_name}. Еве ги деталите за Вашиот престој — едвај чекаме да Ве пречекаме.",
+      outro: "Ви треба промена? Користете го копчето „Управувај со резервацијата“ погоре во секое време. До наскоро!",
+    },
   },
   booking_cancellation: {
     fr: {
@@ -142,6 +149,12 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
       heading: "Rezervasyonunuz iptal edildi",
       intro: "{hotel_name} rezervasyonunuzu iptal ettik, {guest_first_name}. İptal edilen rezervasyonun ayrıntıları aşağıda.",
       outro: "Bunu siz talep etmediyseniz lütfen hemen bizimle iletişime geçin.",
+    },
+    mk: {
+      subject: "Вашата резервација во {hotel_name} е откажана ({reference})",
+      heading: "Вашата резервација е откажана",
+      intro: "Ја откажавме Вашата резервација во {hotel_name}, {guest_first_name}. Деталите за откажаната резервација се подолу.",
+      outro: "Ако не сте го побарале ова, ве молиме јавете ни се веднаш.",
     },
   },
   booking_failed: {
@@ -208,6 +221,13 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
         "Ne yazık ki ödemeniz tamamlanmadan oda tükendi ve {hotel_name} konaklamanızı onaylayamadık. {refund_amount} tutarının tamamını kartınıza iade ettik — görünmesi birkaç gün sürebilir.",
       outro: "Yaşattığımız hayal kırıklığı için üzgünüz. Farklı tarihler deneyin; yardımcı olabileceksek bize yazın.",
     },
+    mk: {
+      subject: "Не можевме да ја потврдиме Вашата резервација во {hotel_name} ({reference})",
+      heading: "Жалиме, {guest_first_name} — не можевме да ја потврдиме Вашата резервација",
+      intro:
+        "За жал, собата беше распродадена пред да заврши Вашето плаќање, па не можевме да го потврдиме Вашиот престој во {hotel_name}. Ви го вративме целиот износ од {refund_amount} на картичката — може да поминат неколку дена додека се појави.",
+      outro: "Жалиме за разочарувањето. Обидете се со други датуми и слободно јавете ни се ако можеме да помогнеме.",
+    },
   },
   // Same subject and heading as booking_failed; only the refund sentence differs.
   booking_failed_refund_pending: {
@@ -273,6 +293,13 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
       intro:
         "Ne yazık ki ödemeniz tamamlanmadan oda tükendi ve {hotel_name} konaklamanızı onaylayamadık. {refund_amount} tutarının tamamı size iade edilecek: iadeyi otel kartınıza yapacak, ardından görünmesi birkaç gün sürebilir.",
       outro: "Yaşattığımız hayal kırıklığı için üzgünüz. İade bir hafta içinde size ulaşmazsa bu e-postayı yanıtlamanız yeterli.",
+    },
+    mk: {
+      subject: "Не можевме да ја потврдиме Вашата резервација во {hotel_name} ({reference})",
+      heading: "Жалиме, {guest_first_name} — не можевме да ја потврдиме Вашата резервација",
+      intro:
+        "За жал, собата беше распродадена пред да заврши Вашето плаќање, па не можевме да го потврдиме Вашиот престој во {hotel_name}. Ви следува целосен поврат на {refund_amount}: објектот ќе го врати на Вашата картичка, а потоа може да поминат неколку дена додека се појави.",
+      outro: "Жалиме за разочарувањето. Ако повратот не стигне во рок од една недела, едноставно одговорете на оваа порака.",
     },
   },
   review_request: {
@@ -347,6 +374,14 @@ const EMAIL_TRANSLATIONS: Record<string, Record<string, Record<string, string>>>
       heading: "Konaklamanız nasıldı, {guest_first_name}?",
       intro:
         "{hotel_name} tesisinde konakladığınız için teşekkürler. Nasıl geçtiğini duymayı çok isteriz — geri bildiriminiz hem gelişmemize hem de gelecekteki misafirlerin seçim yapmasına yardımcı olur.\n\nYalnızca bir dakika sürer — başlamak için aşağıdaki yıldızlardan birine dokunun.",
+    },
+    mk: {
+      subject: "Како помина Вашиот престој во {hotel_name}?",
+      subject2: "Имате ли минута да го оцените престојот, {guest_first_name}?",
+      subject3: "Последна шанса да го оцените престојот во {hotel_name}",
+      heading: "Како помина Вашиот престој, {guest_first_name}?",
+      intro:
+        "Ви благодариме што престојувавте во {hotel_name}. Со задоволство ќе слушнеме како помина — Вашите повратни информации ни помагаат да се подобруваме и им помагаат на идните гости да изберат.\n\nСе одзема само минута — допрете една од ѕвездичките подолу за да започнете.",
     },
   },
 };
