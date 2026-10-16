@@ -2,6 +2,7 @@
 // readers: CONFIG_KV writes use it before a new image reference becomes visible.
 import { env } from "cloudflare:workers";
 import { d1Retry } from "./d1-retry";
+import { boundD1ForRequest } from "./io-timeout";
 
 export const IMAGE_GC_GRACE_MS = 24 * 60 * 60 * 1000;
 export const IMAGE_GC_RETRY_MS = 6 * 60 * 60 * 1000;
@@ -47,7 +48,9 @@ export const IMAGE_GC_SCHEMA = [
 ];
 
 export function imageGcDb(): D1Database | undefined {
-  return (env as unknown as { DB?: D1Database }).DB;
+  // Bounded in a request: this latch (ensureImageGcSchema) was the one schema
+  // latch with no timeout, so a lost D1 response would wedge every image save.
+  return boundD1ForRequest((env as unknown as { DB?: D1Database }).DB);
 }
 
 let ready: Promise<void> | undefined;

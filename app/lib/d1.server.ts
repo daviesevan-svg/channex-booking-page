@@ -12,6 +12,7 @@
 import { waitUntil } from "cloudflare:workers";
 
 import { getDB } from "./config.server";
+import { withTimeout } from "./io-timeout";
 
 export function db(): D1Database {
   const d = getDB();
@@ -60,15 +61,9 @@ export function schemaOnce(statements: (d: D1Database) => D1PreparedStatement[])
  *  enough that a lost response costs one request an error, not the isolate. */
 export const SCHEMA_TIMEOUT_MS = 10_000;
 
-/** Settle with `work`, or reject after `ms` — the timer is cleared either way so
- *  it never keeps an isolate alive on its own. */
-export function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label} did not respond within ${ms} ms`)), ms);
-  });
-  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
-}
+// withTimeout lives in io-timeout.ts (a leaf module shared with the KV and
+// request-deadline bounds); re-exported unchanged for the schema latch's callers.
+export { withTimeout };
 
 /**
  * Keep `work` alive past the response without letting it delay or fail the
