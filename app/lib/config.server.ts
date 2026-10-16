@@ -1,6 +1,7 @@
 import { imageReferenceProperty, withImageReferenceWrite } from "./image-gc-store.server";
 import { env } from "cloudflare:workers";
 
+import { boundD1ForRequest, boundedRead } from "./io-timeout";
 import { requestKvCache } from "./request-cache.server";
 
 // Runtime configuration, read from Worker env bindings at request time.
@@ -188,10 +189,14 @@ export function getConfigKV(): KVNamespace {
       const fn = v as (...a: unknown[]) => unknown;
       if (prop === "get") {
         return (key: unknown, ...rest: unknown[]) => {
-          if (!cache || typeof key !== "string" || rest.length > 0) return fn.call(target, key, ...rest);
+          if (typeof key !== "string" || rest.length > 0) return fn.call(target, key, ...rest);
+          // A KV read that never answers parks the whole request (see
+          // io-timeout.ts); give it a deadline and one re-issue.
+          const issue = () => boundedRead(`KV get ${key}`, () => fn.call(target, key) as Promise<string | null>);
+          if (!cache) return issue();
           const hit = cache.get(key);
           if (hit) return hit;
-          const read = fn.call(target, key) as Promise<string | null>;
+          const read = issue();
           cache.set(key, read);
           // A failed read must not be replayed to later callers as a cached
           // rejection — drop it so they retry against KV.
@@ -257,7 +262,7 @@ export async function getConfigKVMany(keys: string[]): Promise<Map<string, strin
   for (let i = 0; i < keys.length; i += KV_BULK_MAX) chunks.push(keys.slice(i, i + KV_BULK_MAX));
   await Promise.all(
     chunks.map(async (chunk) => {
-      const got = await kv.get(chunk);
+      const got = await boundedRead(`KV get ×${chunk.length}`, () => kv.get(chunk));
       for (const k of chunk) out.set(k, got.get(k) ?? null);
     }),
   );
@@ -271,5 +276,7 @@ export function getImagesBucket(): R2Bucket | undefined {
 
 /** The D1 database holding pushed ARI (availability, rates, restrictions). */
 export function getDB(): D1Database | undefined {
-  return (env as unknown as { DB?: D1Database }).DB;
+  // Bounded while serving a request: a statement that never answers becomes a
+  // rejection naming the SQL, not a tab that spins for half an hour.
+  return boundD1ForRequest((env as unknown as { DB?: D1Database }).DB);
 }

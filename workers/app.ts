@@ -17,6 +17,7 @@ import { activateVerifiedDomains } from "../app/lib/custom-hostnames.server";
 import { getConfig } from "../app/lib/config.server";
 import { httpsRedirect, withHsts } from "../app/lib/https-redirect";
 import { hasInternalParams, stripInternalParams } from "../app/lib/internal-params";
+import { withRequestDeadline } from "../app/lib/io-timeout";
 import { runWithRequestCache } from "../app/lib/request-cache.server";
 
 export { GoogleAriQueue } from "../app/lib/google-ari/queue.server";
@@ -97,7 +98,7 @@ export default {
         httpsRedirect(request, appUrl) ??
         canonicalRedirect(request) ??
         internalParamRedirect(request) ??
-        (await requestHandler(request));
+        (await withRequestDeadline(request, requestHandler(request)));
       return withHsts(response, request, appUrl);
     });
   },
