@@ -9,17 +9,77 @@
 // spun until they gave up. A binding call that never settles is not an error
 // anything can catch, so every read on the request path gets a deadline: it
 // either answers or turns into a rejection that names the call that stalled.
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { requestKvCache } from "./request-cache.server";
+
+// What was this request waiting on? One trace per request (entered in
+// workers/app.ts beside the KV cache). Every bounded KV/D1 call registers while
+// it is in flight and leaves a one-line receipt when it settles, so the
+// request-deadline log can say what was pending — or, when nothing was, that the
+// stall is NOT a storage call (a never-settling promise, a render that never
+// finishes) and where the request got to before it stopped.
+const RECEIPTS_KEPT = 12;
+
+interface IoTrace {
+  startedAt: number;
+  nextId: number;
+  inflight: Map<number, { label: string; at: number }>;
+  receipts: string[];
+}
+
+const traceStore = new AsyncLocalStorage<IoTrace>();
+
+/** Enter a fresh trace scope for one request. Cron stays outside it. */
+export function runWithIoTrace<T>(fn: () => T): T {
+  return traceStore.run({ startedAt: Date.now(), nextId: 0, inflight: new Map(), receipts: [] }, fn);
+}
+
+function beginTraced(label: string): ((outcome: string) => void) | undefined {
+  const trace = traceStore.getStore();
+  if (!trace) return undefined;
+  const id = trace.nextId++;
+  const at = Date.now();
+  trace.inflight.set(id, { label, at });
+  return (outcome) => {
+    trace.inflight.delete(id);
+    trace.receipts.push(`${label} ${outcome} ${Date.now() - at}ms @+${at - trace.startedAt}ms`);
+    if (trace.receipts.length > RECEIPTS_KEPT) trace.receipts.shift();
+  };
+}
+
+/** One line for the deadline log: what is still pending, and what finished last. */
+export function describeIoTrace(trace: IoTrace | undefined = traceStore.getStore()): string {
+  if (!trace) return "no io trace";
+  const now = Date.now();
+  const pending = [...trace.inflight.values()].map((p) => `${p.label} (pending ${now - p.at}ms, started @+${p.at - trace.startedAt}ms)`);
+  return [
+    pending.length ? `in flight: ${pending.join("; ")}` : "in flight: NOTHING (not a KV/D1 stall)",
+    trace.receipts.length ? `last settled: ${trace.receipts.join(" | ")}` : "no KV/D1 call ever settled",
+  ].join(" -- ");
+}
 
 /** Settle with `work`, or reject after `ms` — the timer is cleared either way so
  *  it never keeps an isolate alive on its own. The underlying call is NOT
  *  cancelled (bindings have no abort); it is simply no longer awaited. */
 export function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const end = beginTraced(label);
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new IoTimeoutError(`${label} did not respond within ${ms} ms`)), ms);
   });
-  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+  return Promise.race([work, timeout])
+    .then(
+      (value) => {
+        end?.("ok");
+        return value;
+      },
+      (error) => {
+        end?.(error instanceof IoTimeoutError ? "TIMEOUT" : "error");
+        throw error;
+      },
+    )
+    .finally(() => clearTimeout(timer));
 }
 
 export class IoTimeoutError extends Error {
@@ -136,9 +196,12 @@ export const REQUEST_DEADLINE_MS = 30_000;
 export function withRequestDeadline(request: Request, work: Promise<Response>): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return work;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const trace = traceStore.getStore();
   const expired = new Promise<Response>((resolve) => {
     timer = setTimeout(() => {
-      console.error(`[request-deadline] ${request.method} ${request.url} produced no response in ${REQUEST_DEADLINE_MS} ms`);
+      console.error(
+        `[request-deadline] ${request.method} ${request.url} produced no response in ${REQUEST_DEADLINE_MS} ms -- ${describeIoTrace(trace)}`,
+      );
       resolve(
         new Response("This page took too long to load. Please try again.", {
           status: 503,

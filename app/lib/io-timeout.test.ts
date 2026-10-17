@@ -8,6 +8,7 @@ import {
   IoTimeoutError,
   KV_READ_TIMEOUT_MS,
   REQUEST_DEADLINE_MS,
+  runWithIoTrace,
   withRequestDeadline,
 } from "./io-timeout";
 import { runWithRequestCache } from "./request-cache.server";
@@ -132,5 +133,41 @@ describe("withRequestDeadline", () => {
     const p = withRequestDeadline(post, slow);
     await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS * 2);
     expect((await p).status).toBe(200);
+  });
+});
+
+describe("the deadline log names what the request was doing", () => {
+  const get = new Request("https://bookonline.roxiehub.net/artemis-hotel-evia");
+  const logged = () => (console.error as unknown as ReturnType<typeof vi.fn>).mock.calls.map((c) => String(c[0])).join("\n");
+
+  it("lists a KV read that is still pending and the ones that finished first", async () => {
+    await runWithIoTrace(async () => {
+      await boundedRead("KV get partner-guest-host:x", () => Promise.resolve("v"));
+      void boundedRead("KV get settings:p1", never).catch(() => {});
+      const p = withRequestDeadline(get, never());
+      await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      await p;
+    });
+    const line = logged();
+    expect(line).toMatch(/\[request-deadline\] GET https:\/\/bookonline\.roxiehub\.net\/artemis-hotel-evia/);
+    expect(line).toMatch(/last settled: KV get partner-guest-host:x ok/);
+    expect(line).toMatch(/KV get settings:p1 .*TIMEOUT/);
+  });
+
+  it("says plainly when nothing was in flight, so the stall is not a storage call", async () => {
+    await runWithIoTrace(async () => {
+      await boundedRead("KV get k", () => Promise.resolve("v"));
+      const p = withRequestDeadline(get, never());
+      await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      await p;
+    });
+    expect(logged()).toMatch(/in flight: NOTHING \(not a KV\/D1 stall\)/);
+  });
+
+  it("is a no-op outside a request scope (cron, scripts)", async () => {
+    const p = withRequestDeadline(get, never());
+    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    await p;
+    expect(logged()).toMatch(/no io trace/);
   });
 });
