@@ -306,6 +306,7 @@ const EL: Dict = {
   cancellation: "Ακύρωση",
   close: "Κλείσιμο",
   allRooms: "Όλα τα δωμάτια",
+  addAnotherRoom: "Προσθήκη άλλου δωματίου",
   firstName: "Όνομα",
   lastName: "Επώνυμο",
   email: "Email",

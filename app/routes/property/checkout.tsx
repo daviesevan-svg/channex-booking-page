@@ -1060,7 +1060,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
         to={`${base}/rooms?${searchParams.toString()}`}
         className="mb-[18px] inline-block text-sm font-semibold text-muted hover:text-accent"
       >
-        ← {tr.t("allRooms")}
+        ← {tr.t("addAnotherRoom")}
       </Link>
       <h1 className="mb-7 font-serif text-display-lg font-medium tracking-[-0.02em]">{text.heading}</h1>
 

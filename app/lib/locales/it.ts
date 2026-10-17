@@ -247,6 +247,7 @@ const IT: Dict = {
   cancellation: "Cancellazione",
   close: "Chiudi",
   allRooms: "Tutte le camere",
+  addAnotherRoom: "Aggiungi un'altra camera",
   firstName: "Nome",
   lastName: "Cognome",
   email: "E-mail",

@@ -339,6 +339,7 @@ const TR: Dict = {
   cancellation: "İptal",
   close: "Kapat",
   allRooms: "Tüm odalar",
+  addAnotherRoom: "Başka bir oda ekle",
   firstName: "Ad",
   lastName: "Soyad",
   email: "E-posta",

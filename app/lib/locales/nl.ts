@@ -247,6 +247,7 @@ const NL: Dict = {
   cancellation: "Annulering",
   close: "Sluiten",
   allRooms: "Alle kamers",
+  addAnotherRoom: "Nog een kamer toevoegen",
   firstName: "Voornaam",
   lastName: "Achternaam",
   email: "E-mail",

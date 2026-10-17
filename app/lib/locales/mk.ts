@@ -338,6 +338,7 @@ const MK: Dict = {
   cancellation: "Откажување",
   close: "Затвори",
   allRooms: "Сите соби",
+  addAnotherRoom: "Додади уште една соба",
   firstName: "Име",
   lastName: "Презиме",
   email: "Е-пошта",

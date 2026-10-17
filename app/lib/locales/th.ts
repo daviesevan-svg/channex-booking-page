@@ -317,6 +317,7 @@ const TH: Dict = {
   cancellation: "การยกเลิก",
   close: "ปิด",
   allRooms: "ห้องพักทั้งหมด",
+  addAnotherRoom: "เพิ่มห้องพักอีกห้อง",
 
   firstName: "ชื่อ",
   lastName: "นามสกุล",

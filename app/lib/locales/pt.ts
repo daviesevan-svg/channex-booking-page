@@ -318,6 +318,7 @@ const PT: Dict = {
   cancellation: "Cancelamento",
   close: "Fechar",
   allRooms: "Todos os quartos",
+  addAnotherRoom: "Adicionar outro quarto",
   firstName: "Nome próprio",
   lastName: "Apelido",
   email: "E-mail",

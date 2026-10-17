@@ -359,7 +359,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
     const xt = serializeExtrasState(state);
     if (xt) next.set("xt", xt);
     else next.delete("xt");
-    // The extras step redirects straight to results when the room has no add-ons.
+    // The extras step skips on to checkout (or results, if the party is not yet covered) when the room has no add-ons.
     navigate(`${base}/extras?line=${targetIndex}&${next.toString()}`);
   }
 
