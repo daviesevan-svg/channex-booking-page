@@ -6,7 +6,7 @@ import { Link, redirect, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/extras";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
-import { parseCart } from "~/lib/cart";
+import { cartCovers, parseCart } from "~/lib/cart";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import {
@@ -53,6 +53,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const line = cartLines[lineIndex];
   if (!line) throw redirect(`${base}/rooms?${sp}`);
 
+  // Once the cart sleeps the whole party the guest has what they came for, so the
+  // step after this one is checkout; "Add another room" lives there. A party the
+  // cart doesn't yet cover still needs the rooms list to pick the rest.
+  const nextPath = cartCovers(cartLines, occ) ? "checkout" : "rooms";
+  const nextParams = new URLSearchParams(url.searchParams);
+  nextParams.delete("line");
+
   // Room-scoped extras eligible for this room+rate; booking-scoped extras are
   // offered once, on the first room's step.
   const catalog = await getActiveExtras(pid);
@@ -61,7 +68,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const bookingExtras = isFirst ? catalog.filter((e) => scopeOf(e) === "booking") : [];
   // Nothing to offer for this room → skip the step entirely.
   if (roomExtras.length === 0 && bookingExtras.length === 0) {
-    throw redirect(`${base}/rooms?${sp}`);
+    throw redirect(`${base}/${nextPath}?${nextParams}`);
   }
 
   const state = parseExtrasState(url.searchParams);
@@ -85,6 +92,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         }
       : null,
     lineIndex,
+    nextPath,
     nights,
     currency,
     text,
@@ -214,7 +222,7 @@ function ExtraSection({
 export default function Extras({ loaderData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { tracking, lineIndex, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
+  const { tracking, lineIndex, nextPath, nights, currency, roomGuests, party, roomTitle, rateTitle, roomTotal, roomExtras, bookingExtras, text } =
     loaderData;
   const { currency: ctxCurrency } = useProperty();
   const cur = ctxCurrency || currency;
@@ -238,12 +246,13 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
     const xt = serializeExtrasState(state);
     if (xt) next.set("xt", xt);
     else next.delete("xt");
-    navigate(`${base}/rooms?${next.toString()}`);
+    navigate(`${base}/${nextPath}?${next.toString()}`);
   };
 
   return (
     // Reached only when the selected room has add-ons; rooms without them
-    // redirect straight back to results, so this stage is optional in the walk.
+    // skip straight on (to checkout, or back to results while the party is
+    // uncovered), so this stage is optional in the walk.
     <main className="mx-auto max-w-[1160px] px-7 pb-[72px] pt-9" {...navStage("room-selection")}>
       {tracking && <TrackCart sel={tracking.sel} lines={tracking.cart} stay={tracking.stay} />}
       <Link

@@ -315,6 +315,7 @@ const EN: Dict = {
   cancellation: "Cancellation",
   close: "Close",
   allRooms: "All rooms",
+  addAnotherRoom: "Add another room",
 
   firstName: "First name",
   lastName: "Last name",
