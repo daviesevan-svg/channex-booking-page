@@ -4,6 +4,7 @@
 // `user-api-key` (pasted at onboard time, never stored). Distinct from the Open
 // Channel client (client.ts), which uses the meta-channel path + channel keys.
 import { getConfig } from "../config.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "../io-timeout";
 import { convertToCamelCase } from "./case";
 
 export interface ChannexProperty {
@@ -66,6 +67,7 @@ async function pmsFetch(path: string, apiKey: string): Promise<PmsPage> {
   try {
     res = await fetch(`${base}/api/v1${path}`, {
       headers: { "user-api-key": apiKey, Accept: "application/json" },
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
   } catch {
     throw new Error("Couldn't reach your channel manager. Check your connection and try again.");

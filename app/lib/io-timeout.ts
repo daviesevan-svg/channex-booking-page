@@ -193,6 +193,47 @@ export function boundD1ForRequest(d1: D1Database | undefined): D1Database | unde
  *  an answer it can retry instead of a tab that spins for half an hour. */
 export const REQUEST_DEADLINE_MS = 30_000;
 
+/** Outbound HTTP (Stripe, Channex, a payment gateway, an image CDN) may be
+ *  slow. It must not park an admin loader or action until the isolate is
+ *  killed — POST has no request deadline on purpose (a Booking.com import can
+ *  legitimately take a minute), so each call carries its own. */
+export const OUTBOUND_FETCH_TIMEOUT_MS = 12_000;
+
+const DEADLINE_TEXT = "This page took too long to load. Please try again.";
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+}
+
+/** A document navigation gets a page with a way out. A single-fetch `.data`
+ *  request stays plain text: the client turns a non-Remix 503 into a route
+ *  error, and the admin error boundary is what puts the links back. */
+function deadlineResponse(request: Request): Response {
+  const url = new URL(request.url);
+  const headers = { "Retry-After": "2", "Cache-Control": "no-store" };
+  if (url.pathname.endsWith(".data")) {
+    return new Response(DEADLINE_TEXT, {
+      status: 503,
+      headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  const retry = escapeHtml(`${url.pathname}${url.search}`);
+  const admin = url.pathname === "/admin" || url.pathname.startsWith("/admin/");
+  const home = admin ? "/admin" : "/";
+  const homeLabel = admin ? "Admin home" : "Home";
+  const html = `<!doctype html>
+<meta charset="utf-8">
+<title>${DEADLINE_TEXT}</title>
+<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:4rem auto;padding:0 1.5rem;color:#1c1917">
+<h1 style="font-size:1.4rem">${DEADLINE_TEXT}</h1>
+<p><a href="${retry}">Try again</a> · <a href="${home}">${homeLabel}</a></p>
+</body>`;
+  return new Response(html, {
+    status: 503,
+    headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 export function withRequestDeadline(request: Request, work: Promise<Response>): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return work;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -202,12 +243,7 @@ export function withRequestDeadline(request: Request, work: Promise<Response>): 
       console.error(
         `[request-deadline] ${request.method} ${request.url} produced no response in ${REQUEST_DEADLINE_MS} ms -- ${describeIoTrace(trace)}`,
       );
-      resolve(
-        new Response("This page took too long to load. Please try again.", {
-          status: 503,
-          headers: { "Retry-After": "2", "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
-        }),
-      );
+      resolve(deadlineResponse(request));
     }, REQUEST_DEADLINE_MS);
   });
   return Promise.race([work, expired]).finally(() => clearTimeout(timer));

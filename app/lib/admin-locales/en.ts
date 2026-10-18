@@ -2275,6 +2275,13 @@ const EN: Record<string, string> = {
   bkdRefundRecordedManually: "· refunded in {gateway}",
   bkdRefundReference: "Refund reference",
 
+  adminErrorTitle: "This page didn't load",
+  adminErrorBody: "Something went wrong loading this page. Try it again, or go back to the admin home.",
+  adminNotFoundTitle: "Page not found",
+  adminNotFoundBody: "That page isn't available. It may have moved, or you may not have access to it.",
+  adminErrorRetry: "Try again",
+  adminErrorHome: "Admin home",
+
 };
 
 export default EN;

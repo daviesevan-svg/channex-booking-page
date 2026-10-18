@@ -9,6 +9,8 @@ import {
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
+import { AdminRouteError } from "~/components/admin-route-error";
+
 import type { Route } from "./+types/layout";
 import { requireAdmin } from "~/lib/auth.server";
 import { accessActor, actorCanManageProperty, currentPropertyId, getVisibleProperties, hiddenMemberAreasFor } from "~/lib/properties.server";
@@ -46,23 +48,32 @@ export function shouldRevalidate({
 
 export async function loader({ request }: Route.LoaderArgs) {
   const email = await requireAdmin(request);
-  const [propertyId, properties, superadmin] = await Promise.all([
+  const url = new URL(request.url);
+  // Two waves, not one chain. Nothing here may start before the session check,
+  // and the second wave needs the property picked by the first. Each wave is
+  // independent reads of the same data the sequential version loaded — the
+  // request KV/D1 cache still collapses the duplicate gets.
+  const [propertyId, properties, superadmin, actor, brand, hiddenPages] = await Promise.all([
     currentPropertyId(request),
     getVisibleProperties(request),
     isSuperadmin(email),
+    accessActor(request),
+    brandForUser(email),
+    hiddenPagesFor(email),
   ]);
-  const settings = propertyId ? await getSettings(propertyId) : {};
-  const actor = await accessActor(request);
-  const canManageCurrent = actor && propertyId
-    ? actorCanManageProperty(actor, properties.find((p) => p.id === propertyId))
-    : false;
+  const property = properties.find((p) => p.id === propertyId);
+  const [settings, guestHost, hiddenAreas] = await Promise.all([
+    propertyId ? getSettings(propertyId) : Promise.resolve({} as Awaited<ReturnType<typeof getSettings>>),
+    guestHostForProperty(property?.partnerId, email),
+    hiddenMemberAreasFor(request, propertyId),
+  ]);
+  const canManageCurrent = actor && propertyId ? actorCanManageProperty(actor, property) : false;
   // Test mode = live bookings not enabled → checkout simulates and takes no
   // payment. Surfaced as a persistent banner so it's never a surprise. Only
   // meaningful once a property is selected.
   const testMode = Boolean(propertyId) && !(settings.liveBooking ?? getConfig().allowLiveBooking);
   // White-label: a user under a partner sees the partner's brand in the chrome,
   // never ours. Direct users keep the stock header (brand stays null).
-  const brand = await brandForUser(email);
   const partnerBrand = brand.partnerId ? brand.name : null;
   const partnerLogo = brand.partnerId ? (brand.logo ?? null) : null;
   // Where "View site" must point. The link follows the PROPERTY, not the
@@ -70,20 +81,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   // superadmin (who has no partner of their own) is the one looking, and slug
   // paths don't exist on a partner ADMIN host at all. Same scheme/port as this
   // request so dev partner hosts keep working.
-  const url = new URL(request.url);
-  const guestHost = await guestHostForProperty(
-    properties.find((p) => p.id === propertyId)?.partnerId,
-    email,
-  );
   const guestOrigin = guestHost
     ? `${url.protocol}//${guestHost}${url.port ? `:${url.port}` : ""}`
     : null;
-  // Pages this user's partner hides. Nav-side only — the routes themselves
-  // enforce it in their loaders via requirePageAllowed.
-  const hiddenPages = await hiddenPagesFor(email);
-  // Areas the property owner hides from this teammate (Team page). Nav-side
-  // only — assertMemberAreaAllowed enforces the same rule on every request.
-  const hiddenAreas = await hiddenMemberAreasFor(request, propertyId);
   return {
     email,
     partnerBrand,
@@ -520,4 +520,10 @@ export default function AdminLayout({ loaderData }: Route.ComponentProps) {
       </div>
     </div>
   );
+}
+
+/** Layout-loader failures never reach the pathless boundary below, so this is
+ *  the escape hatch: a link back to /admin instead of root's bare "Oops". */
+export function ErrorBoundary() {
+  return <AdminRouteError />;
 }

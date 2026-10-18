@@ -9,6 +9,8 @@
 // with the Retrieve Transaction API before finalizing (Viva webhooks carry no
 // signature — the API lookup IS the authentication).
 
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
+
 export class VivaError extends Error {
   constructor(
     public status: number,
@@ -134,6 +136,7 @@ async function vivaToken(v: VivaConfig): Promise<string> {
       Authorization: `Basic ${btoa(`${v.clientId}:${v.clientSecret}`)}`,
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as { access_token?: string };
   if (!res.ok || !json.access_token) {
@@ -200,6 +203,7 @@ export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promi
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: orderRequestBody(v, spec),
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   // The raw text, not res.json(): a JSON parse would turn the 16-digit
   // orderCode into a lossy float. Pull the digits out of the body as text.
@@ -234,6 +238,7 @@ export async function retrieveVivaTransaction(v: VivaConfig, transactionId: stri
     : `${api}/checkout/v2/transactions/${encodeURIComponent(transactionId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const text = await res.text();
   if (!res.ok) throw new VivaError(res.status, `Viva transaction lookup failed (${res.status}).`);
@@ -274,7 +279,11 @@ export interface VivaRefundResult {
  *  ticked under Settings → API Access in the property's Viva account. */
 export async function vivaRefund(v: VivaConfig, transactionId: string, amountMinor: number): Promise<VivaRefundResult> {
   const url = `${hosts(v.demo).www}/api/transactions/${encodeURIComponent(transactionId)}?amount=${amountMinor}&sourceCode=${encodeURIComponent(v.sourceCode)}`;
-  const res = await fetch(url, { method: "DELETE", headers: { Authorization: basicAuth(v) } });
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: basicAuth(v) },
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+  });
   const json = (await res.json().catch(() => ({}))) as VivaRefundResult;
   if (!res.ok || json.Success === false || (json.StatusId && json.StatusId !== "F")) {
     throw new VivaError(res.status, `Viva refund failed (${res.status}): ${json.ErrorText ?? "no detail"}`);
@@ -288,6 +297,7 @@ export async function vivaRefund(v: VivaConfig, transactionId: string, amountMin
 export async function retrieveVivaWebhookKey(v: VivaConfig): Promise<string> {
   const res = await fetch(`${hosts(v.demo).www}/api/messages/config/token`, {
     headers: { Authorization: basicAuth(v) },
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as { Key?: string };
   if (!res.ok || !json.Key) {
@@ -384,6 +394,7 @@ export async function runVivaDiagnostics(v: VivaConfig): Promise<VivaDiagnostics
       Authorization: `Basic ${btoa(`${v.clientId}:${v.clientSecret}`)}`,
     },
     body: "grant_type=client_credentials",
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   }).catch(() => null);
   if (!tokenRes) return report;
   report.tokenStatus = tokenRes.status;
@@ -394,6 +405,7 @@ export async function runVivaDiagnostics(v: VivaConfig): Promise<VivaDiagnostics
     method: "POST",
     headers: { Authorization: `Bearer ${tokenJson.access_token}`, "Content-Type": "application/json" },
     body: report.orderRequestBody,
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   }).catch(() => null);
   if (!orderRes) return report;
   report.orderStatus = orderRes.status;

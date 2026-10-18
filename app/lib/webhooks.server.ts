@@ -5,6 +5,7 @@
 // queue is a later enhancement (no Queues/Durable Objects yet).
 import { getConfigKV } from "./config.server";
 import { hmacSha256Hex } from "./hmac.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { WEBHOOK_EVENTS, type WebhookEvent } from "./webhook-events";
 
 export { WEBHOOK_EVENTS, type WebhookEvent };
@@ -121,6 +122,7 @@ export async function dispatchWebhook(pid: string, event: WebhookEvent, data: un
           headers: { "Content-Type": "application/json", "Roompanda-Signature": `t=${t},v1=${sig}` },
           body,
           redirect: "manual", // never follow a 3xx to an internal host (SSRF)
+          signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
         });
         if (!res.ok) console.log(`[webhook] ${event} → ${ep.url} responded ${res.status}`);
       } catch (e) {

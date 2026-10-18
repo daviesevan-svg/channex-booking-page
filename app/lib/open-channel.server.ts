@@ -2,6 +2,7 @@
 // revisions, and the full-sync request we use to recover from an ARI push we
 // failed to store.
 import { getConfig, getConfigKV } from "./config.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 
 export interface OpenChannelBookingResult {
   id?: string;
@@ -16,6 +17,7 @@ export async function pushOpenChannelBooking(booking: unknown): Promise<OpenChan
     method: "POST",
     headers: { "api-key": openChannelBookingKey, "Content-Type": "application/json" },
     body: JSON.stringify({ booking }),
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const text = await res.text();
   let body: unknown;
@@ -86,6 +88,7 @@ export async function requestFullSync(hotelCode: string): Promise<{ ok: boolean;
       method: "POST",
       headers: { "api-key": openChannelBookingKey, "Content-Type": "application/json" },
       body: JSON.stringify({ provider_code: providerCode, hotel_code: hotelCode }),
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) return { ok: false, error: `full sync request failed (${res.status}): ${(await res.text()).slice(0, 200)}` };
     return { ok: true };

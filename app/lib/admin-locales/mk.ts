@@ -2419,6 +2419,13 @@ const MK: Record<string, string> = {
   bkdMarkRefundedDone: "✓ Означено како вратено.",
   bkdRefundRecordedManually: "· вратено во {gateway}",
   bkdRefundReference: "Референца на поврат",
+
+  adminErrorTitle: "Оваа страница не се вчита",
+  adminErrorBody: "Нешто тргна наопаку при вчитувањето на оваа страница. Обидете се повторно, или вратете се на почетната на администрацијата.",
+  adminNotFoundTitle: "Страницата не е пронајдена",
+  adminNotFoundBody: "Таа страница не е достапна. Можеби е преместена, или немате пристап до неа.",
+  adminErrorRetry: "Обиди се повторно",
+  adminErrorHome: "Почетна на администрацијата",
 };
 
 export default MK;

@@ -120,6 +120,31 @@ describe("withRequestDeadline", () => {
     const res = await p;
     expect(res.status).toBe(503);
     expect(res.headers.get("Retry-After")).toBe("2");
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("This page took too long to load. Please try again.");
+    expect(body).toContain('href="/admin"');
+    expect(body).toContain('href="/admin"');
+  });
+
+  it("keeps a single-fetch data request as plain text, and escapes the retry link", async () => {
+    const data = new Request('https://book.roompanda.com/admin/inventory.data?start=1&q="><script>');
+    const p = withRequestDeadline(data, never());
+    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    const res = await p;
+    expect(res.headers.get("Content-Type")).toContain("text/plain");
+    expect(await res.text()).toBe("This page took too long to load. Please try again.");
+
+    const guest = new Request("https://book.roompanda.com/rooms?x=<script>&y=1");
+    const gp = withRequestDeadline(guest, never());
+    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    const gres = await gp;
+    const html = await gres.text();
+    // The URL parser percent-encodes the query before it reaches the page, and
+    // the attribute is escaped again, so a crafted query cannot break out.
+    expect(html).toContain('href="/rooms?x=%3Cscript%3E&amp;y=1"');
+    expect(html).toContain('href="/"');
+    expect(html).not.toContain("<script>");
   });
 
   it("passes a prompt response straight through", async () => {

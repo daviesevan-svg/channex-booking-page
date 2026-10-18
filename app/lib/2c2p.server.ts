@@ -23,6 +23,7 @@
 //
 // WebCrypto rather than node:crypto: this runs on Workers.
 
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { displayFractionDigits } from "./money";
 
 export class C2pError extends Error {
@@ -174,6 +175,7 @@ async function call<T extends C2pResponse>(c: C2pConfig, path: string, claims: u
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ payload: await signC2pPayload(c.secretKey, claims) }),
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
   } catch (e) {
     throw new C2pError(`2C2P unreachable: ${e instanceof Error ? e.message : e}`);

@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import type { InventoryScope } from "../ari/read.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "../io-timeout";
 import type { AriPushResult, SyncKind } from "./push.server";
 
 export interface GoogleAriWork {
@@ -17,7 +18,10 @@ export async function submitGoogleAriWork(work: GoogleAriWork, immediate = false
   if (!namespace) throw new Error("GOOGLE_ARI_QUEUE binding is not configured; Google ARI work was not queued.");
   const stub = namespace.get(namespace.idFromName(work.pid));
   const response = await stub.fetch(`https://google-ari.internal/${immediate ? "run" : "enqueue"}`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(work),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(work),
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Google ARI enqueue failed: HTTP ${response.status}`);
   const body = await response.json() as { results?: AriPushResult[] };

@@ -7,6 +7,7 @@
 // `Stripe-Account` header. This module is the platform-side client.
 import { getConfig } from "./config.server";
 import { hmacSha256Hex, timingSafeEqual } from "./hmac.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { roundStripeMinor } from "./money";
 
 const API_BASE = "https://api.stripe.com";
@@ -71,6 +72,7 @@ async function stripeRequest<T>(path: string, opts: StripeRequestOpts = {}): Pro
     method: opts.method ?? "POST",
     headers,
     body: opts.body ? toForm(opts.body).toString() : undefined,
+    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as { error?: { type?: string; message?: string } };
   if (!res.ok || json.error) {
