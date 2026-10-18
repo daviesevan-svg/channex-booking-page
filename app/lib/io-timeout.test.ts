@@ -112,14 +112,50 @@ describe("boundD1", () => {
 });
 
 describe("withRequestDeadline", () => {
-  const get = new Request("https://book.roompanda.com/admin");
+  const htmlAccept = { headers: { Accept: "text/html,application/xhtml+xml" } };
+  const get = new Request("https://book.roompanda.com/admin", htmlAccept);
 
-  it("answers a GET that never produces a response with a retryable 503", async () => {
+  it("answers a browser GET that never produces a response with a retryable HTML 503", async () => {
     const p = withRequestDeadline(get, never());
     await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
     const res = await p;
     expect(res.status).toBe(503);
     expect(res.headers.get("Retry-After")).toBe("2");
+    expect(res.headers.get("Content-Type")).toContain("text/html");
+    const body = await res.text();
+    expect(body).toContain("This page took too long to load. Please try again.");
+    expect(body).toContain('href="/admin"');
+    expect(body).toContain("Admin home");
+  });
+
+  it("keeps API, feed, image, and single-fetch responses as plain text", async () => {
+    const urls = [
+      "https://book.roompanda.com/admin/inventory.data?start=1",
+      "https://book.roompanda.com/v1/bookings",
+      "https://book.roompanda.com/feeds/google-hotels.xml",
+      "https://book.roompanda.com/images/photo.jpg",
+      "https://book.roompanda.com/admin",
+    ];
+    for (const url of urls) {
+      const req = new Request(url, url.endsWith("/admin") ? undefined : { headers: { Accept: "text/html" } });
+      const p = withRequestDeadline(req, never());
+      await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+      const res = await p;
+      expect(res.headers.get("Content-Type"), url).toContain("text/plain");
+      expect(await res.text()).toBe("This page took too long to load. Please try again.");
+    }
+  });
+
+  it("escapes the retry link on an HTML document", async () => {
+    const guest = new Request("https://book.roompanda.com/rooms?x=<script>&y=1", htmlAccept);
+    const gp = withRequestDeadline(guest, never());
+    await vi.advanceTimersByTimeAsync(REQUEST_DEADLINE_MS);
+    const html = await (await gp).text();
+    // The URL parser percent-encodes the query before it reaches the page, and
+    // the attribute is escaped again, so a crafted query cannot break out.
+    expect(html).toContain('href="/rooms?x=%3Cscript%3E&amp;y=1"');
+    expect(html).toContain('href="/"');
+    expect(html).not.toContain("<script>");
   });
 
   it("passes a prompt response straight through", async () => {

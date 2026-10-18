@@ -7,6 +7,7 @@
 // `Stripe-Account` header. This module is the platform-side client.
 import { getConfig } from "./config.server";
 import { hmacSha256Hex, timingSafeEqual } from "./hmac.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { roundStripeMinor } from "./money";
 
 const API_BASE = "https://api.stripe.com";
@@ -53,6 +54,10 @@ interface StripeRequestOpts {
   apiKey?: string;
   /** Override the base URL (e.g. connect.stripe.com for OAuth). */
   base?: string;
+  /** Never abort client-side. For a lookup that decides whether a guest has paid:
+   *  a timeout there reads as "not paid" while the charge may well have gone
+   *  through, which is worse than waiting for the request deadline. */
+  unbounded?: boolean;
 }
 
 async function stripeRequest<T>(path: string, opts: StripeRequestOpts = {}): Promise<T> {
@@ -67,10 +72,16 @@ async function stripeRequest<T>(path: string, opts: StripeRequestOpts = {}): Pro
   if (opts.account) headers["Stripe-Account"] = opts.account;
   if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
+  const method = opts.method ?? "POST";
+  // A POST is aborted only when Stripe can dedupe the retry. OAuth token
+  // exchange and deauthorize send no idempotency key, so they stay unbounded.
+  const signal =
+    !opts.unbounded && (method === "GET" || opts.idempotencyKey) ? AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS) : undefined;
   const res = await fetch(`${opts.base ?? API_BASE}${path}`, {
-    method: opts.method ?? "POST",
+    method,
     headers,
     body: opts.body ? toForm(opts.body).toString() : undefined,
+    signal,
   });
   const json = (await res.json().catch(() => ({}))) as { error?: { type?: string; message?: string } };
   if (!res.ok || json.error) {
@@ -281,7 +292,8 @@ export function createCheckoutSession(
 export function retrieveCheckoutSession(account: string, id: string): Promise<CheckoutSession> {
   return stripeRequest<CheckoutSession>(
     `/v1/checkout/sessions/${id}?expand[]=payment_intent&expand[]=setup_intent&expand[]=setup_intent.payment_method`,
-    { method: "GET", account },
+    // The payment check behind the return URL and the webhook: unbounded, see StripeRequestOpts.
+    { method: "GET", account, unbounded: true },
   );
 }
 

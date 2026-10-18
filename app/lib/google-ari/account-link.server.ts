@@ -12,6 +12,7 @@
 // registry) and PATCH its hotel list rather than create another, and unlinking
 // only DELETEs once no hotel is left on it.
 import { getConfig, getConfigKV } from "../config.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "../io-timeout";
 import { getProperties } from "../properties.server";
 import { clearSettingsFields, getSettings, patchSettings } from "../overrides.server";
 import { getAccessToken, readCachedMatchStatus, TRAVEL_PARTNER_API } from "./status.server";
@@ -112,6 +113,9 @@ async function api<T>(method: string, path: string, body?: unknown): Promise<Api
       method,
       headers: { Authorization: `Bearer ${token}`, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      // Writes (create/patch/delete a link) are not idempotent. A timed-out GET
+      // can be repeated; a timed-out write cannot.
+      ...(method === "GET" || method === "HEAD" ? { signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS) } : {}),
     });
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);

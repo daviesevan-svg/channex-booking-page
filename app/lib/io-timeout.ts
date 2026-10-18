@@ -193,6 +193,58 @@ export function boundD1ForRequest(d1: D1Database | undefined): D1Database | unde
  *  an answer it can retry instead of a tab that spins for half an hour. */
 export const REQUEST_DEADLINE_MS = 30_000;
 
+/** Read-only outbound HTTP (a Stripe retrieve, a Channex GET, a token exchange).
+ *  Writes that are not idempotent stay unbounded: aborting one after the other
+ *  side has already applied it turns a retry into a second charge, refund, or
+ *  booking push. */
+export const OUTBOUND_FETCH_TIMEOUT_MS = 12_000;
+
+const DEADLINE_TEXT = "This page took too long to load. Please try again.";
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
+}
+
+/** A browser document navigation asks for text/html and gets a page with a way
+ *  out. Everything else — single-fetch `.data`, `/v1/*`, feeds, images, and any
+ *  client that did not ask for HTML — stays plain text. */
+function wantsDeadlineHtml(request: Request): boolean {
+  const accept = request.headers.get("Accept") ?? "";
+  if (!accept.includes("text/html")) return false;
+  const path = new URL(request.url).pathname;
+  if (path.endsWith(".data")) return false;
+  if (path === "/v1" || path.startsWith("/v1/")) return false;
+  if (path.startsWith("/feeds/")) return false;
+  if (path.startsWith("/images/")) return false;
+  return true;
+}
+
+function deadlineResponse(request: Request): Response {
+  const url = new URL(request.url);
+  const headers = { "Retry-After": "2", "Cache-Control": "no-store" };
+  if (!wantsDeadlineHtml(request)) {
+    return new Response(DEADLINE_TEXT, {
+      status: 503,
+      headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+  const retry = escapeHtml(`${url.pathname}${url.search}`);
+  const admin = url.pathname === "/admin" || url.pathname.startsWith("/admin/");
+  const home = admin ? "/admin" : "/";
+  const homeLabel = admin ? "Admin home" : "Home";
+  const html = `<!doctype html>
+<meta charset="utf-8">
+<title>${DEADLINE_TEXT}</title>
+<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:4rem auto;padding:0 1.5rem;color:#1c1917">
+<h1 style="font-size:1.4rem">${DEADLINE_TEXT}</h1>
+<p><a href="${retry}">Try again</a> · <a href="${home}">${homeLabel}</a></p>
+</body>`;
+  return new Response(html, {
+    status: 503,
+    headers: { ...headers, "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 export function withRequestDeadline(request: Request, work: Promise<Response>): Promise<Response> {
   if (request.method !== "GET" && request.method !== "HEAD") return work;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -202,12 +254,7 @@ export function withRequestDeadline(request: Request, work: Promise<Response>): 
       console.error(
         `[request-deadline] ${request.method} ${request.url} produced no response in ${REQUEST_DEADLINE_MS} ms -- ${describeIoTrace(trace)}`,
       );
-      resolve(
-        new Response("This page took too long to load. Please try again.", {
-          status: 503,
-          headers: { "Retry-After": "2", "Cache-Control": "no-store", "Content-Type": "text/plain; charset=utf-8" },
-        }),
-      );
+      resolve(deadlineResponse(request));
     }, REQUEST_DEADLINE_MS);
   });
   return Promise.race([work, expired]).finally(() => clearTimeout(timer));

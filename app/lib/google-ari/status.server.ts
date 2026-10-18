@@ -7,6 +7,7 @@
 // here is best-effort and fails soft (returns null) so a Travel Partner API
 // hiccup can never stall the ARI push.
 import { getConfig, getConfigKV } from "../config.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "../io-timeout";
 import { getProperties } from "../properties.server";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -105,6 +106,7 @@ export async function getAccessToken(): Promise<string | null> {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       console.log(`[travelpartner] token exchange ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -143,7 +145,10 @@ export async function getGoogleMatchStatus(hotelId: string): Promise<GoogleMatch
     `?pageSize=10&filter=${encodeURIComponent(`hotelId = '${hotelId}'`)}`;
   let json: { hotelViews?: HotelView[] };
   try {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+    });
     if (!res.ok) {
       console.log(`[travelpartner] hotelViews ${res.status}: ${(await res.text()).slice(0, 300)}`);
       return null;

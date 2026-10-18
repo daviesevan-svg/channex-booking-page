@@ -11,6 +11,7 @@
 // filtered out) and can't invalidate the document.
 import { googleListingElements } from "./hotel-list-feed.server";
 import { getImagesBucket } from "./config.server";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 
 // Channex's Google Hotel ARI partner feed.
 const CHANNEX_FEED_URL =
@@ -51,7 +52,10 @@ export async function spliceListingsFeed(
 ): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(channexFeedUrl, { headers: { Accept: "application/xml" } });
+    res = await fetch(channexFeedUrl, {
+      headers: { Accept: "application/xml" },
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+    });
   } catch {
     throw new Error("Could not reach the partner feed.");
   }

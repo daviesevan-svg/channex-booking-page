@@ -206,6 +206,15 @@ export function getConfigKV(): KVNamespace {
           return read;
         };
       }
+      if (prop === "list") {
+        // Same "never coming back" bound as get. A list that stalls parks
+        // every admin page that scans users, partners, collections or domains.
+        return (opts?: unknown) => {
+          const prefix =
+            opts && typeof opts === "object" && "prefix" in opts ? String((opts as { prefix?: unknown }).prefix ?? "") : "";
+          return boundedRead(`KV list ${prefix || "(all)"}`, () => fn.call(target, opts) as Promise<unknown>);
+        };
+      }
       if (prop === "put" || prop === "delete") {
         return (key: unknown, ...rest: unknown[]) => {
           if (typeof key !== "string") return fn.call(target, key, ...rest);

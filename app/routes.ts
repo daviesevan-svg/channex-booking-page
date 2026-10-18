@@ -181,6 +181,8 @@ export default [
   // session — so it cannot sit under the layout, whose loader requires one.
   route("admin/payments/callback", "routes/admin/payments.callback.tsx"),
   route("admin", "routes/admin/layout.tsx", [
+    // Pathless, so a page error keeps the admin sidebar. See boundary.tsx.
+    layout("routes/admin/boundary.tsx", [
     index("routes/admin/property.tsx"),
     route("properties", "routes/admin/properties.tsx"),
     route("properties/onboard", "routes/admin/onboard-channex.tsx"),
@@ -229,6 +231,7 @@ export default [
     route("bookings", "routes/admin/bookings.tsx"),
     route("bookings/:id", "routes/admin/booking.tsx"),
     route("bookings/:id/pdf", "routes/admin/booking-pdf.tsx"),
+    ]),
   ]),
 
   // Embeddable booking widget for hotels' own sites: a public loader script +

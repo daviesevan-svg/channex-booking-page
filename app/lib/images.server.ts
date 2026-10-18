@@ -2,6 +2,7 @@ import { env } from "cloudflare:workers";
 
 import { getImagesBucket } from "./config.server";
 import { isAllowedImportImageParsed } from "./image-import-url";
+import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { MAX_IMAGE_BYTES, mb } from "./upload-limits";
 import { isSafeWebhookUrl } from "./webhooks.server";
 
@@ -93,7 +94,10 @@ async function fetchAllowlistedImage(start: URL, allow: (u: URL) => boolean, ref
     if (!allow(current)) {
       throw new Error(refusal);
     }
-    const res = await fetch(current.toString(), { redirect: "manual" });
+    const res = await fetch(current.toString(), {
+      redirect: "manual",
+      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+    });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       if (!loc) throw new Error(`Image fetch failed (${res.status}).`);

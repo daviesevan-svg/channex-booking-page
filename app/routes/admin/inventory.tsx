@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { addDays, format, parseISO } from "date-fns";
 import { Form, Link, useBlocker, useFetcher, useNavigate, useNavigation } from "react-router";
 
@@ -6,6 +6,8 @@ import type { Route } from "./+types/inventory";
 import { adminMeta } from "~/lib/admin-meta";
 import { SavedPill } from "~/components/admin-page-header";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
+import { inventoryLeaveBlocked } from "~/lib/inventory-guard";
+import { useDismiss } from "~/lib/use-dismiss";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
 import { getRates, getRooms, pricingModeOf, rateChannexId } from "~/lib/catalog.server";
@@ -374,9 +376,8 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
 
   // Unsaved-change tracking. The grid is uncontrolled (hundreds of inputs), so
   // rather than mirror it in state we count inputs whose current value differs
-  // from the value they rendered with. That count drives the Save button, the
-  // floating bar and the leave-page guard; a successful save re-renders every
-  // input with the stored value, which brings the count back to zero.
+  // from the value they mounted with. That count drives the Save button, the
+  // floating bar and the leave-page guard.
   const formRef = useRef<HTMLFormElement>(null);
   const [dirty, setDirty] = useState(0);
   const recount = () => {
@@ -404,10 +405,14 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   // In-app navigation (paging dates, the sidebar) with edits pending. Saving
   // is itself a navigation — a POST back to this same URL — so only a change
   // of destination is blocked, never the submission that clears the edits.
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      dirty > 0 && (nextLocation.pathname !== currentLocation.pathname || nextLocation.search !== currentLocation.search),
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    inventoryLeaveBlocked(dirty, currentLocation, nextLocation),
   );
+  // A blocked navigation stays blocked until reset(), even after the edits
+  // that caused it have been saved or discarded.
+  useEffect(() => {
+    if (blocker.state === "blocked" && dirty === 0) blocker.reset();
+  }, [blocker, dirty]);
   // Closing the tab with edits pending.
   useEffect(() => {
     if (dirty === 0) return;
@@ -422,25 +427,50 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   useEffect(() => {
     if (bulkDone) setBulkOpen(false);
   }, [bulkDone, actionData]);
-  // Escape closes the drawer.
-  useEffect(() => {
-    if (!bulkOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setBulkOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [bulkOpen]);
+  // The drawer used to sit behind a full-screen <button> backdrop. That
+  // backdrop swallowed the next click (the same bug useDismiss exists for):
+  // a click on the sidebar closed the drawer and never reached the link.
+  // The scrim is visual only; pointerdown outside the panel both dismisses
+  // and still hits whatever is underneath.
+  const drawerRef = useRef<HTMLElement>(null);
+  const bulkOpenRef = useRef(false);
+  bulkOpenRef.current = bulkOpen;
+  const dismissBulk = useCallback(() => {
+    if (bulkOpenRef.current) setBulkOpen(false);
+  }, []);
+  useDismiss(drawerRef, dismissBulk);
+
+  const leavePrompt =
+    blocker.state === "blocked" ? (
+      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4">
+        <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-notice-line bg-notice-soft px-4 py-3 text-[13px] text-notice shadow-lg">
+          <span className="font-semibold">{t("invLeavePrompt")}</span>
+          <button type="button" onClick={() => blocker.reset()} className={secondaryBtn}>
+            {t("invStay")}
+          </button>
+          <button
+            type="button"
+            onClick={() => blocker.proceed()}
+            className="rounded-[10px] bg-notice px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90"
+          >
+            {t("invLeave")}
+          </button>
+        </div>
+      </div>
+    ) : null;
 
   if (!loaderData.configured) {
     return (
-      <div className="rounded-[14px] border border-line bg-surface p-6">
-        <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("invTitle")}</h1>
-        <p className="text-[15px] text-secondary">
-          {t("invConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
-          {t("invConfigureSuffix")}
-        </p>
-      </div>
+      <>
+        <div className="rounded-[14px] border border-line bg-surface p-6">
+          <h1 className="mb-2 font-serif text-[22px] font-semibold">{t("invTitle")}</h1>
+          <p className="text-[15px] text-secondary">
+            {t("invConfigurePrefix")} <code className="rounded bg-chip px-1.5 py-0.5">DEFAULT_PROPERTY_ID</code>{" "}
+            {t("invConfigureSuffix")}
+          </p>
+        </div>
+        {leavePrompt}
+      </>
     );
   }
 
@@ -462,6 +492,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
           {t("invCreateRoomPrefix")} <Link to="/admin/rooms/new" className="font-semibold text-accent">{t("invCreateRoomLink")}</Link>{" "}
           {t("invCreateRoomSuffix")}
         </div>
+        {leavePrompt}
       </div>
     );
   }
@@ -560,7 +591,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         </div>
       </div>
 
-      <Form method="post" id="inventory-form" ref={formRef} onInput={recount} onChange={recount} onKeyUp={recount} onReset={() => setTimeout(recount, 0)}>
+      <Form method="post" id="inventory-form" ref={formRef} onInput={recount} onChange={recount} onReset={() => setTimeout(recount, 0)}>
         <input type="hidden" name="intent" value="save" />
         <input type="hidden" name="start" value={start} />
         <input type="hidden" name="cols" value={visible} />
@@ -814,25 +845,15 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
 
       {/* Leaving with unsaved edits: an in-page prompt rather than a browser
           confirm(), which some embedded views auto-dismiss. */}
-      {blocker.state === "blocked" && (
-        <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center p-4">
-          <div className="flex flex-wrap items-center gap-3 rounded-[12px] border border-notice-line bg-notice-soft px-4 py-3 text-[13px] text-notice shadow-lg">
-            <span className="font-semibold">{t("invLeavePrompt")}</span>
-            <button type="button" onClick={() => blocker.reset()} className={secondaryBtn}>{t("invStay")}</button>
-            <button type="button" onClick={() => blocker.proceed()} className="rounded-[10px] bg-notice px-4 py-2 text-[13px] font-semibold text-white hover:opacity-90">
-              {t("invLeave")}
-            </button>
-          </div>
-        </div>
-      )}
+      {leavePrompt}
 
       {/* Bulk edit drawer — an editing tool only, never shown read-only. */}
       {bulkOpen && !readOnly && (
         <>
-          <button type="button" aria-label={t("invCloseDrawer")} onClick={() => setBulkOpen(false)} className="fixed inset-0 z-30 bg-ink/30" />
+          <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-30 bg-ink/30" />
           <aside
+            ref={drawerRef}
             role="dialog"
-            aria-modal="true"
             aria-labelledby="bulk-title"
             className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[440px] flex-col bg-surface shadow-2xl"
           >
