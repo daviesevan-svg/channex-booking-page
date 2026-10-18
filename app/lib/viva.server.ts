@@ -128,7 +128,7 @@ export function vivaRequestLang(lang: string | undefined): string {
 /** Fetch a bearer token for the /checkout/v2 endpoints. Tokens last an hour;
  *  we fetch per operation (a checkout is one order + at most one retrieve) —
  *  caching across isolates isn't worth a KV round-trip. */
-async function vivaToken(v: VivaConfig): Promise<string> {
+async function vivaToken(v: VivaConfig, bounded = true): Promise<string> {
   const res = await fetch(`${hosts(v.demo).accounts}/connect/token`, {
     method: "POST",
     headers: {
@@ -136,7 +136,7 @@ async function vivaToken(v: VivaConfig): Promise<string> {
       Authorization: `Basic ${btoa(`${v.clientId}:${v.clientSecret}`)}`,
     },
     body: "grant_type=client_credentials",
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+    ...(bounded ? { signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS) } : {}),
   });
   const json = (await res.json().catch(() => ({}))) as { access_token?: string };
   if (!res.ok || !json.access_token) {
@@ -228,16 +228,19 @@ export interface VivaTransaction {
 }
 
 /** Retrieve a transaction by id — the authoritative payment check for both the
- *  return URL and the webhook. */
+ *  return URL and the webhook.
+ *
+ *  No client abort, on this call or its token exchange. The return URL sends the
+ *  guest back to an empty checkout when this throws, so a timeout would make a
+ *  guest who has paid look unpaid. Waiting for the request deadline is better. */
 export async function retrieveVivaTransaction(v: VivaConfig, transactionId: string): Promise<VivaTransaction> {
-  const token = await vivaToken(v);
+  const token = await vivaToken(v, false);
   const api = hosts(v.demo).api;
   const url = v.isv
     ? `${api}/checkout/v2/isv/transactions/${encodeURIComponent(transactionId)}?merchantId=${encodeURIComponent(v.merchantId)}`
     : `${api}/checkout/v2/transactions/${encodeURIComponent(transactionId)}`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const text = await res.text();
   if (!res.ok) throw new VivaError(res.status, `Viva transaction lookup failed (${res.status}).`);
