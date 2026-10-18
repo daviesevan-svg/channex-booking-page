@@ -24,7 +24,6 @@
 import type { BookingRecord } from "./bookings.server";
 import { DEFAULT_LANG, emailDef, type SiteSettings } from "./content";
 import { getConfig } from "./config.server";
-import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
 import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailBrand, legalLinksForEmail, renderSimpleEmail } from "./email-render.server";
 import { emailBrandFor } from "./site-style";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
@@ -70,7 +69,6 @@ export async function sendEmail(opts: SendEmailOptions): Promise<{ sent: boolean
         },
         recipients: to.map((address) => ({ address })),
       }),
-      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");

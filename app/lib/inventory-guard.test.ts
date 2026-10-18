@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { inventoryLeaveBlocked, nextInventoryFormEpoch } from "./inventory-guard";
+import { inventoryLeaveBlocked } from "./inventory-guard";
 
 const here = { pathname: "/admin/inventory", search: "?start=2026-10-01" };
 
@@ -16,19 +16,5 @@ describe("inventoryLeaveBlocked", () => {
 
   it("releases once nothing is dirty", () => {
     expect(inventoryLeaveBlocked(0, here, { pathname: "/admin", search: "" })).toBe(false);
-  });
-});
-
-describe("nextInventoryFormEpoch", () => {
-  it("remounts the grid once per successful save", () => {
-    const save = { ok: true as const };
-    const first = nextInventoryFormEpoch(0, null, save);
-    expect(first).toEqual({ epoch: 1, seen: save });
-    expect(nextInventoryFormEpoch(first.epoch, first.seen, save)).toEqual(first);
-  });
-
-  it("does not remount on a failed save or when nothing was submitted", () => {
-    expect(nextInventoryFormEpoch(3, null, { ok: false })).toEqual({ epoch: 3, seen: null });
-    expect(nextInventoryFormEpoch(3, null, undefined)).toEqual({ epoch: 3, seen: null });
   });
 });

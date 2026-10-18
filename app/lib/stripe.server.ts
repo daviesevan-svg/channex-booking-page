@@ -68,11 +68,15 @@ async function stripeRequest<T>(path: string, opts: StripeRequestOpts = {}): Pro
   if (opts.account) headers["Stripe-Account"] = opts.account;
   if (opts.idempotencyKey) headers["Idempotency-Key"] = opts.idempotencyKey;
 
+  const method = opts.method ?? "POST";
+  // A POST is aborted only when Stripe can dedupe the retry. OAuth token
+  // exchange and deauthorize send no idempotency key, so they stay unbounded.
+  const signal = method === "GET" || opts.idempotencyKey ? AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS) : undefined;
   const res = await fetch(`${opts.base ?? API_BASE}${path}`, {
-    method: opts.method ?? "POST",
+    method,
     headers,
     body: opts.body ? toForm(opts.body).toString() : undefined,
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
+    signal,
   });
   const json = (await res.json().catch(() => ({}))) as { error?: { type?: string; message?: string } };
   if (!res.ok || json.error) {

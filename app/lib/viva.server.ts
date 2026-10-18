@@ -203,7 +203,6 @@ export async function createVivaOrder(v: VivaConfig, spec: VivaOrderSpec): Promi
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: orderRequestBody(v, spec),
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   // The raw text, not res.json(): a JSON parse would turn the 16-digit
   // orderCode into a lossy float. Pull the digits out of the body as text.
@@ -276,13 +275,17 @@ export interface VivaRefundResult {
 
 /** Refund (or same-day cancel) a card transaction, fully or partially.
  *  `amountMinor` is in the currency's smallest unit. Requires "Allow refunds"
- *  ticked under Settings → API Access in the property's Viva account. */
+ *  ticked under Settings → API Access in the property's Viva account.
+ *
+ *  No client abort. Viva has no idempotency key: a DELETE that is aborted after
+ *  Viva has refunded looks like a failure, the caller releases its once-only
+ *  claim, and the retry refunds again. A hang that leaves the claim stuck is
+ *  the safe outcome. */
 export async function vivaRefund(v: VivaConfig, transactionId: string, amountMinor: number): Promise<VivaRefundResult> {
   const url = `${hosts(v.demo).www}/api/transactions/${encodeURIComponent(transactionId)}?amount=${amountMinor}&sourceCode=${encodeURIComponent(v.sourceCode)}`;
   const res = await fetch(url, {
     method: "DELETE",
     headers: { Authorization: basicAuth(v) },
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   });
   const json = (await res.json().catch(() => ({}))) as VivaRefundResult;
   if (!res.ok || json.Success === false || (json.StatusId && json.StatusId !== "F")) {
@@ -405,7 +408,6 @@ export async function runVivaDiagnostics(v: VivaConfig): Promise<VivaDiagnostics
     method: "POST",
     headers: { Authorization: `Bearer ${tokenJson.access_token}`, "Content-Type": "application/json" },
     body: report.orderRequestBody,
-    signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
   }).catch(() => null);
   if (!orderRes) return report;
   report.orderStatus = orderRes.status;

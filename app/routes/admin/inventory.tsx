@@ -6,7 +6,7 @@ import type { Route } from "./+types/inventory";
 import { adminMeta } from "~/lib/admin-meta";
 import { SavedPill } from "~/components/admin-page-header";
 import { useAdminDateLocale, useAdminT } from "~/lib/admin-i18n";
-import { inventoryLeaveBlocked, nextInventoryFormEpoch } from "~/lib/inventory-guard";
+import { inventoryLeaveBlocked } from "~/lib/inventory-guard";
 import { useDismiss } from "~/lib/use-dismiss";
 import { requireAdmin } from "~/lib/auth.server";
 import { currentPropertyId } from "~/lib/properties.server";
@@ -398,18 +398,6 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
   useEffect(() => {
     recount();
   }, [inventoryRef]);
-  // A save POSTs back to this same URL, so the date keys stay put and React
-  // does not remount the inputs. defaultValue is applied only on mount, which
-  // left `dirty` above zero after every successful save and the leave guard
-  // blocking every later click. Remount once per successful action.
-  const [formEpoch, setFormEpoch] = useState(0);
-  const [seenSave, setSeenSave] = useState<unknown>(null);
-  const nextEpoch = nextInventoryFormEpoch(formEpoch, seenSave, actionData);
-  if (nextEpoch.seen !== seenSave) {
-    setFormEpoch(nextEpoch.epoch);
-    setSeenSave(nextEpoch.seen);
-    setDirty(0);
-  }
   const discard = () => {
     formRef.current?.reset();
     recount();
@@ -603,7 +591,7 @@ export default function AdminInventory({ loaderData, actionData }: Route.Compone
         </div>
       </div>
 
-      <Form key={formEpoch} method="post" id="inventory-form" ref={formRef} onInput={recount} onChange={recount} onReset={() => setTimeout(recount, 0)}>
+      <Form method="post" id="inventory-form" ref={formRef} onInput={recount} onChange={recount} onReset={() => setTimeout(recount, 0)}>
         <input type="hidden" name="intent" value="save" />
         <input type="hidden" name="start" value={start} />
         <input type="hidden" name="cols" value={visible} />

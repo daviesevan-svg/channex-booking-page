@@ -19,8 +19,6 @@
 //
 // WebCrypto rather than node:crypto: this runs on Workers.
 
-import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
-
 export class IyzicoError extends Error {
   constructor(
     message: string,
@@ -140,7 +138,6 @@ async function call<T extends IyzicoResponse>(c: IyzicoConfig, uriPath: string, 
         "Content-Type": "application/json",
       },
       body: json,
-      signal: AbortSignal.timeout(OUTBOUND_FETCH_TIMEOUT_MS),
     });
   } catch (e) {
     throw new IyzicoError(`iyzico unreachable: ${e instanceof Error ? e.message : e}`);

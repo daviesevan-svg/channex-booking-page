@@ -193,10 +193,10 @@ export function boundD1ForRequest(d1: D1Database | undefined): D1Database | unde
  *  an answer it can retry instead of a tab that spins for half an hour. */
 export const REQUEST_DEADLINE_MS = 30_000;
 
-/** Outbound HTTP (Stripe, Channex, a payment gateway, an image CDN) may be
- *  slow. It must not park an admin loader or action until the isolate is
- *  killed — POST has no request deadline on purpose (a Booking.com import can
- *  legitimately take a minute), so each call carries its own. */
+/** Read-only outbound HTTP (a Stripe retrieve, a Channex GET, a token exchange).
+ *  Writes that are not idempotent stay unbounded: aborting one after the other
+ *  side has already applied it turns a retry into a second charge, refund, or
+ *  booking push. */
 export const OUTBOUND_FETCH_TIMEOUT_MS = 12_000;
 
 const DEADLINE_TEXT = "This page took too long to load. Please try again.";
@@ -205,13 +205,24 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] ?? c);
 }
 
-/** A document navigation gets a page with a way out. A single-fetch `.data`
- *  request stays plain text: the client turns a non-Remix 503 into a route
- *  error, and the admin error boundary is what puts the links back. */
+/** A browser document navigation asks for text/html and gets a page with a way
+ *  out. Everything else — single-fetch `.data`, `/v1/*`, feeds, images, and any
+ *  client that did not ask for HTML — stays plain text. */
+function wantsDeadlineHtml(request: Request): boolean {
+  const accept = request.headers.get("Accept") ?? "";
+  if (!accept.includes("text/html")) return false;
+  const path = new URL(request.url).pathname;
+  if (path.endsWith(".data")) return false;
+  if (path === "/v1" || path.startsWith("/v1/")) return false;
+  if (path.startsWith("/feeds/")) return false;
+  if (path.startsWith("/images/")) return false;
+  return true;
+}
+
 function deadlineResponse(request: Request): Response {
   const url = new URL(request.url);
   const headers = { "Retry-After": "2", "Cache-Control": "no-store" };
-  if (url.pathname.endsWith(".data")) {
+  if (!wantsDeadlineHtml(request)) {
     return new Response(DEADLINE_TEXT, {
       status: 503,
       headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
