@@ -5,7 +5,7 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "channex-booking-page",
-	"compatibility_date": "2026-06-22",
+	"compatibility_date": "2026-10-12",
 	"main": "./workers/app.ts",
 	// Runtime config. Two kinds of value, kept deliberately apart:
 	//
