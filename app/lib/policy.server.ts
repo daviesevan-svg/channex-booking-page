@@ -1,6 +1,6 @@
 import { bandAt, isPartialBand, mergeTiers, penaltyAmount, resolveBands } from "./cancel-bands";
 import type { CancelBand } from "./cancellation";
-import { getRates } from "./catalog.server";
+import { getRates, localizeRate } from "./catalog.server";
 import { getSettings } from "./overrides.server";
 import { DEFAULT_RATE_POLICY, ratePolicyOf, type CancelTier, type PenaltyType, type RatePolicy } from "./rate-policy";
 
@@ -109,9 +109,13 @@ const PENALTY_ORD: Record<PenaltyType, number> = { none: 0, first_night: 1, fixe
 /** The effective rate policy for a booking. Single rate → that rate's policy.
  *  Multiple → a most-restrictive combine: strictest payment timing/card/no-show,
  *  refundable only if all are, and the cancellation schedule that charges the
- *  most at every moment (cancel-bands `mergeTiers`). */
-export async function resolveBookingPolicy(pid: string, rateIds: string[]): Promise<RatePolicy> {
-  const rates = await getRates(pid);
+ *  most at every moment (cancel-bands `mergeTiers`).
+ *
+ *  With `lang` the hotel's override note arrives in that language (the rate's
+ *  translation, else the default text) — pass it wherever the policy is shown
+ *  to a guest. Machine callers (the v1 API) omit it. */
+export async function resolveBookingPolicy(pid: string, rateIds: string[], lang?: string): Promise<RatePolicy> {
+  const rates = await getRates(pid).then((rs) => (lang ? rs.map((r) => localizeRate(r, lang)) : rs));
   const byId = new Map(rates.map((r) => [r.id, r]));
   const pols = rateIds.map((id) => byId.get(id)).filter((r): r is NonNullable<typeof r> => !!r).map((r) => ratePolicyOf(r));
   if (pols.length === 0) return DEFAULT_RATE_POLICY;

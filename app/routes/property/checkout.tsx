@@ -193,7 +193,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   );
   // Effective payment + cancellation + no-show policy for the booking, plus the
   // cancellation snapshot (for the translated free-until line).
-  const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId));
+  const policy = await resolveBookingPolicy(pid, lines.map((l) => l.rateId), lang);
   const cancellation = await resolveBookingCancellation(pid, lines.map((l) => l.rateId), stay.checkin);
   // A mixed cart (some refundable, some not) can't be described by one line, so
   // the UI shows a general "varies by room" note instead of the merged policy.
@@ -407,8 +407,9 @@ export async function action({ params, request }: Route.ActionArgs) {
   );
 
   // Consent is required before we create the booking. A non-refundable or
-  // charged-today rate needs the distinct acknowledgment too.
-  const policy = await resolveBookingPolicy(stay.channelId, lines.map((l) => l.rateId));
+  // charged-today rate needs the distinct acknowledgment too. Read in the
+  // guest's language: the consent snapshot records the text they were shown.
+  const policy = await resolveBookingPolicy(stay.channelId, lines.map((l) => l.rateId), langFromRequest(request, settings));
   const due = dueNow(policy, grandTotal, nights);
 
   // Gift voucher: covers (part of) the amount due today. Re-resolved
