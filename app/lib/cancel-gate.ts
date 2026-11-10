@@ -7,11 +7,14 @@
 // "separately" is how they would come to disagree.
 //
 // Client-safe: routes render from it and their actions gate on it.
-import { bandAt, bandRefund, isPartialBand } from "./cancel-bands";
+import { bandAt, bandRefund, isPartialBand, type CancelAnchor } from "./cancel-bands";
 import type { CancelBand } from "./cancellation";
 import type { BookingRecord } from "./bookings.server";
+import { cancelDeadline } from "./dates";
 
 type Gateable = Pick<BookingRecord, "cancellation" | "payment">;
+/** The guest's gate also needs the arrival date: no policy runs past it. */
+type GateableStay = Gateable & Pick<BookingRecord, "checkin">;
 
 export type CancelGate =
   | {
@@ -26,6 +29,13 @@ export type CancelGate =
       band: CancelBand | null;
     }
   | { canCancel: false; reason: "notAllowed" | "nonRefundable" | "deadline" };
+
+/** Arrival, as the policy itself counts it: the hotel's cut-off time on the
+ *  check-in date — the zero every deadline is measured back from, and the
+ *  moment the last band "runs to". Null when the date is unusable. */
+export function arrivalMs(checkin: string, anchor: CancelAnchor): number | null {
+  return cancelDeadline(checkin, 0, anchor.time, anchor.timezone)?.utcMs ?? null;
+}
 
 /** Money the guest has actually paid us. A guarantee card (`mode: "setup"`)
  *  is not a charge. */
@@ -42,11 +52,22 @@ export function chargedAmount(booking: Gateable): number {
  * once only the last band is left ("contact the hotel", as before). Without
  * one (bookings made before multi-tier shipped) the single deadline decides,
  * exactly as it always did.
+ *
+ * And never after arrival, whatever the snapshot says. A schedule's last band
+ * has no end of its own and "free any time" has no deadline at all, so without
+ * this bound a guest could stay, go home, cancel, and — with auto-refund on —
+ * be paid back for nights they slept in. Past arrival is the hotel's call, the
+ * same "contact the hotel" as a passed deadline. `anchor` is the hotel's clock
+ * (settings.cancelAnchorTime / timezone) and is required so no caller can ask
+ * without it; a booking whose arrival can't be worked out is refused, not
+ * waved through.
  */
-export function cancelGate(booking: Gateable, allowCancel: boolean, nowMs = Date.now()): CancelGate {
+export function cancelGate(booking: GateableStay, allowCancel: boolean, anchor: CancelAnchor, nowMs = Date.now()): CancelGate {
   if (!allowCancel) return { canCancel: false, reason: "notAllowed" };
   const c = booking.cancellation;
   if (c && c.refundable === false) return { canCancel: false, reason: "nonRefundable" };
+  const arrival = arrivalMs(booking.checkin, anchor);
+  if (arrival === null || nowMs > arrival) return { canCancel: false, reason: "deadline" };
   const charged = chargedAmount(booking);
 
   const bands = c?.bands;
