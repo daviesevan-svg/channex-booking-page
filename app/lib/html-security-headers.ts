@@ -62,11 +62,13 @@
 //    abort those payments in Chrome. No frame-src exception: we do not embed
 //    Stripe.js / hosted fields / Viva widgets.
 
+import { routerPath } from "./router-path";
+
 export type FrameAncestors = "none" | "self" | "*";
 
 /** True when `pathname` is `/segment` or `/segment/…` (not `/segment-other`). */
 function atSegment(pathname: string, segment: string): boolean {
-  const path = pathname.toLowerCase();
+  const path = routerPath(pathname);
   return path === `/${segment}` || path.startsWith(`/${segment}/`);
 }
 
