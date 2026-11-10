@@ -2,6 +2,7 @@ import { createCookieSessionStorage, redirect } from "react-router";
 
 import { createGuestMagicToken, verifyGuestMagicToken } from "./auth.server";
 import { getConfig } from "./config.server";
+import { signingKey } from "./signing-keys.server";
 import { type GuestSession, guestLoginDecision, sessionCanSee } from "./guest-session";
 
 export { createGuestMagicToken, verifyGuestMagicToken };
@@ -35,7 +36,7 @@ const COOKIE = "__ibe_guest2"; // renamed from __ibe_guest: every pre-scoping
 // old cookie simply expires.
 
 function guestSessionStorage() {
-  const { sessionSecret, appUrl } = getConfig();
+  const { appUrl } = getConfig();
   return createCookieSessionStorage({
     cookie: {
       name: COOKIE,
@@ -43,7 +44,9 @@ function guestSessionStorage() {
       sameSite: "lax",
       path: "/",
       secure: appUrl.startsWith("https"),
-      secrets: [sessionSecret],
+      // Its own key — see signing-keys.server.ts. With SESSION_SECRET itself a
+      // guest cookie was also a valid ADMIN cookie for the same email.
+      secrets: [signingKey("guest-session")],
       maxAge: 60 * 60 * 24 * 7, // 1 week
     },
   });
