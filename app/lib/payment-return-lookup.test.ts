@@ -106,6 +106,38 @@ for (const provider of providers) {
   });
 }
 
+// iyzico and 2C2P verify the payment with the credentials of the property in the
+// URL. A pending that belongs to a different property must therefore be treated
+// as unknown: otherwise a hotel pays ITSELF under another hotel's reference and
+// that hotel's booking is confirmed as paid.
+describe.each(providers.filter((p) => p.name === "iyzico" || p.name === "2c2p"))(
+  "$name return for another property's reference",
+  (provider) => {
+    it("goes home without verifying, finalizing or touching the pending", async () => {
+      mocks.getPending.mockResolvedValue({ ...pending, pid: "someone-else" });
+      const url = await redirectOf(provider.run);
+      expect(url.pathname).toBe("/hotel-slug");
+      expect(url.search).toBe(""); // the other hotel's cart is not carried over
+      expect(mocks.retrieveCheckoutForm).not.toHaveBeenCalled();
+      expect(mocks.inquireC2pPayment).not.toHaveBeenCalled();
+      expect(mocks.finalizeBooking).not.toHaveBeenCalled();
+      expect(mocks.deletePending).not.toHaveBeenCalled();
+    });
+  },
+);
+
+// Neither gateway is refunded through the API, so a charge that fails the bind
+// is held for the hotel — the guest must not be told it already went back.
+it.each(providers.filter((p) => p.name === "iyzico" || p.name === "2c2p"))(
+  "$name tells the guest a mismatched charge is held, not refunded",
+  async (provider) => {
+    mocks.finalizeBooking.mockRejectedValue(new SessionBindError("amount_mismatch", "The charge does not match the stay."));
+    const url = await redirectOf(provider.run);
+    expect(url.pathname).toBe("/hotel-slug/checkout");
+    expect(url.searchParams.get("notice")).toBe("held");
+  },
+);
+
 it("keeps fail-closed Stripe session binding behavior", async () => {
   mocks.finalizeFromStripeSession.mockRejectedValue(new SessionBindError("unbound_session", "The session belongs to another reference."));
   expect((await redirectOf(providers[0].run)).pathname).toBe("/hotel-slug/checkout");

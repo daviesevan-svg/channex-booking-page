@@ -38,7 +38,12 @@ async function handle(request: Request, params: { channelId?: string }): Promise
 
   const base = basePath(params.channelId);
   const pid = await resolveRequestProperty(params.channelId, request);
-  const pending = await getPending(ref);
+  // The pending must be THIS property's. The payment below is verified with
+  // this property's iyzico credentials, so without the match a hotel could pay
+  // itself under another hotel's reference and confirm that hotel's booking —
+  // "paid", with nothing reaching it. Someone else's reference is no reference.
+  const found = await getPending(ref);
+  const pending = found && found.pid === pid ? found : null;
   const returnParams = new URLSearchParams(pending?.returnParams ?? "");
 
   const outcomeUrl = (rec: BookingRecord) => {
@@ -84,10 +89,12 @@ async function handle(request: Request, params: { channelId?: string }): Promise
     record = await finalizeBooking(pending, payment, pending.origin);
   } catch (e) {
     if (e instanceof SessionBindError) {
-      // The charge doesn't match the stay. Refund it rather than keep it — the
-      // guest must not land on an empty form with their money gone.
+      // The charge doesn't match the stay. iyzico refunds are the hotel's to
+      // make by hand, so the money is flagged for them and the guest is told
+      // plainly — not "refunded", which would be untrue and invite a second
+      // payment.
       await rejectMismatchedIyzicoPayment(iyzico, payment, ref, e);
-      back.set("notice", "refunded");
+      back.set("notice", "held");
       throw redirect(`${base}/checkout?${back.toString()}`);
     }
     throw e;

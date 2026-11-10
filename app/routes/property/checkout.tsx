@@ -304,9 +304,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       : null,
     taxConfig: taxConfigFrom(settings),
     jsonLd,
-    // Set by a gateway return URL when a charge was refused: "refunded" (Viva,
-    // iyzico — the money went back) or "held" (2C2P — no refund API, the hotel
-    // refunds by hand). Fixed tokens only, never guest text.
+    // Set by a gateway return URL when a charge was refused: "refunded" (Viva —
+    // the money went back) or "held" (iyzico, 2C2P — the hotel refunds by hand).
+    // Fixed tokens only, never guest text.
     notice: (["refunded", "held"] as const).find((n) => n === url.searchParams.get("notice")),
   };
 }
