@@ -6,6 +6,7 @@ import { claimSuperadminIfUnclaimed, getUser, isSuperadmin, upsertUser } from ".
 import { brandForUser, getPartner, partnerIdForAdminHost } from "./partners.server";
 import { isOwnHost } from "./domains.server";
 import { timingSafeEqual } from "./hmac.server";
+import { signingKey } from "./signing-keys.server";
 import { tokenAudienceOk } from "./guest-session";
 import {
   generateConnectNonce,
@@ -43,19 +44,17 @@ async function sign(payload: string, secret: string): Promise<string> {
 }
 
 export async function createMagicToken(email: string): Promise<string> {
-  const { sessionSecret } = getConfig();
   // jti makes the link single-use: it's marked consumed in KV on first verify.
   const jti = crypto.randomUUID();
   const payload = toBase64Url(enc(JSON.stringify({ email, exp: Date.now() + TOKEN_TTL_MS, jti })));
-  const sig = await sign(payload, sessionSecret);
+  const sig = await sign(payload, signingKey("magic-link"));
   return `${payload}.${sig}`;
 }
 
 export async function verifyMagicToken(token: string): Promise<string | null> {
-  const { sessionSecret } = getConfig();
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
-  if (!timingSafeEqual(await sign(payload, sessionSecret), sig)) return null;
+  if (!timingSafeEqual(await sign(payload, signingKey("magic-link")), sig)) return null;
   try {
     const { email, exp, jti, aud } = JSON.parse(new TextDecoder().decode(fromBase64Url(payload)));
     if (typeof email !== "string" || typeof exp !== "number" || Date.now() > exp) return null;
@@ -96,22 +95,20 @@ export async function verifyMagicToken(token: string): Promise<string | null> {
  * thing that can say so once the link leaves our hands.
  */
 export async function createGuestMagicToken(email: string, pid: string): Promise<string> {
-  const { sessionSecret } = getConfig();
   const jti = crypto.randomUUID();
   const payload = toBase64Url(
     enc(JSON.stringify({ email, pid, aud: "guest", exp: Date.now() + TOKEN_TTL_MS, jti })),
   );
-  return `${payload}.${await sign(payload, sessionSecret)}`;
+  return `${payload}.${await sign(payload, signingKey("magic-link"))}`;
 }
 
 /** Verify a guest link. Returns the email and the property it was minted for. */
 export async function verifyGuestMagicToken(
   token: string,
 ): Promise<{ email: string; pid: string } | null> {
-  const { sessionSecret } = getConfig();
   const [payload, sig] = token.split(".");
   if (!payload || !sig) return null;
-  if (!timingSafeEqual(await sign(payload, sessionSecret), sig)) return null;
+  if (!timingSafeEqual(await sign(payload, signingKey("magic-link")), sig)) return null;
   try {
     const { email, pid, aud, exp, jti } = JSON.parse(
       new TextDecoder().decode(fromBase64Url(payload)),
@@ -155,7 +152,7 @@ export async function canSignIn(email: string): Promise<boolean> {
 
 // ---------- session ----------
 function sessionStorage() {
-  const { sessionSecret, appUrl } = getConfig();
+  const { appUrl } = getConfig();
   return createCookieSessionStorage({
     cookie: {
       name: "__ibe_admin",
@@ -163,7 +160,9 @@ function sessionStorage() {
       sameSite: "lax",
       path: "/",
       secure: appUrl.startsWith("https"),
-      secrets: [sessionSecret],
+      // Its own key — see signing-keys.server.ts. Never SESSION_SECRET itself:
+      // the guest portal's cookie would then verify here.
+      secrets: [signingKey("admin-session")],
       maxAge: 60 * 60 * 24 * 7, // 1 week
     },
   });
@@ -237,11 +236,14 @@ export async function getAdminEmail(request: Request): Promise<string | null> {
   const storage = sessionStorage();
   const session = await storage.getSession(request.headers.get("Cookie"));
   const email = session.get("email");
-  if (typeof email !== "string") return null;
+  // `partner` is written by createAdminSession and by nothing else ("" on our
+  // own hosts), so it doubles as proof this value was minted as an ADMIN
+  // session. A signed value without it — whatever it is, however it got a
+  // valid signature — is not one, and must not read as "canonical host".
+  const minted = session.get("partner");
+  if (typeof email !== "string" || typeof minted !== "string") return null;
   // Sessions are bound to the door they were minted at (both directions).
-  // Pre-binding sessions carry no claim and read as canonical — exactly what
-  // they were.
-  const mintedFor = (session.get("partner") as string | undefined) || null;
+  const mintedFor = minted || null;
   if (mintedFor !== hostPartnerId) return null;
   return (await canSignInOnHost(email, hostPartnerId)) ? email : null;
 }
