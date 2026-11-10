@@ -30,7 +30,12 @@ async function handle(request: Request, params: { channelId?: string }): Promise
 
   const base = basePath(params.channelId);
   const pid = await resolveRequestProperty(params.channelId, request);
-  const pending = await getPending(ref);
+  // The pending must be THIS property's, as the notify leg already requires
+  // (finalizeFromC2pInvoice). The inquiry below runs on this property's 2C2P
+  // credentials, so without the match a hotel could pay itself under another
+  // hotel's reference and confirm that hotel's booking as paid.
+  const found = await getPending(ref);
+  const pending = found && found.pid === pid ? found : null;
   const returnParams = new URLSearchParams(pending?.returnParams ?? "");
 
   const outcomeUrl = (rec: BookingRecord) => {
