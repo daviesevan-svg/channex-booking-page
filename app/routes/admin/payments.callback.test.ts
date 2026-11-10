@@ -76,6 +76,25 @@ describe("Stripe Connect callback on the canonical host", () => {
     expect(location).not.toContain("ac_test_123");
   });
 
+  // The origin in `state` is whatever the clicked link carried. A host that is
+  // only ours by PATTERN is anyone's: workers.dev subdomains are free to
+  // register, and the authorisation code must not be delivered to one.
+  it.each([
+    ["a workers.dev subdomain", "https://anything.someone.workers.dev"],
+    ["localhost, on a deployment whose own host is not local", "http://localhost:8787"],
+    ["a registered partner host over plain http", "http://admin.zimrly.com"],
+  ])("does not forward to %s", async (_name, origin) => {
+    const { encodeConnectState, generateConnectNonce } = await import("~/lib/stripe-connect-state");
+    const res = await callback(
+      `code=ac_test_123&state=${encodeURIComponent(encodeConnectState(generateConnectNonce(), origin))}`,
+    );
+    expect(res.status).toBeGreaterThanOrEqual(300);
+    expect(res.status).toBeLessThan(400);
+    const location = res.headers.get("location") ?? "";
+    expect(location).not.toContain(new URL(origin).hostname);
+    expect(location).not.toContain("ac_test_123");
+  });
+
   it("handles a bare nonce locally (own-host flow unchanged)", async () => {
     const { generateConnectNonce } = await import("~/lib/stripe-connect-state");
     const res = await callback(`code=ac_test_123&state=${generateConnectNonce()}`);
