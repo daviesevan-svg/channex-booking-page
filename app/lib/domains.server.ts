@@ -94,8 +94,30 @@ export async function liveCustomOrigin(
 export function isOwnHost(host: string): boolean {
   const h = normalizeDomain(host);
   if (!h) return true;
-  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  if (isLocalHost(h)) return true;
   if (h.endsWith(".workers.dev")) return true;
+  return isNamedOwnHost(h);
+}
+
+/** localhost and its subdomains — a developer's machine. */
+export function isLocalHost(host: string): boolean {
+  const h = normalizeDomain(host);
+  return h === "localhost" || h.endsWith(".localhost");
+}
+
+/**
+ * True when `host` is ours BY NAME: the app's hostname, the CNAME target, or an
+ * entry in OWN_HOSTS. No patterns.
+ *
+ * isOwnHost answers "did this request reach us on an address of ours", where
+ * the host is one our Worker is actually routed on — so `*.workers.dev` there
+ * can only be our own preview. It is the wrong question for a hostname that
+ * came out of a URL someone handed us: anyone can register a workers.dev
+ * subdomain. Before sending anything to a host you were told about, ask this.
+ */
+export function isNamedOwnHost(host: string): boolean {
+  const h = normalizeDomain(host);
+  if (!h) return false;
   const config = getConfig();
   const own = new Set<string>();
   try {

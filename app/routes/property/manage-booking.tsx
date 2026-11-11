@@ -50,6 +50,13 @@ async function ownedBooking(pid: string, id: string, request: Request) {
 // (lib/cancel-gate.ts) — shared with the admin's refund field, so the button,
 // the confirmation, the action's re-check and the admin all read one answer.
 
+/** The hotel's clock, as the booking's policy snapshot was resolved against
+ *  (policy.server.ts) — what "arrival" means to the gate. */
+const cancelAnchor = (settings: { cancelAnchorTime?: string; timezone?: string }) => ({
+  time: settings.cancelAnchorTime,
+  timezone: settings.timezone,
+});
+
 export async function loader({ params, request }: Route.LoaderArgs) {
   const base = basePath(params.channelId);
   // :channelId may be a slug — resolve to the real id for data; redirects keep it.
@@ -58,7 +65,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   if (!booking) throw redirect(`${base}/manage`);
 
   const settings = await getSettings(pid);
-  const gate = cancelGate(booking, Boolean(settings.allowCancel));
+  const gate = cancelGate(booking, Boolean(settings.allowCancel), cancelAnchor(settings));
   return {
     booking,
     canCancel: gate.canCancel,
@@ -95,7 +102,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     const active = (booking.lifecycle ?? "active") === "active";
     // The gate is computed HERE, at submit time, from the snapshot — a guest
     // with a stale tab open across a band boundary gets the band they are in.
-    const gate = cancelGate(booking, Boolean(settings.allowCancel));
+    const gate = cancelGate(booking, Boolean(settings.allowCancel), cancelAnchor(settings));
     if (active && gate.canCancel) {
       // Atomic: only the ONE request whose write flips active→cancelled runs
       // the side effects. A concurrent duplicate gets undefined and does
