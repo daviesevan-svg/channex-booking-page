@@ -18,12 +18,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     hasRooms: rooms.length > 0,
     rates: rates.map((r) => {
       const prices = Object.values(r.prices);
+      // 0 = priced from the channel manager (a Channex import), not "free" —
+      // the "from" figure only counts real base prices.
+      const based = prices.filter((p) => p > 0);
       return {
         id: r.id,
         title: r.title,
         mealPlan: r.mealPlan,
         roomCount: prices.length,
-        fromPrice: prices.length ? Math.min(...prices) : null,
+        fromPrice: based.length ? Math.min(...based) : null,
+        channelPriced: prices.length > 0 && based.length === 0,
         active: r.active,
       };
     }),
@@ -104,7 +108,11 @@ export default function AdminRates({ loaderData }: Route.ComponentProps) {
               </div>
               <div className="flex flex-none items-center gap-4">
                 <span className="font-semibold">
-                  {rate.fromPrice == null ? "—" : t("rtFromPerNight", { price: rate.fromPrice.toFixed(2) })}
+                  {rate.fromPrice != null
+                    ? t("rtFromPerNight", { price: rate.fromPrice.toFixed(2) })
+                    : rate.channelPriced
+                      ? t("rtPriceFromChannel")
+                      : "—"}
                 </span>
                 <span className="text-[13px] font-semibold text-accent">{t("rtEdit")}</span>
               </div>

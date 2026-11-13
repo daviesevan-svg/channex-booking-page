@@ -394,7 +394,7 @@ const rateBodyProps = {
   active: { type: "boolean" },
   min_advance_days: { type: ["integer", "null"], minimum: 0, description: "Early Bird: only sold for arrivals at least this many days away. null clears it." },
   max_advance_days: { type: ["integer", "null"], minimum: 0, description: "Last Minute: only sold for arrivals at most this many days away (0 = same day only). null clears it. Must be ≥ min_advance_days." },
-  prices: { type: "object", description: "room_id → base nightly price (> 0). A rate is offered on a room only when it has a price here. NOT date-level ARI prices — those come from the channel manager." },
+  prices: { type: "object", description: "room_id → base nightly price (≥ 0). A rate is offered on a room only when it has a price here; 0 means no base price, so the room sells only on nights the channel manager has priced. NOT date-level ARI prices — those come from the channel manager." },
   occupancy_pricing: occupancyPricingSchema,
   occupancy_pricing_by_room: { type: ["object", "null"], description: "room_id → occupancy-pricing override (same shape as occupancy_pricing)." },
   policy: ratePolicySchema,

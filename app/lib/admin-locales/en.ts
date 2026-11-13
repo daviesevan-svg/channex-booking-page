@@ -1453,6 +1453,8 @@ const EN: Record<string, string> = {
   rtOptional: "(optional)",
   rtMealPlanPlaceholder: "Breakfast included",
   rtPricesTitle: "Nightly price per room",
+  rtPricesZeroNote: "Enter 0 to sell a room at the nightly prices from your channel manager.",
+  rtPriceFromChannel: "Price from your channel manager",
   rtPricesIntro: "This rate applies to every room you price below — leave a room blank to not offer it there. Occupancy is taken from each room’s settings. Prices in your property currency.",
   rtPricesIntroPerPerson: "This rate applies to every room you price below — leave a room blank to not offer it there. Prices are PER ADULT per night, in your property currency.",
   rtPricingModeNote: "Per-room vs per-person pricing is one setting for the whole property, on",

@@ -26,6 +26,7 @@ import { MAX_CANCEL_TIERS, validateTiers } from "~/lib/cancel-bands";
 import { DEFAULT_CANCEL_ANCHOR } from "~/lib/dates";
 import { parseAdvanceDays, validateAdvanceWindow } from "~/lib/advance-window";
 import { getSettings } from "~/lib/overrides.server";
+import { parseRoomPrices } from "~/lib/rate-prices";
 
 /** Build the structured policy from form field getters — shared by the save
  *  action and the editor's live preview. Disabled inputs simply read as "". */
@@ -162,16 +163,11 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (onDefault && !title) return { error: "Enter a rate name." };
 
   // One price per room — a room is offered this rate only when it has a price.
-  const prices: Record<string, number> = {};
+  // 0 = priced from the channel manager (what a Channex import stores).
   const rooms = await getRooms(propertyId);
-  for (const room of rooms) {
-    const raw = form.get(`price:${room.id}`);
-    if (raw == null || String(raw).trim() === "") continue;
-    const p = Math.round(Number(raw) * 100) / 100;
-    if (Number.isFinite(p) && p > 0) prices[room.id] = p;
-  }
+  const prices = parseRoomPrices((n) => form.get(n), rooms.map((r) => r.id));
   if (Object.keys(prices).length === 0) {
-    return { error: "Enter a nightly price for at least one room." };
+    return { error: "Enter a nightly price for at least one room — or 0 to use the prices from your channel manager." };
   }
 
   const posInt = (v: FormDataEntryValue | null) => {
@@ -441,6 +437,7 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
           <div className="mb-1 font-serif text-[17px] font-semibold">{t("rtPricesTitle")}</div>
           <p className="mb-3 text-[13px] text-muted">
             {perPerson ? t("rtPricesIntroPerPerson") : t("rtPricesIntro")}{" "}
+            {t("rtPricesZeroNote")}{" "}
             {t("rtPricingModeNote")}{" "}
             <Link to="/admin/general" className="font-semibold text-accent hover:underline">
               {t("navGeneral")}
@@ -455,7 +452,12 @@ export default function AdminRate({ loaderData, actionData }: Route.ComponentPro
                   i > 0 ? "border-t border-divider" : ""
                 }`}
               >
-                <span className="text-[14px] font-semibold text-secondary">{r.title}</span>
+                <span className="text-[14px] font-semibold text-secondary">
+                  {r.title}
+                  {rate?.prices[r.id] === 0 && (
+                    <span className="block text-[12px] font-normal text-muted">{t("rtPriceFromChannel")}</span>
+                  )}
+                </span>
                 <input
                   name={`price:${r.id}`}
                   type="number"

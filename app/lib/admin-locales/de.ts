@@ -1450,6 +1450,8 @@ const DE: Record<string, string> = {
   rtOptional: "(optional)",
   rtMealPlanPlaceholder: "Frühstück inklusive",
   rtPricesTitle: "Übernachtungspreis pro Zimmer",
+  rtPricesZeroNote: "Geben Sie 0 ein, um ein Zimmer zu den Übernachtungspreisen aus Ihrem Channel Manager zu verkaufen.",
+  rtPriceFromChannel: "Preis aus Ihrem Channel Manager",
   rtPricesIntro: "Diese Rate gilt für jedes Zimmer, das Sie unten bepreisen — lassen Sie ein Zimmer leer, um sie dort nicht anzubieten. Die Belegung ergibt sich aus den Einstellungen des jeweiligen Zimmers. Preise in Ihrer Unterkunftswährung.",
   rtPricesIntroPerPerson: "Diese Rate gilt für jedes Zimmer, das Sie unten bepreisen — lassen Sie ein Zimmer leer, um sie dort nicht anzubieten. Die Preise gelten PRO ERWACHSENEM pro Nacht, in Ihrer Unterkunftswährung.",
   rtPricingModeNote: "Ob pro Zimmer oder pro Person bepreist wird, ist eine Einstellung für die gesamte Unterkunft, unter",

@@ -186,7 +186,7 @@ export const manageSchemas = {
   ManageRateInput: {
     type: "object",
     description:
-      "Rate-plan write payload. POST requires title, prices and policy (no implicit default policy). `prices` maps room_id → base nightly price > 0 — NOT date-level ARI. `channex_rate_ids` is server-owned and rejected if sent.",
+      "Rate-plan write payload. POST requires title, prices and policy (no implicit default policy). `prices` maps room_id → base nightly price ≥ 0 — NOT date-level ARI. 0 offers the room with no base price, so it sells only on nights the channel manager has priced (what a Channex import stores). `channex_rate_ids` is server-owned and rejected if sent.",
     properties: {
       id: { type: "string", description: "PUT-list items only: keep a stable id to preserve the Channex mapping. Ignored on POST." },
       title: { type: "string" },
@@ -194,7 +194,7 @@ export const manageSchemas = {
       active: { type: "boolean" },
       min_advance_days: { type: ["integer", "null"], minimum: 0, description: "Early Bird: only sold for arrivals at least this many days away. null clears it." },
       max_advance_days: { type: ["integer", "null"], minimum: 0, description: "Last Minute: only sold for arrivals at most this many days away (0 = same day only). null clears it. Must be ≥ min_advance_days." },
-      prices: { type: "object", additionalProperties: { type: "number", exclusiveMinimum: 0 } },
+      prices: { type: "object", additionalProperties: { type: "number", minimum: 0 } },
       occupancy_pricing: { type: ["object", "null"] },
       occupancy_pricing_by_room: { type: ["object", "null"] },
       policy: {
