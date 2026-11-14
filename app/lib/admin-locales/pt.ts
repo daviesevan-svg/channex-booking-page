@@ -1446,6 +1446,8 @@ const PT: Record<string, string> = {
   rtOptional: "(opcional)",
   rtMealPlanPlaceholder: "Pequeno-almoço incluído",
   rtPricesTitle: "Preço por noite por quarto",
+  rtPricesZeroNote: "Introduza 0 para vender um quarto aos preços por noite do seu channel manager.",
+  rtPriceFromChannel: "Preço do seu channel manager",
   rtPricesIntro: "Esta tarifa aplica-se a todos os quartos a que der preço abaixo — deixe um quarto em branco para não a oferecer nele. A ocupação é retirada das definições de cada quarto. Preços na moeda da sua propriedade.",
   rtPricesIntroPerPerson: "Esta tarifa aplica-se a todos os quartos a que der preço abaixo — deixe um quarto em branco para não a oferecer nele. Os preços são POR ADULTO por noite, na moeda da sua propriedade.",
   rtPricingModeNote: "Cobrar por quarto ou por pessoa é uma definição única para toda a propriedade, em",

@@ -1491,6 +1491,8 @@ const TR: Record<string, string> = {
   rtOptional: "(isteğe bağlı)",
   rtMealPlanPlaceholder: "Kahvaltı dâhil",
   rtPricesTitle: "Oda başına gecelik fiyat",
+  rtPricesZeroNote: "Bir odayı kanal yöneticinizden gelen gecelik fiyatlarla satmak için 0 girin.",
+  rtPriceFromChannel: "Fiyat kanal yöneticinizden",
   rtPricesIntro:
     "Bu plan, aşağıda fiyat verdiğiniz her oda için geçerlidir — o odada sunmamak için boş bırakın. Kapasite her odanın kendi ayarlarından alınır. Fiyatlar tesis para biriminizdedir.",
   rtPricesIntroPerPerson:

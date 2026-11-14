@@ -334,7 +334,9 @@ export function validateRateInput(body: unknown, opts: { create: boolean; roomId
       const map: Record<string, number> = {};
       for (const [roomId, price] of Object.entries(prices)) {
         if (!opts.roomIds.has(roomId)) ctx.fail("prices", `Unknown room id "${roomId}".`);
-        else if (typeof price !== "number" || !Number.isFinite(price) || price <= 0) ctx.fail("prices", `Price for "${roomId}" must be a number > 0.`);
+        // 0 = offered, priced only from ARI (what a Channex import stores) —
+        // a night with no ARI price stays closed, so 0 never sells free.
+        else if (typeof price !== "number" || !Number.isFinite(price) || price < 0) ctx.fail("prices", `Price for "${roomId}" must be a number ≥ 0 (0 = priced only by the channel manager).`);
         else map[roomId] = price;
       }
       if (!ctx.failed && Object.keys(map).length === 0) ctx.fail("prices", "At least one room price is required — a rate with no prices is offered nowhere.");
