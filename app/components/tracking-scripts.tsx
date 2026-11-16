@@ -24,7 +24,7 @@
 // not storage, and both GTM and gtag replay what they find in it when they
 // load. So a guest who accepts on the checkout page still reports the steps
 // they took before accepting, and a guest who declines has had nothing sent.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ConsentBanner, type ConsentDecision } from "~/components/consent-banner";
 import { ATTRIBUTION_COOKIE, ATTRIBUTION_MAX_AGE_SEC, serializeAttribution } from "~/lib/attribution";
@@ -204,7 +204,17 @@ export function TrackingRoot({
   // the tags only once something is granted. Both run in the same effect so the
   // ordering can't drift: a `consent default` pushed after gtag.js has already
   // initialised is a default that arrives too late to mean anything.
-  useEffect(() => {
+  //
+  // A LAYOUT effect, and that is load-bearing. React runs a child's effects
+  // before its parent's, and every event in the guest tree (pageviews, funnel
+  // steps, the purchase and its Ads conversion) is pushed from a passive effect
+  // in a child. As a passive effect here, a fresh document — which the
+  // confirmation page always is, checkout ends in redirectDocument — pushed the
+  // conversion while window.gtag did not exist yet, so `gtag?.()` dropped it,
+  // the dedupe key was already set, and no hotel ever received one. Layout
+  // effects all run before any passive one, so the shim, the consent default
+  // and the `config` for each destination are in the queue first.
+  useLayoutEffect(() => {
     if (!tagged) return;
     const gtag = ensureDataLayer();
     gtag("consent", done.current.size ? "update" : "default", consentModeSignals(granted));

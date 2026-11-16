@@ -50,35 +50,44 @@ export function PageViews() {
 export function TrackEvent({ event, dedupeKey }: { event: TrackingEvent | null; dedupeKey: string }) {
   const consent = useConsent();
   const adsGranted = consent.ads;
+
   useEffect(() => {
-    if (!event) return;
-    let already = false;
-    try {
-      already = sessionStorage.getItem(dedupeKey) === "1";
-      sessionStorage.setItem(dedupeKey, "1");
-    } catch {
-      // Private mode, or storage blocked. Sending a duplicate is a smaller
-      // error than sending nothing, so carry on.
-    }
-    if (already) return;
-
+    if (!event || !claimOnce(dedupeKey)) return;
     push(event.event, event.params);
+  }, [event, dedupeKey]);
 
-    // The Google Ads conversion is a separate send_to, and it is gated on LIVE
-    // consent rather than on what the server believed when it rendered: a guest
-    // can have refused advertising a second ago. Pushing it regardless would
-    // leave it queued in the dataLayer, and gtag would fire it the moment it
-    // loaded for analytics — an ads ping for a guest who declined ads.
-    if (event.adsConversion && adsGranted) {
-      window.gtag?.("event", "conversion", {
-        send_to: event.adsConversion.sendTo,
-        value: event.adsConversion.value,
-        currency: event.adsConversion.currency,
-        transaction_id: event.adsConversion.transactionId,
-      });
-    }
+  // The Google Ads conversion is a separate send_to, and it is gated on LIVE
+  // consent rather than on what the server believed when it rendered: a guest
+  // can have refused advertising a second ago. Pushing it regardless would
+  // leave it queued in the dataLayer, and gtag would fire it the moment it
+  // loaded for analytics — an ads ping for a guest who declined ads.
+  //
+  // Its own once-key, claimed only when it actually goes out. Sharing the
+  // purchase's key meant a guest who accepted the banner ON the confirmation
+  // page found the booking already "reported" and the conversion never sent.
+  useEffect(() => {
+    if (!event?.adsConversion || !adsGranted || !claimOnce(`${dedupeKey}_ads`)) return;
+    window.gtag?.("event", "conversion", {
+      send_to: event.adsConversion.sendTo,
+      value: event.adsConversion.value,
+      currency: event.adsConversion.currency,
+      transaction_id: event.adsConversion.transactionId,
+    });
   }, [event, dedupeKey, adsGranted]);
   return null;
+}
+
+/** True the first time a key is seen in this tab. Private mode or blocked
+ *  storage answers true: sending a duplicate is a smaller error than sending
+ *  nothing — and Google Ads drops the duplicate by transaction_id anyway. */
+function claimOnce(key: string): boolean {
+  try {
+    if (sessionStorage.getItem(key) === "1") return false;
+    sessionStorage.setItem(key, "1");
+  } catch {
+    // fall through
+  }
+  return true;
 }
 
 /**
