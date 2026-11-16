@@ -44,7 +44,11 @@ const rateOccTotal = (r: RatePlan) =>
 /** Channex `withVirtualRatePlans` returns one rate plan per occupancy level.
  *  Collapse them to a single variant per distinct rate product, choosing the
  *  occupancy that best fits the searched party (largest that doesn't exceed it,
- *  else the smallest). This dedupes the UI and prices for the actual party. */
+ *  else the smallest). This dedupes the UI and prices for the actual party.
+ *
+ *  Returned cheapest first (stay total for the searched party): the room page
+ *  lists rates in this order and pre-selects the first. Equal prices keep the
+ *  admin's order (Array.prototype.sort is stable). */
 export function ratePlansForParty(room: RoomWithRates, party: number): RatePlan[] {
   const groups = new Map<string, RatePlan[]>();
   for (const rp of room.ratePlans) {
@@ -57,8 +61,14 @@ export function ratePlansForParty(room: RoomWithRates, party: number): RatePlan[
     const sorted = [...variants].sort((a, b) => rateOccTotal(a) - rateOccTotal(b));
     const fitting = sorted.filter((r) => rateOccTotal(r) <= Math.max(party, 1));
     return fitting.length ? fitting[fitting.length - 1] : sorted[0];
-  });
+  }).sort((a, b) => stayTotal(a) - stayTotal(b));
 }
+
+/** A rate's stay total as a number; an unparseable price sorts last. */
+const stayTotal = (r: RatePlan) => {
+  const n = Number(r.totalPrice);
+  return Number.isFinite(n) ? n : Infinity;
+};
 
 /** Product ceiling for URL-supplied adults. Guest UI tops out at 12; this is
  *  the server clamp so a crafted `?adults=` can't self-DoS or mint absurd
