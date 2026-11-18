@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "Ihre Buchung bei {hotel_name} ist bestätigt ({reference})",
+    "heading": "Ihre Buchung steht, {guest_first_name}!",
+    "intro": "Danke, dass Sie direkt bei {hotel_name} gebucht haben. Hier sind die Details Ihres Aufenthalts — wir freuen uns darauf, Sie willkommen zu heißen.",
+    "outro": "Möchten Sie etwas ändern? Nutzen Sie jederzeit die Schaltfläche „Buchung verwalten“ oben. Bis bald!"
+  },
+  "booking_cancellation": {
+    "subject": "Ihre Buchung bei {hotel_name} wurde storniert ({reference})",
+    "heading": "Ihre Buchung ist storniert",
+    "intro": "Wir haben Ihre Buchung bei {hotel_name} storniert, {guest_first_name}. Die Details der stornierten Reservierung finden Sie unten.",
+    "outro": "Falls Sie das nicht veranlasst haben, kontaktieren Sie uns bitte umgehend."
+  },
+  "booking_failed": {
+    "subject": "Wir konnten Ihre Buchung bei {hotel_name} nicht bestätigen ({reference})",
+    "heading": "Es tut uns leid, {guest_first_name} — wir konnten Ihre Buchung nicht bestätigen",
+    "intro": "Leider war das Zimmer ausverkauft, bevor Ihre Zahlung abgeschlossen war, sodass wir Ihren Aufenthalt bei {hotel_name} nicht bestätigen konnten. Wir haben {refund_amount} vollständig auf Ihre Karte erstattet — es kann einige Tage dauern, bis der Betrag erscheint.",
+    "outro": "Die Enttäuschung tut uns leid. Versuchen Sie es gern mit anderen Daten — und melden Sie sich, wenn wir helfen können."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "Wir konnten Ihre Buchung bei {hotel_name} nicht bestätigen ({reference})",
+    "heading": "Es tut uns leid, {guest_first_name} — wir konnten Ihre Buchung nicht bestätigen",
+    "intro": "Leider war das Zimmer ausverkauft, bevor Ihre Zahlung abgeschlossen war, sodass wir Ihren Aufenthalt bei {hotel_name} nicht bestätigen konnten. Ihnen steht eine vollständige Erstattung von {refund_amount} zu: Das Hotel erstattet den Betrag auf Ihre Karte, danach kann es einige Tage dauern, bis er erscheint.",
+    "outro": "Die Enttäuschung tut uns leid. Falls die Erstattung nicht innerhalb einer Woche bei Ihnen eingeht, antworten Sie einfach auf diese E-Mail."
+  },
+  "review_request": {
+    "subject": "Wie war Ihr Aufenthalt bei {hotel_name}?",
+    "subject2": "Eine Minute, um Ihren Aufenthalt zu bewerten, {guest_first_name}?",
+    "subject3": "Letzte Gelegenheit, {hotel_name} zu bewerten",
+    "heading": "Wie war Ihr Aufenthalt, {guest_first_name}?",
+    "intro": "Danke für Ihren Aufenthalt bei {hotel_name}. Wir würden gern erfahren, wie es war — Ihr Feedback hilft uns, besser zu werden, und künftigen Gästen bei der Wahl.\n\nEs dauert nur eine Minute — tippen Sie einfach unten auf einen Stern, um zu beginnen."
+  }
+}

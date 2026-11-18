@@ -1,0 +1,47 @@
+{
+  "label": "Português",
+  "flag": "🇵🇹",
+  "search": {
+    "heading": "Reserve a sua estadia",
+    "intro": "Consulte a disponibilidade em tempo real e reserve a sua estadia diretamente connosco.",
+    "promoText": "Adicionar um código promocional ou empresarial",
+    "searchButton": "Procurar quartos"
+  },
+  "pages": {
+    "results": {
+      "heading": "Escolha os seus quartos",
+      "editSearch": "Editar pesquisa",
+      "cartTitle": "A sua estadia",
+      "continueButton": "Continuar para os detalhes"
+    },
+    "detail": {
+      "backLink": "Todos os quartos",
+      "amenitiesTitle": "Neste quarto",
+      "rateTitle": "Escolha a sua tarifa",
+      "addButton": "Adicionar à estadia"
+    },
+    "checkout": {
+      "heading": "Os seus dados",
+      "guestSection": "Informações do hóspede",
+      "arrivalSection": "Chegada e pedidos",
+      "requestsPlaceholder": "Quarto tranquilo, entrada antecipada, tudo o que devamos saber…",
+      "paymentSection": "Pagamento",
+      "paymentNote": "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.",
+      "completeButton": "Concluir reserva"
+    },
+    "extras": {
+      "heading": "Melhore o seu {room}",
+      "intro": "Extras opcionais para tornar a sua estadia especial.",
+      "stayTitle": "Para toda a sua estadia",
+      "summaryLabel": "Extras",
+      "continueButton": "Continuar",
+      "skipButton": "Ignorar por agora"
+    },
+    "confirmation": {
+      "heading": "Está tudo pronto",
+      "subtitle": "A sua estadia no {hotel} está confirmada. Um e-mail de confirmação está a caminho.",
+      "newBooking": "Fazer outra reserva"
+    }
+  },
+  "euOrderButton": "Reservar com obrigação de pagamento"
+}

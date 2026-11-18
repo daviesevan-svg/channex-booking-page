@@ -1,0 +1,47 @@
+{
+  "label": "Čeština",
+  "flag": "🇨🇿",
+  "search": {
+    "heading": "Rezervujte si pobyt",
+    "intro": "Ověřte si aktuální dostupnost a rezervujte pobyt přímo u nás.",
+    "promoText": "Přidat promo nebo firemní kód",
+    "searchButton": "Hledat pokoje"
+  },
+  "pages": {
+    "results": {
+      "heading": "Vyberte si pokoje",
+      "editSearch": "Upravit vyhledávání",
+      "cartTitle": "Váš pobyt",
+      "continueButton": "Pokračovat k údajům"
+    },
+    "detail": {
+      "backLink": "Všechny pokoje",
+      "amenitiesTitle": "V tomto pokoji",
+      "rateTitle": "Vyberte cenu",
+      "addButton": "Přidat k pobytu"
+    },
+    "checkout": {
+      "heading": "Vaše údaje",
+      "guestSection": "Údaje o hostovi",
+      "arrivalSection": "Příjezd a požadavky",
+      "requestsPlaceholder": "Tichý pokoj, dřívější příjezd, cokoli, co bychom měli vědět…",
+      "paymentSection": "Platba",
+      "paymentNote": "Flexibilní cenu zaplatíte na místě. Kartu potřebujeme pouze jako záruku rezervace — dnes vám nic nestrhneme.",
+      "completeButton": "Dokončit rezervaci"
+    },
+    "extras": {
+      "heading": "Vylepšete si pokoj: {room}",
+      "intro": "Volitelné doplňky, které váš pobyt udělají výjimečným.",
+      "stayTitle": "Na celý pobyt",
+      "summaryLabel": "Doplňky",
+      "continueButton": "Pokračovat",
+      "skipButton": "Teď přeskočit"
+    },
+    "confirmation": {
+      "heading": "Vše je hotovo",
+      "subtitle": "Váš pobyt v ubytování {hotel} je potvrzen. Potvrzovací e-mail je na cestě.",
+      "newBooking": "Vytvořit další rezervaci"
+    }
+  },
+  "euOrderButton": "Rezervovat s povinností platby"
+}

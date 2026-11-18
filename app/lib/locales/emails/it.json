@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "La tua prenotazione presso {hotel_name} è confermata ({reference})",
+    "heading": "Prenotazione fatta, {guest_first_name}!",
+    "intro": "Grazie per aver prenotato direttamente con {hotel_name}. Ecco i dettagli del tuo soggiorno — non vediamo l'ora di darti il benvenuto.",
+    "outro": "Devi modificare qualcosa? Usa in qualsiasi momento il pulsante «Gestisci prenotazione» qui sopra. A presto!"
+  },
+  "booking_cancellation": {
+    "subject": "La tua prenotazione presso {hotel_name} è stata cancellata ({reference})",
+    "heading": "La tua prenotazione è cancellata",
+    "intro": "Abbiamo cancellato la tua prenotazione presso {hotel_name}, {guest_first_name}. Qui sotto trovi i dettagli della prenotazione cancellata.",
+    "outro": "Se non l'hai richiesto tu, contattaci subito."
+  },
+  "booking_failed": {
+    "subject": "Non siamo riusciti a confermare la tua prenotazione presso {hotel_name} ({reference})",
+    "heading": "Ci dispiace, {guest_first_name} — non siamo riusciti a confermare la tua prenotazione",
+    "intro": "Purtroppo la camera è andata esaurita prima che il pagamento fosse completato, quindi non abbiamo potuto confermare il tuo soggiorno presso {hotel_name}. Ti abbiamo rimborsato integralmente {refund_amount} sulla carta — potrebbero volerci alcuni giorni.",
+    "outro": "Ci dispiace per la delusione. Prova con altre date e scrivici se possiamo aiutarti."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "Non siamo riusciti a confermare la tua prenotazione presso {hotel_name} ({reference})",
+    "heading": "Ci dispiace, {guest_first_name} — non siamo riusciti a confermare la tua prenotazione",
+    "intro": "Purtroppo la camera è andata esaurita prima che il pagamento fosse completato, quindi non abbiamo potuto confermare il tuo soggiorno presso {hotel_name}. Ti spetta il rimborso integrale di {refund_amount}: l'hotel lo riaccrediterà sulla tua carta, e poi potrebbero volerci alcuni giorni perché compaia.",
+    "outro": "Ci dispiace per la delusione. Se il rimborso non ti è arrivato entro una settimana, rispondi pure a questa email."
+  },
+  "review_request": {
+    "subject": "Com'è andato il tuo soggiorno presso {hotel_name}?",
+    "subject2": "Un minuto per valutare il tuo soggiorno, {guest_first_name}?",
+    "subject3": "Ultima occasione per recensire il tuo soggiorno presso {hotel_name}",
+    "heading": "Com'è andato il tuo soggiorno, {guest_first_name}?",
+    "intro": "Grazie per aver soggiornato presso {hotel_name}. Ci piacerebbe sapere com'è andata — il tuo feedback ci aiuta a migliorare e aiuta i futuri ospiti a scegliere.\n\nBasta un minuto — tocca una stella qui sotto per iniziare."
+  }
+}

@@ -20,6 +20,8 @@
 // page, ISO 3166-1 alpha-2, also feeding the Google feeds. Unset means we can't
 // tell, so nothing changes and the Legal block on the General page says so.
 
+import { LOCALE_COPY } from "./locales/copy";
+
 /** EU 27 + the three EEA states that took the Consumer Rights Directive on. */
 const EU_EEA = new Set([
   "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU",
@@ -37,23 +39,13 @@ export function isEuConsumerCountry(code: string | undefined): boolean {
  * Deliberately blunt in every language — the test is whether the guest can
  * misread the button as anything other than "this costs money", so the clumsy
  * phrasing is the point and must survive a copy pass.
+ * English here; every other language in app/lib/locales/copy/<lang>.json
+ * (`euOrderButton`).
  */
-const PAY_BUTTON: Record<string, string> = {
-  en: "Book with obligation to pay",
-  de: "Zahlungspflichtig buchen",
-  fr: "Réserver avec obligation de paiement",
-  es: "Reservar con obligación de pago",
-  it: "Prenota con obbligo di pagamento",
-  pt: "Reservar com obrigação de pagamento",
-  nl: "Reserveren met betalingsverplichting",
-  el: "Κράτηση με υποχρέωση πληρωμής",
-  th: "จองโดยมีภาระผูกพันในการชำระเงิน",
-  tr: "Ödeme yükümlülüğüyle rezervasyon yap",
-  mk: "Резервирај со обврска за плаќање",
-};
+const PAY_BUTTON_EN = "Book with obligation to pay";
 
 export function payButtonLabel(lang: string): string {
-  return PAY_BUTTON[lang] ?? PAY_BUTTON.en;
+  return LOCALE_COPY[lang]?.euOrderButton ?? PAY_BUTTON_EN;
 }
 
 /**

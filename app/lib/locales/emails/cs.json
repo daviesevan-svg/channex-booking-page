@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "Vaše rezervace v ubytování {hotel_name} je potvrzena ({reference})",
+    "heading": "Rezervace na jméno {guest_first_name} je potvrzena!",
+    "intro": "Děkujeme, že jste si pobyt v ubytování {hotel_name} rezervovali přímo u nás. Níže najdete podrobnosti o Vašem pobytu — už se na Vás moc těšíme.",
+    "outro": "Potřebujete něco změnit? Kdykoli použijte tlačítko „Spravovat rezervaci“ výše. Brzy na viděnou!"
+  },
+  "booking_cancellation": {
+    "subject": "Vaše rezervace v ubytování {hotel_name} byla zrušena ({reference})",
+    "heading": "Vaše rezervace je zrušena",
+    "intro": "Zrušili jsme Vaši rezervaci na jméno {guest_first_name} v ubytování {hotel_name}. Podrobnosti o zrušené rezervaci najdete níže.",
+    "outro": "Pokud jste o zrušení nežádali, kontaktujte nás prosím co nejdříve."
+  },
+  "booking_failed": {
+    "subject": "Vaši rezervaci v ubytování {hotel_name} se nepodařilo potvrdit ({reference})",
+    "heading": "Omlouváme se — rezervaci na jméno {guest_first_name} se nepodařilo potvrdit",
+    "intro": "Bohužel byl pokoj vyprodán dříve, než se dokončila Vaše platba, a proto jsme Váš pobyt v ubytování {hotel_name} nemohli potvrdit. Celou částku {refund_amount} jsme Vám vrátili na kartu — připsání může trvat několik dní.",
+    "outro": "Mrzí nás, že to nevyšlo. Zkuste prosím jiný termín a neváhejte se na nás obrátit, pokud Vám můžeme pomoci."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "Vaši rezervaci v ubytování {hotel_name} se nepodařilo potvrdit ({reference})",
+    "heading": "Omlouváme se — rezervaci na jméno {guest_first_name} se nepodařilo potvrdit",
+    "intro": "Bohužel byl pokoj vyprodán dříve, než se dokončila Vaše platba, a proto jsme Váš pobyt v ubytování {hotel_name} nemohli potvrdit. Máte nárok na vrácení celé částky {refund_amount}: ubytování Vám ji pošle zpět na kartu a poté může připsání trvat několik dní.",
+    "outro": "Mrzí nás, že to nevyšlo. Pokud Vám peníze do týdne nepřijdou, stačí odpovědět na tento e-mail."
+  },
+  "review_request": {
+    "subject": "Jak se Vám líbilo v ubytování {hotel_name}?",
+    "subject2": "Máte minutku na hodnocení pobytu na jméno {guest_first_name}?",
+    "subject3": "Poslední příležitost ohodnotit Váš pobyt v ubytování {hotel_name}",
+    "heading": "Jak se Vám líbil pobyt na jméno {guest_first_name}?",
+    "intro": "Děkujeme za Váš pobyt v ubytování {hotel_name}. Rádi bychom slyšeli, jak jste byli spokojeni — Vaše hodnocení nám pomáhá se zlepšovat a budoucím hostům s výběrem.\n\nZabere to jen minutu — stačí níže klepnout na hvězdičku."
+  }
+}

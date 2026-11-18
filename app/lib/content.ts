@@ -2,6 +2,7 @@
 // the admin editor so defaults stay in one place.
 
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
+import { LOCALE_COPY } from "./locales/copy";
 import type { GoogleAdsLinkRecord } from "./google-ari/account-link";
 
 export interface Highlight {
@@ -539,19 +540,12 @@ export const isDeadlineUnit = (v: string): v is DeadlineUnit => v === "hours" ||
 // Supported content languages for the booking pages. `label` is the endonym
 // (the language's name in itself); `flag` is a representative country flag emoji
 // (a pragmatic convention — a language isn't a country, but it reads instantly).
-export const LANGUAGES = [
+export const LANGUAGES: readonly { code: string; label: string; flag: string }[] = [
   { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "fr", label: "Français", flag: "🇫🇷" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
-  { code: "es", label: "Español", flag: "🇪🇸" },
-  { code: "it", label: "Italiano", flag: "🇮🇹" },
-  { code: "pt", label: "Português", flag: "🇵🇹" },
-  { code: "nl", label: "Nederlands", flag: "🇳🇱" },
-  { code: "el", label: "Ελληνικά", flag: "🇬🇷" },
-  { code: "th", label: "ไทย", flag: "🇹🇭" },
-  { code: "tr", label: "Türkçe", flag: "🇹🇷" },
-  { code: "mk", label: "Македонски", flag: "🇲🇰" },
-] as const;
+  // Every other language is a data file — app/lib/locales/copy/<lang>.json,
+  // written by `npm run i18n:import` (scripts/i18n.mjs).
+  ...Object.entries(LOCALE_COPY).map(([code, c]) => ({ code, label: c.label, flag: c.flag })),
+];
 
 /**
  * The BASE language: where a hotel's copy is written, the admin editor's first
@@ -671,145 +665,11 @@ export const DEFAULT_SEARCH = {
 // Machine-quality baseline — each hotel can refine it in the admin.
 type SearchDefaults = typeof DEFAULT_SEARCH;
 
-const SEARCH_TRANSLATIONS: Record<string, SearchDefaults> = {
-  fr: {
-    heading: "Réservez votre séjour",
-    intro: "Consultez les disponibilités en temps réel et réservez votre séjour directement auprès de nous.",
-    promoText: "Ajouter un code promo ou entreprise",
-    searchButton: "Rechercher",
-    highlights: [],
-  },
-  de: {
-    heading: "Reservieren Sie Ihren Aufenthalt",
-    intro: "Prüfen Sie die aktuelle Verfügbarkeit und buchen Sie Ihren Aufenthalt direkt bei uns.",
-    promoText: "Promo- oder Firmencode hinzufügen",
-    searchButton: "Zimmer suchen",
-    highlights: [],
-  },
-  es: {
-    heading: "Reserve su estancia",
-    intro: "Consulte la disponibilidad en tiempo real y reserve su estancia directamente con nosotros.",
-    promoText: "Añadir un código promocional o corporativo",
-    searchButton: "Buscar habitaciones",
-    highlights: [],
-  },
-  it: {
-    heading: "Prenota il tuo soggiorno",
-    intro: "Verifica la disponibilità in tempo reale e prenota il tuo soggiorno direttamente con noi.",
-    promoText: "Aggiungi un codice promozionale o aziendale",
-    searchButton: "Cerca camere",
-    highlights: [],
-  },
-  pt: {
-    heading: "Reserve a sua estadia",
-    intro: "Consulte a disponibilidade em tempo real e reserve a sua estadia diretamente connosco.",
-    promoText: "Adicionar um código promocional ou empresarial",
-    searchButton: "Procurar quartos",
-    highlights: [],
-  },
-  nl: {
-    heading: "Reserveer uw verblijf",
-    intro: "Bekijk de actuele beschikbaarheid en boek uw verblijf rechtstreeks bij ons.",
-    promoText: "Voeg een promo- of bedrijfscode toe",
-    searchButton: "Zoek kamers",
-    highlights: [],
-  },
-  el: {
-    heading: "Κλείστε τη διαμονή σας",
-    intro: "Δείτε τη διαθεσιμότητα σε πραγματικό χρόνο και κλείστε τη διαμονή σας απευθείας σε εμάς.",
-    promoText: "Προσθέστε κωδικό προσφοράς ή εταιρικό κωδικό",
-    searchButton: "Αναζήτηση δωματίων",
-    highlights: [],
-  },
-  th: {
-    heading: "จองการเข้าพักของคุณ",
-    intro: "เช็คห้องว่างแบบเรียลไทม์และจองการเข้าพักของคุณกับเราโดยตรง",
-    promoText: "ใส่รหัสส่วนลดหรือรหัสองค์กร",
-    searchButton: "ค้นหาห้องพัก",
-    highlights: [],
-  },
-  tr: {
-    heading: "Konaklamanızı ayırtın",
-    intro: "Güncel müsaitlik durumunu görün ve konaklamanızı doğrudan bizden ayırtın.",
-    promoText: "Promosyon veya kurumsal kod ekleyin",
-    searchButton: "Oda ara",
-    highlights: [],
-  },
-  mk: {
-    heading: "Резервирајте го Вашиот престој",
-    intro: "Погледнете ја достапноста во реално време и резервирајте го Вашиот престој директно кај нас.",
-    promoText: "Додајте промо или корпоративен код",
-    searchButton: "Пребарај соби",
-    highlights: [],
-  },
-};
-
+/** Search-box defaults for a language (English fills any untranslated field). */
 export function searchDefaults(lang: string): SearchDefaults {
-  return SEARCH_TRANSLATIONS[lang] ?? DEFAULT_SEARCH;
+  const t = LOCALE_COPY[lang]?.search;
+  return t ? { ...DEFAULT_SEARCH, ...t, highlights: [] } : DEFAULT_SEARCH;
 }
-
-const PAGE_TRANSLATIONS: Record<string, Record<string, Record<string, string>>> = {
-  results: {
-    fr: { heading: "Choisissez vos chambres", editSearch: "Modifier la recherche", cartTitle: "Votre séjour", continueButton: "Continuer vers les détails" },
-    de: { heading: "Wählen Sie Ihre Zimmer", editSearch: "Suche ändern", cartTitle: "Ihr Aufenthalt", continueButton: "Weiter zu den Angaben" },
-    es: { heading: "Elija sus habitaciones", editSearch: "Editar búsqueda", cartTitle: "Su estancia", continueButton: "Continuar a los datos" },
-    it: { heading: "Scegli le tue camere", editSearch: "Modifica ricerca", cartTitle: "Il tuo soggiorno", continueButton: "Continua ai dettagli" },
-    pt: { heading: "Escolha os seus quartos", editSearch: "Editar pesquisa", cartTitle: "A sua estadia", continueButton: "Continuar para os detalhes" },
-    nl: { heading: "Kies uw kamers", editSearch: "Zoekopdracht wijzigen", cartTitle: "Uw verblijf", continueButton: "Doorgaan naar gegevens" },
-    el: { heading: "Επιλέξτε τα δωμάτιά σας", editSearch: "Αλλαγή αναζήτησης", cartTitle: "Η διαμονή σας", continueButton: "Συνέχεια στα στοιχεία" },
-    th: { heading: "เลือกห้องพักของคุณ", editSearch: "แก้ไขการค้นหา", cartTitle: "การเข้าพักของคุณ", continueButton: "ไปกรอกข้อมูล" },
-    tr: { heading: "Odalarınızı seçin", editSearch: "Aramayı düzenle", cartTitle: "Konaklamanız", continueButton: "Bilgilere devam et" },
-    mk: { heading: "Изберете ги Вашите соби", editSearch: "Уреди го пребарувањето", cartTitle: "Вашиот престој", continueButton: "Продолжи кон податоците" },
-  },
-  detail: {
-    fr: { backLink: "Toutes les chambres", amenitiesTitle: "Dans cette chambre", rateTitle: "Choisissez votre tarif", addButton: "Ajouter à votre séjour" },
-    de: { backLink: "Alle Zimmer", amenitiesTitle: "In diesem Zimmer", rateTitle: "Wählen Sie Ihren Tarif", addButton: "Zum Aufenthalt hinzufügen" },
-    es: { backLink: "Todas las habitaciones", amenitiesTitle: "En esta habitación", rateTitle: "Elija su tarifa", addButton: "Añadir a su estancia" },
-    it: { backLink: "Tutte le camere", amenitiesTitle: "In questa camera", rateTitle: "Scegli la tua tariffa", addButton: "Aggiungi al soggiorno" },
-    pt: { backLink: "Todos os quartos", amenitiesTitle: "Neste quarto", rateTitle: "Escolha a sua tarifa", addButton: "Adicionar à estadia" },
-    nl: { backLink: "Alle kamers", amenitiesTitle: "In deze kamer", rateTitle: "Kies uw tarief", addButton: "Toevoegen aan verblijf" },
-    el: { backLink: "Όλα τα δωμάτια", amenitiesTitle: "Σε αυτό το δωμάτιο", rateTitle: "Επιλέξτε τιμή", addButton: "Προσθήκη στη διαμονή" },
-    th: { backLink: "ห้องพักทั้งหมด", amenitiesTitle: "ในห้องนี้", rateTitle: "เลือกแพ็กเกจราคาของคุณ", addButton: "เพิ่มในการเข้าพักของคุณ" },
-    tr: { backLink: "Tüm odalar", amenitiesTitle: "Bu odada", rateTitle: "Fiyat planınızı seçin", addButton: "Konaklamanıza ekle" },
-    mk: { backLink: "Сите соби", amenitiesTitle: "Во оваа соба", rateTitle: "Изберете тарифа", addButton: "Додај во Вашиот престој" },
-  },
-  checkout: {
-    fr: { heading: "Vos coordonnées", guestSection: "Informations du client", arrivalSection: "Arrivée et demandes", requestsPlaceholder: "Chambre calme, arrivée tôt, tout ce que nous devrions savoir…", paymentSection: "Paiement", paymentNote: "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.", completeButton: "Finaliser la réservation" },
-    de: { heading: "Ihre Angaben", guestSection: "Gästeinformationen", arrivalSection: "Anreise & Wünsche", requestsPlaceholder: "Ruhiges Zimmer, frühe Anreise, alles, was wir wissen sollten…", paymentSection: "Zahlung", paymentNote: "Ihr flexibler Tarif wird im Hotel bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.", completeButton: "Buchung abschließen" },
-    es: { heading: "Sus datos", guestSection: "Información del huésped", arrivalSection: "Llegada y solicitudes", requestsPlaceholder: "Habitación tranquila, entrada temprana, cualquier cosa que debamos saber…", paymentSection: "Pago", paymentNote: "Su tarifa flexible se paga en el hotel. Solo necesitamos una tarjeta para garantizar la reserva: hoy no se le cobrará nada.", completeButton: "Completar la reserva" },
-    it: { heading: "I tuoi dati", guestSection: "Informazioni dell'ospite", arrivalSection: "Arrivo e richieste", requestsPlaceholder: "Camera silenziosa, arrivo anticipato, qualsiasi cosa dovremmo sapere…", paymentSection: "Pagamento", paymentNote: "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.", completeButton: "Completa la prenotazione" },
-    pt: { heading: "Os seus dados", guestSection: "Informações do hóspede", arrivalSection: "Chegada e pedidos", requestsPlaceholder: "Quarto tranquilo, entrada antecipada, tudo o que devamos saber…", paymentSection: "Pagamento", paymentNote: "A sua tarifa flexível é paga no hotel. Só precisamos de um cartão para garantir a reserva — não será cobrado hoje.", completeButton: "Concluir reserva" },
-    nl: { heading: "Uw gegevens", guestSection: "Gastinformatie", arrivalSection: "Aankomst & verzoeken", requestsPlaceholder: "Rustige kamer, vroeg inchecken, alles wat we moeten weten…", paymentSection: "Betaling", paymentNote: "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.", completeButton: "Boeking voltooien" },
-    el: { heading: "Τα στοιχεία σας", guestSection: "Στοιχεία επισκέπτη", arrivalSection: "Άφιξη & αιτήματα", requestsPlaceholder: "Ήσυχο δωμάτιο, πρόωρη άφιξη, ό,τι πρέπει να γνωρίζουμε…", paymentSection: "Πληρωμή", paymentNote: "Η ευέλικτη τιμή σας πληρώνεται στο ξενοδοχείο. Χρειαζόμαστε μόνο μια κάρτα για την εξασφάλιση της κράτησης — δεν θα χρεωθείτε σήμερα.", completeButton: "Ολοκλήρωση κράτησης" },
-    th: { heading: "ข้อมูลของคุณ", guestSection: "ข้อมูลผู้เข้าพัก", arrivalSection: "การเดินทางถึงและคำขอเพิ่มเติม", requestsPlaceholder: "ห้องเงียบ เช็คอินก่อนเวลา หรือสิ่งอื่นที่เราควรทราบ…", paymentSection: "การชำระเงิน", paymentNote: "ราคาแบบยืดหยุ่นของคุณชำระที่โรงแรม เราขอเพียงบัตรเพื่อรับประกันการจอง — วันนี้ยังไม่มีการเรียกเก็บเงิน", completeButton: "ยืนยันการจอง" },
-    tr: { heading: "Bilgileriniz", guestSection: "Misafir bilgileri", arrivalSection: "Varış ve istekler", requestsPlaceholder: "Sessiz oda, erken giriş, bilmemiz gereken her şey…", paymentSection: "Ödeme", paymentNote: "Esnek fiyat planınız otelde ödenir. Rezervasyonu garanti altına almak için yalnızca bir karta ihtiyacımız var — bugün tahsilat yapılmayacak.", completeButton: "Rezervasyonu tamamla" },
-    mk: { heading: "Вашите податоци", guestSection: "Податоци за гостинот", arrivalSection: "Пристигнување и барања", requestsPlaceholder: "Тивка соба, рано пристигнување, сè што треба да знаеме…", paymentSection: "Плаќање", paymentNote: "Вашата флексибилна тарифа се плаќа во објектот. Ни треба само картичка за да ја гарантираме резервацијата — денес нема да се наплати ништо.", completeButton: "Заврши ја резервацијата" },
-  },
-  extras: {
-    fr: { heading: "Améliorez votre {room}", intro: "Des extras facultatifs pour rendre votre séjour spécial.", stayTitle: "Pour tout votre séjour", summaryLabel: "Extras", continueButton: "Continuer", skipButton: "Passer pour l’instant" },
-    de: { heading: "Verschönern Sie Ihr {room}", intro: "Optionale Extras für einen besonderen Aufenthalt.", stayTitle: "Für Ihren gesamten Aufenthalt", summaryLabel: "Extras", continueButton: "Weiter", skipButton: "Vorerst überspringen" },
-    es: { heading: "Mejora tu {room}", intro: "Extras opcionales para hacer tu estancia especial.", stayTitle: "Para toda tu estancia", summaryLabel: "Extras", continueButton: "Continuar", skipButton: "Omitir por ahora" },
-    it: { heading: "Arricchisci la tua {room}", intro: "Extra facoltativi per rendere speciale il tuo soggiorno.", stayTitle: "Per tutto il tuo soggiorno", summaryLabel: "Extra", continueButton: "Continua", skipButton: "Salta per ora" },
-    pt: { heading: "Melhore o seu {room}", intro: "Extras opcionais para tornar a sua estadia especial.", stayTitle: "Para toda a sua estadia", summaryLabel: "Extras", continueButton: "Continuar", skipButton: "Ignorar por agora" },
-    nl: { heading: "Maak je {room} compleet", intro: "Optionele extra’s om je verblijf bijzonder te maken.", stayTitle: "Voor je hele verblijf", summaryLabel: "Extra’s", continueButton: "Doorgaan", skipButton: "Nu overslaan" },
-    el: { heading: "Αναβαθμίστε το {room}", intro: "Προαιρετικά έξτρα για να κάνετε τη διαμονή σας ξεχωριστή.", stayTitle: "Για όλη τη διαμονή σας", summaryLabel: "Έξτρα", continueButton: "Συνέχεια", skipButton: "Παράλειψη για τώρα" },
-    th: { heading: "เพิ่มความพิเศษให้ {room}", intro: "บริการเสริมที่เลือกได้ เพื่อให้การเข้าพักของคุณพิเศษยิ่งขึ้น", stayTitle: "สำหรับการเข้าพักทั้งหมด", summaryLabel: "บริการเสริม", continueButton: "ดำเนินการต่อ", skipButton: "ข้ามไปก่อน" },
-    tr: { heading: "{room} odanızı zenginleştirin", intro: "Konaklamanızı özel kılacak isteğe bağlı ek hizmetler.", stayTitle: "Tüm konaklamanız için", summaryLabel: "Ekstralar", continueButton: "Devam et", skipButton: "Şimdilik geç" },
-    mk: { heading: "Збогатете ја Вашата {room}", intro: "Изборни додатоци за Вашиот престој да биде посебен.", stayTitle: "За целиот Ваш престој", summaryLabel: "Додатоци", continueButton: "Продолжи", skipButton: "Прескокни за сега" },
-  },
-  confirmation: {
-    fr: { heading: "Tout est confirmé", subtitle: "Votre séjour à {hotel} est confirmé. Un e-mail de confirmation est en route.", newBooking: "Faire une autre réservation" },
-    de: { heading: "Alles erledigt", subtitle: "Ihr Aufenthalt im {hotel} ist bestätigt. Eine Bestätigungs-E-Mail ist unterwegs.", newBooking: "Weitere Buchung vornehmen" },
-    es: { heading: "Todo listo", subtitle: "Su estancia en {hotel} está confirmada. Un correo de confirmación está en camino.", newBooking: "Hacer otra reserva" },
-    it: { heading: "Tutto pronto", subtitle: "Il tuo soggiorno presso {hotel} è confermato. Un'e-mail di conferma è in arrivo.", newBooking: "Effettua un'altra prenotazione" },
-    pt: { heading: "Está tudo pronto", subtitle: "A sua estadia no {hotel} está confirmada. Um e-mail de confirmação está a caminho.", newBooking: "Fazer outra reserva" },
-    nl: { heading: "Helemaal geregeld", subtitle: "Uw verblijf in {hotel} is bevestigd. Een bevestigingsmail is onderweg.", newBooking: "Nog een boeking maken" },
-    el: { heading: "Είστε έτοιμοι", subtitle: "Η διαμονή σας στο {hotel} επιβεβαιώθηκε. Ένα email επιβεβαίωσης βρίσκεται καθ’ οδόν.", newBooking: "Κάντε νέα κράτηση" },
-    th: { heading: "เรียบร้อยแล้ว", subtitle: "การเข้าพักของคุณที่ {hotel} ได้รับการยืนยันแล้ว อีเมลยืนยันกำลังส่งถึงคุณ", newBooking: "จองอีกครั้ง" },
-    tr: { heading: "Her şey hazır", subtitle: "{hotel} tesisindeki konaklamanız onaylandı. Onay e-postanız yolda.", newBooking: "Yeni bir rezervasyon yap" },
-    mk: { heading: "Сè е готово", subtitle: "Вашиот престој во {hotel} е потврден. Потврдата е на пат по е-пошта.", newBooking: "Направи нова резервација" },
-  },
-};
 
 /** Built-in page defaults for a language (English fields fill any gaps). */
 export function pageDefaults(pageId: string, lang: string): Record<string, string> {
@@ -817,7 +677,7 @@ export function pageDefaults(pageId: string, lang: string): Record<string, strin
   const en: Record<string, string> = {};
   if (def) for (const f of def.fields) en[f.key] = f.default;
   if (lang === DEFAULT_LANG) return en;
-  return { ...en, ...(PAGE_TRANSLATIONS[pageId]?.[lang] ?? {}) };
+  return { ...en, ...(LOCALE_COPY[lang]?.pages?.[pageId] ?? {}) };
 }
 
 // ---- Editable transactional email templates ----

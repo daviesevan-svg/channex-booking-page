@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "A sua reserva em {hotel_name} está confirmada ({reference})",
+    "heading": "Reserva feita, {guest_first_name}!",
+    "intro": "Obrigado por reservar diretamente com {hotel_name}. Aqui estão os detalhes da sua estadia — mal podemos esperar para o receber.",
+    "outro": "Precisa de alterar alguma coisa? Use o botão «Gerir reserva» acima a qualquer momento. Até breve!"
+  },
+  "booking_cancellation": {
+    "subject": "A sua reserva em {hotel_name} foi cancelada ({reference})",
+    "heading": "A sua reserva está cancelada",
+    "intro": "Cancelámos a sua reserva em {hotel_name}, {guest_first_name}. Os detalhes da reserva cancelada estão abaixo.",
+    "outro": "Se não pediu este cancelamento, contacte-nos de imediato."
+  },
+  "booking_failed": {
+    "subject": "Não conseguimos confirmar a sua reserva em {hotel_name} ({reference})",
+    "heading": "Lamentamos, {guest_first_name} — não conseguimos confirmar a sua reserva",
+    "intro": "Infelizmente, o quarto esgotou antes de o seu pagamento ficar concluído, pelo que não conseguimos confirmar a sua estadia em {hotel_name}. Reembolsámos {refund_amount} na totalidade para o seu cartão — pode demorar alguns dias a aparecer.",
+    "outro": "Lamentamos a desilusão. Experimente outras datas e fale connosco se pudermos ajudar."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "Não conseguimos confirmar a sua reserva em {hotel_name} ({reference})",
+    "heading": "Lamentamos, {guest_first_name} — não conseguimos confirmar a sua reserva",
+    "intro": "Infelizmente, o quarto esgotou antes de o seu pagamento ficar concluído, pelo que não conseguimos confirmar a sua estadia em {hotel_name}. Tem direito ao reembolso total de {refund_amount}: o hotel vai devolvê-lo para o seu cartão e, depois disso, pode demorar alguns dias a aparecer.",
+    "outro": "Lamentamos a desilusão. Se o reembolso não lhe chegar no prazo de uma semana, basta responder a este e-mail."
+  },
+  "review_request": {
+    "subject": "Como foi a sua estadia em {hotel_name}?",
+    "subject2": "Um minuto para avaliar a sua estadia, {guest_first_name}?",
+    "subject3": "Última oportunidade para avaliar a sua estadia em {hotel_name}",
+    "heading": "Como foi a sua estadia, {guest_first_name}?",
+    "intro": "Obrigado por ficar em {hotel_name}. Gostávamos de saber como correu — a sua opinião ajuda-nos a melhorar e ajuda futuros hóspedes a escolher.\n\nDemora apenas um minuto — toque numa estrela abaixo para começar."
+  }
+}

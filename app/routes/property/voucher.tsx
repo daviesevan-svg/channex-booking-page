@@ -12,7 +12,8 @@ import { fmtDate } from "~/lib/dates";
 
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { getBooking } from "~/lib/bookings.server";
-import { displayStatus, giftBalance, normalizeVoucherCode, WEEKDAY_LABELS } from "~/lib/vouchers";
+import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
+import { weekdayShortNames } from "~/components/offers-section";
 import { useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -168,7 +169,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
                 </div>
                 {v.product.roomTitles.length > 0 && <div>{v.product.roomTitles.join(" · ")}</div>}
                 {v.product.package.checkinDays.length > 0 && (
-                  <div>{tr.t("voucherCheckinDays", { days: v.product.package.checkinDays.map((d) => WEEKDAY_LABELS[d]).join(" / ") })}</div>
+                  <div>{tr.t("voucherCheckinDays", { days: weekdayShortNames(v.product.package.checkinDays, tr) })}</div>
                 )}
                 {(v.product.package.window?.from || v.product.package.window?.to) && (
                   <div>{tr.t("voucherStayWindow", { from: v.product.package.window.from ?? "…", to: v.product.package.window.to ?? "…" })}</div>

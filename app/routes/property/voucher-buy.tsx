@@ -17,7 +17,8 @@ import { getConfig } from "~/lib/config.server";
 
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getRooms } from "~/lib/catalog.server";
-import { computeExpiry, voucherCode, WEEKDAY_LABELS, type VoucherRecord } from "~/lib/vouchers";
+import { computeExpiry, voucherCode, type VoucherRecord } from "~/lib/vouchers";
+import { weekdayShortNames } from "~/components/offers-section";
 import { getVoucherProduct, soldCount } from "~/lib/vouchers.server";
 import { generateReference } from "~/lib/bookings.server";
 import { stashPendingVoucher, type PendingVoucher } from "~/lib/pending-vouchers.server";
@@ -285,7 +286,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
         { label: tr.t("voucherFactGuests"), value: tr.p("voucherGuests", pkgGuests) },
         {
           label: tr.t("voucherFactCheckin"),
-          value: pkg.checkinDays.length ? pkg.checkinDays.map((d) => WEEKDAY_LABELS[d]).join(" / ") : tr.t("voucherAnyDay"),
+          value: pkg.checkinDays.length ? weekdayShortNames(pkg.checkinDays, tr) : tr.t("voucherAnyDay"),
         },
         {
           label: tr.t("voucherFactWindow"),

@@ -1,0 +1,47 @@
+{
+  "label": "Nederlands",
+  "flag": "🇳🇱",
+  "search": {
+    "heading": "Reserveer uw verblijf",
+    "intro": "Bekijk de actuele beschikbaarheid en boek uw verblijf rechtstreeks bij ons.",
+    "promoText": "Voeg een promo- of bedrijfscode toe",
+    "searchButton": "Zoek kamers"
+  },
+  "pages": {
+    "results": {
+      "heading": "Kies uw kamers",
+      "editSearch": "Zoekopdracht wijzigen",
+      "cartTitle": "Uw verblijf",
+      "continueButton": "Doorgaan naar gegevens"
+    },
+    "detail": {
+      "backLink": "Alle kamers",
+      "amenitiesTitle": "In deze kamer",
+      "rateTitle": "Kies uw tarief",
+      "addButton": "Toevoegen aan verblijf"
+    },
+    "checkout": {
+      "heading": "Uw gegevens",
+      "guestSection": "Gastinformatie",
+      "arrivalSection": "Aankomst & verzoeken",
+      "requestsPlaceholder": "Rustige kamer, vroeg inchecken, alles wat we moeten weten…",
+      "paymentSection": "Betaling",
+      "paymentNote": "Uw flexibele tarief wordt in het hotel betaald. We hebben alleen een kaart nodig om de boeking te garanderen — vandaag wordt er niets afgeschreven.",
+      "completeButton": "Boeking voltooien"
+    },
+    "extras": {
+      "heading": "Maak je {room} compleet",
+      "intro": "Optionele extra’s om je verblijf bijzonder te maken.",
+      "stayTitle": "Voor je hele verblijf",
+      "summaryLabel": "Extra’s",
+      "continueButton": "Doorgaan",
+      "skipButton": "Nu overslaan"
+    },
+    "confirmation": {
+      "heading": "Helemaal geregeld",
+      "subtitle": "Uw verblijf in {hotel} is bevestigd. Een bevestigingsmail is onderweg.",
+      "newBooking": "Nog een boeking maken"
+    }
+  },
+  "euOrderButton": "Reserveren met betalingsverplichting"
+}

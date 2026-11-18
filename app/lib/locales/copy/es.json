@@ -1,0 +1,47 @@
+{
+  "label": "Español",
+  "flag": "🇪🇸",
+  "search": {
+    "heading": "Reserve su estancia",
+    "intro": "Consulte la disponibilidad en tiempo real y reserve su estancia directamente con nosotros.",
+    "promoText": "Añadir un código promocional o corporativo",
+    "searchButton": "Buscar habitaciones"
+  },
+  "pages": {
+    "results": {
+      "heading": "Elija sus habitaciones",
+      "editSearch": "Editar búsqueda",
+      "cartTitle": "Su estancia",
+      "continueButton": "Continuar a los datos"
+    },
+    "detail": {
+      "backLink": "Todas las habitaciones",
+      "amenitiesTitle": "En esta habitación",
+      "rateTitle": "Elija su tarifa",
+      "addButton": "Añadir a su estancia"
+    },
+    "checkout": {
+      "heading": "Sus datos",
+      "guestSection": "Información del huésped",
+      "arrivalSection": "Llegada y solicitudes",
+      "requestsPlaceholder": "Habitación tranquila, entrada temprana, cualquier cosa que debamos saber…",
+      "paymentSection": "Pago",
+      "paymentNote": "Su tarifa flexible se paga en el hotel. Solo necesitamos una tarjeta para garantizar la reserva: hoy no se le cobrará nada.",
+      "completeButton": "Completar la reserva"
+    },
+    "extras": {
+      "heading": "Mejora tu {room}",
+      "intro": "Extras opcionales para hacer tu estancia especial.",
+      "stayTitle": "Para toda tu estancia",
+      "summaryLabel": "Extras",
+      "continueButton": "Continuar",
+      "skipButton": "Omitir por ahora"
+    },
+    "confirmation": {
+      "heading": "Todo listo",
+      "subtitle": "Su estancia en {hotel} está confirmada. Un correo de confirmación está en camino.",
+      "newBooking": "Hacer otra reserva"
+    }
+  },
+  "euOrderButton": "Reservar con obligación de pago"
+}

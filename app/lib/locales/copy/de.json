@@ -1,0 +1,47 @@
+{
+  "label": "Deutsch",
+  "flag": "🇩🇪",
+  "search": {
+    "heading": "Reservieren Sie Ihren Aufenthalt",
+    "intro": "Prüfen Sie die aktuelle Verfügbarkeit und buchen Sie Ihren Aufenthalt direkt bei uns.",
+    "promoText": "Promo- oder Firmencode hinzufügen",
+    "searchButton": "Zimmer suchen"
+  },
+  "pages": {
+    "results": {
+      "heading": "Wählen Sie Ihre Zimmer",
+      "editSearch": "Suche ändern",
+      "cartTitle": "Ihr Aufenthalt",
+      "continueButton": "Weiter zu den Angaben"
+    },
+    "detail": {
+      "backLink": "Alle Zimmer",
+      "amenitiesTitle": "In diesem Zimmer",
+      "rateTitle": "Wählen Sie Ihren Tarif",
+      "addButton": "Zum Aufenthalt hinzufügen"
+    },
+    "checkout": {
+      "heading": "Ihre Angaben",
+      "guestSection": "Gästeinformationen",
+      "arrivalSection": "Anreise & Wünsche",
+      "requestsPlaceholder": "Ruhiges Zimmer, frühe Anreise, alles, was wir wissen sollten…",
+      "paymentSection": "Zahlung",
+      "paymentNote": "Ihr flexibler Tarif wird im Hotel bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.",
+      "completeButton": "Buchung abschließen"
+    },
+    "extras": {
+      "heading": "Verschönern Sie Ihr {room}",
+      "intro": "Optionale Extras für einen besonderen Aufenthalt.",
+      "stayTitle": "Für Ihren gesamten Aufenthalt",
+      "summaryLabel": "Extras",
+      "continueButton": "Weiter",
+      "skipButton": "Vorerst überspringen"
+    },
+    "confirmation": {
+      "heading": "Alles erledigt",
+      "subtitle": "Ihr Aufenthalt im {hotel} ist bestätigt. Eine Bestätigungs-E-Mail ist unterwegs.",
+      "newBooking": "Weitere Buchung vornehmen"
+    }
+  },
+  "euOrderButton": "Zahlungspflichtig buchen"
+}

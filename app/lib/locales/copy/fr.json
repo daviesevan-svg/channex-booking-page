@@ -1,0 +1,47 @@
+{
+  "label": "Français",
+  "flag": "🇫🇷",
+  "search": {
+    "heading": "Réservez votre séjour",
+    "intro": "Consultez les disponibilités en temps réel et réservez votre séjour directement auprès de nous.",
+    "promoText": "Ajouter un code promo ou entreprise",
+    "searchButton": "Rechercher"
+  },
+  "pages": {
+    "results": {
+      "heading": "Choisissez vos chambres",
+      "editSearch": "Modifier la recherche",
+      "cartTitle": "Votre séjour",
+      "continueButton": "Continuer vers les détails"
+    },
+    "detail": {
+      "backLink": "Toutes les chambres",
+      "amenitiesTitle": "Dans cette chambre",
+      "rateTitle": "Choisissez votre tarif",
+      "addButton": "Ajouter à votre séjour"
+    },
+    "checkout": {
+      "heading": "Vos coordonnées",
+      "guestSection": "Informations du client",
+      "arrivalSection": "Arrivée et demandes",
+      "requestsPlaceholder": "Chambre calme, arrivée tôt, tout ce que nous devrions savoir…",
+      "paymentSection": "Paiement",
+      "paymentNote": "Votre tarif flexible est payé à l'hôtel. Nous avons seulement besoin d'une carte pour garantir la réservation — vous ne serez pas débité aujourd'hui.",
+      "completeButton": "Finaliser la réservation"
+    },
+    "extras": {
+      "heading": "Améliorez votre {room}",
+      "intro": "Des extras facultatifs pour rendre votre séjour spécial.",
+      "stayTitle": "Pour tout votre séjour",
+      "summaryLabel": "Extras",
+      "continueButton": "Continuer",
+      "skipButton": "Passer pour l’instant"
+    },
+    "confirmation": {
+      "heading": "Tout est confirmé",
+      "subtitle": "Votre séjour à {hotel} est confirmé. Un e-mail de confirmation est en route.",
+      "newBooking": "Faire une autre réservation"
+    }
+  },
+  "euOrderButton": "Réserver avec obligation de paiement"
+}
