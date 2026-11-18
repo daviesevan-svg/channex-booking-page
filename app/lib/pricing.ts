@@ -34,6 +34,9 @@ export interface CityTaxConfig {
   taxable: boolean;
   /** Children don't count towards a per-person city tax. */
   childrenExempt: boolean;
+  /** With `childrenExempt`: only children YOUNGER than this age are exempt
+   *  (15 = ages 0–14 free, a 15-year-old pays). Absent = every child exempt. */
+  childrenExemptUnderAge?: number;
   /** Cap on nights charged (0 = no cap). */
   maxNights: number;
   /** Advanced: 2–3 seasonal rates. Each night is charged at the rate of the
@@ -56,6 +59,17 @@ export function cityTaxNightlyAmount(ct: CityTaxConfig, isoDate: string): number
     if (hit) return s.amount;
   }
   return 0;
+}
+
+/** How many of the booked children pay a per-person city tax. Exemption off:
+ *  all of them. Exemption on with no age limit: none. With an age limit: those
+ *  whose age is at or above it — a child whose age isn't known (a caller that
+ *  only has a headcount) stays exempt, so an unknown age never overcharges. */
+export function cityTaxPayingChildren(ct: CityTaxConfig, children: number, childrenAge?: number[]): number {
+  if (!ct.childrenExempt) return children;
+  const limit = ct.childrenExemptUnderAge;
+  if (!limit || !childrenAge) return 0;
+  return Math.min(children, childrenAge.filter((age) => age >= limit).length);
 }
 
 /** How a FIXED fee multiplies: once per booking (default), or per room /
@@ -103,6 +117,9 @@ export interface PricingInput {
   nights: number;
   adults: number;
   children: number;
+  /** Each booked child's age, when known. Only a city tax with a child age
+   *  limit reads it; without ages every child counts as exempt-age. */
+  childrenAge?: number[];
   /** Number of rooms booked. */
   rooms: number;
   /** Total cleaning fee across the booked rooms (per stay). VAT always applies. */
@@ -176,7 +193,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   const ct = cfg.cityTax;
   if (ct && ct.enabled && (ct.amount > 0 || ct.seasons?.some((s) => s.amount > 0))) {
     const chargeableNights = ct.maxNights > 0 ? Math.min(nights, ct.maxNights) : nights;
-    const persons = adults + (ct.childrenExempt ? 0 : children);
+    const persons = adults + cityTaxPayingChildren(ct, children, input.childrenAge);
     // Seasonal rates price each charged night by its own DATE (a stay spanning
     // two seasons mixes rates); needs the check-in date, else the base amount
     // applies to every night. UTC date math so it's client/server identical.

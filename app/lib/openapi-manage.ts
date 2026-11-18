@@ -162,7 +162,7 @@ export const manageSchemas = {
           required: ["name", "kind", "amount"],
         },
       },
-      city_tax: { type: ["object", "null"], description: "{enabled, name, amount, basis, taxable, children_exempt, max_nights, seasons? (2–3 MM-DD ranges)} or null." },
+      city_tax: { type: ["object", "null"], description: "{enabled, name, amount, basis, taxable, children_exempt, children_exempt_under_age? (1–17: only children younger than this are exempt; null/absent = every child), max_nights, seasons? (2–3 MM-DD ranges)} or null." },
     },
   },
   ManageRoomInput: {

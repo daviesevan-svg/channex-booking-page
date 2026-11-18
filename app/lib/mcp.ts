@@ -476,7 +476,7 @@ export const MANAGE_WRITE_TOOLS: McpTool[] = [
   {
     name: "set_tax_config",
     description:
-      "Replace the property's whole tax document: taxes_inclusive (are taxes inside the room price?), taxes [{name, rate%}], fees [{name, kind: percent|fixed, amount, taxable, basis?}], city_tax ({enabled, name, amount, basis, taxable, children_exempt, max_nights, seasons?} or null). This is a REPLACE — send the full document (read get_tax_config first and modify it). Changing tax mode changes every displayed price; confirm with the operator.",
+      "Replace the property's whole tax document: taxes_inclusive (are taxes inside the room price?), taxes [{name, rate%}], fees [{name, kind: percent|fixed, amount, taxable, basis?}], city_tax ({enabled, name, amount, basis, taxable, children_exempt, children_exempt_under_age? (1–17; e.g. 15 = only under-15s exempt; omit = every child), max_nights, seasons?} or null). This is a REPLACE — send the full document (read get_tax_config first and modify it). Changing tax mode changes every displayed price; confirm with the operator.",
     inputSchema: {
       type: "object",
       properties: {

@@ -149,6 +149,30 @@ describe("PUT /v1/manage/taxes", () => {
     expect(json.data.fees[0].basis).toBe("room");
     expect(json.data.city_tax.seasons).toHaveLength(2);
 
+    // Child age limit: only under-15s exempt. GET returns the PUT shape, so a
+    // read-modify-write round-trips (it used to return camelCase keys that the
+    // validator rejected).
+    const badAge = (await action({
+      request: jsonReq("/v1/manage/taxes", ak, "PUT", {
+        taxes_inclusive: false, taxes: [], fees: [],
+        city_tax: { enabled: true, name: "City tax", amount: 2, basis: "person_night", children_exempt: true, children_exempt_under_age: 18 },
+      }),
+    } as never)) as Response;
+    expect(badAge.status).toBe(422);
+    const withAge = (await action({
+      request: jsonReq("/v1/manage/taxes", ak, "PUT", {
+        taxes_inclusive: false, taxes: [], fees: [],
+        city_tax: { enabled: true, name: "City tax", amount: 2, basis: "person_night", children_exempt: true, children_exempt_under_age: 15, max_nights: 7 },
+      }),
+    } as never)) as Response;
+    expect(withAge.status).toBe(200);
+    const got = (await (
+      (await loader({ request: jsonReq("/v1/manage/taxes", ak, "GET") } as never)) as Response
+    ).json()) as { data: { city_tax: Record<string, unknown> } };
+    expect(got.data.city_tax).toMatchObject({ children_exempt: true, children_exempt_under_age: 15, max_nights: 7 });
+    const roundTrip = (await action({ request: jsonReq("/v1/manage/taxes", ak, "PUT", got.data) } as never)) as Response;
+    expect(roundTrip.status).toBe(200);
+
     // Clearing city_tax with null deletes the key.
     await action({ request: jsonReq("/v1/manage/taxes", ak, "PUT", { taxes_inclusive: false, taxes: [], fees: [], city_tax: null }) } as never);
     const read = (await loader({ request: jsonReq("/v1/manage/taxes", ak, "GET") } as never)) as Response;

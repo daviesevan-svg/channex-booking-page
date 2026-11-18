@@ -645,7 +645,7 @@ export async function resolveCartByOccupancy(
         childrenAge: l.childrenAge,
         roomTitle: room.title,
         rateTitle: rate.title,
-        occupancy: { adults, children, infants: 0 },
+        occupancy: { adults, children, infants: 0, childrenAge: occ.childrenAge.slice(0, children) },
         total: Number(rate.totalPrice),
         net: Number(rate.netPrice ?? rate.totalPrice),
         cleaningFee: Number(room.cleaningFee ?? 0),

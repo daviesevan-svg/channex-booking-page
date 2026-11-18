@@ -90,6 +90,9 @@ export function serializePropertyContent(
               basis: ct.basis,
               taxable: ct.taxable,
               children_exempt: ct.childrenExempt,
+              // With children_exempt: only children younger than this pay
+              // nothing (15 = ages 0–14 exempt). null = every child exempt.
+              children_exempt_under_age: ct.childrenExempt ? (ct.childrenExemptUnderAge ?? null) : null,
               max_nights: ct.maxNights > 0 ? ct.maxNights : null,
               // Seasonal nightly rates (annual recurring MM-DD ranges; a range
               // may wrap the year end). Each night is charged at its date's
@@ -123,6 +126,7 @@ export interface StayContext {
   nights: number;
   adults: number;
   children: number;
+  childrenAge?: number[];
   checkin: string;
   taxConfig: TaxConfig;
   /** Rate definitions by id, for the policy summary. */
@@ -144,6 +148,7 @@ function serializeRatePlan(rp: RatePlan, room: RoomWithRates, ctx?: StayContext)
               nights: ctx.nights,
               adults: ctx.adults,
               children: ctx.children,
+              childrenAge: ctx.childrenAge,
               rooms: 1,
               cleaningFee: room.cleaningFee ?? 0,
               taxableExtras: 0,

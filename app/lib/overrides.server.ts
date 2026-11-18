@@ -808,6 +808,12 @@ function parseJson<T>(form: FormData, key: string): T[] {
   }
 }
 
+/** A city-tax child age limit: whole years 1–17 (child ages run 0–17). */
+function validChildAge(v: unknown): boolean {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= 17;
+}
+
 export async function saveTaxSettings(pid: string, form: FormData): Promise<SiteSettings> {
   const existing = await getSettings(pid);
 
@@ -860,6 +866,9 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
             : "person_night",
         taxable: ctRaw.taxable === true,
         childrenExempt: ctRaw.childrenExempt === true,
+        ...(ctRaw.childrenExempt === true && validChildAge(ctRaw.childrenExemptUnderAge)
+          ? { childrenExemptUnderAge: Number(ctRaw.childrenExemptUnderAge) }
+          : {}),
         maxNights: Math.round(num(ctRaw.maxNights)),
         ...(seasons.length >= 2 ? { seasons } : {}),
       }

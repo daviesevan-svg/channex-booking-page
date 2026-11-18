@@ -41,11 +41,12 @@ export function stayTotals(
   extraLines: ResolvedExtra[],
   stay: { nights: number; checkin?: string; discount?: number },
   taxConfig: TaxConfig,
-  fallbackParty?: { adults: number; children: number },
+  fallbackParty?: { adults: number; children: number; childrenAge?: number[] },
 ): StayTotals {
   const coverage = cartCoverage(lines);
   const adults = lines.length ? coverage.adults : (fallbackParty?.adults ?? 0);
   const children = lines.length ? coverage.children : (fallbackParty?.children ?? 0);
+  const childrenAge = lines.length ? coverage.childrenAge : fallbackParty?.childrenAge;
   const discountedRoom = round2(coverage.total - (stay.discount ?? 0));
   const pricing = computePricing(
     {
@@ -53,6 +54,7 @@ export function stayTotals(
       nights: stay.nights,
       adults,
       children,
+      childrenAge,
       rooms: lines.length,
       cleaningFee: lines.reduce((s, l) => s + l.cleaningFee, 0),
       taxableExtras: taxableExtrasTotal(extraLines),

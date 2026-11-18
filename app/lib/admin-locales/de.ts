@@ -1822,6 +1822,8 @@ const DE: Record<string, string> = {
   txCharged: "Berechnet",
   txVatAppliesCityTax: "MwSt. fällt auf die City Tax an",
   txChildrenExempt: "Kinder befreit",
+  txExemptUnderAge: "jünger als",
+  txExemptUnderAgeHint: "leer = alle Kinder",
   txMaxNights: "Max. berechnete Nächte",
   txNoCap: "(0 = keine Obergrenze)",
   txSeasonalRates: "Saisonale Sätze",

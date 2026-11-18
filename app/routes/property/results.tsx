@@ -154,7 +154,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const allIn = (base: number, cleaningFee: number) =>
     r2(
       computePricing(
-        { base, nights, adults: occ.adults, children: occ.childrenAge?.length ?? 0, rooms: 1, cleaningFee, taxableExtras: 0, checkin },
+        { base, nights, adults: occ.adults, children: occ.childrenAge?.length ?? 0, childrenAge: occ.childrenAge, rooms: 1, cleaningFee, taxableExtras: 0, checkin },
         taxConfig,
       ).total,
     );
