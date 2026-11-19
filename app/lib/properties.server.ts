@@ -7,6 +7,7 @@ import { getAdminEmail, getSessionProperty } from "./auth.server";
 import { getConfig, getConfigKV } from "./config.server";
 import { db, schemaOnce } from "./d1.server";
 import { requestKvCache } from "./request-cache.server";
+import { succeedOnce } from "./succeed-once.server";
 import { getOverrides, getSettings } from "./overrides.server";
 import { getUser, isSuperadmin } from "./users.server";
 import { areaForPathname, type MemberArea } from "./member-areas";
@@ -111,30 +112,24 @@ const ensureSchema = schemaOnce((d) => [
 // called for, on the first property lookup of every cold isolate. That is the
 // layout loader of every guest request, and a deploy makes every request a cold
 // one.
-let slugIndexReady: Promise<void> | undefined;
-
-function ensureSlugIndex(): Promise<void> {
-  slugIndexReady ??= (async () => {
-    await ensureSchema();
-    try {
-      await db()
-        .prepare(
-          `ALTER TABLE property ADD COLUMN slug TEXT GENERATED ALWAYS AS (lower(json_extract(json,'$.slug'))) VIRTUAL`,
-        )
-        .run();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/duplicate column/i.test(message)) throw error;
-    }
-    await db().prepare(`CREATE INDEX IF NOT EXISTS property_slug ON property (slug)`).run();
-  })().catch((error) => {
-    // Let the next caller retry rather than latching the failure for the life
-    // of the isolate. Lookups fall back to the full read meanwhile.
-    slugIndexReady = undefined;
-    throw error;
-  });
-  return slugIndexReady;
-}
+//
+// Success is remembered per isolate; an attempt in flight is never shared with
+// another request (see succeed-once.server.ts). A failure isn't remembered, so
+// the next caller retries; lookups fall back to the full read meanwhile.
+const ensureSlugIndex = succeedOnce(async () => {
+  await ensureSchema();
+  try {
+    await db()
+      .prepare(
+        `ALTER TABLE property ADD COLUMN slug TEXT GENERATED ALWAYS AS (lower(json_extract(json,'$.slug'))) VIRTUAL`,
+      )
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!/duplicate column/i.test(message)) throw error;
+  }
+  await db().prepare(`CREATE INDEX IF NOT EXISTS property_slug ON property (slug)`).run();
+});
 
 /** One property by id and/or slug, in a single round trip of indexed lookups.
  *

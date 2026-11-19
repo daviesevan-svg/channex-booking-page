@@ -3,6 +3,7 @@
 import { env } from "cloudflare:workers";
 import { d1Retry } from "./d1-retry";
 import { boundD1ForRequest } from "./io-timeout";
+import { succeedOnce } from "./succeed-once.server";
 
 export const IMAGE_GC_GRACE_MS = 24 * 60 * 60 * 1000;
 export const IMAGE_GC_RETRY_MS = 6 * 60 * 60 * 1000;
@@ -53,15 +54,18 @@ export function imageGcDb(): D1Database | undefined {
   return boundD1ForRequest((env as unknown as { DB?: D1Database }).DB);
 }
 
-let ready: Promise<void> | undefined;
-export async function ensureImageGcSchema(): Promise<void> {
+// Success is remembered per isolate; an attempt in flight is never shared with
+// another request (see succeed-once.server.ts).
+const createImageGcSchema = succeedOnce(async () => {
   const d = imageGcDb();
   if (!d) return;
-  ready ??= d1Retry(() => d.batch(IMAGE_GC_SCHEMA.map((sql) => d.prepare(sql)))).then(() => {}).catch((error) => {
-    ready = undefined;
-    throw error;
-  });
-  return ready;
+  await d1Retry(() => d.batch(IMAGE_GC_SCHEMA.map((sql) => d.prepare(sql))));
+});
+export async function ensureImageGcSchema(): Promise<void> {
+  // No binding (tests, scripts): nothing to create, and nothing remembered, so
+  // a later call with the binding still creates the schema.
+  if (!imageGcDb()) return;
+  return createImageGcSchema();
 }
 
 // This list must cover every KV source read by referencedBy. Clone writes use
