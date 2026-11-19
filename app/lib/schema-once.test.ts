@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-// The schema is created once per isolate, including when the first callers
-// arrive together.
-//
-// The latch used to be a boolean set AFTER awaiting D1, which only makes a
-// caller that arrives after the first one has FINISHED skip the work. Every
-// request racing the first into a cold isolate — and a deploy makes every
-// request that — slipped past the flag while it was still false and sent the
-// same CREATE batch again.
+// The schema is created once per isolate. Callers that arrive together in ONE
+// request share a batch; callers in DIFFERENT requests never await each other's
+// batch, because Workers cancels a promise whose request has ended and a shared
+// one then failed every caller of the isolate ("This promise was created by a
+// request that has since ended"). See succeed-once.server.ts.
 
 let batches = 0;
 let fail = false;
@@ -27,18 +24,34 @@ const fakeD1 = {
 
 vi.mock("cloudflare:workers", () => ({ env: { DB: fakeD1 }, waitUntil: () => {} }));
 
+const { runWithRequestCache } = await import("./request-cache.server");
+
 describe("schemaOnce", () => {
-  it("sends one batch for callers that arrive together", async () => {
+  it("sends one batch for callers that arrive together in one request", async () => {
     const { schemaOnce } = await import("./d1.server");
     batches = 0;
     const ensure = schemaOnce((d) => [d.prepare(`CREATE TABLE IF NOT EXISTS t (a TEXT)`)]);
 
-    await Promise.all(Array.from({ length: 8 }, () => ensure()));
+    await runWithRequestCache(() => Promise.all(Array.from({ length: 8 }, () => ensure())));
     expect(batches).toBe(1);
 
-    // And still one after they have all settled.
+    // And none after it has succeeded, in any request.
+    await runWithRequestCache(() => ensure());
     await ensure();
     expect(batches).toBe(1);
+  });
+
+  it("gives concurrent requests their own batch instead of sharing one", async () => {
+    const { schemaOnce } = await import("./d1.server");
+    batches = 0;
+    const ensure = schemaOnce((d) => [d.prepare(`CREATE TABLE IF NOT EXISTS t (a TEXT)`)]);
+
+    // Three requests racing into a cold isolate: three idempotent batches, and
+    // none of them depends on another request staying alive.
+    await Promise.all([1, 2, 3].map(() => runWithRequestCache(() => ensure())));
+    expect(batches).toBe(3);
+    await runWithRequestCache(() => ensure());
+    expect(batches).toBe(3);
   });
 
   it("does not latch a failure — the next caller retries", async () => {
@@ -69,8 +82,8 @@ describe("schemaOnce", () => {
       hang = true;
       const ensure = schemaOnce((d) => [d.prepare(`CREATE TABLE IF NOT EXISTS t (a TEXT)`)]);
 
-      const first = ensure();
-      const second = ensure(); // arrives while the first is still pending: same batch
+      // Both calls in one request: the second shares the first's pending batch.
+      const [first, second] = runWithRequestCache(() => [ensure(), ensure()]);
       const settled = expect(first).rejects.toThrow(/did not respond within/);
       await vi.advanceTimersByTimeAsync(SCHEMA_TIMEOUT_MS + 1);
       await settled;
