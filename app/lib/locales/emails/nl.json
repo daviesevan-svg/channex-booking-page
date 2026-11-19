@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "Je boeking bij {hotel_name} is bevestigd ({reference})",
+    "heading": "Geboekt, {guest_first_name}!",
+    "intro": "Bedankt dat je rechtstreeks bij {hotel_name} hebt geboekt. Hier zijn de details van je verblijf — we kijken ernaar uit je te verwelkomen.",
+    "outro": "Wil je iets wijzigen? Gebruik op elk moment de knop ‘Boeking beheren’ hierboven. Tot snel!"
+  },
+  "booking_cancellation": {
+    "subject": "Je boeking bij {hotel_name} is geannuleerd ({reference})",
+    "heading": "Je boeking is geannuleerd",
+    "intro": "We hebben je boeking bij {hotel_name} geannuleerd, {guest_first_name}. De details van de geannuleerde reservering staan hieronder.",
+    "outro": "Heb je dit niet zelf aangevraagd? Neem dan direct contact met ons op."
+  },
+  "booking_failed": {
+    "subject": "We konden je boeking bij {hotel_name} niet bevestigen ({reference})",
+    "heading": "Sorry, {guest_first_name} — we konden je boeking niet bevestigen",
+    "intro": "Helaas was de kamer uitverkocht voordat je betaling was afgerond, dus we konden je verblijf bij {hotel_name} niet bevestigen. We hebben {refund_amount} volledig teruggestort op je kaart — het kan een paar dagen duren voordat je het ziet.",
+    "outro": "Sorry voor de teleurstelling. Probeer andere data, en neem gerust contact op als we kunnen helpen."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "We konden je boeking bij {hotel_name} niet bevestigen ({reference})",
+    "heading": "Sorry, {guest_first_name} — we konden je boeking niet bevestigen",
+    "intro": "Helaas was de kamer uitverkocht voordat je betaling was afgerond, dus we konden je verblijf bij {hotel_name} niet bevestigen. Je krijgt {refund_amount} volledig terug: het hotel stort het bedrag terug op je kaart, en daarna kan het een paar dagen duren voordat je het ziet.",
+    "outro": "Sorry voor de teleurstelling. Heb je de terugbetaling binnen een week nog niet ontvangen? Beantwoord dan gewoon deze e-mail."
+  },
+  "review_request": {
+    "subject": "Hoe was je verblijf bij {hotel_name}?",
+    "subject2": "Een minuutje om uw verblijf te beoordelen, {guest_first_name}?",
+    "subject3": "Laatste kans om uw verblijf bij {hotel_name} te beoordelen",
+    "heading": "Hoe was je verblijf, {guest_first_name}?",
+    "intro": "Bedankt voor je verblijf bij {hotel_name}. We horen graag hoe het was — jouw feedback helpt ons verbeteren en helpt toekomstige gasten kiezen.\n\nHet duurt maar een minuut — tik hieronder op een ster om te beginnen."
+  }
+}

@@ -53,6 +53,12 @@ export function weekdayNames(days: number[], tr: Translator): string {
     .join(", ");
 }
 
+/** Short weekday names ("Mo / Fr", "Po / Pá") in the guest's language, in the
+ *  order given — the voucher check-in days. */
+export function weekdayShortNames(days: readonly number[], tr: Translator, sep = " / "): string {
+  return days.map((d) => fmtDate(`2024-01-0${d === 0 ? 7 : d}`, "EEE", tr.locale)).join(sep);
+}
+
 /**
  * The offer's terms, one sentence per rule.
  *

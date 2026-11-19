@@ -7,9 +7,10 @@
 // reaches the browser as root loader data, registered by root's Layout before
 // anything renders. See `registerDict`.
 
-import { de, el, enGB, es, fr, it, mk, nl, pt, th, tr, type Locale } from "date-fns/locale";
+import { enGB, type Locale } from "date-fns/locale";
 
 import EN from "./locales/en";
+import { DATE_LOCALES } from "./locales/date-locales";
 import type { Dict } from "./i18n-dict";
 import { useProperty } from "./booking-context";
 
@@ -32,7 +33,26 @@ export function registerDict(lang: string, dict: Dict | null | undefined): void 
   DICTS.set(lang, dict);
 }
 
-const LOCALES: Record<string, Locale> = { en: enGB, fr, de, es, it, pt, nl, el, th, tr, mk };
+/** Which plural form a count takes. 1 is always `_one` and every other count
+ *  that CLDR also calls "one" (French 0, Russian 21) stays `_other`, which is
+ *  what every dictionary was written against. Languages with more forms add
+ *  keys for them — Slovak/Czech `_few` (2–4) — and fall back to `_other` when
+ *  a key has none. scripts/i18n.mjs mirrors this to decide which rows to export. */
+const PLURAL_RULES = new Map<string, Intl.PluralRules | null>();
+export function pluralForm(lang: string, n: number): string {
+  if (n === 1) return "one";
+  if (!PLURAL_RULES.has(lang)) {
+    let rules: Intl.PluralRules | null = null;
+    try {
+      rules = new Intl.PluralRules(lang);
+    } catch {
+      // unknown tag: English rules
+    }
+    PLURAL_RULES.set(lang, rules);
+  }
+  const cat = PLURAL_RULES.get(lang)?.select(n) ?? "other";
+  return cat === "one" ? "other" : cat;
+}
 
 function interpolate(s: string, vars?: Record<string, string | number>): string {
   return vars ? s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? `{${k}}`)) : s;
@@ -43,7 +63,7 @@ export interface Translator {
   locale: Locale;
   /** Translate a key with optional {var} interpolation. */
   t: (key: string, vars?: Record<string, string | number>) => string;
-  /** Pluralized key: picks `${key}_one` / `${key}_other` and fills {n}. */
+  /** Pluralized key: picks `${key}_one` / `_few` / … / `_other` (see pluralForm) and fills {n}. */
   p: (key: string, n: number, vars?: Record<string, string | number>) => string;
 }
 
@@ -52,10 +72,12 @@ export function makeTranslator(lang: string): Translator {
   const t = (key: string, vars?: Record<string, string | number>) =>
     interpolate(dict[key] ?? EN[key] ?? key, vars);
   const p = (key: string, n: number, vars?: Record<string, string | number>) => {
-    const k = `${key}_${n === 1 ? "one" : "other"}`;
-    return interpolate(dict[k] ?? EN[k] ?? key, { ...vars, n });
+    const form = pluralForm(lang, n);
+    const k = `${key}_${form}`;
+    const other = `${key}_${form === "one" ? "one" : "other"}`;
+    return interpolate(dict[k] ?? dict[other] ?? EN[other] ?? key, { ...vars, n });
   };
-  return { lang, locale: LOCALES[lang] ?? enGB, t, p };
+  return { lang, locale: DATE_LOCALES[lang] ?? enGB, t, p };
 }
 
 /** Localized "{n} adults[, {m} children]" label. */

@@ -1,0 +1,47 @@
+{
+  "label": "Türkçe",
+  "flag": "🇹🇷",
+  "search": {
+    "heading": "Konaklamanızı ayırtın",
+    "intro": "Güncel müsaitlik durumunu görün ve konaklamanızı doğrudan bizden ayırtın.",
+    "promoText": "Promosyon veya kurumsal kod ekleyin",
+    "searchButton": "Oda ara"
+  },
+  "pages": {
+    "results": {
+      "heading": "Odalarınızı seçin",
+      "editSearch": "Aramayı düzenle",
+      "cartTitle": "Konaklamanız",
+      "continueButton": "Bilgilere devam et"
+    },
+    "detail": {
+      "backLink": "Tüm odalar",
+      "amenitiesTitle": "Bu odada",
+      "rateTitle": "Fiyat planınızı seçin",
+      "addButton": "Konaklamanıza ekle"
+    },
+    "checkout": {
+      "heading": "Bilgileriniz",
+      "guestSection": "Misafir bilgileri",
+      "arrivalSection": "Varış ve istekler",
+      "requestsPlaceholder": "Sessiz oda, erken giriş, bilmemiz gereken her şey…",
+      "paymentSection": "Ödeme",
+      "paymentNote": "Esnek fiyat planınız otelde ödenir. Rezervasyonu garanti altına almak için yalnızca bir karta ihtiyacımız var — bugün tahsilat yapılmayacak.",
+      "completeButton": "Rezervasyonu tamamla"
+    },
+    "extras": {
+      "heading": "{room} odanızı zenginleştirin",
+      "intro": "Konaklamanızı özel kılacak isteğe bağlı ek hizmetler.",
+      "stayTitle": "Tüm konaklamanız için",
+      "summaryLabel": "Ekstralar",
+      "continueButton": "Devam et",
+      "skipButton": "Şimdilik geç"
+    },
+    "confirmation": {
+      "heading": "Her şey hazır",
+      "subtitle": "{hotel} tesisindeki konaklamanız onaylandı. Onay e-postanız yolda.",
+      "newBooking": "Yeni bir rezervasyon yap"
+    }
+  },
+  "euOrderButton": "Ödeme yükümlülüğüyle rezervasyon yap"
+}

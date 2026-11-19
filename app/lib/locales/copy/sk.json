@@ -1,0 +1,47 @@
+{
+  "label": "Slovenčina",
+  "flag": "🇸🇰",
+  "search": {
+    "heading": "Rezervujte si pobyt",
+    "intro": "Overte si aktuálnu dostupnosť a rezervujte pobyt priamo u nás.",
+    "promoText": "Pridať zľavový alebo firemný kód",
+    "searchButton": "Hľadať izby"
+  },
+  "pages": {
+    "results": {
+      "heading": "Vyberte si izby",
+      "editSearch": "Upraviť vyhľadávanie",
+      "cartTitle": "Váš pobyt",
+      "continueButton": "Pokračovať k údajom"
+    },
+    "detail": {
+      "backLink": "Všetky izby",
+      "amenitiesTitle": "Vybavenie izby",
+      "rateTitle": "Vyberte si tarifu",
+      "addButton": "Pridať k pobytu"
+    },
+    "checkout": {
+      "heading": "Vaše údaje",
+      "guestSection": "Údaje o hosťovi",
+      "arrivalSection": "Príchod a požiadavky",
+      "requestsPlaceholder": "Tichá izba, skorší príchod, čokoľvek, čo by sme mali vedieť…",
+      "paymentSection": "Platba",
+      "paymentNote": "Vašu flexibilnú tarifu zaplatíte v hoteli. Kartu potrebujeme len na garanciu rezervácie — dnes vám nič nestrhneme.",
+      "completeButton": "Dokončiť rezerváciu"
+    },
+    "extras": {
+      "heading": "Spríjemnite si pobyt v izbe {room}",
+      "intro": "Voliteľné doplnky, vďaka ktorým bude váš pobyt výnimočný.",
+      "stayTitle": "Na celý pobyt",
+      "summaryLabel": "Doplnky",
+      "continueButton": "Pokračovať",
+      "skipButton": "Teraz preskočiť"
+    },
+    "confirmation": {
+      "heading": "Všetko je pripravené",
+      "subtitle": "Váš pobyt v {hotel} je potvrdený. Potvrdzujúci e-mail je už na ceste.",
+      "newBooking": "Vytvoriť ďalšiu rezerváciu"
+    }
+  },
+  "euOrderButton": "Rezervovať s povinnosťou platby"
+}

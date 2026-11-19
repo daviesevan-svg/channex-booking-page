@@ -1,7 +1,7 @@
 // Every guest language, on the server only.
 //
 // The `.server` suffix is doing real work here: this module statically imports
-// all eleven dictionaries, and if the browser bundle could reach it we would be
+// every dictionary, and if the browser bundle could reach it we would be
 // straight back to shipping 46 kB gzipped of languages nobody on the page reads.
 // Nothing outside a loader may import this.
 //
@@ -10,19 +10,10 @@
 // module load is free: this is one server bundle, already in memory.
 
 import { registerDict, type Dict } from "./i18n";
-import de from "./locales/de";
-import el from "./locales/el";
-import en from "./locales/en";
-import es from "./locales/es";
-import fr from "./locales/fr";
-import it from "./locales/it";
-import mk from "./locales/mk";
-import nl from "./locales/nl";
-import pt from "./locales/pt";
-import th from "./locales/th";
-import tr from "./locales/tr";
+import { GUEST_DICTS } from "./locales/dicts.server";
 
-const ALL: Record<string, Dict> = { en, fr, de, es, it, pt, nl, el, th, tr, mk };
+// Generated from the files in app/lib/locales/ by `npm run i18n:sync`.
+const ALL: Record<string, Dict> = GUEST_DICTS;
 
 for (const [lang, dict] of Object.entries(ALL)) registerDict(lang, dict);
 

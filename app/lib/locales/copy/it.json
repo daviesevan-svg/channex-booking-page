@@ -1,0 +1,47 @@
+{
+  "label": "Italiano",
+  "flag": "🇮🇹",
+  "search": {
+    "heading": "Prenota il tuo soggiorno",
+    "intro": "Verifica la disponibilità in tempo reale e prenota il tuo soggiorno direttamente con noi.",
+    "promoText": "Aggiungi un codice promozionale o aziendale",
+    "searchButton": "Cerca camere"
+  },
+  "pages": {
+    "results": {
+      "heading": "Scegli le tue camere",
+      "editSearch": "Modifica ricerca",
+      "cartTitle": "Il tuo soggiorno",
+      "continueButton": "Continua ai dettagli"
+    },
+    "detail": {
+      "backLink": "Tutte le camere",
+      "amenitiesTitle": "In questa camera",
+      "rateTitle": "Scegli la tua tariffa",
+      "addButton": "Aggiungi al soggiorno"
+    },
+    "checkout": {
+      "heading": "I tuoi dati",
+      "guestSection": "Informazioni dell'ospite",
+      "arrivalSection": "Arrivo e richieste",
+      "requestsPlaceholder": "Camera silenziosa, arrivo anticipato, qualsiasi cosa dovremmo sapere…",
+      "paymentSection": "Pagamento",
+      "paymentNote": "La tua tariffa flessibile si paga in hotel. Ci serve solo una carta per garantire la prenotazione — oggi non verrà addebitato nulla.",
+      "completeButton": "Completa la prenotazione"
+    },
+    "extras": {
+      "heading": "Arricchisci la tua {room}",
+      "intro": "Extra facoltativi per rendere speciale il tuo soggiorno.",
+      "stayTitle": "Per tutto il tuo soggiorno",
+      "summaryLabel": "Extra",
+      "continueButton": "Continua",
+      "skipButton": "Salta per ora"
+    },
+    "confirmation": {
+      "heading": "Tutto pronto",
+      "subtitle": "Il tuo soggiorno presso {hotel} è confermato. Un'e-mail di conferma è in arrivo.",
+      "newBooking": "Effettua un'altra prenotazione"
+    }
+  },
+  "euOrderButton": "Prenota con obbligo di pagamento"
+}
