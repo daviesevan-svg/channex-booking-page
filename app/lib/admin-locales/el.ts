@@ -1702,6 +1702,8 @@ const EL: Record<string, string> = {
   txCharged: "Χρέωση",
   txVatAppliesCityTax: "Ο ΦΠΑ ισχύει για τον δημοτικό φόρο",
   txChildrenExempt: "Εξαίρεση παιδιών",
+  txExemptUnderAge: "κάτω των",
+  txExemptUnderAgeHint: "κενό = όλα τα παιδιά",
   txMaxNights: "Μέγιστες χρεώσιμες νύχτες",
   txNoCap: "(0 = χωρίς όριο)",
   txSeasonalRates: "Τιμές ανά σεζόν",

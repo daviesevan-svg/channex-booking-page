@@ -1825,6 +1825,8 @@ const EN: Record<string, string> = {
   txCharged: "Charged",
   txVatAppliesCityTax: "VAT applies to city tax",
   txChildrenExempt: "Children exempt",
+  txExemptUnderAge: "under age",
+  txExemptUnderAgeHint: "blank = every child",
   txMaxNights: "Max nights charged",
   txNoCap: "(0 = no cap)",
   txSeasonalRates: "Seasonal rates",

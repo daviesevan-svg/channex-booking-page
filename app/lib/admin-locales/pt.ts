@@ -1817,6 +1817,8 @@ const PT: Record<string, string> = {
   txCharged: "Cobrado",
   txVatAppliesCityTax: "IVA aplicável à taxa municipal",
   txChildrenExempt: "Crianças isentas",
+  txExemptUnderAge: "menores de",
+  txExemptUnderAgeHint: "vazio = todas as crianças",
   txMaxNights: "Máx. de noites cobradas",
   txNoCap: "(0 = sem limite)",
   txSeasonalRates: "Tarifas por época",

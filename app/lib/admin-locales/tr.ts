@@ -1879,6 +1879,8 @@ const TR: Record<string, string> = {
   txCharged: "Ücretlendirme",
   txVatAppliesCityTax: "Şehir vergisine KDV uygulanır",
   txChildrenExempt: "Çocuklar muaf",
+  txExemptUnderAge: "bu yaşın altı",
+  txExemptUnderAgeHint: "boş = tüm çocuklar",
   txMaxNights: "Ücretlendirilecek en fazla gece",
   txNoCap: "(0 = sınır yok)",
   txSeasonalRates: "Sezonluk tutarlar",

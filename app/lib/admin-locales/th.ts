@@ -1814,6 +1814,8 @@ const TH: Record<string, string> = {
   txCharged: "คิดค่า",
   txVatAppliesCityTax: "คิดภาษีมูลค่าเพิ่มกับภาษีท้องถิ่น",
   txChildrenExempt: "เด็กได้รับการยกเว้น",
+  txExemptUnderAge: "อายุต่ำกว่า",
+  txExemptUnderAgeHint: "เว้นว่าง = เด็กทุกคน",
   txMaxNights: "จำนวนคืนสูงสุดที่คิดค่า",
   txNoCap: "(0 = ไม่จำกัด)",
   txSeasonalRates: "อัตราตามฤดูกาล",

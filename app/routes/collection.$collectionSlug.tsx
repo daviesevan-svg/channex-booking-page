@@ -115,6 +115,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
                   nights,
                   adults: occ.adults,
                   children: occ.childrenAge.length,
+                  childrenAge: occ.childrenAge,
                   rooms: 1,
                   cleaningFee: room.cleaningFee ?? 0,
                   taxableExtras: 0,

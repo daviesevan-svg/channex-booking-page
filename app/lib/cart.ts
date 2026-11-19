@@ -77,7 +77,8 @@ export function replaceIndex(lines: CartLine[], index: number, line: CartLine): 
 export interface ResolvedLine extends CartLine {
   roomTitle: string;
   rateTitle: string;
-  occupancy: { adults: number; children: number; infants: number };
+  /** `childrenAge` = the ages of the `children` actually seated (capacity-capped). */
+  occupancy: { adults: number; children: number; infants: number; childrenAge?: number[] };
   total: number;
   net: number;
   /** Flat cleaning fee for this room (per stay). */
@@ -97,6 +98,8 @@ export interface ResolvedLine extends CartLine {
 export interface CartCoverage {
   adults: number;
   children: number;
+  /** Ages of the seated children across every line (a line without ages adds none). */
+  childrenAge: number[];
   capacity: number;
   total: number;
   net: number;
@@ -107,11 +110,12 @@ export function cartCoverage(resolved: ResolvedLine[]): CartCoverage {
     (acc, l) => ({
       adults: acc.adults + l.occupancy.adults,
       children: acc.children + l.occupancy.children,
+      childrenAge: [...acc.childrenAge, ...(l.occupancy.childrenAge ?? [])],
       capacity: acc.capacity + l.occupancy.adults + l.occupancy.children + l.occupancy.infants,
       total: acc.total + l.total,
       net: acc.net + l.net,
     }),
-    { adults: 0, children: 0, capacity: 0, total: 0, net: 0 },
+    { adults: 0, children: 0, childrenAge: [], capacity: 0, total: 0, net: 0 },
   );
 }
 

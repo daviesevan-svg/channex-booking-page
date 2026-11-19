@@ -727,7 +727,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
   if (ct !== undefined && ct !== null) {
     if (!isObj(ct)) ctx.fail("city_tax", "Must be an object or null.");
     else {
-      const allowed = new Set(["enabled", "name", "amount", "basis", "taxable", "children_exempt", "max_nights", "seasons"]);
+      const allowed = new Set(["enabled", "name", "amount", "basis", "taxable", "children_exempt", "children_exempt_under_age", "max_nights", "seasons"]);
       for (const k of Object.keys(ct)) if (!allowed.has(k)) ctx.fail("city_tax", `Unknown field "${k}".`);
       if (typeof ct.enabled !== "boolean") ctx.fail("city_tax", "`enabled` (boolean) is required.");
       const amount = typeof ct.amount === "number" && ct.amount >= 0 ? ct.amount : ctx.fail("city_tax", "`amount` must be a number ≥ 0.");
@@ -745,6 +745,12 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
           }
         }
       }
+      const underAge =
+        ct.children_exempt_under_age === undefined || ct.children_exempt_under_age === null
+          ? undefined
+          : typeof ct.children_exempt_under_age === "number" && Number.isInteger(ct.children_exempt_under_age) && ct.children_exempt_under_age >= 1 && ct.children_exempt_under_age <= 17
+            ? ct.children_exempt_under_age
+            : ctx.fail("city_tax", "`children_exempt_under_age` must be an integer 1–17 (children younger than it are exempt) or null for every child.");
       const maxNights = ct.max_nights === undefined ? 0 : typeof ct.max_nights === "number" && Number.isInteger(ct.max_nights) && ct.max_nights >= 0 ? ct.max_nights : ctx.fail("city_tax", "`max_nights` must be an integer ≥ 0 (0 = no cap).");
       if (!ctx.failed) {
         cityTax = {
@@ -754,6 +760,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
           basis: basis as CityTaxConfig["basis"],
           taxable: ct.taxable === true,
           childrenExempt: ct.children_exempt === true,
+          ...(ct.children_exempt === true && typeof underAge === "number" ? { childrenExemptUnderAge: underAge } : {}),
           maxNights: (maxNights as number) ?? 0,
           ...(seasons && seasons.length >= 2 ? { seasons } : {}),
         };

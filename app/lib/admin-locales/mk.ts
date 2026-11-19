@@ -1938,6 +1938,8 @@ const MK: Record<string, string> = {
   txCharged: "Се наплатува",
   txVatAppliesCityTax: "ДДВ се применува на туристичката такса",
   txChildrenExempt: "Децата се изземени",
+  txExemptUnderAge: "помлади од",
+  txExemptUnderAgeHint: "празно = сите деца",
   txMaxNights: "Максимум наплатени ноќи",
   txNoCap: "(0 = без ограничување)",
   txSeasonalRates: "Сезонски тарифи",

@@ -164,7 +164,7 @@ export const openApiSpec = {
   openapi: "3.1.0",
   info: {
     title: "Roompanda Booking API",
-    version: "1.6.0",
+    version: "1.7.0",
     description:
       "Commission-free direct-booking API. Each API key is scoped to a single property, so read endpoints take no property id. Authenticate with `Authorization: Bearer sk_live_…` (or `sk_test_…` for simulated bookings). All prices are in the property's own configured currency — there is no currency conversion, and currency is never a client input.",
   },
@@ -511,6 +511,12 @@ export const openApiSpec = {
                   basis: { type: "string", enum: ["person_night", "room_night", "room_stay"] },
                   taxable: { type: "boolean" },
                   children_exempt: { type: "boolean" },
+                  children_exempt_under_age: {
+                    type: ["integer", "null"],
+                    minimum: 1,
+                    maximum: 17,
+                    description: "With children_exempt: only children younger than this age are exempt (15 = ages 0–14 free; a 15-year-old pays like an adult). null = every child exempt. Pass children_ages on availability/bookings so the age limit can apply; a child whose age is not given is treated as exempt.",
+                  },
                   max_nights: { type: ["integer", "null"], minimum: 1, description: "Cap on nights charged; null = no cap." },
                   seasons: {
                     type: ["array", "null"],

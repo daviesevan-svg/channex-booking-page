@@ -303,6 +303,26 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   />
                   {t("txChildrenExempt")}
                 </label>
+                {cityTax.childrenExempt && cityTax.basis === "person_night" && (
+                  // Many cities exempt only children under a set age (e.g. 15).
+                  // Blank = every child the guest books as a child is exempt.
+                  <label className="flex items-center gap-2 text-[14px] font-semibold">
+                    {t("txExemptUnderAge")}
+                    <input
+                      type="number"
+                      min={1}
+                      max={17}
+                      step={1}
+                      value={cityTax.childrenExemptUnderAge ?? ""}
+                      onChange={(e) => {
+                        const n = Math.round(Number(e.target.value));
+                        setCity({ childrenExemptUnderAge: e.target.value === "" || !(n >= 1) ? undefined : Math.min(17, n) });
+                      }}
+                      className={`${smallInput} w-20`}
+                    />
+                    <span className="font-normal text-faint">{t("txExemptUnderAgeHint")}</span>
+                  </label>
+                )}
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
                   {t("txMaxNights")}
                   <input

@@ -172,7 +172,24 @@ export function serializeTaxConfig(s: SiteSettings) {
     taxes_inclusive: s.taxesInclusive ?? false,
     taxes: s.taxes ?? [],
     fees: s.fees ?? [],
-    city_tax: s.cityTax ?? null,
+    city_tax: s.cityTax ? serializeCityTax(s.cityTax) : null,
+  };
+}
+
+// The same snake_case shape PUT /v1/manage/taxes accepts, so a read-modify-write
+// round-trips. (It used to return the stored camelCase object, whose
+// `childrenExempt`/`maxNights` keys the validator rejects as unknown.)
+function serializeCityTax(ct: NonNullable<SiteSettings["cityTax"]>) {
+  return {
+    enabled: ct.enabled,
+    name: ct.name,
+    amount: ct.amount,
+    basis: ct.basis,
+    taxable: ct.taxable,
+    children_exempt: ct.childrenExempt,
+    children_exempt_under_age: ct.childrenExempt ? (ct.childrenExemptUnderAge ?? null) : null,
+    max_nights: ct.maxNights,
+    ...(ct.seasons?.length ? { seasons: ct.seasons } : {}),
   };
 }
 

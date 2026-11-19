@@ -38,6 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     nights,
     adults,
     children: childrenAge.length,
+    childrenAge,
     checkin,
     taxConfig: taxConfigFrom(settings),
     policyByRateId: policyMap(rates, settings.cancelAnchorTime),

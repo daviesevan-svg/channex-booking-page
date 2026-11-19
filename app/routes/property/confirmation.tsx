@@ -113,7 +113,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     extraLines,
     { nights, checkin: checkin ?? undefined, discount: applied?.discount },
     taxConfigFrom(settings),
-    { adults: occ.adults, children: occ.childrenAge?.length ?? 0 },
+    { adults: occ.adults, children: occ.childrenAge?.length ?? 0, childrenAge: occ.childrenAge },
   );
 
   // The analytics payload is built from the STORED booking, never from the
