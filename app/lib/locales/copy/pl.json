@@ -1,0 +1,47 @@
+{
+  "label": "Polski",
+  "flag": "🇵🇱",
+  "search": {
+    "heading": "Zarezerwuj pobyt",
+    "intro": "Sprawdź aktualną dostępność i zarezerwuj pobyt bezpośrednio u nas.",
+    "promoText": "Dodaj kod promocyjny lub firmowy",
+    "searchButton": "Szukaj pokoi"
+  },
+  "pages": {
+    "results": {
+      "heading": "Wybierz pokoje",
+      "editSearch": "Zmień wyszukiwanie",
+      "cartTitle": "Twój pobyt",
+      "continueButton": "Przejdź do danych"
+    },
+    "detail": {
+      "backLink": "Wszystkie pokoje",
+      "amenitiesTitle": "Wyposażenie pokoju",
+      "rateTitle": "Wybierz taryfę",
+      "addButton": "Dodaj do pobytu"
+    },
+    "checkout": {
+      "heading": "Twoje dane",
+      "guestSection": "Dane gościa",
+      "arrivalSection": "Przyjazd i życzenia",
+      "requestsPlaceholder": "Cichy pokój, wcześniejsze zameldowanie, wszystko, o czym powinniśmy wiedzieć…",
+      "paymentSection": "Płatność",
+      "paymentNote": "Za elastyczną taryfę zapłacisz na miejscu. Potrzebujemy tylko karty jako gwarancji rezerwacji — dziś nic nie pobierzemy.",
+      "completeButton": "Dokończ rezerwację"
+    },
+    "extras": {
+      "heading": "Uprzyjemnij sobie pobyt w pokoju {room}",
+      "intro": "Opcjonalne dodatki, dzięki którym Twój pobyt będzie wyjątkowy.",
+      "stayTitle": "Na cały pobyt",
+      "summaryLabel": "Dodatki",
+      "continueButton": "Dalej",
+      "skipButton": "Pomiń"
+    },
+    "confirmation": {
+      "heading": "Wszystko gotowe",
+      "subtitle": "Twój pobyt w obiekcie {hotel} został potwierdzony. E-mail z potwierdzeniem jest już w drodze.",
+      "newBooking": "Dokonaj kolejnej rezerwacji"
+    }
+  },
+  "euOrderButton": "Rezerwuję z obowiązkiem zapłaty"
+}

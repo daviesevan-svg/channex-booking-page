@@ -1,0 +1,33 @@
+{
+  "booking_confirmation": {
+    "subject": "Twoja rezerwacja w obiekcie {hotel_name} została potwierdzona ({reference})",
+    "heading": "Rezerwacja gotowa, {guest_first_name}!",
+    "intro": "Dziękujemy za rezerwację bezpośrednio w obiekcie {hotel_name}. Poniżej znajdziesz szczegóły swojego pobytu — nie możemy się doczekać, aż Cię powitamy.",
+    "outro": "Chcesz coś zmienić? W każdej chwili skorzystaj z przycisku „Zarządzaj rezerwacją” powyżej. Do zobaczenia!"
+  },
+  "booking_cancellation": {
+    "subject": "Twoja rezerwacja w obiekcie {hotel_name} została anulowana ({reference})",
+    "heading": "Twoja rezerwacja została anulowana",
+    "intro": "{guest_first_name}, anulowaliśmy Twoją rezerwację w obiekcie {hotel_name}. Szczegóły anulowanej rezerwacji znajdziesz poniżej.",
+    "outro": "Jeśli to nie była Twoja prośba, natychmiast się z nami skontaktuj."
+  },
+  "booking_failed": {
+    "subject": "Nie udało nam się potwierdzić Twojej rezerwacji w obiekcie {hotel_name} ({reference})",
+    "heading": "Przykro nam, {guest_first_name} — nie udało nam się potwierdzić Twojej rezerwacji",
+    "intro": "Niestety pokój został wyprzedany, zanim Twoja płatność została sfinalizowana, więc nie mogliśmy potwierdzić Twojego pobytu w obiekcie {hotel_name}. Zwróciliśmy pełną kwotę {refund_amount} na Twoją kartę — jej zaksięgowanie może potrwać kilka dni.",
+    "outro": "Przepraszamy za rozczarowanie. Spróbuj wybrać inne daty i śmiało się z nami skontaktuj, jeśli możemy w czymś pomóc."
+  },
+  "booking_failed_refund_pending": {
+    "subject": "Nie udało nam się potwierdzić Twojej rezerwacji w obiekcie {hotel_name} ({reference})",
+    "heading": "Przykro nam, {guest_first_name} — nie udało nam się potwierdzić Twojej rezerwacji",
+    "intro": "Niestety pokój został wyprzedany, zanim Twoja płatność została sfinalizowana, więc nie mogliśmy potwierdzić Twojego pobytu w obiekcie {hotel_name}. Przysługuje Ci zwrot pełnej kwoty {refund_amount}: obiekt zwróci ją na Twoją kartę, a jej zaksięgowanie może potem potrwać kilka dni.",
+    "outro": "Przepraszamy za rozczarowanie. Jeśli zwrot nie dotrze do Ciebie w ciągu tygodnia, po prostu odpowiedz na tę wiadomość."
+  },
+  "review_request": {
+    "subject": "Jak minął Twój pobyt w obiekcie {hotel_name}?",
+    "subject2": "Masz chwilę, by ocenić swój pobyt, {guest_first_name}?",
+    "subject3": "Ostatnia szansa, by ocenić pobyt w obiekcie {hotel_name}",
+    "heading": "Jak minął Twój pobyt, {guest_first_name}?",
+    "intro": "Dziękujemy za pobyt w obiekcie {hotel_name}. Chętnie dowiemy się, jak było — Twoja opinia pomaga nam stawać się lepszymi, a przyszłym gościom ułatwia wybór.\n\nZajmie to tylko chwilę — wystarczy kliknąć gwiazdkę poniżej."
+  }
+}

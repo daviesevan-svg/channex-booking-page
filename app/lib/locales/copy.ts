@@ -11,9 +11,10 @@ import fr from "./copy/fr.json";
 import it from "./copy/it.json";
 import mk from "./copy/mk.json";
 import nl from "./copy/nl.json";
+import pl from "./copy/pl.json";
 import pt from "./copy/pt.json";
 import sk from "./copy/sk.json";
 import th from "./copy/th.json";
 import tr from "./copy/tr.json";
 
-export const LOCALE_COPY: Record<string, LocaleCopy> = { cs, de, el, es, fr, it, mk, nl, pt, sk, th, tr };
+export const LOCALE_COPY: Record<string, LocaleCopy> = { cs, de, el, es, fr, it, mk, nl, pl, pt, sk, th, tr };
