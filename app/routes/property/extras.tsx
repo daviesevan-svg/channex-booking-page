@@ -10,7 +10,7 @@ import { cartCovers, parseCart } from "~/lib/cart";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
 import {
-  UNIT_LABEL,
+  type ExtraUnit,
   extraEligible,
   fromPrice,
   isConfigurable,
@@ -136,6 +136,16 @@ function Stepper({ qty, max, onDec, onInc }: { qty: number; max?: number; onDec:
 const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 11px,#e7ddcc 11px,#e7ddcc 22px)";
 
 type Tr = ReturnType<typeof useT>;
+
+/** "per night", "each"… in the guest's language. */
+const UNIT_KEY: Record<ExtraUnit, string> = {
+  stay: "unitStay",
+  night: "unitNight",
+  person: "unitPerson",
+  person_night: "unitPersonNight",
+  trip: "unitTrip",
+  item: "unitItem",
+};
 
 /** One selectable group of extras (a room's add-ons, or the stay-wide set),
  *  owning its own configure-modal state. Mutates the parent's selection list. */
@@ -397,7 +407,7 @@ function ExtraCard({
             {configurable
               ? `${tr.t("from")} ${formatMoney(fromPrice(extra), currency)}`
               : formatMoney(extra.price ?? 0, currency)}
-            <span className="text-label font-normal text-muted-2"> · {UNIT_LABEL[extra.unit]}</span>
+            <span className="text-label font-normal text-muted-2"> · {tr.t(UNIT_KEY[extra.unit])}</span>
           </span>
         </div>
         {extra.desc && <p className="mb-4 text-caption leading-[1.5] text-muted">{extra.desc}</p>}
@@ -535,7 +545,7 @@ function ConfigureModal({
                         <span className="text-body-lg font-semibold">{o.name}</span>
                         <span className="whitespace-nowrap text-body font-semibold">
                           {formatMoney(o.price, currency)}
-                          <span className="text-label font-normal text-muted-2"> · {UNIT_LABEL[o.unit ?? extra.unit]}</span>
+                          <span className="text-label font-normal text-muted-2"> · {tr.t(UNIT_KEY[o.unit ?? extra.unit])}</span>
                         </span>
                       </span>
                       {o.desc && <span className="mt-0.5 block text-caption text-muted">{o.desc}</span>}

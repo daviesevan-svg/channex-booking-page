@@ -10,9 +10,10 @@ import fr from "./emails/fr.json";
 import it from "./emails/it.json";
 import mk from "./emails/mk.json";
 import nl from "./emails/nl.json";
+import pl from "./emails/pl.json";
 import pt from "./emails/pt.json";
 import sk from "./emails/sk.json";
 import th from "./emails/th.json";
 import tr from "./emails/tr.json";
 
-export const LOCALE_EMAILS: Record<string, LocaleEmails> = { cs, de, el, es, fr, it, mk, nl, pt, sk, th, tr };
+export const LOCALE_EMAILS: Record<string, LocaleEmails> = { cs, de, el, es, fr, it, mk, nl, pl, pt, sk, th, tr };

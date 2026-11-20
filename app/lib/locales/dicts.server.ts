@@ -12,9 +12,10 @@ import fr from "./fr";
 import it from "./it";
 import mk from "./mk";
 import nl from "./nl";
+import pl from "./pl";
 import pt from "./pt";
 import sk from "./sk";
 import th from "./th";
 import tr from "./tr";
 
-export const GUEST_DICTS: Record<string, Dict> = { en, cs, de, el, es, fr, it, mk, nl, pt, sk, th, tr };
+export const GUEST_DICTS: Record<string, Dict> = { en, cs, de, el, es, fr, it, mk, nl, pl, pt, sk, th, tr };
