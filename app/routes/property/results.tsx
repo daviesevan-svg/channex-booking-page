@@ -31,6 +31,7 @@ import { viewItemListEvent } from "~/lib/tracking";
 import { isTagged } from "~/lib/tracking-settings";
 import { TrackCart, TrackFunnel } from "~/components/tracking-events";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { serverTranslator } from "~/lib/i18n-locales.server";
 import { stayTotals } from "~/lib/checkout-totals";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
@@ -149,7 +150,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // Tax-/fee-inclusive (all-in) total per rate, so the headline price matches the
   // checkout total and the Google structured data. Computed once here and shown
   // both on the card and in the JSON-LD below.
-  const taxConfig = taxConfigFrom(settings);
+  const taxConfig = taxConfigFrom(settings, serverTranslator(lang));
   const r2 = (n: number) => Math.round(n * 100) / 100;
   const allIn = (base: number, cleaningFee: number) =>
     r2(
@@ -173,6 +174,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     parseCart(url.searchParams),
     { adults: occ.adults, childrenAge: occ.childrenAge },
     inventory,
+    lang,
   );
   const coverage = cartCoverage(cartLines);
   const covered = cartCovers(cartLines, occ);

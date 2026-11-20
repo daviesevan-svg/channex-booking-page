@@ -11,6 +11,9 @@ export interface TaxRule {
   id: string;
   name: string;
   rate: number; // percent
+  /** The name per guest language ({ sk: "DPH" }); a language without one shows
+   *  `name`. Guest pages pick it up through taxConfigFrom(settings, guest). */
+  nameTranslations?: Record<string, string>;
 }
 
 export type CityTaxBasis = "person_night" | "room_night" | "room_stay";
@@ -43,6 +46,9 @@ export interface CityTaxConfig {
    *  season containing its DATE (a cross-season stay mixes rates, per night);
    *  nights outside every season fall back to `amount`. */
   seasons?: CityTaxSeason[];
+  /** The name per guest language ({ sk: "DPH" }); a language without one shows
+   *  `name`. Guest pages pick it up through taxConfigFrom(settings, guest). */
+  nameTranslations?: Record<string, string>;
 }
 
 /** The nightly city-tax amount for a calendar date (ISO yyyy-mm-dd). With
@@ -85,6 +91,9 @@ export interface FeeRule {
   taxable: boolean;
   /** Fixed fees only. Absent = "booking" (flat per stay — the legacy shape). */
   basis?: FeeBasis;
+  /** The name per guest language ({ sk: "DPH" }); a language without one shows
+   *  `name`. Guest pages pick it up through taxConfigFrom(settings, guest). */
+  nameTranslations?: Record<string, string>;
 }
 
 /** Multiplier for a fixed fee's basis. Persons = adults + children. */
@@ -109,6 +118,8 @@ export interface TaxConfig {
   taxes: TaxRule[];
   fees: FeeRule[];
   cityTax?: CityTaxConfig;
+  /** The engine's own line labels in the guest's language. Absent = English. */
+  labels?: { cleaningFee: string; cityTax: string };
 }
 
 export interface PricingInput {
@@ -173,7 +184,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   // Cleaning fee — flat, per stay, always counts towards VAT (part of the room price).
   const cleaning = round2(input.cleaningFee ?? 0);
   if (cleaning > 0) {
-    charges.push({ label: "Cleaning fee", amount: cleaning, kind: "fee" });
+    charges.push({ label: cfg.labels?.cleaningFee ?? "Cleaning fee", amount: cleaning, kind: "fee" });
     chargesTotal += cleaning;
     taxableExtra += cleaning;
   }
@@ -216,7 +227,7 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
             (input.checkin ? cityTaxNightlyAmount(ct, input.checkin) : ct.amount) * rooms,
     );
     if (amount > 0) {
-      charges.push({ label: ct.name || "City tax", amount, kind: "tax" });
+      charges.push({ label: ct.name || cfg.labels?.cityTax || "City tax", amount, kind: "tax" });
       chargesTotal += amount;
       if (ct.taxable) taxableExtra += amount;
     }
@@ -253,17 +264,76 @@ export function computePricing(input: PricingInput, cfg: TaxConfig): Pricing {
   };
 }
 
-/** Build the engine's config from the loosely-typed site settings. */
-export function taxConfigFrom(settings: {
+/** What a guest page passes to get its tax lines in the guest's language. */
+export interface GuestLabels {
+  lang: string;
+  t: (key: string) => string;
+}
+
+/** The name the property stores when it leaves a city tax unnamed — shown in
+ *  the guest's language instead (`cityTax` label) unless translated. */
+const DEFAULT_CITY_TAX_NAME = "City tax";
+
+type TaxSettings = {
   taxesInclusive?: boolean;
   taxes?: TaxRule[];
   fees?: FeeRule[];
   cityTax?: CityTaxConfig;
-}): TaxConfig {
-  return {
+};
+
+/** Build the engine's config from the loosely-typed site settings. With
+ *  `guest`, every tax, fee and city-tax name and the engine's own labels come
+ *  out in the guest's language; without it (bookings API, admin, the stored
+ *  record) they stay as the property typed them. */
+export function taxConfigFrom(settings: TaxSettings, guest?: GuestLabels): TaxConfig {
+  const base: TaxConfig = {
     inclusive: settings.taxesInclusive === true,
     taxes: settings.taxes ?? [],
     fees: settings.fees ?? [],
     cityTax: settings.cityTax,
   };
+  if (!guest) return base;
+  const named = <T extends { name: string; nameTranslations?: Record<string, string> }>(r: T): T => {
+    const own = r.nameTranslations?.[guest.lang]?.trim();
+    return own ? { ...r, name: own } : r;
+  };
+  const ct = base.cityTax;
+  return {
+    ...base,
+    taxes: base.taxes.map(named),
+    fees: base.fees.map(named),
+    cityTax: ct
+      ? ct.nameTranslations?.[guest.lang]?.trim()
+        ? named(ct)
+        : // Left at the default name: the guest's word for it, not English.
+          !ct.name || ct.name === DEFAULT_CITY_TAX_NAME
+          ? { ...ct, name: "" }
+          : ct
+      : undefined,
+    labels: { cleaningFee: guest.t("cleaningFee"), cityTax: guest.t("cityTax") },
+  };
+}
+
+/** Stored charge label → the same line in the guest's language. A booking
+ *  snapshots its labels as the property named them (the record and the hotel's
+ *  copy); the guest's emails relabel through this. Labels are rebuilt the way
+ *  computePricing writes them, so a tax renamed since simply doesn't match and
+ *  keeps its stored text. */
+export function guestChargeLabels(settings: TaxSettings, guest: GuestLabels): Map<string, string> {
+  const from = taxConfigFrom(settings);
+  const to = taxConfigFrom(settings, guest);
+  const out = new Map<string, string>();
+  const add = (a: string, b: string) => {
+    if (a && b && a !== b) out.set(a, b);
+  };
+  add("Cleaning fee", to.labels!.cleaningFee);
+  from.taxes.forEach((t, i) => add(`${t.name} (${t.rate}%)`, `${to.taxes[i].name} (${t.rate}%)`));
+  from.fees.forEach((f, i) =>
+    add(
+      f.kind === "percent" ? `${f.name} (${f.amount}%)` : f.name,
+      f.kind === "percent" ? `${to.fees[i].name} (${f.amount}%)` : to.fees[i].name,
+    ),
+  );
+  if (from.cityTax) add(from.cityTax.name || DEFAULT_CITY_TAX_NAME, to.cityTax?.name || to.labels!.cityTax);
+  return out;
 }

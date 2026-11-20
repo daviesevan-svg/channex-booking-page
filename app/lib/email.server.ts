@@ -28,6 +28,8 @@ import { accentHex, composeEmail, composeReviewEmail, DEFAULT_ACCENT_HEX, emailB
 import { emailBrandFor } from "./site-style";
 import { getEmailTemplate, getOverrides, getSettings } from "./overrides.server";
 import { brandOf, getPartner, partnerForProperty } from "./partners.server";
+import { serverTranslator } from "./i18n-locales.server";
+import { guestChargeLabels } from "./pricing";
 
 export interface SendEmailOptions {
   to: string | string[];
@@ -102,6 +104,28 @@ export async function senderFor(pid: string, settings: SiteSettings): Promise<st
   return `${settings.emailFromName} <${addr}>`;
 }
 
+/** The booking as the guest should read it: room, rate, tax and fee names in
+ *  their language. The record keeps the base names it was booked under, and the
+ *  host emails show those. */
+async function forGuest(pid: string, booking: BookingRecord): Promise<BookingRecord> {
+  const lang = booking.lang;
+  if (!lang || lang === DEFAULT_LANG) return booking;
+  try {
+    // Lazy: the catalogue pulls in the ARI/D1 stack, which nothing else in
+    // this module needs (and which the email tests don't load).
+    const { localizeBookingRooms } = await import("./catalog.server");
+    const [rooms, settings] = await Promise.all([localizeBookingRooms(pid, booking.rooms, lang), getSettings(pid)]);
+    const labels = guestChargeLabels(settings, serverTranslator(lang));
+    const relabel = <T extends { label: string }>(l: T): T => ({ ...l, label: labels.get(l.label) ?? l.label });
+    const pricing = booking.pricing
+      ? { ...booking.pricing, charges: booking.pricing.charges.map(relabel), taxLines: booking.pricing.taxLines.map(relabel) }
+      : booking.pricing;
+    return { ...booking, rooms, pricing };
+  } catch {
+    return booking;
+  }
+}
+
 /** Send (or re-send) just the guest booking confirmation. Returns whether the
  *  send was accepted, so the admin "Resend email" button can show the outcome.
  *  Never throws. */
@@ -116,7 +140,7 @@ export async function sendGuestBookingEmail(pid: string, booking: BookingRecord,
     // The contract terms, in a form the guest keeps — § 312i(1) BGB. See
     // legalLinksForEmail; host emails drop them inside composeEmail.
     const legal = legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG);
-    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking, hotelName, brand, manageUrl, legal });
+    const g = composeEmail({ def: emailDef("booking_confirmation")!, text: gtext, booking: await forGuest(pid, booking), hotelName, brand, manageUrl, legal });
     const r = await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
     return r.sent;
   } catch (e) {
@@ -168,7 +192,7 @@ export async function sendBookingFailedEmail(pid: string, booking: BookingRecord
     const refundPending = booking.payment?.mode === "payment" && !booking.payment.refund;
     const guestId = refundPending ? "booking_failed_refund_pending" : "booking_failed";
     const text = await getEmailTemplate(pid, guestId, booking.lang);
-    const g = composeEmail({ def: emailDef(guestId)!, text, booking, hotelName, brand, manageUrl: "", legal: legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG) });
+    const g = composeEmail({ def: emailDef(guestId)!, text, booking: await forGuest(pid, booking), hotelName, brand, manageUrl: "", legal: legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG) });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
 
     const hostTo = settings.hostNotifyEmail || ov.email;
@@ -516,7 +540,7 @@ export async function sendCancellationEmails(pid: string, booking: BookingRecord
 
     const gtext = await getEmailTemplate(pid, "booking_cancellation", booking.lang);
     const legal = legalLinksForEmail(settings, booking.lang ?? DEFAULT_LANG);
-    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking, hotelName, brand, manageUrl, legal });
+    const g = composeEmail({ def: emailDef("booking_cancellation")!, text: gtext, booking: await forGuest(pid, booking), hotelName, brand, manageUrl, legal });
     await sendEmail({ to: booking.guest.email, subject: g.subject, html: g.html, from, replyTo: settings.emailReplyTo });
 
     const hostTo = settings.hostNotifyEmail || ov.email;

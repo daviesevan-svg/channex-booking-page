@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "No hemos podido confirmar tu reserva en {hotel_name} ({reference})",
     "heading": "Lo sentimos, {guest_first_name}: no hemos podido confirmar tu reserva",
-    "intro": "Lamentablemente, la habitación se agotó antes de completarse tu pago, así que no hemos podido confirmar tu estancia en {hotel_name}. Tienes derecho al reembolso íntegro de {refund_amount}: el hotel te lo devolverá en tu tarjeta y, después, puede tardar unos días en aparecer.",
+    "intro": "Lamentablemente, la habitación se agotó antes de completarse tu pago, así que no hemos podido confirmar tu estancia en {hotel_name}. Tienes derecho al reembolso íntegro de {refund_amount}: el alojamiento te lo devolverá en tu tarjeta y, después, puede tardar unos días en aparecer.",
     "outro": "Sentimos la decepción. Si el reembolso no te ha llegado en una semana, responde a este correo."
   },
   "review_request": {

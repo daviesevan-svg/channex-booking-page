@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "Nous n'avons pas pu confirmer votre réservation à {hotel_name} ({reference})",
     "heading": "Désolé, {guest_first_name} — nous n'avons pas pu confirmer votre réservation",
-    "intro": "Malheureusement, la chambre s'est vendue avant la fin de votre paiement et nous n'avons pas pu confirmer votre séjour à {hotel_name}. Vous avez droit au remboursement intégral de {refund_amount} : l'hôtel le reversera sur votre carte, et il peut ensuite falloir quelques jours pour qu'il apparaisse.",
+    "intro": "Malheureusement, la chambre s'est vendue avant la fin de votre paiement et nous n'avons pas pu confirmer votre séjour à {hotel_name}. Vous avez droit au remboursement intégral de {refund_amount} : l'établissement le reversera sur votre carte, et il peut ensuite falloir quelques jours pour qu'il apparaisse.",
     "outro": "Nous sommes désolés de cette déception. Si le remboursement ne vous est pas parvenu d'ici une semaine, répondez simplement à cet e-mail."
   },
   "review_request": {

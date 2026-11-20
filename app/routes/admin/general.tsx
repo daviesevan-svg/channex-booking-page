@@ -317,6 +317,24 @@ export default function AdminGeneral({ loaderData, actionData }: Route.Component
           </label>
         </section>
 
+        {/* Marketing opt-in at checkout */}
+        <section className="border-t border-divider pt-6">
+          <div className="mb-1 font-serif text-[18px] font-semibold">{t("genMarketingOptIn")}</div>
+          <p className="mb-3 text-[13px] text-muted">{t("genMarketingOptInHint")}</p>
+          <label className="flex cursor-pointer items-start gap-3 rounded-[10px] border border-line-alt bg-surface-alt px-4 py-3">
+            <input
+              type="checkbox"
+              name="marketingOptIn"
+              defaultChecked={settings.marketingOptIn !== false}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-[14px] font-semibold text-ink">{t("genMarketingOptInLabel")}</span>
+              <span className="block text-[12px] text-muted">{t("genMarketingOptInDesc")}</span>
+            </span>
+          </label>
+        </section>
+
         <section className="border-t border-divider pt-6">
           <div className="mb-1 font-serif text-[18px] font-semibold">{t("genLegalLinks")}</div>
           <p className="mb-3 text-[13px] text-muted">{t("genLegalLinksHint")}</p>

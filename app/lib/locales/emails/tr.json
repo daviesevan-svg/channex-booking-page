@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "{hotel_name} rezervasyonunuzu onaylayamadık ({reference})",
     "heading": "Üzgünüz {guest_first_name} — rezervasyonunuzu onaylayamadık",
-    "intro": "Ne yazık ki ödemeniz tamamlanmadan oda tükendi ve {hotel_name} konaklamanızı onaylayamadık. {refund_amount} tutarının tamamı size iade edilecek: iadeyi otel kartınıza yapacak, ardından görünmesi birkaç gün sürebilir.",
+    "intro": "Ne yazık ki ödemeniz tamamlanmadan oda tükendi ve {hotel_name} konaklamanızı onaylayamadık. {refund_amount} tutarının tamamı size iade edilecek: iadeyi tesis kartınıza yapacak, ardından görünmesi birkaç gün sürebilir.",
     "outro": "Yaşattığımız hayal kırıklığı için üzgünüz. İade bir hafta içinde size ulaşmazsa bu e-postayı yanıtlamanız yeterli."
   },
   "review_request": {

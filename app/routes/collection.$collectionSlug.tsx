@@ -31,6 +31,7 @@ import {
 import { getOverrides, getSettings } from "~/lib/overrides.server";
 import { getProperties } from "~/lib/properties.server";
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { serverTranslator } from "~/lib/i18n-locales.server";
 import { isStayBookable } from "~/lib/dates";
 import { useDateRange } from "~/lib/use-date-range";
 
@@ -103,7 +104,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           { gate: true },
         ).catch(() => []);
         soldOut = rooms.length === 0;
-        const taxConfig = taxConfigFrom(settings);
+        const taxConfig = taxConfigFrom(settings, serverTranslator(lang));
         let cheapest = Infinity;
         let cheapestRoom: (typeof rooms)[number] | null = null;
         for (const room of rooms) {

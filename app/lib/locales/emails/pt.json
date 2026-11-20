@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "Não conseguimos confirmar a sua reserva em {hotel_name} ({reference})",
     "heading": "Lamentamos, {guest_first_name} — não conseguimos confirmar a sua reserva",
-    "intro": "Infelizmente, o quarto esgotou antes de o seu pagamento ficar concluído, pelo que não conseguimos confirmar a sua estadia em {hotel_name}. Tem direito ao reembolso total de {refund_amount}: o hotel vai devolvê-lo para o seu cartão e, depois disso, pode demorar alguns dias a aparecer.",
+    "intro": "Infelizmente, o quarto esgotou antes de o seu pagamento ficar concluído, pelo que não conseguimos confirmar a sua estadia em {hotel_name}. Tem direito ao reembolso total de {refund_amount}: o alojamento vai devolvê-lo para o seu cartão e, depois disso, pode demorar alguns dias a aparecer.",
     "outro": "Lamentamos a desilusão. Se o reembolso não lhe chegar no prazo de uma semana, basta responder a este e-mail."
   },
   "review_request": {

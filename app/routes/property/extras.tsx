@@ -31,6 +31,7 @@ import { useBase, useHome } from "~/lib/base";
 import { requireDatedStay } from "~/lib/dated-stay.server";
 import { cartTokenMap } from "~/lib/cart-tokens";
 import { isTagged } from "~/lib/tracking-settings";
+import { langFromRequest } from "~/lib/content";
 import { TrackCart } from "~/components/tracking-events";
 import { useSlots } from "~/components/site-style";
 import { cx } from "~/lib/site-style";
@@ -49,6 +50,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     { checkin, checkout, currency },
     parseCart(url.searchParams),
     { adults: occ.adults, childrenAge: occ.childrenAge },
+    undefined,
+    langFromRequest(request, settings),
   );
   const line = cartLines[lineIndex];
   if (!line) throw redirect(`${base}/rooms?${sp}`);

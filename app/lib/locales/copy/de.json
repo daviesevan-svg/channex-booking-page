@@ -26,7 +26,7 @@
       "arrivalSection": "Anreise & Wünsche",
       "requestsPlaceholder": "Ruhiges Zimmer, frühe Anreise, alles, was wir wissen sollten…",
       "paymentSection": "Zahlung",
-      "paymentNote": "Ihr flexibler Tarif wird im Hotel bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.",
+      "paymentNote": "Ihr flexibler Tarif wird vor Ort bezahlt. Wir benötigen nur eine Karte zur Garantie der Buchung – heute wird nichts abgebucht.",
       "completeButton": "Buchung abschließen"
     },
     "extras": {
@@ -39,7 +39,7 @@
     },
     "confirmation": {
       "heading": "Alles erledigt",
-      "subtitle": "Ihr Aufenthalt im {hotel} ist bestätigt. Eine Bestätigungs-E-Mail ist unterwegs.",
+      "subtitle": "Ihr Aufenthalt bei {hotel} ist bestätigt. Eine Bestätigungs-E-Mail ist unterwegs.",
       "newBooking": "Weitere Buchung vornehmen"
     }
   },

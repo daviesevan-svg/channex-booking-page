@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "We konden je boeking bij {hotel_name} niet bevestigen ({reference})",
     "heading": "Sorry, {guest_first_name} — we konden je boeking niet bevestigen",
-    "intro": "Helaas was de kamer uitverkocht voordat je betaling was afgerond, dus we konden je verblijf bij {hotel_name} niet bevestigen. Je krijgt {refund_amount} volledig terug: het hotel stort het bedrag terug op je kaart, en daarna kan het een paar dagen duren voordat je het ziet.",
+    "intro": "Helaas was de kamer uitverkocht voordat je betaling was afgerond, dus we konden je verblijf bij {hotel_name} niet bevestigen. Je krijgt {refund_amount} volledig terug: de accommodatie stort het bedrag terug op je kaart, en daarna kan het een paar dagen duren voordat je het ziet.",
     "outro": "Sorry voor de teleurstelling. Heb je de terugbetaling binnen een week nog niet ontvangen? Beantwoord dan gewoon deze e-mail."
   },
   "review_request": {

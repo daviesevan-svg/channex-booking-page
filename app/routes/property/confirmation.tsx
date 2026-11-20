@@ -17,6 +17,7 @@ import { TrackEvent } from "~/components/tracking-events";
 
 import { resolveAppliedPromo } from "~/lib/promotions.server";
 import { taxConfigFrom } from "~/lib/pricing";
+import { serverTranslator } from "~/lib/i18n-locales.server";
 import { stayTotals } from "~/lib/checkout-totals";
 import { resolveCartByOccupancy } from "~/lib/catalog.server";
 import { getActiveExtras } from "~/lib/extras.server";
@@ -65,6 +66,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       { checkin, checkout, currency },
       parseCart(url.searchParams),
       { adults: occ.adults, childrenAge: occ.childrenAge },
+      undefined,
+      lang,
     );
     // The photo travels with the line — it was dropped here, so the card below
     // fell back to its placeholder for every booking ever made, on properties
@@ -112,7 +115,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lines,
     extraLines,
     { nights, checkin: checkin ?? undefined, discount: applied?.discount },
-    taxConfigFrom(settings),
+    taxConfigFrom(settings, serverTranslator(lang)),
     { adults: occ.adults, children: occ.childrenAge?.length ?? 0, childrenAge: occ.childrenAge },
   );
 

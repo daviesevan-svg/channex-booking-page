@@ -219,6 +219,27 @@ export async function deleteRoom(pid: string, id: string): Promise<void> {
 }
 
 // ---- rates ----
+/** A booking's room and rate names in the guest's language, for what the guest
+ *  reads (their emails). The record keeps the base names it was booked under —
+ *  the Channex push and the hotel's copy use those — so this maps by id at
+ *  read time. A room or rate deleted since, or with no translation, keeps the
+ *  stored name. */
+export async function localizeBookingRooms<T extends { roomId: string; rateId?: string; roomTitle: string; rateTitle: string }>(
+  pid: string,
+  rooms: T[],
+  lang: string | undefined,
+): Promise<T[]> {
+  if (!lang || rooms.length === 0) return rooms;
+  const [rs, rts] = await Promise.all([getRooms(pid).catch(() => []), getRates(pid).catch(() => [])]);
+  const roomName = new Map(rs.map((r) => [r.id, r.translations?.[lang]?.title?.trim()]));
+  const rateName = new Map(rts.map((r) => [r.id, r.translations?.[lang]?.title?.trim()]));
+  return rooms.map((r) => ({
+    ...r,
+    roomTitle: roomName.get(r.roomId) || r.roomTitle,
+    rateTitle: (r.rateId && rateName.get(r.rateId)) || r.rateTitle,
+  }));
+}
+
 export async function getRates(pid: string): Promise<CatalogRate[]> {
   return (await readArr<CatalogRate>(ratesKey(pid))).map(normalizeRate);
 }
@@ -588,6 +609,10 @@ export async function resolveCartByOccupancy(
   lines: CartLine[],
   searched: { adults: number; childrenAge: number[] },
   inventory?: StayInventory,
+  /** The guest's language, for pages that SHOW the cart: room and rate names
+   *  arrive translated. Leave it out where the line is stored on a booking —
+   *  the record, the Channex push and the hotel's copy keep the base names. */
+  lang?: string,
 ): Promise<ResolvedLine[]> {
   const occOf = (l: CartLine) => lineOccupancy(l, searched);
   const sig = (o: { adults: number; childrenAge: number[] }) =>
@@ -617,7 +642,7 @@ export async function resolveCartByOccupancy(
                 adults: occ.adults,
                 childrenAge: occ.childrenAge,
               },
-              { gate: true, inventory: inv },
+              { gate: true, inventory: inv, lang },
             ),
           ] as const,
       ),
