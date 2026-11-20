@@ -9,7 +9,7 @@
 // language and SSR has no chance to await a chunk mid-render. Registering at
 // module load is free: this is one server bundle, already in memory.
 
-import { registerDict, type Dict } from "./i18n";
+import { makeTranslator, registerDict, type Dict, type Translator } from "./i18n";
 import { GUEST_DICTS } from "./locales/dicts.server";
 
 // Generated from the files in app/lib/locales/ by `npm run i18n:sync`.
@@ -26,4 +26,12 @@ for (const [lang, dict] of Object.entries(ALL)) registerDict(lang, dict);
 export function guestDictFor(lang: string): Dict | null {
   if (!lang || lang === "en") return null;
   return ALL[lang] ?? null;
+}
+
+/** A server-side translator for `lang`. Importing it from here (rather than
+ *  calling makeTranslator directly) guarantees every dictionary is registered
+ *  first — a loader that reaches makeTranslator before this module has loaded
+ *  would silently get English. */
+export function serverTranslator(lang: string): Translator {
+  return makeTranslator(lang);
 }

@@ -4,6 +4,7 @@ import type { Route } from "./+types/manage-booking";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { cancelBookingIfActive, getBooking, stayAvailabilityItems } from "~/lib/bookings.server";
+import { localizeBookingRooms } from "~/lib/catalog.server";
 import { cancelChannexBooking } from "~/lib/booking-finalize.server";
 import { groupExtrasByRoom } from "~/lib/extras";
 import { incrementAvailability } from "~/lib/ari/admin.server";
@@ -66,8 +67,11 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const settings = await getSettings(pid);
   const gate = cancelGate(booking, Boolean(settings.allowCancel), cancelAnchor(settings));
+  const lang = langFromRequest(request, settings);
   return {
-    booking,
+    // Room and rate names in the language the guest is reading; the stored
+    // record keeps the base names (display-only, nothing is written back).
+    booking: { ...booking, rooms: await localizeBookingRooms(pid, booking.rooms, lang) },
     canCancel: gate.canCancel,
     cancelReason: gate.reason,
     // Inside a paying band: what was paid, what comes back, and the charge —
@@ -79,7 +83,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         : null,
     // In the guest's own language, falling back to the hotel's default-language
     // text (and, if they never wrote one, to our built-in string at render).
-    afterDeadlineMessage: await getPortalMessage(pid, langFromRequest(request, settings)),
+    afterDeadlineMessage: await getPortalMessage(pid, lang),
   };
 }
 

@@ -1,33 +1,33 @@
 {
   "booking_confirmation": {
-    "subject": "Vaša rezervácia v {hotel_name} je potvrdená ({reference})",
+    "subject": "Vaša rezervácia v zariadení {hotel_name} je potvrdená ({reference})",
     "heading": "Rezervácia je hotová, {guest_first_name}!",
-    "intro": "Ďakujeme, že ste si pobyt v {hotel_name} rezervovali priamo u nás. Tu sú podrobnosti o Vašom pobyte — už sa tešíme, že Vás privítame.",
+    "intro": "Ďakujeme, že ste si pobyt v zariadení {hotel_name} rezervovali priamo u nás. Tu sú podrobnosti o Vašom pobyte — už sa tešíme, že Vás privítame.",
     "outro": "Potrebujete niečo zmeniť? Kedykoľvek použite tlačidlo „Spravovať rezerváciu“ vyššie. Dovidenia čoskoro!"
   },
   "booking_cancellation": {
-    "subject": "Vaša rezervácia v {hotel_name} bola zrušená ({reference})",
+    "subject": "Vaša rezervácia v zariadení {hotel_name} bola zrušená ({reference})",
     "heading": "Vaša rezervácia je zrušená",
-    "intro": "{guest_first_name}, Vašu rezerváciu v {hotel_name} sme zrušili. Podrobnosti o zrušenej rezervácii nájdete nižšie.",
+    "intro": "{guest_first_name}, Vašu rezerváciu v zariadení {hotel_name} sme zrušili. Podrobnosti o zrušenej rezervácii nájdete nižšie.",
     "outro": "Ak ste o zrušenie nežiadali, kontaktujte nás, prosím, ihneď."
   },
   "booking_failed": {
-    "subject": "Vašu rezerváciu v {hotel_name} sa nám nepodarilo potvrdiť ({reference})",
+    "subject": "Vašu rezerváciu v zariadení {hotel_name} sa nám nepodarilo potvrdiť ({reference})",
     "heading": "Prepáčte, {guest_first_name} — Vašu rezerváciu sa nám nepodarilo potvrdiť",
-    "intro": "Izba sa, žiaľ, vypredala skôr, než sa dokončila Vaša platba, preto sme Váš pobyt v {hotel_name} nemohli potvrdiť. Celú sumu {refund_amount} sme Vám vrátili na kartu — pripísanie môže trvať niekoľko dní.",
+    "intro": "Izba sa, žiaľ, vypredala skôr, než sa dokončila Vaša platba, preto sme Váš pobyt v zariadení {hotel_name} nemohli potvrdiť. Celú sumu {refund_amount} sme Vám vrátili na kartu — pripísanie môže trvať niekoľko dní.",
     "outro": "Mrzí nás, že to nevyšlo. Skúste, prosím, iné dátumy a ak Vám môžeme s niečím pomôcť, kontaktujte nás."
   },
   "booking_failed_refund_pending": {
-    "subject": "Vašu rezerváciu v {hotel_name} sa nám nepodarilo potvrdiť ({reference})",
+    "subject": "Vašu rezerváciu v zariadení {hotel_name} sa nám nepodarilo potvrdiť ({reference})",
     "heading": "Prepáčte, {guest_first_name} — Vašu rezerváciu sa nám nepodarilo potvrdiť",
-    "intro": "Izba sa, žiaľ, vypredala skôr, než sa dokončila Vaša platba, preto sme Váš pobyt v {hotel_name} nemohli potvrdiť. Máte nárok na vrátenie celej sumy {refund_amount}: hotel Vám ju pošle späť na kartu a pripísanie potom môže trvať niekoľko dní.",
+    "intro": "Izba sa, žiaľ, vypredala skôr, než sa dokončila Vaša platba, preto sme Váš pobyt v zariadení {hotel_name} nemohli potvrdiť. Máte nárok na vrátenie celej sumy {refund_amount}: zariadenie Vám ju pošle späť na kartu a pripísanie potom môže trvať niekoľko dní.",
     "outro": "Mrzí nás, že to nevyšlo. Ak Vám peniaze do týždňa neprídu, stačí odpovedať na tento e-mail."
   },
   "review_request": {
-    "subject": "Aký bol Váš pobyt v {hotel_name}?",
+    "subject": "Aký bol Váš pobyt v zariadení {hotel_name}?",
     "subject2": "Máte minútku na ohodnotenie pobytu, {guest_first_name}?",
-    "subject3": "Posledná možnosť ohodnotiť Váš pobyt v {hotel_name}",
+    "subject3": "Posledná možnosť ohodnotiť Váš pobyt v zariadení {hotel_name}",
     "heading": "Aký bol Váš pobyt, {guest_first_name}?",
-    "intro": "Ďakujeme, že ste sa ubytovali v {hotel_name}. Radi by sme vedeli, ako ste boli spokojní — Vaša spätná väzba nám pomáha zlepšovať sa a budúcim hosťom uľahčuje výber.\n\nZaberie to len minútku — stačí ťuknúť na hviezdičku nižšie."
+    "intro": "Ďakujeme, že ste sa ubytovali v zariadení {hotel_name}. Radi by sme vedeli, ako ste boli spokojní — Vaša spätná väzba nám pomáha zlepšovať sa a budúcim hosťom uľahčuje výber.\n\nZaberie to len minútku — stačí ťuknúť na hviezdičku nižšie."
   }
 }

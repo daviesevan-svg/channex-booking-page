@@ -5,6 +5,7 @@ import { parseHHMM } from "./dates";
 import type { CityTaxConfig, FeeRule, TaxRule } from "./pricing";
 import {
   bookingCutoffOf,
+  cleanNameTranslations,
   DEFAULT_LANG,
   DEFAULT_PROMO_PLACEHOLDER,
   emailDef,
@@ -593,6 +594,7 @@ export async function saveSettings(
     bookingCutoffDays: cutoffDays(form.get("bookingCutoffDays")),
     bookingCutoffTime: cleanTime(form.get("bookingCutoffTime")),
     preselectFirstAvailable: form.get("preselectFirstAvailable") === "on",
+    marketingOptIn: form.get("marketingOptIn") === "on",
   };
   await writeJson(settingsKey(pid), next);
   return next;
@@ -814,6 +816,12 @@ function validChildAge(v: unknown): boolean {
   return Number.isInteger(n) && n >= 1 && n <= 17;
 }
 
+/** `nameTranslations`, cleaned, as a spreadable fragment (nothing when empty). */
+const withNames = (v: unknown) => {
+  const names = cleanNameTranslations(v);
+  return names ? { nameTranslations: names } : {};
+};
+
 export async function saveTaxSettings(pid: string, form: FormData): Promise<SiteSettings> {
   const existing = await getSettings(pid);
 
@@ -822,6 +830,7 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
       id: String(t.id || rid()),
       name: String(t.name ?? "").trim() || "VAT",
       rate: clamp(num(t.rate), 0, 100),
+      ...withNames(t.nameTranslations),
     }))
     .filter((t) => t.rate > 0);
 
@@ -842,6 +851,7 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
         amount: num(f.amount),
         taxable: f.taxable === true,
         ...(basis ? { basis } : {}),
+        ...withNames(f.nameTranslations),
       };
     })
     .filter((f) => f.amount > 0);
@@ -871,6 +881,7 @@ export async function saveTaxSettings(pid: string, form: FormData): Promise<Site
           : {}),
         maxNights: Math.round(num(ctRaw.maxNights)),
         ...(seasons.length >= 2 ? { seasons } : {}),
+        ...withNames(ctRaw.nameTranslations),
       }
     : undefined;
 

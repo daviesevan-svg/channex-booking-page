@@ -8,7 +8,7 @@
 // domain shape ready for the catalog savers; the wire format is snake_case
 // like the read serializers.
 import type { CatalogRate, CatalogRoom } from "./catalog.server";
-import { PROPERTY_FACILITIES, VR_AMENITY_KEYS, isLang, DEFAULT_LANG, type DeadlineUnit, type SiteSettings } from "./content";
+import { PROPERTY_FACILITIES, VR_AMENITY_KEYS, isLang, DEFAULT_LANG, cleanNameTranslations, type DeadlineUnit, type SiteSettings } from "./content";
 import { isSupportedCurrency } from "./currencies";
 import { IMAGE_URL_HINT, isPropertyImageUrl } from "./image-paths";
 import { parseHHMM } from "./dates";
@@ -662,6 +662,23 @@ const CITY_BASES = new Set(["person_night", "room_night", "room_stay"]);
 const MMDD = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 const rid = () => Math.random().toString(36).slice(2, 10);
 
+/** `name_translations` on a tax, fee or city tax: { "<lang>": "<name>" } with
+ *  guest language codes other than the base one. Returns the stored fragment
+ *  ({} when absent or empty) or fails the field. */
+function nameTranslationsOf(ctx: Ctx, field: string, v: unknown): { nameTranslations?: Record<string, string> } {
+  if (v === undefined || v === null) return {};
+  if (!isObj(v)) {
+    ctx.fail(field, "name_translations must be an object of language code → name.");
+    return {};
+  }
+  for (const [lang, name] of Object.entries(v)) {
+    if (!isLang(lang) || lang === DEFAULT_LANG) ctx.fail(field, `name_translations: "${lang}" is not a guest language other than ${DEFAULT_LANG}.`);
+    else if (typeof name !== "string") ctx.fail(field, `name_translations.${lang} must be a string.`);
+  }
+  const names = cleanNameTranslations(v);
+  return names ? { nameTranslations: names } : {};
+}
+
 export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
   const ctx = new Ctx();
   if (!isObj(body)) return { ok: false, errors: { body: ["Must be a JSON object."] } };
@@ -679,7 +696,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
       // that sent it meant something by it.
       if (!isObj(t) || typeof t.name !== "string" || !t.name.trim()) ctx.fail(`taxes[${i}]`, "Needs a non-empty name.");
       else if (typeof t.rate !== "number" || !(t.rate > 0) || t.rate > 100) ctx.fail(`taxes[${i}]`, "rate must be a percent > 0 and ≤ 100.");
-      else taxes.push({ id: typeof t.id === "string" && t.id.trim() ? t.id.trim() : rid(), name: t.name.trim(), rate: t.rate });
+      else taxes.push({ id: typeof t.id === "string" && t.id.trim() ? t.id.trim() : rid(), name: t.name.trim(), rate: t.rate, ...nameTranslationsOf(ctx, `taxes[${i}]`, t.name_translations) });
     }
   }
 
@@ -718,6 +735,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
         amount: f.amount,
         taxable: f.taxable === true,
         ...(basis ? { basis } : {}),
+        ...nameTranslationsOf(ctx, `fees[${i}]`, f.name_translations),
       });
     }
   }
@@ -727,7 +745,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
   if (ct !== undefined && ct !== null) {
     if (!isObj(ct)) ctx.fail("city_tax", "Must be an object or null.");
     else {
-      const allowed = new Set(["enabled", "name", "amount", "basis", "taxable", "children_exempt", "children_exempt_under_age", "max_nights", "seasons"]);
+      const allowed = new Set(["enabled", "name", "amount", "basis", "taxable", "children_exempt", "children_exempt_under_age", "max_nights", "seasons", "name_translations"]);
       for (const k of Object.keys(ct)) if (!allowed.has(k)) ctx.fail("city_tax", `Unknown field "${k}".`);
       if (typeof ct.enabled !== "boolean") ctx.fail("city_tax", "`enabled` (boolean) is required.");
       const amount = typeof ct.amount === "number" && ct.amount >= 0 ? ct.amount : ctx.fail("city_tax", "`amount` must be a number ≥ 0.");
@@ -751,6 +769,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
           : typeof ct.children_exempt_under_age === "number" && Number.isInteger(ct.children_exempt_under_age) && ct.children_exempt_under_age >= 1 && ct.children_exempt_under_age <= 17
             ? ct.children_exempt_under_age
             : ctx.fail("city_tax", "`children_exempt_under_age` must be an integer 1–17 (children younger than it are exempt) or null for every child.");
+      const ctNames = nameTranslationsOf(ctx, "city_tax", ct.name_translations);
       const maxNights = ct.max_nights === undefined ? 0 : typeof ct.max_nights === "number" && Number.isInteger(ct.max_nights) && ct.max_nights >= 0 ? ct.max_nights : ctx.fail("city_tax", "`max_nights` must be an integer ≥ 0 (0 = no cap).");
       if (!ctx.failed) {
         cityTax = {
@@ -763,6 +782,7 @@ export function validateTaxDocument(body: unknown): Validated<TaxDocument> {
           ...(ct.children_exempt === true && typeof underAge === "number" ? { childrenExemptUnderAge: underAge } : {}),
           maxNights: (maxNights as number) ?? 0,
           ...(seasons && seasons.length >= 2 ? { seasons } : {}),
+          ...ctNames,
         };
       }
     }

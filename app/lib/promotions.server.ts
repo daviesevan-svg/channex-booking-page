@@ -25,6 +25,17 @@ export async function getPromotions(pid: string): Promise<Promotion[]> {
   }
 }
 
+/** Is there any code a guest could type at checkout? An enabled code-triggered
+ *  promotion with a code. Without one the promo box is dead weight (and an
+ *  invitation to go hunting for codes elsewhere). Fails open. */
+export async function hasPromoCodes(pid: string): Promise<boolean> {
+  try {
+    return (await getPromotions(pid)).some((p) => p.enabled && p.trigger === "code" && Boolean(normalizeCode(p.code ?? "")));
+  } catch {
+    return true;
+  }
+}
+
 /** The enabled promotion matching a guest-entered code, if any. */
 export async function findPromotionByCode(
   pid: string,

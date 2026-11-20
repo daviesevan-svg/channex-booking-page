@@ -126,7 +126,7 @@ export const EDITABLE_PAGES: PageDef[] = [
         label: "Payment note",
         textarea: true,
         default:
-          "Your flexible rate is paid at the hotel. We only need a card to guarantee the booking — you won't be charged today.",
+          "Your flexible rate is paid on site. We only need a card to guarantee the booking — you won't be charged today.",
       },
       { key: "completeButton", label: "Complete button", default: "Complete booking" },
     ],
@@ -446,6 +446,10 @@ export interface SiteSettings {
    *  available check-in + its shortest valid stay) already selected. Pre-fills
    *  the fields only — no search runs until the guest asks for one. */
   preselectFirstAvailable?: boolean;
+  /** The "send me offers and news" checkbox at checkout. Unset = shown (the
+   *  long-standing behaviour); false = not asked, and every booking records
+   *  marketingOptIn: false. */
+  marketingOptIn?: boolean;
   // ----- Check-in / check-out times -----
   /** "HH:MM" local check-in-from and check-out-by times. Shown to guests and
    *  emitted in Google structured data; default 15:00 / 11:00 when unset. */
@@ -641,6 +645,21 @@ export function enabledLanguages(settings: Pick<SiteSettings, "languages" | "def
   return LANGUAGES.map((l) => l.code).filter((c) => set.has(c));
 }
 
+/** Per-language names for a tax, fee or city tax, cleaned for storage: known
+ *  language codes other than the base one, trimmed, empty dropped, capped
+ *  length. Undefined when nothing is left, so an untranslated rule stores no
+ *  key at all. */
+export function cleanNameTranslations(v: unknown): Record<string, string> | undefined {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [lang, name] of Object.entries(v as Record<string, unknown>)) {
+    if (lang === DEFAULT_LANG || !isLang(lang) || typeof name !== "string") continue;
+    const t = name.trim().slice(0, 120);
+    if (t) out[lang] = t;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Returns a normalized #rrggbb / #rgb hex, or undefined if invalid. */
 export function normalizeHex(value: string): string | undefined {
   const s = value.trim();
@@ -827,7 +846,7 @@ export const EMAIL_TEMPLATES: EmailDef[] = [
       subject: "We couldn't confirm your booking at {hotel_name} ({reference})",
       heading: "Sorry, {guest_first_name} — we couldn't confirm your booking",
       intro:
-        "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. You're owed a full refund of {refund_amount}: the hotel will send it back to your card, and it can take a few days to appear after that.",
+        "Unfortunately the room sold out before your payment completed, so we couldn't confirm your stay at {hotel_name}. You're owed a full refund of {refund_amount}: the property will send it back to your card, and it can take a few days to appear after that.",
       outro: "We're sorry for the disappointment. If the refund hasn't reached you within a week, just reply to this email.",
     }),
   },

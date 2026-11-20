@@ -26,7 +26,7 @@
       "arrivalSection": "Príchod a požiadavky",
       "requestsPlaceholder": "Tichá izba, skorší príchod, čokoľvek, čo by sme mali vedieť…",
       "paymentSection": "Platba",
-      "paymentNote": "Vašu flexibilnú tarifu zaplatíte v hoteli. Kartu potrebujeme len na garanciu rezervácie — dnes vám nič nestrhneme.",
+      "paymentNote": "Vašu flexibilnú tarifu zaplatíte na mieste. Kartu potrebujeme len na garanciu rezervácie — dnes vám nič nestrhneme.",
       "completeButton": "Dokončiť rezerváciu"
     },
     "extras": {
@@ -39,7 +39,7 @@
     },
     "confirmation": {
       "heading": "Všetko je pripravené",
-      "subtitle": "Váš pobyt v {hotel} je potvrdený. Potvrdzujúci e-mail je už na ceste.",
+      "subtitle": "Váš pobyt v zariadení {hotel} je potvrdený. Potvrdzujúci e-mail je už na ceste.",
       "newBooking": "Vytvoriť ďalšiu rezerváciu"
     }
   },

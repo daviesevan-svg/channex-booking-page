@@ -11,7 +11,7 @@ import { Trans } from "~/components/trans";
 import { pageMeta } from "~/lib/page-meta";
 import type { RoomWithRates } from "~/lib/channex/types";
 import { displayStatus, giftBalance, normalizeVoucherCode } from "~/lib/vouchers";
-import { holdGiftAmount, lookupVoucherGuarded, releaseGiftHold } from "~/lib/vouchers.server";
+import { acceptsGiftVouchers, holdGiftAmount, lookupVoucherGuarded, releaseGiftHold } from "~/lib/vouchers.server";
 import { useProperty } from "~/lib/booking-context";
 import {
   cartCoverage,
@@ -32,7 +32,7 @@ import { dueNow } from "~/lib/policy-copy";
 import { describePolicy } from "~/lib/rate-policy";
 import { cancellationBandMessages, cancellationMessage, formatCancelDeadline } from "~/lib/cancellation";
 import { consentGate, stayTotals } from "~/lib/checkout-totals";
-import { resolveAppliedPromo } from "~/lib/promotions.server";
+import { hasPromoCodes, resolveAppliedPromo } from "~/lib/promotions.server";
 import { normalizeCode, type AppliedPromo } from "~/lib/promotions";
 import { getActiveExtras } from "~/lib/extras.server";
 import { parseExtrasState, resolveAllExtras, serializeExtrasState, type ExtraContextLine } from "~/lib/extras";
@@ -40,6 +40,7 @@ import { PriceBreakdown } from "~/components/price-breakdown";
 import { getConfig } from "~/lib/config.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { taxConfigFrom } from "~/lib/pricing";
+import { serverTranslator } from "~/lib/i18n-locales.server";
 import { buildCheckoutSessionParams, createCheckoutSession, stripeLocale } from "~/lib/stripe.server";
 import { createVivaOrder, toVivaMinor, vivaCheckoutUrl } from "~/lib/viva.server";
 import { IYZICO_PLACEHOLDER_IDENTITY, initializeCheckoutForm } from "~/lib/iyzico.server";
@@ -80,6 +81,9 @@ interface Stay {
 async function resolveStayCart(
   stay: Stay,
   url: URL,
+  /** Set by the loader, which shows the cart; unset in the action, whose lines
+   *  are stored on the booking under the property's base names. */
+  lang?: string,
 ): Promise<{ rooms: RoomWithRates[]; lines: ResolvedLine[] }> {
   // One ARI read for the page: the catalog below and every cart occupancy group
   // price the same stay, so they share this slice.
@@ -93,7 +97,7 @@ async function resolveStayCart(
       adults: stay.occ.adults,
       childrenAge: stay.occ.childrenAge,
     },
-    { gate: true, inventory },
+    { gate: true, inventory, lang },
   );
   const lines = await resolveCartByOccupancy(
     stay.channelId,
@@ -101,6 +105,7 @@ async function resolveStayCart(
     parseCart(url.searchParams),
     { adults: stay.occ.adults, childrenAge: stay.occ.childrenAge },
     inventory,
+    lang,
   );
   return { rooms, lines };
 }
@@ -154,7 +159,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const stay: Stay = { channelId: pid, checkin, checkout, currency, occ };
 
   const lang = langFromRequest(request, settings);
-  const { rooms, lines } = await resolveStayCart(stay, url);
+  const { rooms, lines } = await resolveStayCart(stay, url, lang);
   if (!cartCovers(lines, stay.occ) || !withinAvailability(parseCart(url.searchParams), rooms)) {
     throw redirect(`${base}/rooms?${url.searchParams.toString()}`);
   }
@@ -205,7 +210,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     lines,
     extraLines,
     { nights, checkin: stay.checkin, discount: urlPromo?.discount },
-    taxConfigFrom(settings),
+    taxConfigFrom(settings, serverTranslator(lang)),
   );
 
   const trackedStay = {
@@ -258,11 +263,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     grandTotal,
   );
 
+  // Boxes and boxes-to-tick only where they do something (see each helper).
+  const [promoBox, voucherBox] = await Promise.all([hasPromoCodes(pid), acceptsGiftVouchers(pid)]);
+
   return {
     stay,
     lines: linesView,
     nights,
     totals,
+    promoBox,
+    voucherBox,
+    askMarketing: settings.marketingOptIn !== false,
     originalSubtotal,
     offer,
     text,
@@ -302,7 +313,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
           stay: trackedStay,
         }
       : null,
-    taxConfig: taxConfigFrom(settings),
+    taxConfig: taxConfigFrom(settings, serverTranslator(lang)),
     jsonLd,
     // Set by a gateway return URL when a charge was refused: "refunded" (Viva —
     // the money went back) or "held" (iyzico, 2C2P — the hotel refunds by hand).
@@ -466,7 +477,9 @@ export async function action({ params, request }: Route.ActionArgs) {
     // What they ticked, as it was worded to them — the label can be edited
     // later, and a consent record that changes afterwards defends nothing.
     acceptedPolicies: acceptLinks.length ? acceptLinks.map((l) => l.label) : undefined,
-    marketingOptIn: form.get("marketing") === "on",
+    // A property that switched the checkbox off never asked, so nothing is
+    // recorded as a yes even if a stale tab posts one.
+    marketingOptIn: settings.marketingOptIn !== false && form.get("marketing") === "on",
   };
 
   // Carry the cart params onto the post-payment confirmation page.
@@ -897,7 +910,7 @@ function LegalRef({ url, label }: { url?: string | null; label: string }) {
 export default function Checkout({ loaderData, actionData, params }: Route.ComponentProps) {
   const base = useBase();
   const home = useHome();
-  const { stay, lines, nights, totals, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, arrivalTimes: arrivalOptions, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, euConsumer, tracking, notice } = loaderData;
+  const { stay, lines, nights, totals, promoBox, voucherBox, askMarketing, text, offer, originalSubtotal, extraLines, policy, cancellation, mixedCancellation, cancelAnchor, arrivalTimes: arrivalOptions, termsUrl, privacyUrl, acceptLinks, jsonLd, collectsCard, euConsumer, tracking, notice } = loaderData;
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
@@ -1102,13 +1115,16 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           <section className={cx(s.panel, "p-[26px]")}>
             <h3 className="mb-[18px] font-serif text-title-md font-semibold">{text.guestSection}</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field name="firstName" label={tr.t("firstName")} placeholder="Jamie" autoComplete="given-name" error={errors?.firstName?.map((k) => tr.t(k))} />
-              <Field name="lastName" label={tr.t("lastName")} placeholder="Doyle" autoComplete="family-name" error={errors?.lastName?.map((k) => tr.t(k))} />
-              <Field name="email" label={tr.t("email")} type="email" autoComplete="email" inputMode="email" placeholder="jamie@email.com" error={errors?.email?.map((k) => tr.t(k))} />
-              {/* type=tel, not text: it's what brings up the phone keypad. The
+              <Field name="firstName" label={tr.t("firstName")} autoComplete="given-name" error={errors?.firstName?.map((k) => tr.t(k))} />
+              <Field name="lastName" label={tr.t("lastName")} autoComplete="family-name" error={errors?.lastName?.map((k) => tr.t(k))} />
+              <Field name="email" label={tr.t("email")} type="email" autoComplete="email" inputMode="email" error={errors?.email?.map((k) => tr.t(k))} />
+              {/* No sample names or addresses: an English "Jamie Doyle" read as
+                  untranslated text on every other language's page. The phone
+                  hint is translated — international guests need the prefix.
+                  type=tel, not text: it's what brings up the phone keypad. The
                   value stays a free-text string — numbers are typed with spaces,
                   dashes and country prefixes and the server parses it as text. */}
-              <Field name="phone" label={tr.t("phone")} type="tel" autoComplete="tel" inputMode="tel" placeholder="+44 …" error={errors?.phone?.map((k) => tr.t(k))} />
+              <Field name="phone" label={tr.t("phone")} type="tel" autoComplete="tel" inputMode="tel" placeholder={tr.t("phonePlaceholder")} error={errors?.phone?.map((k) => tr.t(k))} />
             </div>
           </section>
 
@@ -1282,81 +1298,87 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
             </div>
           )}
 
-          {/* promo code */}
-          <div className={cx("border-b", s.rule, "py-4")}>
-            {/* htmlFor/id, not nesting: the input sits in a flex row with its
-                Apply button, so it can't be a child of the label. Without the
-                pairing the field was announced with no name at all. */}
-            <label
-              htmlFor="promoCode"
-              className="block text-label font-semibold uppercase tracking-wide text-muted-2"
-            >
-              {tr.t("promoCode")}
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                id="promoCode"
-                name="promoCode"
-                defaultValue={promoCodeValue}
-                placeholder="SUMMER10"
-                autoComplete="off"
-                className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
-              />
-              <button
-                type="submit"
-                name="intent"
-                value="applyPromo"
-                formNoValidate
-                disabled={submitting}
-                className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+          {/* promo code — only when the property has a code a guest could type
+              (or one is already in play, from the URL or a failed Apply) */}
+          {(promoBox || promoCodeValue) && (
+            <div className={cx("border-b", s.rule, "py-4")}>
+              {/* htmlFor/id, not nesting: the input sits in a flex row with its
+                  Apply button, so it can't be a child of the label. Without the
+                  pairing the field was announced with no name at all. */}
+              <label
+                htmlFor="promoCode"
+                className="block text-label font-semibold uppercase tracking-wide text-muted-2"
               >
-                {tr.t("applyCode")}
-              </button>
+                {tr.t("promoCode")}
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="promoCode"
+                  name="promoCode"
+                  defaultValue={promoCodeValue}
+                  placeholder="SUMMER10"
+                  autoComplete="off"
+                  className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
+                />
+                <button
+                  type="submit"
+                  name="intent"
+                  value="applyPromo"
+                  formNoValidate
+                  disabled={submitting}
+                  className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+                >
+                  {tr.t("applyCode")}
+                </button>
+              </div>
+              {promoError && <p className="mt-1.5 text-label text-danger">{tr.t("promoInvalid")}</p>}
+              {appliedPromo && discount > 0 && (
+                <p className="mt-1.5 text-label text-success">{tr.t("promoApplied")}</p>
+              )}
             </div>
-            {promoError && <p className="mt-1.5 text-label text-danger">{tr.t("promoInvalid")}</p>}
-            {appliedPromo && discount > 0 && (
-              <p className="mt-1.5 text-label text-success">{tr.t("promoApplied")}</p>
-            )}
-          </div>
+          )}
 
-          {/* gift voucher — pays (part of) the amount due today */}
-          <div className={cx("border-b", s.rule, "py-4")}>
-            <label
-              htmlFor="voucherCode"
-              className="block text-label font-semibold uppercase tracking-wide text-muted-2"
-            >
-              {tr.t("voucherHave")}
-            </label>
-            <div className="mt-2 flex gap-2">
-              <input
-                id="voucherCode"
-                name="voucherCode"
-                defaultValue={voucherCodeValue}
-                placeholder="RP-XXXX-XXXX"
-                autoComplete="off"
-                className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
-              />
-              <button
-                type="submit"
-                name="intent"
-                value="applyVoucher"
-                formNoValidate
-                disabled={submitting}
-                className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+          {/* gift voucher — pays (part of) the amount due today; only where a
+              gift voucher can exist at all */}
+          {(voucherBox || voucherCodeValue) && (
+            <div className={cx("border-b", s.rule, "py-4")}>
+              <label
+                htmlFor="voucherCode"
+                className="block text-label font-semibold uppercase tracking-wide text-muted-2"
               >
-                {tr.t("applyCode")}
-              </button>
+                {tr.t("voucherHave")}
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="voucherCode"
+                  name="voucherCode"
+                  defaultValue={voucherCodeValue}
+                  placeholder="RP-XXXX-XXXX"
+                  autoComplete="off"
+                  className={cx("min-w-0 flex-1", s.field, "px-3 py-2.5 text-body uppercase text-ink outline-none focus:border-accent")}
+                />
+                <button
+                  type="submit"
+                  name="intent"
+                  value="applyVoucher"
+                  formNoValidate
+                  disabled={submitting}
+                  className={cx("flex-none rounded-control border border-line-alt bg-surface px-4 py-2.5 text-caption font-semibold text-ink hover:border-accent hover:text-accent disabled:opacity-60")}
+                >
+                  {tr.t("applyCode")}
+                </button>
+              </div>
+              {voucherError === true && <p className="mt-1.5 text-label text-danger">{tr.t("voucherInvalid")}</p>}
+              {voucherError === "payAtHotel" && (
+                <p className="mt-1.5 text-label text-notice">{tr.t("voucherPayAtHotel")}</p>
+              )}
+              {appliedVoucher && voucherApplied > 0 && (
+                <p className="mt-1.5 text-label text-success">
+                  {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
+                </p>
+              )}
             </div>
-            {voucherError === true && <p className="mt-1.5 text-label text-danger">{tr.t("voucherInvalid")}</p>}
-            {voucherError === "payAtHotel" && (
-              <p className="mt-1.5 text-label text-notice">{tr.t("voucherPayAtHotel")}</p>
-            )}
-            {appliedVoucher && voucherApplied > 0 && (
-              <p className="mt-1.5 text-label text-success">
-                {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
-              </p>
-            )}
-          </div>
+          )}
 
           <PriceBreakdown
             pricing={pricing}
@@ -1446,20 +1468,22 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               </label>
             )}
 
-            <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-muted">
-              <input
-                type="checkbox"
-                name="marketing"
-                checked={marketing}
-                onChange={(e) => setMarketing(e.target.checked)}
-                className={checkboxCls}
-              />
-              <span>
-                {hotelName
-                  ? tr.t("marketingOptInFrom", { hotel: hotelName })
-                  : tr.t("marketingOptIn")}
-              </span>
-            </label>
+            {askMarketing && (
+              <label className="flex items-start gap-2.5 text-caption leading-[1.5] text-muted">
+                <input
+                  type="checkbox"
+                  name="marketing"
+                  checked={marketing}
+                  onChange={(e) => setMarketing(e.target.checked)}
+                  className={checkboxCls}
+                />
+                <span>
+                  {hotelName
+                    ? tr.t("marketingOptInFrom", { hotel: hotelName })
+                    : tr.t("marketingOptIn")}
+                </span>
+              </label>
+            )}
 
             {showConsentError && (
               <p className="text-label font-medium text-danger">

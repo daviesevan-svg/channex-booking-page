@@ -153,6 +153,26 @@ export async function getVoucherByCode(pid: string, code: string): Promise<Vouch
   return parse(row);
 }
 
+/** Can a gift voucher be redeemed at this property's checkout at all? True
+ *  while a gift product is in the catalogue (active or paused — a paused one
+ *  can still have vouchers out) or any gift voucher was ever sold (its product
+ *  may since have been deleted). Lets checkout drop the voucher box for the
+ *  many properties that have never sold one. Fails open (true): a lookup error
+ *  must not hide a box a guest holding a voucher needs. */
+export async function acceptsGiftVouchers(pid: string): Promise<boolean> {
+  try {
+    if ((await getVoucherProducts(pid)).some((p) => p.kind === "gift")) return true;
+    await ensureSchema();
+    const row = await db()
+      .prepare(`SELECT 1 AS x FROM voucher WHERE pid = ? AND json_extract(json, '$.kind') = 'gift' LIMIT 1`)
+      .bind(pid)
+      .first<{ x: number }>();
+    return Boolean(row);
+  } catch {
+    return true;
+  }
+}
+
 /** All sold vouchers for the admin list, newest first. */
 export async function listVouchers(pid: string): Promise<VoucherRecord[]> {
   await ensureSchema();

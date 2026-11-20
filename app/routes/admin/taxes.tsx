@@ -11,6 +11,7 @@ import { currentPropertyId } from "~/lib/properties.server";
 import { getSettings, saveTaxSettings } from "~/lib/overrides.server";
 import { queueGoogleAriPush } from "~/lib/google-ari/push.server";
 import { formatMoney } from "~/lib/money";
+import { DEFAULT_LANG, enabledLanguages, langFlag, langLabel } from "~/lib/content";
 import {
   computePricing,
   type CityTaxBasis,
@@ -80,6 +81,11 @@ export async function loader({ request }: Route.LoaderArgs) {
     taxes: settings.taxes ?? [],
     fees: settings.fees ?? [],
     cityTax: settings.cityTax ?? null,
+    // Guest languages besides the base one — each tax, fee and city-tax name can
+    // carry its own text in these. Empty = the property is English-only.
+    otherLanguages: enabledLanguages(settings)
+      .filter((c) => c !== DEFAULT_LANG)
+      .map((code) => ({ code, label: langLabel(code), flag: langFlag(code) })),
   };
 }
 
@@ -113,6 +119,53 @@ const BASIS_LABEL_KEYS: Record<CityTaxBasis, string> = {
   room_stay: "txBasisRoomStay",
 };
 
+type OtherLanguage = { code: string; label: string; flag: string };
+
+/** "Name in other languages" under a tax, fee or city-tax name. Collapsed by
+ *  default (most properties name a tax once); blank = guests in that language
+ *  see the main name. */
+function NameTranslations({
+  langs,
+  value,
+  onChange,
+}: {
+  langs: OtherLanguage[];
+  value: Record<string, string> | undefined;
+  onChange: (next: Record<string, string> | undefined) => void;
+}) {
+  const t = useAdminT();
+  if (langs.length === 0) return null;
+  const filled = langs.filter((l) => value?.[l.code]?.trim()).length;
+  const set = (code: string, name: string) => {
+    const next = { ...(value ?? {}), [code]: name };
+    if (!name) delete next[code];
+    onChange(Object.keys(next).length ? next : undefined);
+  };
+  return (
+    <details className="w-full text-[13px]">
+      <summary className="cursor-pointer select-none font-semibold text-accent">
+        {t("txNameTranslations")} ({filled}/{langs.length})
+      </summary>
+      <p className="mt-1.5 text-[12px] text-faint">{t("txNameTranslationsHint")}</p>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {langs.map((l) => (
+          <label key={l.code} className="flex items-center gap-2">
+            <span className="w-32 shrink-0 text-secondary">
+              {l.flag} {l.label}
+            </span>
+            <input
+              value={value?.[l.code] ?? ""}
+              onChange={(e) => set(l.code, e.target.value)}
+              lang={l.code}
+              className={`${smallInput} min-w-0 flex-1`}
+            />
+          </label>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 const sectionCls = "rounded-[14px] border border-line bg-surface p-6";
 const checkbox = "h-4 w-4 rounded border-line-alt text-accent focus:ring-accent";
 const smallInput =
@@ -142,7 +195,7 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
     );
   }
 
-  const { currency } = loaderData;
+  const { currency, otherLanguages } = loaderData;
   const money = (n: number) => formatMoney(n, currency);
 
   const setTax = (i: number, patch: Partial<TaxRule>) =>
@@ -191,32 +244,39 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
 
           <div className="flex flex-col gap-2.5">
             {taxes.map((tax, i) => (
-              <div key={tax.id} className="flex items-center gap-2.5">
-                <input
-                  value={tax.name}
-                  onChange={(e) => setTax(i, { name: e.target.value })}
-                  placeholder={t("txTaxNamePlaceholder")}
-                  className={`${smallInput} flex-1`}
-                />
-                <div className="flex items-center gap-1.5">
+              <div key={tax.id} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2.5">
                   <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="0.01"
-                    value={tax.rate}
-                    onChange={(e) => setTax(i, { rate: Number(e.target.value) })}
-                    className={`${smallInput} w-24 text-right`}
+                    value={tax.name}
+                    onChange={(e) => setTax(i, { name: e.target.value })}
+                    placeholder={t("txTaxNamePlaceholder")}
+                    className={`${smallInput} flex-1`}
                   />
-                  <span className="text-[14px] text-muted-2">%</span>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="0.01"
+                      value={tax.rate}
+                      onChange={(e) => setTax(i, { rate: Number(e.target.value) })}
+                      className={`${smallInput} w-24 text-right`}
+                    />
+                    <span className="text-[14px] text-muted-2">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTaxes((prev) => prev.filter((_, j) => j !== i))}
+                    className="text-[13px] font-semibold text-[#c0392b] hover:underline"
+                  >
+                    {t("txRemove")}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setTaxes((prev) => prev.filter((_, j) => j !== i))}
-                  className="text-[13px] font-semibold text-[#c0392b] hover:underline"
-                >
-                  {t("txRemove")}
-                </button>
+                <NameTranslations
+                  langs={otherLanguages}
+                  value={tax.nameTranslations}
+                  onChange={(nameTranslations) => setTax(i, { nameTranslations })}
+                />
               </div>
             ))}
           </div>
@@ -284,6 +344,11 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                   </select>
                 </label>
               </div>
+              <NameTranslations
+                langs={otherLanguages}
+                value={cityTax.nameTranslations}
+                onChange={(nameTranslations) => setCity({ nameTranslations })}
+              />
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2.5">
                 <label className="flex items-center gap-2 text-[14px] font-semibold">
                   <input
@@ -472,6 +537,11 @@ export default function AdminTaxes({ loaderData, actionData }: Route.ComponentPr
                 >
                   {t("txRemove")}
                 </button>
+                <NameTranslations
+                  langs={otherLanguages}
+                  value={f.nameTranslations}
+                  onChange={(nameTranslations) => setFee(i, { nameTranslations })}
+                />
               </div>
             ))}
           </div>

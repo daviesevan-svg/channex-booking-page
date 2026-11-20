@@ -170,8 +170,10 @@ export function serializeManageProperty(ref: PropertyRef, s: SiteSettings) {
 export function serializeTaxConfig(s: SiteSettings) {
   return {
     taxes_inclusive: s.taxesInclusive ?? false,
-    taxes: s.taxes ?? [],
-    fees: s.fees ?? [],
+    // Explicit, snake_case: the stored rows carry `nameTranslations`, which PUT
+    // would silently drop — a read-modify-write must keep the translations.
+    taxes: (s.taxes ?? []).map(({ nameTranslations, ...t }) => ({ ...t, name_translations: nameTranslations ?? {} })),
+    fees: (s.fees ?? []).map(({ nameTranslations, ...f }) => ({ ...f, name_translations: nameTranslations ?? {} })),
     city_tax: s.cityTax ? serializeCityTax(s.cityTax) : null,
   };
 }
@@ -190,6 +192,7 @@ function serializeCityTax(ct: NonNullable<SiteSettings["cityTax"]>) {
     children_exempt_under_age: ct.childrenExempt ? (ct.childrenExemptUnderAge ?? null) : null,
     max_nights: ct.maxNights,
     ...(ct.seasons?.length ? { seasons: ct.seasons } : {}),
+    name_translations: ct.nameTranslations ?? {},
   };
 }
 

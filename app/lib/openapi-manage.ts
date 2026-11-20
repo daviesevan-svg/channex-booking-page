@@ -142,11 +142,13 @@ export const manageSchemas = {
   },
   ManageTaxDocument: {
     type: "object",
+    // name_translations: { "<guest language>": "<name>" } on any tax, fee or the
+    // city tax — what guests reading that language see instead of `name`.
     description: "The full tax document (PUT replaces it wholesale).",
     required: ["taxes_inclusive", "taxes", "fees"],
     properties: {
       taxes_inclusive: { type: "boolean" },
-      taxes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, rate: { type: "number", exclusiveMinimum: 0, maximum: 100 } }, required: ["name", "rate"] } },
+      taxes: { type: "array", items: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, rate: { type: "number", exclusiveMinimum: 0, maximum: 100 }, name_translations: { type: "object", additionalProperties: { type: "string" }, description: "Name per guest language, e.g. {\"sk\": \"DPH\"}. A language without one shows `name`." } }, required: ["name", "rate"] } },
       fees: {
         type: "array",
         items: {
@@ -158,11 +160,12 @@ export const manageSchemas = {
             amount: { type: "number", exclusiveMinimum: 0 },
             taxable: { type: "boolean" },
             basis: { type: "string", enum: ["booking", "room", "room_night", "person", "person_night"] },
+            name_translations: { type: "object", additionalProperties: { type: "string" }, description: "Name per guest language, e.g. {\"sk\": \"DPH\"}. A language without one shows `name`." },
           },
           required: ["name", "kind", "amount"],
         },
       },
-      city_tax: { type: ["object", "null"], description: "{enabled, name, amount, basis, taxable, children_exempt, children_exempt_under_age? (1–17: only children younger than this are exempt; null/absent = every child), max_nights, seasons? (2–3 MM-DD ranges)} or null." },
+      city_tax: { type: ["object", "null"], description: "{enabled, name, amount, basis, taxable, children_exempt, children_exempt_under_age? (1–17: only children younger than this are exempt; null/absent = every child), max_nights, seasons? (2–3 MM-DD ranges), name_translations? ({\"sk\": \"Daň za ubytovanie\"} — the name per guest language)} or null." },
     },
   },
   ManageRoomInput: {

@@ -15,6 +15,7 @@ import { navCriticalPath, navStage } from "~/lib/nav-tags";
 import { getPageText } from "~/lib/overrides.server";
 
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
+import { serverTranslator } from "~/lib/i18n-locales.server";
 import { formatMoney } from "~/lib/money";
 import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
@@ -121,7 +122,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   // All-in (tax-/fee-inclusive) price for the searched party — matches the headline
   // shown to the guest and the checkout total. Also passed to the client so the
   // live occupancy re-price stays all-in.
-  const taxConfig = taxConfigFrom(settings);
+  const taxConfig = taxConfigFrom(settings, serverTranslator(lang));
   const allIn = (base: number) =>
     Math.round(
       computePricing(

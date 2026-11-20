@@ -20,7 +20,7 @@
   "booking_failed_refund_pending": {
     "subject": "Non siamo riusciti a confermare la tua prenotazione presso {hotel_name} ({reference})",
     "heading": "Ci dispiace, {guest_first_name} — non siamo riusciti a confermare la tua prenotazione",
-    "intro": "Purtroppo la camera è andata esaurita prima che il pagamento fosse completato, quindi non abbiamo potuto confermare il tuo soggiorno presso {hotel_name}. Ti spetta il rimborso integrale di {refund_amount}: l'hotel lo riaccrediterà sulla tua carta, e poi potrebbero volerci alcuni giorni perché compaia.",
+    "intro": "Purtroppo la camera è andata esaurita prima che il pagamento fosse completato, quindi non abbiamo potuto confermare il tuo soggiorno presso {hotel_name}. Ti spetta il rimborso integrale di {refund_amount}: la struttura lo riaccrediterà sulla tua carta, e poi potrebbero volerci alcuni giorni perché compaia.",
     "outro": "Ci dispiace per la delusione. Se il rimborso non ti è arrivato entro una settimana, rispondi pure a questa email."
   },
   "review_request": {
