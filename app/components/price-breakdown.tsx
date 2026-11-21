@@ -5,7 +5,6 @@
 // screens (confirmation listed extras after the taxes). One implementation,
 // one order; the `variant` keeps each page's existing type scale.
 import { groupExtrasByRoom, type ResolvedExtra } from "~/lib/extras";
-import { formatMoney, formatMoneyParts } from "~/lib/money";
 import { offerScope, priceSpecScope, unitPriceScope } from "~/lib/nav-tags";
 import { priceComponents, type PriceComponent } from "~/lib/price-components";
 import type { Pricing } from "~/lib/pricing";
@@ -23,7 +22,7 @@ import { cx } from "~/lib/site-style";
  * The visible text keeps its group separators (it has to: this IS the price the
  * guest is shown), so the unseparated value rides in `content` alongside it.
  * Google explicitly does NOT accept a total that is only in a <meta>; this
- * renders the same characters formatMoney would have.
+ * renders the same characters tr.money would have.
  */
 function TaggedTotal({
   amount,
@@ -34,7 +33,8 @@ function TaggedTotal({
   currency: string;
   components: PriceComponent[] | null;
 }) {
-  const { before, number, after, value } = formatMoneyParts(amount, currency);
+  const tr = useT();
+  const { before, number, after, value } = tr.moneyParts(amount, currency);
   return (
     <span {...offerScope}>
       <span {...priceSpecScope}>
@@ -93,7 +93,7 @@ export function PriceBreakdown({
   const co = variant === "checkout";
 
   const extras = groupExtrasByRoom(extraLines);
-  const money = (n: number) => formatMoney(n, currency);
+  const money = (n: number) => tr.money(n, currency);
 
   const row = (key: string, label: string, value: string) => (
     <div key={key} className="flex justify-between">

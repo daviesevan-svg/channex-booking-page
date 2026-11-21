@@ -74,9 +74,14 @@ describe("guest emails in the guest's language", () => {
     expect(guest.html).not.toContain("VAT (20%)");
     // Item 6: the name stays in the nominative after "v zariadení".
     expect(guest.subject).toContain("v zariadení U Maťka a Kubka");
+    // Item 3: Slovak money and dates ("15,00 €", "po 14. 12. 2026"), not "€15.00".
+    expect(guest.html).toContain("15,00&nbsp;€".replace("&nbsp;", " "));
+    expect(guest.html).not.toContain("€15.00");
+    expect(guest.html).toMatch(/\b\d{1,2}\. \d{1,2}\. 20\d\d\b/);
 
     expect(host.html).toContain("Garden Suite");
     expect(host.html).toContain("VAT (20%)");
+    expect(host.html).toContain("€15.00");
   });
 
   it("English guest: unchanged", async () => {

@@ -1,7 +1,6 @@
 // Renders transactional emails: token substitution + a branded, email-safe
 // HTML shell with an auto-generated booking details block. Operators only edit
 // plain prose (subject/heading/intro/outro); everything structural lives here.
-import { format, parseISO } from "date-fns";
 
 import type { BookingRecord } from "./bookings.server";
 import { policyRefundNow } from "./cancel-gate";
@@ -13,7 +12,6 @@ import { DEFAULT_LANG, THEMES, type ThemeId } from "./content";
 // any booking.lang here on the server.
 import "./i18n-locales.server";
 import { makeTranslator, type Translator } from "./i18n";
-import { formatMoney } from "./money";
 import { getSiteStyle } from "./site.server";
 import { emailBrandFor, type EmailBrand } from "./site-style";
 
@@ -59,16 +57,9 @@ function paragraphs(text: string): string {
     .join("");
 }
 
-const fmtDate = (iso: string, tr?: Translator) => {
+const stayDate = (iso: string, tr: Translator) => {
   try {
-    return format(parseISO(iso), "EEE d MMM yyyy", tr ? { locale: tr.locale } : undefined);
-  } catch {
-    return iso;
-  }
-};
-const fmtDateTime = (iso: string) => {
-  try {
-    return format(parseISO(iso), "d MMM yyyy, HH:mm");
+    return tr.date(iso, "dayYear");
   } catch {
     return iso;
   }
@@ -76,7 +67,7 @@ const fmtDateTime = (iso: string) => {
 /** A cancellation deadline: the hotel's own wall clock when the booking has it,
  *  else the instant as before (bookings made before deadlines were anchored). */
 const fmtDeadline = (c: { cancelByISO: string | null; cancelByLocal?: string }, tr?: Translator) =>
-  formatCancelDeadline({ iso: c.cancelByISO ?? "", local: c.cancelByLocal }, "d MMM yyyy", tr?.locale);
+  formatCancelDeadline({ iso: c.cancelByISO ?? "", local: c.cancelByLocal }, "long", tr?.lang);
 
 /** Plain (unescaped) token values for subject + prose substitution. */
 export function bookingVars(
@@ -86,7 +77,7 @@ export function bookingVars(
   lang: string = DEFAULT_LANG,
 ): Record<string, string> {
   const tr = makeTranslator(lang);
-  const money = (n: number) => formatMoney(n, booking.currency);
+  const money = (n: number) => tr.money(n, booking.currency);
   // Mirror detailsHtml: once a payment was captured, {due_now} is what was paid
   // and {due_at_hotel} is the true remainder — not the policy's pre-payment split.
   const paid = booking.payment?.mode === "payment" ? (booking.payment.amount ?? 0) : 0;
@@ -97,8 +88,8 @@ export function bookingVars(
     guest_first_name: booking.guest.firstName,
     guest_last_name: booking.guest.lastName,
     reference: booking.reference,
-    checkin: fmtDate(booking.checkin, tr),
-    checkout: fmtDate(booking.checkout, tr),
+    checkin: stayDate(booking.checkin, tr),
+    checkout: stayDate(booking.checkout, tr),
     nights: String(booking.nights),
     total: money(booking.total),
     due_now: money(dueNow),
@@ -137,7 +128,7 @@ function detailsHtml(
 ): string {
   const { tr } = opts;
   const ROW = row(opts.brand);
-  const money = (n: number) => formatMoney(n, booking.currency);
+  const money = (n: number) => tr.money(n, booking.currency);
   // What was actually captured wins over the policy's "due now": a guest who has
   // already paid must see "Paid", not an amount still owing. (mode "setup" only
   // stores a guarantee card — nothing is charged, so it stays "due".)
@@ -269,8 +260,8 @@ function detailsHtml(
     <tr><td>
       <table role="presentation" width="100%">
         ${ROW(tr.t("reference"), booking.reference)}
-        ${ROW(tr.t("checkIn"), fmtDate(booking.checkin, tr))}
-        ${ROW(tr.t("checkOut"), fmtDate(booking.checkout, tr))}
+        ${ROW(tr.t("checkIn"), stayDate(booking.checkin, tr))}
+        ${ROW(tr.t("checkOut"), stayDate(booking.checkout, tr))}
         ${ROW(tr.t("nights"), String(booking.nights))}
       </table>
       <table role="presentation" width="100%">${roomRows}</table>
@@ -435,8 +426,8 @@ export function reviewVars(booking: BookingRecord, hotelName: string): Record<st
     hotel_name: hotelName,
     guest_first_name: booking.guest.firstName,
     guest_last_name: booking.guest.lastName,
-    checkin: fmtDate(booking.checkin, tr),
-    checkout: fmtDate(booking.checkout, tr),
+    checkin: stayDate(booking.checkin, tr),
+    checkout: stayDate(booking.checkout, tr),
     nights: String(booking.nights),
   };
 }

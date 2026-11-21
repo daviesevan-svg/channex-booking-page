@@ -126,7 +126,6 @@ export function useDateRange({
   onExtend,
   tr,
 }: UseDateRangeArgs) {
-  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [checkin, setCheckin] = useState<Date | null>(
     initialCheckin ? parseISO(initialCheckin) : null,
   );
@@ -257,13 +256,13 @@ export function useDateRange({
     if (!isKnown(date)) return;
     if (!checkin || checkout || !isBefore(checkin, date)) {
       if (ctaSet.has(iso(date))) {
-        setHelper(tr.t("helperClosedToArrival", { date: fmt(date, "EEE d MMM") }));
+        setHelper(tr.t("helperClosedToArrival", { date: tr.date(date, "day") }));
         return;
       }
       // Explain the ceiling rather than just refusing: a greyed date with no
       // reason reads as broken, and this one isn't about availability.
       if (afterLastArrival(date)) {
-        setHelper(tr.t("helperMaxArrival", { date: fmt(lastArrival!, "EEE d MMM") }));
+        setHelper(tr.t("helperMaxArrival", { date: tr.date(lastArrival!, "day") }));
         return;
       }
       const minS = minStayFor(date);
@@ -275,33 +274,33 @@ export function useDateRange({
       // click that exceeds it.
       setHelper(
         minS > 1
-          ? tr.t("helperMinStayArrival", { n: minS, date: fmt(date, "EEE d MMM") })
+          ? tr.t("helperMinStayArrival", { n: minS, date: tr.date(date, "day") })
           : maxS > 0
-            ? tr.t("helperMaxStayArrival", { n: maxS, date: fmt(date, "EEE d MMM") })
+            ? tr.t("helperMaxStayArrival", { n: maxS, date: tr.date(date, "day") })
             : "",
       );
       return;
     }
     if (ctdSet.has(iso(date))) {
-      setHelper(tr.t("helperClosedToDeparture", { date: fmt(date, "EEE d MMM") }));
+      setHelper(tr.t("helperClosedToDeparture", { date: tr.date(date, "day") }));
       return;
     }
     if (afterLastDeparture(date)) {
-      setHelper(tr.t("helperMaxDeparture", { date: fmt(lastDeparture!, "EEE d MMM") }));
+      setHelper(tr.t("helperMaxDeparture", { date: tr.date(lastDeparture!, "day") }));
       return;
     }
     const nights = differenceInCalendarDays(date, checkin);
     const minS = minStayFor(checkin);
     if (nights < minS) {
       setHelper(
-        tr.t("helperMinStayCheckout", { n: minS, date: fmt(addDays(checkin, minS), "EEE d MMM") }),
+        tr.t("helperMinStayCheckout", { n: minS, date: tr.date(addDays(checkin, minS), "day") }),
       );
       return;
     }
     const maxS = maxStayFor(checkin);
     if (maxS > 0 && nights > maxS) {
       setHelper(
-        tr.t("helperMaxStayCheckout", { n: maxS, date: fmt(addDays(checkin, maxS), "EEE d MMM") }),
+        tr.t("helperMaxStayCheckout", { n: maxS, date: tr.date(addDays(checkin, maxS), "day") }),
       );
       return;
     }
@@ -325,7 +324,7 @@ export function useDateRange({
     const baseMonth = startOfMonth(today);
     return [0, 1].map((i) => {
       const monthDate = addMonths(baseMonth, monthOffset + i);
-      const title = fmt(monthDate, "MMMM yyyy");
+      const title = tr.date(monthDate, "month");
       const firstDow = (getDay(monthDate) + 6) % 7; // Monday-first
       const dim = getDaysInMonth(monthDate);
       const cells: DayCell[] = [];
@@ -378,7 +377,7 @@ export function useDateRange({
         if (!unknown && !tooEarly && !tooLate) {
           if (sold) title = asCheckout || checkoutBoundary ? tr.t("checkoutOnly") : tr.t("unavailable");
           else if (ctaSet.has(iso(date))) title = tr.t("checkoutOnly");
-          else if (afterLastArrival(date)) title = tr.t("helperMaxArrival", { date: fmt(lastArrival!, "EEE d MMM") });
+          else if (afterLastArrival(date)) title = tr.t("helperMaxArrival", { date: tr.date(lastArrival!, "day") });
           else if (arrivalBlocked) title = tr.t("minStayUnreachable", { n: minStayFor(date) });
         }
         const isCheckin = !!checkin && differenceInCalendarDays(date, checkin) === 0;
@@ -438,8 +437,8 @@ export function useDateRange({
     checkout,
     checkinIso: checkin ? iso(checkin) : "",
     checkoutIso: checkout ? iso(checkout) : "",
-    checkinLabel: checkin ? fmt(checkin, "EEE d MMM") : tr.t("selectDate"),
-    checkoutLabel: checkout ? fmt(checkout, "EEE d MMM") : tr.t("selectDate"),
+    checkinLabel: checkin ? tr.date(checkin, "day") : tr.t("selectDate"),
+    checkoutLabel: checkout ? tr.date(checkout, "day") : tr.t("selectDate"),
     helper,
     rangeSummary,
     months,

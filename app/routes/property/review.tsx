@@ -15,7 +15,7 @@ import { getReviewByBooking, upsertReview } from "~/lib/reviews.server";
 import { REVIEW_CATEGORIES, type ReviewCategory, reviewsOn } from "~/lib/reviews";
 
 import { useProperty } from "~/lib/booking-context";
-import { fmtDate } from "~/lib/dates";
+import { RANGE_DASH } from "~/lib/locale-format";
 import { useT } from "~/lib/i18n";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -171,7 +171,7 @@ export default function Review({ loaderData, actionData }: Route.ComponentProps)
       <h1 className="mb-2 font-serif text-display-md font-medium tracking-[-0.02em]">{tr.t("reviewHeading")}</h1>
       <p className="mb-1 text-body-lg text-secondary">{tr.t("reviewIntro", { hotel: hotelName })}</p>
       <p className="mb-7 text-caption text-muted-2">
-        {fmtDate(loaderData.checkin, "d MMM")} — {fmtDate(loaderData.checkout, "d MMM yyyy")}
+        {tr.date(loaderData.checkin, "short")}{RANGE_DASH}{tr.date(loaderData.checkout, "long")}
       </p>
 
       <Form

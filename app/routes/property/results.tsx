@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 
 import { useEffect, useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
@@ -35,7 +35,6 @@ import { serverTranslator } from "~/lib/i18n-locales.server";
 import { stayTotals } from "~/lib/checkout-totals";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 import {
   childrenAgeParam,
   partySize,
@@ -401,11 +400,11 @@ function RoomCard({
           <span className="text-caption text-muted-2">{tr.t("from")} </span>
           {cheapest?.offer && (
             <span className="mr-1.5 text-body-lg text-muted-2 line-through">
-              {formatMoney((cheapest.allInOriginal ?? Number(cheapest.offer.originalTotalPrice)) / nights, currency)}
+              {tr.money((cheapest.allInOriginal ?? Number(cheapest.offer.originalTotalPrice)) / nights, currency)}
             </span>
           )}
           <span className="font-serif text-display-sm font-semibold">
-            {formatMoney(perNight, currency)}
+            {tr.money(perNight, currency)}
           </span>
           <div className="text-label text-muted-2">{tr.t("perNightInclTaxes")}</div>
         </div>
@@ -515,7 +514,7 @@ function CartPanel({
                 </Link>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-body font-semibold">{formatMoney(l.total, currency)}</span>
+                <span className="text-body font-semibold">{tr.money(l.total, currency)}</span>
                 <button
                   type="button"
                   onClick={() => onRemove(i)}
@@ -554,19 +553,19 @@ function CartPanel({
       {extrasSum > 0 && (
         <div className="mb-2 flex items-baseline justify-between text-caption">
           <span className="text-secondary">{tr.t("extrasLabel")}</span>
-          <span className="font-semibold">{formatMoney(extrasSum, currency)}</span>
+          <span className="font-semibold">{tr.money(extrasSum, currency)}</span>
         </div>
       )}
       {taxesSum > 0 && (
         <div className="mb-2 flex items-baseline justify-between text-caption">
           <span className="text-secondary">{tr.t("taxesFees")}</span>
-          <span className="font-semibold">{formatMoney(taxesSum, currency)}</span>
+          <span className="font-semibold">{tr.money(taxesSum, currency)}</span>
         </div>
       )}
       <div className="mb-4 flex items-baseline justify-between">
         <span className="text-body-lg font-semibold">{tr.t("total")}</span>
         <span className="font-serif text-display-sm font-semibold">
-          {formatMoney(grandTotal, currency)}
+          {tr.money(grandTotal, currency)}
         </span>
       </div>
 
@@ -621,7 +620,7 @@ function MobileCartBar({
       <div className="mx-auto flex max-w-[560px] items-center gap-4">
         <div className="min-w-0 flex-1">
           <div className="truncate text-label text-muted-2">{tr.p("roomsSelected", count)}</div>
-          <div className="font-serif text-title-md font-semibold">{formatMoney(total, currency)}</div>
+          <div className="font-serif text-title-md font-semibold">{tr.money(total, currency)}</div>
         </div>
         <button
           type="button"
@@ -706,11 +705,7 @@ export default function Results({ loaderData, params }: Route.ComponentProps) {
   // both would hand the crawler two critical paths on one page.
   const criticalRoomId = covered ? undefined : bestMatchId;
 
-  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
-  const summary = `${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
-    parseISO(query.checkout),
-    "EEE d MMM",
-  )} · ${tr.p("night", nights)} · ${occLabel(tr, query.adults, query.childrenAge)}`;
+  const summary = `${tr.dateRange(query.checkin, query.checkout)} · ${tr.p("night", nights)} · ${occLabel(tr, query.adults, query.childrenAge)}`;
 
   return (
     <main

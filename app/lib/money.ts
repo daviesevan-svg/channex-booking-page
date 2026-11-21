@@ -1,21 +1,21 @@
-// Money is formatted in ONE locale, deliberately. An undefined locale means the
-// RUNTIME default, which is not the same thing on both sides of a render: en-US
-// in the Worker, whatever the guest's browser is set to in the client. Where
-// those disagree the server sends one string and hydration replaces it with
-// another — "¥369" becoming "JP¥369" on a JPY property in an en-GB browser, or
-// every price on every currency for a de-DE one — which React reports as a
-// failed hydration and the guest sees as the price changing after the page
-// loads. GBP and EUR happen to format identically in en-US and en-GB, which is
-// the only reason this went unnoticed.
+import { MONEY_STYLES } from "./locale-format";
+
+// Money's SYMBOL data comes from one Intl locale, deliberately. An undefined
+// locale means the RUNTIME default, which is not the same thing on both sides
+// of a render: en-US in the Worker, whatever the guest's browser is set to in
+// the client. Where those disagree the server sends one string and hydration
+// replaces it with another — "¥369" becoming "JP¥369" on a JPY property in an
+// en-GB browser — which React reports as a failed hydration and the guest sees
+// as the price changing after the page loads.
 //
-// en-US because it is what the Worker was already rendering, so nothing moves,
-// and it has the cleanest symbols of the English locales (en-GB writes USD as
-// "US$" and JPY as "JP¥").
+// en-US because it is what the Worker was already rendering and it has the
+// cleanest symbols of the English locales (en-GB writes USD as "US$").
 //
-// This is a DISPLAY locale, not the guest's language: a German guest sees
-// "€369.00", not "369,00 €". Threading the guest's `lang` through instead would
-// be more correct — but only if EVERY call site passes it, since a half-migrated
-// version reintroduces exactly the mismatch this constant exists to prevent.
+// The guest's LANGUAGE still decides the separators and where the symbol sits
+// ("369,00 €" for a German guest) — but from the baked table in
+// locale-format.ts, never from Intl's per-locale data, so the server and the
+// browser produce the same string. Guest code formats through `tr.money` (see
+// i18n.ts); scripts/check-guest-formatting.mjs keeps it that way.
 export const MONEY_LOCALE = "en-US";
 
 // Currencies to render with their NARROW symbol. Intl's default `symbol`
@@ -43,29 +43,18 @@ export function currencyDisplay(currency: string): "symbol" | "narrowSymbol" {
   return NARROW_SYMBOL.has(currency.trim().toUpperCase()) ? "narrowSymbol" : "symbol";
 }
 
-// Format a Channex price string (e.g. "198.00") in the given currency.
+// Format a Channex price string (e.g. "198.00") in the given currency, the way
+// `lang` writes money. English (the default, and what the admin, the API and
+// anything sent to the hotel use) is Intl's en-US output, unchanged.
 //
 // The fraction digits are Intl's, per currency — NOT a hardcoded 2. Two is
 // right for most, but the zero-decimal currencies have no minor unit at all
 // (see STRIPE_ZERO_DECIMAL below), and forcing a maximum of 2 on those left the
 // half of a yen that the arithmetic produced on screen: "¥1,234.5" where the
 // hotel means ¥1,235. It reads like a typo, and there is no such coin.
-export function formatMoney(
-  amount: string | number,
-  currency = "USD",
-  locale: string = MONEY_LOCALE,
-): string {
-  const value = typeof amount === "string" ? Number(amount) : amount;
-  if (Number.isNaN(value)) return String(amount);
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-      currencyDisplay: currencyDisplay(currency),
-    }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${currency}`;
-  }
+export function formatMoney(amount: string | number, currency = "USD", lang = "en"): string {
+  const { before, number, after } = formatMoneyParts(amount, currency, lang);
+  return before + number + after;
 }
 
 /** The pieces of a formatted price, split around the number.
@@ -74,53 +63,61 @@ export function formatMoney(
  * `itemprop="price"` element, and that element's text should be the number
  * ALONE — a "£" or a trailing "kr" inside it is a parse away from being read
  * as part of the amount. Splitting here rather than at the call site keeps one
- * formatter: `before + number + after` reassembles to exactly what
- * formatMoney would have produced, symbol placement and per-currency digits
- * included, so tagging a price can never change what the guest sees.
+ * formatter: `before + number + after` IS formatMoney, symbol placement and
+ * per-currency digits included, so tagging a price can never change what the
+ * guest sees.
  *
  * `number` keeps its group separators, because it IS the visible text. The
  * machine-readable value belongs in a `content` attribute alongside it (which
  * is the pattern Google's own guide prescribes for dates) — that is `value`,
- * built from the SAME parts with the group separators dropped, so the tagged
- * number and the displayed number can never drift apart.
+ * always with a "." decimal and no grouping, built from the SAME parts, so the
+ * tagged number and the displayed number can never drift apart.
  */
 export function formatMoneyParts(
   amount: string | number,
   currency = "USD",
-  locale: string = MONEY_LOCALE,
+  lang = "en",
 ): { before: string; number: string; after: string; value: string } {
   const value = typeof amount === "string" ? Number(amount) : amount;
-  const whole = formatMoney(amount, currency, locale);
-  const plain = { before: "", number: whole, after: "", value: String(value) };
-  if (Number.isNaN(value)) return { before: "", number: whole, after: "", value: "" };
+  if (Number.isNaN(value)) return { before: "", number: String(amount), after: "", value: "" };
+  let parts: Intl.NumberFormatPart[];
   try {
-    const parts = new Intl.NumberFormat(locale, {
+    parts = new Intl.NumberFormat(MONEY_LOCALE, {
       style: "currency",
       currency,
       currencyDisplay: currencyDisplay(currency),
     }).formatToParts(value);
+  } catch {
+    return { before: "", number: `${value.toFixed(2)} ${currency}`, after: "", value: String(value) };
+  }
+  const int = parts.filter((p) => p.type === "integer").map((p) => p.value).join("");
+  const frac = parts.find((p) => p.type === "fraction")?.value;
+  const minus = parts.some((p) => p.type === "minusSign") ? "-" : "";
+  const plain = minus + int + (frac !== undefined ? `.${frac}` : "");
+
+  const style = MONEY_STYLES[lang];
+  if (!style || lang === "en") {
     // Everything from the first digit-ish part to the last is the number; what
-    // sits outside that run is symbol and spacing, wherever the locale put it.
+    // sits outside that run is symbol and spacing, wherever en-US put it.
     const numeric = new Set(["integer", "group", "decimal", "fraction", "minusSign", "plusSign"]);
     const first = parts.findIndex((p) => numeric.has(p.type));
-    if (first < 0) return plain;
+    const whole = parts.map((p) => p.value).join("");
+    if (first < 0) return { before: "", number: whole, after: "", value: String(value) };
     let last = first;
     for (let i = first; i < parts.length; i++) if (numeric.has(parts[i].type)) last = i;
-    const join = (from: number, to: number) =>
-      parts.slice(from, to).map((p) => p.value).join("");
-    return {
-      before: join(0, first),
-      number: join(first, last + 1),
-      after: join(last + 1, parts.length),
-      value: parts
-        .slice(first, last + 1)
-        .filter((p) => p.type !== "group")
-        .map((p) => (p.type === "decimal" ? "." : p.value))
-        .join(""),
-    };
-  } catch {
-    return plain;
+    const join = (from: number, to: number) => parts.slice(from, to).map((p) => p.value).join("");
+    return { before: join(0, first), number: join(first, last + 1), after: join(last + 1, parts.length), value: plain };
   }
+
+  const grouped = style.minGroup2 && int.length < 5 ? int : int.replace(/\B(?=(\d{3})+(?!\d))/g, style.group);
+  const number = grouped + (frac !== undefined ? style.decimal + frac : "");
+  const symbol = parts.filter((p) => p.type === "currency").map((p) => p.value).join("");
+  if (!symbol) return { before: minus, number, after: "", value: plain };
+  if (style.after) return { before: minus, number, after: `\u00a0${symbol}`, value: plain };
+  // A code or letter-ended symbol ("CHF", "Kč") always needs the space; "€" and
+  // "CA$" sit flush unless the language spaces them ("€ 54,00" in Dutch).
+  const space = style.spaceBefore || /\p{L}$/u.test(symbol) ? "\u00a0" : "";
+  return { before: minus + symbol + space, number, after: "", value: plain };
 }
 
 // ---- Stripe minor units ----

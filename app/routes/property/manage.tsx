@@ -2,7 +2,6 @@ import { Form, Link, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage";
 import { pageMeta } from "~/lib/page-meta";
-import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import {
   findBookingByRefAndEmail,
@@ -22,7 +21,6 @@ import { sendGuestPortalLink } from "~/lib/email.server";
 
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
 import { useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { useSlots } from "~/components/site-style";
@@ -137,7 +135,6 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
   const s = useSlots();
   const { currency } = useProperty();
   const nav = useNavigation();
-  const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
 
   if (!loaderData.authed) {
     return (
@@ -193,7 +190,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
             >
               <div className="min-w-0">
                 <div className="font-serif text-title-sm font-semibold">
-                  {fmt(b.checkin, "EEE d MMM")} — {fmt(b.checkout, "EEE d MMM yyyy")}
+                  {tr.dateRange(b.checkin, b.checkout, { year: true })}
                 </div>
                 <div className="mt-1 text-caption text-muted-2">
                   {tr.t("reference")} {b.reference} · {tr.p("room", b.rooms)}
@@ -201,7 +198,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
               </div>
               <div className="flex flex-none items-center gap-4">
                 <span className="font-serif text-title-sm font-semibold">
-                  {formatMoney(b.total, b.currency || currency)}
+                  {tr.money(b.total, b.currency || currency)}
                 </span>
                 <span className="text-caption font-semibold text-accent">{tr.t("view")} →</span>
               </div>
@@ -229,7 +226,7 @@ export default function Manage({ loaderData, actionData, params }: Route.Compone
                   <div className="mt-1 text-caption text-muted-2">
                     {v.code}
                     {v.recipientName ? ` · ${tr.t("manageVoucherFor", { name: v.recipientName })}` : ""}
-                    {v.balance != null ? ` · ${tr.t("voucherBalance")}: ${formatMoney(v.balance, currency)}` : ""}
+                    {v.balance != null ? ` · ${tr.t("voucherBalance")}: ${tr.money(v.balance, currency)}` : ""}
                   </div>
                 </div>
                 <div className="flex flex-none items-center gap-4">

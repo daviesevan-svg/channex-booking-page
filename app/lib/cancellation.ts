@@ -1,6 +1,8 @@
 // Shared (client-safe) view logic for a booking's cancellation snapshot.
 // Structurally matches CancellationSnapshot from policy.server.ts.
-import { format, parseISO, type Locale } from "date-fns";
+import { parseISO } from "date-fns";
+
+import { formatDate, type DateStyle } from "./locale-format";
 
 import type { PenaltyType } from "./rate-policy";
 
@@ -85,18 +87,18 @@ export type CancelMessage =
  */
 export function formatCancelDeadline(
   m: { iso: string; local?: string },
-  datePattern: string,
-  locale?: Locale,
+  style: DateStyle,
+  lang = "en",
 ): string {
   if (m.local) {
     const [datePart, timePart] = m.local.split("T");
     const d = parseISO(datePart);
     if (!Number.isNaN(d.getTime()) && timePart) {
-      return `${format(d, datePattern, locale ? { locale } : undefined)}, ${timePart}`;
+      return `${formatDate(d, style, lang)}, ${timePart}`;
     }
   }
   const at = parseISO(m.iso);
-  return Number.isNaN(at.getTime()) ? m.iso : format(at, datePattern, locale ? { locale } : undefined);
+  return Number.isNaN(at.getTime()) ? m.iso : formatDate(at, style, lang);
 }
 
 /** Whether, at `nowMs`, the schedule is in a band that refunds something but not

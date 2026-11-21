@@ -74,6 +74,18 @@ extra rows automatically: Slovak, Czech, Polish and Russian get `_few` (2–4) a
 forms come from `Intl.PluralRules`, the same rule the runtime uses (`pluralForm` in
 `app/lib/i18n.ts`). A missing extra form falls back to `_other`.
 
+## Prices and dates
+
+How each language writes money ("54,00 €", "€ 54,00", "€54.00") and dates ("po 14. – st 16. 12.") is a
+baked table in `app/lib/locale-format.ts`, not translator text: `MONEY_STYLES` (separators, symbol
+position) and `DATE_PATTERNS` (date-fns patterns per named shape). A new language needs one entry in
+each; `locale-format.test.ts` fails until it has them, and without one it formats like English.
+
+Guest code formats through the translator: `tr.money(amount, currency)`, `tr.moneyParts`, `tr.date(iso,
+"day" | "dayYear" | "short" | "long" | …)` and `tr.dateRange(checkin, checkout)`. `npm run typecheck`
+runs `scripts/check-guest-formatting.mjs`, which fails on a bare `formatMoney(` or a hand-written
+date pattern in guest code.
+
 ## Rules worth knowing
 
 - Edit translations through the CSV, not the generated files. The next import rewrites

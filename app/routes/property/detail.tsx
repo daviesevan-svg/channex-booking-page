@@ -1,4 +1,3 @@
-import { format, parseISO } from "date-fns";
 
 import { useState } from "react";
 import { Link, redirect, useNavigate, useNavigation, useSearchParams } from "react-router";
@@ -16,7 +15,6 @@ import { getPageText } from "~/lib/overrides.server";
 
 import { computePricing, taxConfigFrom } from "~/lib/pricing";
 import { serverTranslator } from "~/lib/i18n-locales.server";
-import { formatMoney } from "~/lib/money";
 import { addLine, lineOccupancy, parseCart, replaceIndex, serializeCart } from "~/lib/cart";
 import { addExtrasLine, parseExtrasState, serializeExtrasState } from "~/lib/extras";
 import { childrenNightlyDelta, occupancyNightlyDelta, perPersonPrice, pricedOccupancy } from "~/lib/rate-pricing";
@@ -234,7 +232,7 @@ function rateNote(plan: RoomWithRates["ratePlans"][number], tr: Translator): str
     // different promises, and this rate card is where the guest chooses.
     if (msg) {
       parts.push(
-        tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "d MMM", tr.locale) } : undefined),
+        tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "short", tr.lang) } : undefined),
       );
     }
     else if (plan.cancellationPolicy?.title) parts.push(tr.t("cancellationSuffix", { title: plan.cancellationPolicy.title }));
@@ -262,7 +260,6 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   const { currency } = useProperty();
   const tr = useT();
   const s = useSlots();
-  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   // Full-screen photo viewer; null = closed, otherwise the galleryPhotos index.
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [searchParams] = useSearchParams();
@@ -325,10 +322,7 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
   };
   const chosenPrice = chosen ? priceFor(chosen) : { gross: 0, sale: 0, hasOffer: false };
 
-  const summary = `${tr.p("night", nights)} · ${fmt(parseISO(query.checkin), "EEE d")} — ${fmt(
-    parseISO(query.checkout),
-    "EEE d MMM",
-  )}`;
+  const summary = `${tr.p("night", nights)} · ${tr.dateRange(query.checkin, query.checkout)}`;
 
   const ratePhotos = (chosen?.images ?? []).map((url) => ({ url }));
   const galleryPhotos = [...ratePhotos, ...(room.photos ?? [])];
@@ -554,10 +548,10 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                         <span className="block whitespace-nowrap text-body-lg font-semibold">
                           {pr.hasOffer && (
                             <span className="mr-1.5 text-caption font-normal text-muted-2 line-through">
-                              {formatMoney(pr.gross / nights, currency)}
+                              {tr.money(pr.gross / nights, currency)}
                             </span>
                           )}
-                          {formatMoney(perNight, currency)}
+                          {tr.money(perNight, currency)}
                         </span>
                         <span className="block text-micro text-muted-2">{tr.t("perNightInclTaxes")}</span>
                       </span>
@@ -637,10 +631,10 @@ export default function Detail({ loaderData, params }: Route.ComponentProps) {
                 <>
                   {chosenPrice.hasOffer && (
                     <span className="mr-2 text-title-sm font-normal text-muted-2 line-through">
-                      {formatMoney(chosenPrice.gross, currency)}
+                      {tr.money(chosenPrice.gross, currency)}
                     </span>
                   )}
-                  {formatMoney(chosenPrice.sale, currency)}
+                  {tr.money(chosenPrice.sale, currency)}
                 </>
               ) : (
                 "—"

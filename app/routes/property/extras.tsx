@@ -24,7 +24,6 @@ import {
   type Extra,
   type ExtraSelection,
 } from "~/lib/extras";
-import { formatMoney } from "~/lib/money";
 import { partySize } from "~/lib/occupancy";
 import { useT } from "~/lib/i18n";
 import { useBase, useHome } from "~/lib/base";
@@ -310,7 +309,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
             <div className="min-w-0">
               <div className="text-label text-muted-2">{rateTitle}</div>
             </div>
-            <span className="whitespace-nowrap text-body font-semibold">{formatMoney(roomTotal, cur)}</span>
+            <span className="whitespace-nowrap text-body font-semibold">{tr.money(roomTotal, cur)}</span>
           </div>
 
           {allLines.length > 0 && (
@@ -325,7 +324,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
                     </div>
                     {l.infoLine && <div className="text-label text-muted-2">{l.infoLine}</div>}
                   </div>
-                  <span className="whitespace-nowrap text-caption font-semibold">{formatMoney(l.amount, cur)}</span>
+                  <span className="whitespace-nowrap text-caption font-semibold">{tr.money(l.amount, cur)}</span>
                 </div>
               ))}
             </div>
@@ -333,7 +332,7 @@ export default function Extras({ loaderData, params }: Route.ComponentProps) {
 
           <div className="flex items-baseline justify-between py-4">
             <span className="text-body-lg font-semibold">{text.summaryLabel}</span>
-            <span className="font-serif text-title-lg font-semibold">{formatMoney(extrasSum, cur)}</span>
+            <span className="font-serif text-title-lg font-semibold">{tr.money(extrasSum, cur)}</span>
           </div>
 
           {/* Continue, not Skip: both return to results, but the crawler should
@@ -405,8 +404,8 @@ function ExtraCard({
           <h3 className="font-serif text-title-sm font-semibold">{extra.name}</h3>
           <span className="whitespace-nowrap text-body font-semibold text-secondary">
             {configurable
-              ? `${tr.t("from")} ${formatMoney(fromPrice(extra), currency)}`
-              : formatMoney(extra.price ?? 0, currency)}
+              ? `${tr.t("from")} ${tr.money(fromPrice(extra), currency)}`
+              : tr.money(extra.price ?? 0, currency)}
             <span className="text-label font-normal text-muted-2"> · {tr.t(UNIT_KEY[extra.unit])}</span>
           </span>
         </div>
@@ -421,7 +420,7 @@ function ExtraCard({
                   {line?.optionName ?? extra.name}
                   {line && line.qty > 1 ? ` ×${line.qty}` : ""}
                 </span>
-                <span className="text-body font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
+                <span className="text-body font-semibold">{line ? tr.money(line.amount, currency) : ""}</span>
               </div>
               {line?.infoLine && <div className="mt-0.5 text-label text-muted-2">{line.infoLine}</div>}
               <div className="mt-2 flex items-center gap-3 text-caption font-semibold">
@@ -447,7 +446,7 @@ function ExtraCard({
               ) : (
                 <Stepper qty={selection!.qty} max={maxQtyOf(extra)} onDec={onDec} onInc={onInc} />
               )}
-              <span className="text-body font-semibold">{line ? formatMoney(line.amount, currency) : ""}</span>
+              <span className="text-body font-semibold">{line ? tr.money(line.amount, currency) : ""}</span>
             </div>
           ) : (
             <button
@@ -544,7 +543,7 @@ function ConfigureModal({
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="text-body-lg font-semibold">{o.name}</span>
                         <span className="whitespace-nowrap text-body font-semibold">
-                          {formatMoney(o.price, currency)}
+                          {tr.money(o.price, currency)}
                           <span className="text-label font-normal text-muted-2"> · {tr.t(UNIT_KEY[o.unit ?? extra.unit])}</span>
                         </span>
                       </span>
@@ -597,7 +596,7 @@ function ConfigureModal({
         <div className={cx("flex-none border-t", s.rule, "p-5")}>
           {!canAdd && <p className="mb-2.5 text-label text-caution">{tr.t("selectToContinue")}</p>}
           <div className="flex items-center justify-between gap-3">
-            <span className="font-serif text-title-md font-semibold">{line ? formatMoney(line.amount, currency) : "—"}</span>
+            <span className="font-serif text-title-md font-semibold">{line ? tr.money(line.amount, currency) : "—"}</span>
             <div className="flex items-center gap-3">
               {already && (
                 <button type="button" onClick={onRemove} className="text-caption font-semibold text-danger hover:underline">

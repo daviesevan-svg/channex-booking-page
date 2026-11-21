@@ -6,7 +6,6 @@ import type { Route } from "./+types/vouchers";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 
 import { getActiveVoucherProducts, soldCount } from "~/lib/vouchers.server";
 import { useBase } from "~/lib/base";
@@ -50,7 +49,7 @@ export default function Vouchers({ loaderData, params }: Route.ComponentProps) {
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
-  const money = (n: number) => formatMoney(n, currency);
+  const money = (n: number) => tr.money(n, currency);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
 
   return (

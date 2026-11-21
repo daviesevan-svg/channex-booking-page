@@ -9,10 +9,14 @@
 
 import { enGB, type Locale } from "date-fns/locale";
 
+import { format, parseISO } from "date-fns";
+
 import EN from "./locales/en";
 import { DATE_LOCALES } from "./locales/date-locales";
 import type { Dict } from "./i18n-dict";
 import { useProperty } from "./booking-context";
+import { datePatterns, formatDate, RANGE_DASH, type DateStyle } from "./locale-format";
+import { formatMoney, formatMoneyParts } from "./money";
 
 export type { Dict };
 
@@ -65,7 +69,19 @@ export interface Translator {
   t: (key: string, vars?: Record<string, string | number>) => string;
   /** Pluralized key: picks `${key}_one` / `_few` / … / `_other` (see pluralForm) and fills {n}. */
   p: (key: string, n: number, vars?: Record<string, string | number>) => string;
+  /** A price the way this language writes money ("54,00 €"). */
+  money: (amount: string | number, currency: string) => string;
+  /** The same, split around the number (for `itemprop="price"`); see formatMoneyParts. */
+  moneyParts: (amount: string | number, currency: string) => ReturnType<typeof formatMoneyParts>;
+  /** A date in one of the named shapes ("po 14. 12.", "Mon 14 Dec"). Takes a
+   *  YYYY-MM-DD / ISO string or a Date. */
+  date: (d: string | Date, style: DateStyle) => string;
+  /** A check-in – check-out range, sharing the month when both fall in it
+   *  ("Mon 14 – Wed 16 Dec", "po 14. – st 16. 12."). `year` adds the year. */
+  dateRange: (from: string | Date, to: string | Date, opts?: { year?: boolean }) => string;
 }
+
+const toDate = (d: string | Date) => (typeof d === "string" ? parseISO(d) : d);
 
 export function makeTranslator(lang: string): Translator {
   const dict = DICTS.get(lang) ?? EN;
@@ -77,7 +93,27 @@ export function makeTranslator(lang: string): Translator {
     const other = `${key}_${form === "one" ? "one" : "other"}`;
     return interpolate(dict[k] ?? dict[other] ?? EN[other] ?? key, { ...vars, n });
   };
-  return { lang, locale: DATE_LOCALES[lang] ?? enGB, t, p };
+  const locale = DATE_LOCALES[lang] ?? enGB;
+  const pat = datePatterns(lang);
+  const date = (d: string | Date, style: DateStyle) => formatDate(d, style, lang);
+  const dateRange = (from: string | Date, to: string | Date, opts?: { year?: boolean }) => {
+    const a = toDate(from);
+    const b = toDate(to);
+    const end = opts?.year ? "dayYear" : "day";
+    const sameYear = a.getFullYear() === b.getFullYear();
+    const start = sameYear && a.getMonth() === b.getMonth() ? pat.rangeStart : opts?.year && !sameYear ? pat.dayYear : pat.day;
+    return format(a, start, { locale }) + RANGE_DASH + format(b, pat[end], { locale });
+  };
+  return {
+    lang,
+    locale,
+    t,
+    p,
+    money: (amount, currency) => formatMoney(amount, currency, lang),
+    moneyParts: (amount, currency) => formatMoneyParts(amount, currency, lang),
+    date,
+    dateRange,
+  };
 }
 
 /** Localized "{n} adults[, {m} children]" label. */

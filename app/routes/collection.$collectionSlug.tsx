@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 
@@ -18,8 +18,8 @@ import {
   langFromRequest,
 } from "~/lib/content";
 import { makeTranslator } from "~/lib/i18n";
-import { truncate } from "~/lib/page-meta";
 import { formatMoney } from "~/lib/money";
+import { truncate } from "~/lib/page-meta";
 import {
   childrenAgeParam,
   type Occupancy,
@@ -133,7 +133,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
         if (cheapestRoom) {
           if (!photo) photo = cheapestRoom.photos?.[0]?.url ?? null;
           chips = (cheapestRoom.facilities ?? []).slice(0, 3);
-          fromPrice = formatMoney(cheapest, currency);
+          fromPrice = formatMoney(cheapest, currency, lang);
           fromPriceNum = cheapest;
         }
       }
@@ -409,9 +409,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
   }
 
   const datesLabel = hasDates
-    ? `${format(parseISO(checkin), "EEE d", { locale: tr.locale })} — ${format(parseISO(checkout), "EEE d MMM", {
-        locale: tr.locale,
-      })} · ${tr.p("night", nights)} · ${tr.p("adult", occ.adults)}`
+    ? `${tr.dateRange(checkin, checkout)} · ${tr.p("night", nights)} · ${tr.p("adult", occ.adults)}`
     : tr.t("selectYourDates");
 
   return (

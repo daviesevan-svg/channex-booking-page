@@ -195,7 +195,7 @@ export async function action({ params, request }: Route.ActionArgs) {
         productName: `${hotelName} — ${product.title}`,
         productDescription:
           product.kind === "gift"
-            ? `Gift voucher worth ${formatMoney(product.value ?? product.price, currency)}.`
+            ? `Gift voucher worth ${formatMoney(product.value ?? product.price, currency)}.` // guest-format-exempt: Stripe product text, English
             : product.description || "Stay package voucher.",
       }),
       reference,
@@ -272,7 +272,7 @@ export default function VoucherBuy({ loaderData, actionData, params }: Route.Com
   const [isGift, setIsGift] = useState(false);
   const [formOpen, setFormOpen] = useState(Boolean(actionData?.error));
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const money = (n: number) => formatMoney(n, currency);
+  const money = (n: number) => tr.money(n, currency);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
   const input =
     "mt-1.5 block w-full rounded-control border border-line-alt bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
