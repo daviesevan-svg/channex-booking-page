@@ -51,7 +51,7 @@ import { afterCommit, finalizeBooking } from "~/lib/booking-finalize.server";
 import { preparePendingBooking } from "~/lib/booking-create.server";
 import { reservationHotelJsonLd } from "~/lib/hotel-jsonld.server";
 import { hotelReservationScope, navStage } from "~/lib/nav-tags";
-import { formatMoney, toStripeMinor } from "~/lib/money";
+import { toStripeMinor } from "~/lib/money";
 import type { Occupancy } from "~/lib/occupancy";
 import { makeTranslator, occLabel, useT } from "~/lib/i18n";
 import { langFromRequest } from "~/lib/content";
@@ -611,13 +611,12 @@ export async function action({ params, request }: Route.ActionArgs) {
     // context, so the translator is built from the language stored on the pending
     // booking rather than from a hook.
     const tr = makeTranslator(guestLang);
-    const fmtd = (d: Date, f: string) => format(d, f, { locale: tr.locale });
     const hotelName =
       (await getOverrides(stay.channelId, guestLang)).hotelName || tr.t("yourBookingFallback");
-    const money = (n: number) => formatMoney(n, stay.currency);
+    const money = (n: number) => tr.money(n, stay.currency);
     const ci = parseISO(stay.checkin);
     const co = parseISO(stay.checkout);
-    const dateLabel = `${fmtd(ci, "EEE d MMM")} – ${fmtd(co, "EEE d MMM yyyy")}`;
+    const dateLabel = tr.dateRange(ci, co, { year: true });
     // Not occLabel(): that takes the children's ages, and by this point the lines
     // have been summed to plain counts. Same output, same plural keys.
     const guestLabel = tr.p("adult", adults) + (children ? `, ${tr.p("child", children)}` : "");
@@ -914,7 +913,6 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
-  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const [searchParams] = useSearchParams();
   const nav = useNavigation();
   const errors = actionData?.errors;
@@ -962,7 +960,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
       case "percent":
         return value ? tr.t("penaltyPercent", { n: value }) : "";
       case "fixed":
-        return value ? formatMoney(value, currency) : "";
+        return value ? tr.money(value, currency) : "";
       default:
         return "";
     }
@@ -982,7 +980,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
     (cancelMsg
       ? tr.t(
           cancelMsg.key,
-          "iso" in cancelMsg ? { date: formatCancelDeadline(cancelMsg, "EEE d MMM yyyy", tr.locale) } : undefined,
+          "iso" in cancelMsg ? { date: formatCancelDeadline(cancelMsg, "dayYear", tr.lang) } : undefined,
         )
       : "");
   // The schedule after the free window — "Until D, X is charged" for each band
@@ -997,7 +995,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           const penalty = penaltyPhrase(m.penalty, m.penaltyValue);
           if (!penalty) return "";
           return m.key === "cancelBandUntil"
-            ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", tr.locale), penalty })
+            ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "dayYear", tr.lang), penalty })
             : tr.t("afterDeadlineCharge", { penalty });
         })
         .filter(Boolean);
@@ -1020,7 +1018,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
   // window has closed but a band that still refunds part of the stay is open
   // (name the charge, don't call it non-refundable); or simply that the card is
   // charged today.
-  const amountToday = formatMoney(dueShown, currency);
+  const amountToday = tr.money(dueShown, currency);
   const partialPenalty = partialBand ? penaltyPhrase(partialBand.penalty, partialBand.penaltyValue) : "";
   const ackText = nonRefundable
     ? chargedToday
@@ -1172,17 +1170,17 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                     <span>
                       {tr.t("voucherAppliedLabel")} ({appliedVoucher.code})
                     </span>
-                    <span className="font-semibold">−{formatMoney(voucherApplied, currency)}</span>
+                    <span className="font-semibold">−{tr.money(voucherApplied, currency)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
                   <span className="text-secondary">{tr.t("dueNow")}</span>
-                  <span className="font-semibold">{formatMoney(dueShown, currency)}</span>
+                  <span className="font-semibold">{tr.money(dueShown, currency)}</span>
                 </div>
                 {atHotel > 0 && (
                   <div className="flex justify-between">
                     <span className="text-secondary">{tr.t("dueAtHotel")}</span>
-                    <span className="font-semibold">{formatMoney(atHotel, currency)}</span>
+                    <span className="font-semibold">{tr.money(atHotel, currency)}</span>
                   </div>
                 )}
               </div>
@@ -1247,7 +1245,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                   <div className="text-label text-muted-2">{l.rateTitle}</div>
                 </div>
                 <span className="whitespace-nowrap text-body font-semibold">
-                  {formatMoney(l.originalTotal, currency)}
+                  {tr.money(l.originalTotal, currency)}
                 </span>
               </div>
             ))}
@@ -1263,13 +1261,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                 also the names the JSON-LD offer already uses. */}
             <Row
               label={tr.t("checkIn")}
-              value={fmt(parseISO(stay.checkin), "EEE d MMM")}
+              value={tr.date(stay.checkin, "day")}
               itemProp="checkinTime"
               content={stay.checkin}
             />
             <Row
               label={tr.t("checkOut")}
-              value={fmt(parseISO(stay.checkout), "EEE d MMM")}
+              value={tr.date(stay.checkout, "day")}
               itemProp="checkoutTime"
               content={stay.checkout}
             />
@@ -1278,13 +1276,13 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
           </div>
           {(offer || (discount > 0 && appliedPromo)) && (
             <div className={cx("flex flex-col gap-2.5 border-b", s.rule, "py-4 text-body")}>
-              <Row label={tr.t("subtotal")} value={formatMoney(originalSubtotal, currency)} />
+              <Row label={tr.t("subtotal")} value={tr.money(originalSubtotal, currency)} />
               {offer && offer.discount > 0 && (
                 <div className="flex justify-between text-success">
                   <span>
                     {offer.name} (−{offer.value}%)
                   </span>
-                  <span className="font-semibold">−{formatMoney(offer.discount, currency)}</span>
+                  <span className="font-semibold">−{tr.money(offer.discount, currency)}</span>
                 </div>
               )}
               {discount > 0 && appliedPromo && (
@@ -1292,7 +1290,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
                   <span>
                     {tr.t("discount")} ({appliedPromo.code})
                   </span>
-                  <span className="font-semibold">−{formatMoney(discount, currency)}</span>
+                  <span className="font-semibold">−{tr.money(discount, currency)}</span>
                 </div>
               )}
             </div>
@@ -1374,7 +1372,7 @@ export default function Checkout({ loaderData, actionData, params }: Route.Compo
               )}
               {appliedVoucher && voucherApplied > 0 && (
                 <p className="mt-1.5 text-label text-success">
-                  {tr.t("voucherAppliedNote", { amount: formatMoney(voucherApplied, currency) })}
+                  {tr.t("voucherAppliedNote", { amount: tr.money(voucherApplied, currency) })}
                 </p>
               )}
             </div>

@@ -7,8 +7,6 @@ import type { Route } from "./+types/voucher";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
-import { fmtDate } from "~/lib/dates";
 
 import { lookupVoucherGuarded } from "~/lib/vouchers.server";
 import { getBooking } from "~/lib/bookings.server";
@@ -97,7 +95,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
   const { currency, hotelName } = useProperty();
   const tr = useT();
   const s = useSlots();
-  const money = (n: number) => formatMoney(n, currency);
+  const money = (n: number) => tr.money(n, currency);
   const statusLabel = tr.t(`voucherStatus_${v.status}`);
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 12px,#e7ddcc 12px,#e7ddcc 24px)";
 
@@ -119,8 +117,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
         >
           {justBooked && <div className="font-semibold">✓ {tr.t("bookingConfirmedTitle")}</div>}
           <div>
-            {booking.guestName} · {booking.roomTitle} · {fmtDate(booking.checkin, "EEE d MMM")} —{" "}
-            {fmtDate(booking.checkout, "EEE d MMM yyyy")} ·{" "}
+            {booking.guestName} · {booking.roomTitle} · {tr.dateRange(booking.checkin, booking.checkout, { year: true })} ·{" "}
             <span className="font-mono font-semibold">{booking.reference}</span>
           </div>
         </div>
@@ -185,7 +182,7 @@ export default function Voucher({ loaderData, params }: Route.ComponentProps) {
           )}
 
           <p className="mb-6 text-center text-caption text-muted">
-            {tr.t("voucherValidUntil", { date: fmtDate(v.expiresAt, "d MMM yyyy") })}
+            {tr.t("voucherValidUntil", { date: tr.date(v.expiresAt, "long") })}
           </p>
 
           <div className="flex flex-wrap justify-center gap-3">

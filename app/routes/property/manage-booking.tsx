@@ -18,9 +18,7 @@ import { langFromRequest } from "~/lib/content";
 import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
 import { cancellationBandMessages, cancellationMessage, formatCancelDeadline, penaltyText } from "~/lib/cancellation";
 import { cancelGate } from "~/lib/cancel-gate";
-import { fmtDate } from "~/lib/dates";
 import { occLabel, useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 import { basePath, useBase } from "~/lib/base";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { clientKey, rateLimit } from "~/lib/rate-limit.server";
@@ -168,7 +166,6 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
   const s = useSlots();
   const { currency } = useProperty();
   const nav = useNavigation();
-  const fmt = (d: string, f: string) => fmtDate(d, f, tr.locale);
   const cur = b.currency || currency;
   const cancelled = (b.lifecycle ?? "active") === "cancelled";
   const cancelling = nav.state === "submitting";
@@ -183,15 +180,15 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
 
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
-    ? tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", tr.locale) } : undefined)
+    ? tr.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "dayYear", tr.lang) } : undefined)
     : "";
   // A multi-step policy: the bands still ahead, then what follows the last.
   const bandLines = cancellationBandMessages(b.cancellation, Date.now())
     .map((m) => {
-      const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => formatMoney(n, cur));
+      const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => tr.money(n, cur));
       if (!penalty) return "";
       return m.key === "cancelBandUntil"
-        ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", tr.locale), penalty })
+        ? tr.t("cancelBandUntil", { date: formatCancelDeadline(m, "dayYear", tr.lang), penalty })
         : tr.t("afterDeadlineCharge", { penalty });
     })
     .filter(Boolean);
@@ -206,7 +203,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
       </Link>
 
       <h1 className="mb-1 font-serif text-display-md font-medium tracking-[-0.02em]">
-        {fmt(b.checkin, "EEE d MMM")} — {fmt(b.checkout, "EEE d MMM yyyy")}
+        {tr.dateRange(b.checkin, b.checkout, { year: true })}
       </h1>
       <div className="mb-7 flex flex-wrap items-center gap-2.5">
         <span
@@ -232,10 +229,10 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
         <section className={cx(s.panel, "p-5")}>
           <h2 className="mb-3 font-serif text-title-sm font-semibold">{tr.t("sectionBooking")}</h2>
           <Row label={tr.t("reference")} value={<span className="font-mono text-caption">{b.reference}</span>} />
-          <Row label={tr.t("checkIn")} value={fmt(b.checkin, "EEE d MMM yyyy")} />
-          <Row label={tr.t("checkOut")} value={fmt(b.checkout, "EEE d MMM yyyy")} />
+          <Row label={tr.t("checkIn")} value={tr.date(b.checkin, "dayYear")} />
+          <Row label={tr.t("checkOut")} value={tr.date(b.checkout, "dayYear")} />
           <Row label={tr.t("nights")} value={String(b.nights)} />
-          <Row label={tr.t("bookedOn")} value={fmt(b.createdAt, "d MMM yyyy, HH:mm")} />
+          <Row label={tr.t("bookedOn")} value={tr.date(b.createdAt, "dateTime")} />
         </section>
 
         <section className={cx(s.panel, "p-5")}>
@@ -266,7 +263,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
                   {r.rateTitle} · {occLabel(tr, r.adults, Array(r.children).fill(8))}
                 </div>
               </div>
-              <span className="whitespace-nowrap font-semibold">{formatMoney(r.total, cur)}</span>
+              <span className="whitespace-nowrap font-semibold">{tr.money(r.total, cur)}</span>
             </div>
           ))}
         </div>
@@ -301,7 +298,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
                       </span>
                       {x.infoLine && <div className="text-label text-muted-2">{x.infoLine}</div>}
                     </div>
-                    <span className="whitespace-nowrap font-semibold">{formatMoney(x.amount, cur)}</span>
+                    <span className="whitespace-nowrap font-semibold">{tr.money(x.amount, cur)}</span>
                   </div>
                 ))}
               </div>
@@ -313,7 +310,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             <span>
               {b.offer.name || "Offer"} (−{b.offer.value}%)
             </span>
-            <span className="font-semibold">−{formatMoney(b.offer.discount, cur)}</span>
+            <span className="font-semibold">−{tr.money(b.offer.discount, cur)}</span>
           </div>
         )}
         {b.promo && (
@@ -321,12 +318,12 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             <span>
               {tr.t("discount")} ({b.promo.code})
             </span>
-            <span className="font-semibold">−{formatMoney(b.promo.discount, cur)}</span>
+            <span className="font-semibold">−{tr.money(b.promo.discount, cur)}</span>
           </div>
         )}
         <div className={cx("mt-4 flex items-baseline justify-between border-t", s.rule, "pt-4")}>
           <span className="text-lead font-semibold">{tr.t("total")}</span>
-          <span className="font-serif text-display-sm font-semibold">{formatMoney(b.total, cur)}</span>
+          <span className="font-serif text-display-sm font-semibold">{tr.money(b.total, cur)}</span>
         </div>
       </section>
 
@@ -357,7 +354,7 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
             // so the same numbers stand above the button too.
             const question =
               partialCancel && partialCancel.charged > 0
-                ? tr.t("cancelConfirmPartial", { paid: formatMoney(partialCancel.charged, cur), refund: formatMoney(partialCancel.refund, cur) })
+                ? tr.t("cancelConfirmPartial", { paid: tr.money(partialCancel.charged, cur), refund: tr.money(partialCancel.refund, cur) })
                 : tr.t("cancelConfirm");
             if (!canCancel || !confirm(question)) e.preventDefault();
           }}
@@ -365,9 +362,9 @@ export default function ManageBooking({ loaderData, params }: Route.ComponentPro
           {canCancel && partialCancel && (
             <p className="mb-3 text-body text-secondary">
               {(() => {
-                const penalty = penaltyText(partialCancel.penalty, partialCancel.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => formatMoney(n, cur));
+                const penalty = penaltyText(partialCancel.penalty, partialCancel.penaltyValue, (k, v) => tr.t(k as never, v as never), (n) => tr.money(n, cur));
                 return partialCancel.charged > 0
-                  ? tr.t("cancelPartialNotice", { penalty, refund: formatMoney(partialCancel.refund, cur), paid: formatMoney(partialCancel.charged, cur) })
+                  ? tr.t("cancelPartialNotice", { penalty, refund: tr.money(partialCancel.refund, cur), paid: tr.money(partialCancel.charged, cur) })
                   : tr.t("cancelPartialNoticeUnpaid", { penalty });
               })()}
             </p>

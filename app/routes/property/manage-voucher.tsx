@@ -9,10 +9,8 @@ import { Form, Link, redirect, useNavigation } from "react-router";
 
 import type { Route } from "./+types/manage-voucher";
 import { pageMeta } from "~/lib/page-meta";
-import { fmtDate } from "~/lib/dates";
 import { useProperty } from "~/lib/booking-context";
 import { useT } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 import { getGuestSession, sessionCanSee } from "~/lib/guest-auth.server";
 import { resolveRequestProperty } from "~/lib/property-scope.server";
 import { getSettings } from "~/lib/overrides.server";
@@ -190,8 +188,8 @@ export default function ManageVoucher({ loaderData, actionData, params }: Route.
   const { currency } = useProperty();
   const nav = useNavigation();
   const busy = nav.state !== "idle";
-  const money = (n: number) => formatMoney(n, currency);
-  const date = (iso: string) => fmtDate(iso, "d MMM yyyy", tr.locale);
+  const money = (n: number) => tr.money(n, currency);
+  const date = (iso: string) => tr.date(iso, "long");
   const card = "rounded-panel border border-line bg-surface p-6";
   const inputCls =
     "mt-1.5 block w-full rounded-control border border-line-alt bg-surface-alt px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";

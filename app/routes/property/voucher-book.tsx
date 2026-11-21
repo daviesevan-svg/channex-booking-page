@@ -107,7 +107,6 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
   const busy = nav.state !== "idle";
   const [checkin, setCheckin] = useState<string | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
-  const { locale } = tr;
   const input =
     "mt-1.5 block w-full rounded-control border border-line-alt bg-surface px-3.5 py-2.5 text-body-lg text-ink outline-none focus:border-accent";
   const stripe = "repeating-linear-gradient(135deg,#efe7da,#efe7da 10px,#e7ddcc 10px,#e7ddcc 20px)";
@@ -156,9 +155,9 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
                       }`}
                     >
                       <span className="block text-micro font-medium uppercase opacity-80">
-                        {format(d, "EEE", { locale })}
+                        {tr.date(d, "weekday")}
                       </span>
-                      {format(d, "d MMM yyyy", { locale })}
+                      {tr.date(d, "long")}
                     </button>
                   );
                 })}
@@ -166,7 +165,7 @@ export default function VoucherBook({ loaderData, actionData, params }: Route.Co
               <p className="mt-2 text-label text-faint">{tr.t("voucherShowingNext")}</p>
               {checkin && checkoutISO && (
                 <p className="mt-2 text-caption font-semibold text-accent-deep">
-                  {format(parseISO(checkin), "EEE d MMM", { locale })} → {format(parseISO(checkoutISO), "EEE d MMM yyyy", { locale })} ·{" "}
+                  {tr.dateRange(checkin, checkoutISO, { year: true })} ·{" "}
                   {tr.p("night", nights)} · {tr.p("adult", adults)}
                   {children ? ` + ${tr.p("child", children)}` : ""}
                 </p>

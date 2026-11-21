@@ -259,7 +259,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
   const gt = makeTranslator(useAdminLang());
   const msg = cancellationMessage(b.cancellation, Date.now());
   const cancellationText = msg
-    ? gt.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "EEE d MMM yyyy", dl) } : undefined)
+    ? gt.t(msg.key, "iso" in msg ? { date: formatCancelDeadline(msg, "dayYear", gt.lang) } : undefined)
     : "";
   // A multi-step policy: the bands still ahead, then what follows the last.
   const bandLines = cancellationBandMessages(b.cancellation, Date.now())
@@ -267,7 +267,7 @@ export default function AdminBooking({ loaderData, actionData }: Route.Component
       const penalty = penaltyText(m.penalty, m.penaltyValue, (k, v) => gt.t(k as never, v as never), (n) => formatMoney(n, b.currency));
       if (!penalty) return "";
       return m.key === "cancelBandUntil"
-        ? gt.t("cancelBandUntil", { date: formatCancelDeadline(m, "EEE d MMM yyyy", dl), penalty })
+        ? gt.t("cancelBandUntil", { date: formatCancelDeadline(m, "dayYear", gt.lang), penalty })
         : gt.t("afterDeadlineCharge", { penalty });
     })
     .filter(Boolean);

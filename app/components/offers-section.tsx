@@ -17,9 +17,7 @@ import { Diamond, SectionH2, sectionHeading } from "~/components/sections";
 import { RichText } from "~/components/rich-text";
 import { useBase } from "~/lib/base";
 import { useProperty } from "~/lib/booking-context";
-import { fmtDate } from "~/lib/dates";
 import type { Translator } from "~/lib/i18n";
-import { formatMoney } from "~/lib/money";
 import type { OfferView } from "~/lib/promotions";
 import { numberSetting, type SiteSection } from "~/lib/sections";
 import { useSlots } from "~/components/site-style";
@@ -28,7 +26,7 @@ import { cx } from "~/lib/site-style";
 /** Dates read as "4 Oct 2026" — the year is not optional here. Half of these are
  *  months out, and "4 Oct" on a December stay window is ambiguous by one year. */
 export function offerDate(iso: string, tr: Translator): string {
-  return fmtDate(iso, "d MMM yyyy", tr.locale);
+  return tr.date(iso, "long");
 }
 
 /** The saving, as the badge states it — or, for a value-add, how much is in it.
@@ -39,7 +37,7 @@ export function offerHeadline(offer: OfferView, tr: Translator, currency: string
   }
   return offer.type === "percent"
     ? tr.t("offerPercentOff", { value: offer.value })
-    : tr.t("offerAmountOff", { amount: formatMoney(offer.value, currency) });
+    : tr.t("offerAmountOff", { amount: tr.money(offer.value, currency) });
 }
 
 /** Weekday numbers as a list in the guest's language, Monday first. Names come
@@ -49,14 +47,14 @@ export function weekdayNames(days: number[], tr: Translator): string {
   const order = [1, 2, 3, 4, 5, 6, 0];
   return order
     .filter((d) => days.includes(d))
-    .map((d) => fmtDate(`2024-01-0${d === 0 ? 7 : d}`, "EEEE", tr.locale))
+    .map((d) => tr.date(`2024-01-0${d === 0 ? 7 : d}`, "weekdayLong"))
     .join(", ");
 }
 
 /** Short weekday names ("Mo / Fr", "Po / Pá") in the guest's language, in the
  *  order given — the voucher check-in days. */
 export function weekdayShortNames(days: readonly number[], tr: Translator, sep = " / "): string {
-  return days.map((d) => fmtDate(`2024-01-0${d === 0 ? 7 : d}`, "EEE", tr.locale)).join(sep);
+  return days.map((d) => tr.date(`2024-01-0${d === 0 ? 7 : d}`, "weekday")).join(sep);
 }
 
 /**

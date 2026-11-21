@@ -217,7 +217,7 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     : cancel.refundable
       ? cancel.cancelByISO
         ? // The hotel's wall clock, not the server's UTC — same reason as the email.
-          `Free cancellation until ${formatCancelDeadline({ iso: cancel.cancelByISO, local: cancel.cancelByLocal }, "d MMM yyyy")}`
+          `Free cancellation until ${formatCancelDeadline({ iso: cancel.cancelByISO, local: cancel.cancelByLocal }, "long")}`
         : "Free cancellation"
       : "Non-refundable";
   if (cancelLine) {
@@ -232,7 +232,7 @@ export async function renderBookingPdf(input: BookingPdfInput): Promise<Uint8Arr
     const penalty = m.penalty === "fixed" && m.penaltyValue ? money(m.penaltyValue) : describePenalty(m.penalty, m.penaltyValue);
     const line =
       m.key === "cancelBandUntil"
-        ? `Until ${formatCancelDeadline({ iso: m.iso, local: m.local }, "d MMM yyyy")}, ${penalty} is charged if you cancel.`
+        ? `Until ${formatCancelDeadline({ iso: m.iso, local: m.local }, "long")}, ${penalty} is charged if you cancel.`
         : `After that, ${penalty} is charged if you cancel.`;
     ensure(15);
     text(line, { size: 9.5, color: MUTED });

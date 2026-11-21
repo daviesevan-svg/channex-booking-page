@@ -1,11 +1,10 @@
-import { differenceInCalendarDays, format, parseISO } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Link } from "react-router";
 
 import type { Route } from "./+types/confirmation";
 import { pageMeta } from "~/lib/page-meta";
 import { useProperty } from "~/lib/booking-context";
 import { cartCoverage, parseCart, type ResolvedLine } from "~/lib/cart";
-import { formatMoney } from "~/lib/money";
 import { langFromRequest } from "~/lib/content";
 import { occLabel, useT } from "~/lib/i18n";
 import { readOccupancy } from "~/lib/occupancy";
@@ -196,10 +195,9 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
       </main>
     );
   }
-  const fmt = (d: Date, f: string) => format(d, f, { locale: tr.locale });
   const datesStr =
     checkin && checkout
-      ? `${fmt(parseISO(checkin), "EEE d")} — ${fmt(parseISO(checkout), "EEE d MMM")} · ${tr.p(
+      ? `${tr.dateRange(checkin, checkout)} · ${tr.p(
           "night",
           nights,
         )}`
@@ -300,7 +298,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
               <span>
                 {offer.name} (−{offer.percent}%)
               </span>
-              <span className="font-semibold">−{formatMoney(offer.discount, currency)}</span>
+              <span className="font-semibold">−{tr.money(offer.discount, currency)}</span>
             </div>
           )}
           {total > 0 && discount > 0 && promoCode && (
@@ -308,7 +306,7 @@ export default function Confirmation({ loaderData, params }: Route.ComponentProp
               <span>
                 {tr.t("discount")} ({promoCode})
               </span>
-              <span className="font-semibold">−{formatMoney(discount, currency)}</span>
+              <span className="font-semibold">−{tr.money(discount, currency)}</span>
             </div>
           )}
           {/* Same component and section order as checkout — the guest sees the
