@@ -643,7 +643,10 @@ export async function action({ params, request }: Route.ActionArgs) {
       try {
         const orderCode = await createVivaOrder(gateway.viva, {
           amountMinor: toVivaMinor(dueAfterVoucher),
-          customerTrns: `${hotelName} — ${roomName} · ${stayLine}. ${balanceNote}`,
+          // Kept short on purpose: Viva passes it to MB WAY, which refuses
+          // 70+ characters (createVivaOrder strips it to letters/digits too).
+          // The amount and balance show on Viva's page and in our email.
+          customerTrns: `${hotelName} ${roomName} ${dateLabel}`,
           merchantTrns: reference,
           email: g.email,
           fullName: `${g.firstName} ${g.lastName}`,
