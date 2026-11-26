@@ -10,6 +10,7 @@
 // signature — the API lookup IS the authentication).
 
 import { OUTBOUND_FETCH_TIMEOUT_MS } from "./io-timeout";
+import { vivaDescription } from "./viva-description";
 
 export class VivaError extends Error {
   constructor(
@@ -171,8 +172,10 @@ export interface VivaOrderSpec {
 function orderRequestBody(v: VivaConfig, spec: VivaOrderSpec): string {
   return JSON.stringify({
     amount: spec.amountMinor,
-    customerTrns: spec.customerTrns,
-    merchantTrns: spec.merchantTrns,
+    // Local schemes (MB WAY via SIBS) reject long or non-alphanumeric
+    // descriptions — see viva-description.ts.
+    customerTrns: vivaDescription(spec.customerTrns),
+    merchantTrns: vivaDescription(spec.merchantTrns),
     sourceCode: v.sourceCode,
     paymentTimeout: spec.timeoutSeconds ?? 3600,
     // ISV orders carry the partner's cut, counted INSIDE amount (the merchant
